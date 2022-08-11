@@ -1,14 +1,9 @@
-#pragma once
-
-#include <string>
+#include "trace_segment.h"
 
 namespace datadog {
 namespace tracing {
 
-struct Error {
-  int code;
-  std::string message;
-};
+// TODO
 
 }  // namespace tracing
 }  // namespace datadog

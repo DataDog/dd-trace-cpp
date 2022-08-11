@@ -4,7 +4,7 @@ namespace datadog {
 namespace tracing {
 
 struct CollectorConfig {
-    // TODO
+  // TODO
 };
 
 }  // namespace tracing

@@ -14,6 +14,11 @@
 
 component=$1
 
+if [ "$component" = "" ]; then
+    >&2 echo 'usage: bin/create-component COMPONENT_NAME'
+    exit 1
+fi
+
 bin_dir=$(dirname "$0")
 cd "$bin_dir"/..
 

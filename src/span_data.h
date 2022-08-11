@@ -4,7 +4,7 @@ namespace datadog {
 namespace tracing {
 
 struct SpanData {
-    // TODO
+  // TODO
 };
 
 }  // namespace tracing

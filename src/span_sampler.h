@@ -6,7 +6,7 @@ namespace datadog {
 namespace tracing {
 
 class SpanSampler {
-    // TODO
+  // TODO
 };
 
 }  // namespace tracing
