@@ -2,7 +2,7 @@
 - Which unit testing framework?
     - Catch2
     - Google Test
-- Which integration testing framework?
+- Integration tests?
 - Error handling options:
     - `std::variant<T, Error>`
     - homebrew a `std::expected<T>`
@@ -26,3 +26,4 @@
     - `enum Color { red, green, blue };`
 - Can tracing be reconfigured at runtime?
 - Are rate limits per-tracer, per-process, or other?
+- Which clang-format version and configuration do we use?
