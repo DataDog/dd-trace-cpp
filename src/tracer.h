@@ -25,7 +25,7 @@ class Tracer {
   explicit Tracer(const TracerConfig& config);
   Tracer(const TracerConfig& config, const IDGenerator& generator, const Clock& clock);
 
-  std::variant<Span, Error> create_span(const SpanConfig& config);
+  Span create_span(const SpanConfig& config);
   // ...
 
   std::variant<Span, Error> extract_span(const DictReader& reader);
