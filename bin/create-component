@@ -12,17 +12,18 @@
 #     include/datadog/foo_bar.h  ->  ../../src/foo_bar.h
 #
 
-component=$1
+create_component() {
+    component=$1
 
-if [ "$component" = "" ]; then
-    >&2 echo 'usage: bin/create-component COMPONENT_NAME'
-    exit 1
-fi
+    if [ "$component" = "" ]; then
+        >&2 echo 'usage: bin/create-component COMPONENT_NAME'
+        exit 1
+    fi
 
-bin_dir=$(dirname "$0")
-cd "$bin_dir"/..
+    bin_dir=$(dirname "$0")
+    cd "$bin_dir"/..
 
->"src/$component.h" cat <<END_HEADER
+    >"src/$component.h" cat <<END_HEADER
 #pragma once
 
 namespace datadog {
@@ -45,5 +46,10 @@ namespace tracing {
 }  // namespace tracing
 }  // namespace datadog
 END_SOURCE
+}
+
+for arg in "$@"; do
+    create_component "$arg"
+done
 
 "$bin_dir"/update-includes

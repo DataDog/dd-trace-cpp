@@ -24,6 +24,7 @@
     - `int private_member_;`
     - `int public_member;`
     - `enum Color { red, green, blue };`
+    - `which_one<TraceId, TraceID>`
 - Can tracing be reconfigured at runtime?
 - Are rate limits per-tracer, per-process, or other?
 - Which clang-format version and configuration do we use?

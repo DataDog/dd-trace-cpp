@@ -1,11 +1,9 @@
-#pragma once
+#include "clock.h"
 
 namespace datadog {
 namespace tracing {
 
-struct SpanConfig {
-  // TODO: This will be similar to `SpanData`.
-};
+// TODO
 
 }  // namespace tracing
 }  // namespace datadog
