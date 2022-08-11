@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# This script makes sure that "include/datadog" is a directory whose contents
+# are symbolic links to all header files in "src/".
+
+bin_dir=$(dirname "$0")
+repo="$bin_dir"/..
+cd "$repo"
+
+rm -rf include/datadog
+mkdir include/datadog
+cd include/datadog
+find ../../src -type f -name '*.h' | xargs ln -s -t .
