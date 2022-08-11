@@ -1,4 +1,7 @@
 - Which version of C++ do we require?
+- Which build systems do we support?
+    - CMake
+    - Bazel
 - Which unit testing framework?
     - Catch2
     - Google Test
@@ -26,5 +29,6 @@
     - `enum Color { red, green, blue };`
     - `which_one<TraceId, TraceID>`
 - Can tracing be reconfigured at runtime?
+- Can multiple tracers share a collector?
 - Are rate limits per-tracer, per-process, or other?
 - Which clang-format version and configuration do we use?

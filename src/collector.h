@@ -18,7 +18,7 @@ class Collector {
  public:
   virtual std::optional<Error> send(
       std::vector<SpanData>&& spans,
-      std::function<void(const CollectorResponse&)>) = 0;
+      const std::function<void(const CollectorResponse&)>& callback) = 0;
 };
 
 }  // namespace tracing

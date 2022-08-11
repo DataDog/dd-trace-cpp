@@ -33,6 +33,8 @@ class TraceSegment {
 
   void register_span(std::unique_ptr<SpanData> span);
   void span_finished();
+
+  // TODO: sampling-related stuff
 };
 
 }  // namespace tracing

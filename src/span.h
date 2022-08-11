@@ -23,7 +23,9 @@ class Span {
   Clock clock_;
 
  public:
-  Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment, const std::function<std::uint64_t()>& generate_span_id, const Clock& clock);
+  Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
+       const std::function<std::uint64_t()>& generate_span_id,
+       const Clock& clock);
 
   void finish();
 

@@ -6,7 +6,7 @@ namespace datadog {
 namespace tracing {
 
 struct TimePoint {
-    // TODO
+  // TODO
 };
 
 using Clock = std::function<TimePoint()>;
