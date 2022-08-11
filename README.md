@@ -1,3 +1,13 @@
+Component Relationships
+-----------------------
+- Vertices are components.
+- Edges are ownership relationships between components.  Each edge is labeled
+  by the kind of "smart pointer" that could implement that kind of
+  relationship.
+- Components containing a padlock are protected by a mutex.
+
+![diagram](ownership.svg)
+
 Example Usage
 -------------
 ```C++
