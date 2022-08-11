@@ -1,8 +1,11 @@
-#include "trace_sampler_config.h"
+#pragma once
+
 namespace datadog {
 namespace tracing {
 
-// TODO
+struct SpanData {
+    // TODO
+};
 
 }  // namespace tracing
 }  // namespace datadog

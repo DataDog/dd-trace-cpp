@@ -1,7 +1,4 @@
-July 20, 2022
--------------
-Questions:
-
+- Which version of C++ do we require?
 - Which unit testing framework?
     - Catch2
     - Google Test
@@ -19,10 +16,13 @@ Questions:
 - Do we keep using cURL for the default `Collector`?
     - In-tree C++ library instead?
 - Naming conventions:
-    - `class TypeName`
-    - `.member_function()`
-    - `free_function()`
-    - `f(int func_arg)`
-    - `int local_var`
-- How is tracing configured?
+    - `class TypeName;`
+    - `.member_function();`
+    - `free_function();`
+    - `f(int func_arg);`
+    - `int local_var;`
+    - `int private_member_;`
+    - `int public_member;`
+    - `enum Color { red, green, blue };`
 - Can tracing be reconfigured at runtime?
+- Are rate limits per-tracer, per-process, or other?

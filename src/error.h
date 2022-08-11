@@ -1,8 +1,14 @@
-#include "trace_sampler_config.h"
+#pragma once
+
+#include <string>
+
 namespace datadog {
 namespace tracing {
 
-// TODO
+struct Error {
+    int code;
+    std::string message;
+};
 
 }  // namespace tracing
 }  // namespace datadog

@@ -15,8 +15,6 @@ namespace tracing {
 
 class Collector;
 class Logger;
-class TraceSampler;
-class SpanSampler;
 
 struct TracerConfig {
     struct {
@@ -30,8 +28,8 @@ struct TracerConfig {
     } spans;
 
     std::variant<CollectorConfig, std::shared_ptr<Collector>> collector;
-    std::variant<TraceSamplerConfig, std::shared_ptr<TraceSampler>> trace_sampler;
-    std::variant<SpanSamplerConfig, std::shared_ptr<SpanSampler>> span_sampler;
+    TraceSamplerConfig trace_sampler;
+    SpanSamplerConfig span_sampler;
     std::shared_ptr<Logger> logger;
 
     PropagationStyles injection_styles;
