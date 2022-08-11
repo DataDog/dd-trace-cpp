@@ -10,6 +10,8 @@ Component Relationships
 
 Example Usage
 -------------
+TODO: The following is old.
+
 ```C++
 
 #include <datadog/tracing.h>
