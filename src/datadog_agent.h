@@ -1,0 +1,17 @@
+#pragma once
+
+#include "collector.h"
+
+namespace datadog {
+namespace tracing {
+
+class DatadogAgent : public Collector {
+  // TODO
+ public:
+  virtual std::optional<Error> send(
+      std::vector<SpanData>&& spans,
+      const std::function<void(const CollectorResponse&)>& callback) override;
+};
+
+}  // namespace tracing
+}  // namespace datadog

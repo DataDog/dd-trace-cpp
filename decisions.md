@@ -12,6 +12,7 @@
     - `throw Error(...)`
     - `RCode do_thing(T& output)`
     - `struct Result { Error error; T value; }`
+- Is a `Span` RAII with respect to start/finish?
 - When we begin calculating trace metrics within the tracer, we'll need to hit
   a `/stats` HTTP endpoint.
     - Does it live on the same thread as the `Collector`?
@@ -32,3 +33,4 @@
 - Can multiple tracers share a collector?
 - Are rate limits per-tracer, per-process, or other?
 - Which clang-format version and configuration do we use?
+- Do we separate "public" and "private" APIs, or do we export all headers?
