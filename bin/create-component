@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# Create a .h/.cpp pair of boilerplate under src/ for a specified component,
+# e.g.
+#
+#     $ bin/create-component foo_bar
+#
+# creates
+#
+#     src/foo_bar.h
+#     src/foo_bar.cpp
+#     include/datadog/foo_bar.h  ->  ../../src/foo_bar.h
+#
+
+component=$1
+
+bin_dir=$(dirname "$0")
+cd "$bin_dir"/..
+
+>"src/$component.h" cat <<END_HEADER
+#pragma once
+
+namespace datadog {
+namespace tracing {
+
+// TODO
+
+}  // namespace tracing
+}  // namespace datadog
+END_HEADER
+
+>"src/$component.cpp" cat <<END_SOURCE
+#include "$component.h"
+
+namespace datadog {
+namespace tracing {
+
+// TODO
+
+}  // namespace tracing
+}  // namespace datadog
+END_SOURCE
+
+"$bin_dir"/update-includes

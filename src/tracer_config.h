@@ -1,6 +1,9 @@
 #pragma once
 
 #include "propagation_styles.h"
+#include "collector_config.h"
+#include "span_sampler_config.h"
+#include "trace_sampler_config.h"
 
 #include <memory>
 #include <optional>
@@ -11,13 +14,9 @@ namespace datadog {
 namespace tracing {
 
 class Collector;
-class SpanSampler;
-class TraceSampler;
 class Logger;
-
-struct CollectorConfig {};  // TODO: elsewhere
-struct SpanSamplerConfig {};  // TODO: elsewhere
-struct TraceSamplerConfig {};  // TODO: elsewhere
+class TraceSampler;
+class SpanSampler;
 
 struct TracerConfig {
     struct {
