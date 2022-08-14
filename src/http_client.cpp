@@ -1,11 +1,9 @@
-#pragma once
+#include "http_client.h"
 
 namespace datadog {
 namespace tracing {
 
-struct CollectorConfig {
-  // TODO
-};
+// TODO
 
 }  // namespace tracing
 }  // namespace datadog

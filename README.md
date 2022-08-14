@@ -25,7 +25,7 @@ auto span = tracer.create_span({/*options*/});
 ### Extract a span from somewhere
 ```c++
 auto result = tracer.extract_span(source, {/*options*/});
-if (Error *error = result.get_if<Error>()) {
+if (Error *error = get_if<Error>(result)) {
   // handle error
 }
 auto span = result.get<Span>();

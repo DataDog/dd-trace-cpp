@@ -7,4 +7,6 @@ int main() {
     dd::TracerConfig config;
     config.spans.service = "foosvc";
     std::cout << "config.spans.service: " << config.spans.service << '\n';
+    
+    std::get<dd::DatadogAgentConfig>(config.collector).http_client = nullptr;
 }
