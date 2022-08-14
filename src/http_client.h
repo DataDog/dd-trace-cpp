@@ -22,10 +22,10 @@ class HTTPClient {
   using ErrorHandler = std::function<void(Error)>;
 
   virtual std::optional<Error> send_request(std::string_view URL,
-                                            HeadersSetter setHeaders,
+                                            HeadersSetter set_headers,
                                             std::string body,
-                                            ResponseHandler onResponse,
-                                            ErrorHandler onError) = 0;
+                                            ResponseHandler on_response,
+                                            ErrorHandler on_error) = 0;
 
   virtual ~HTTPClient();
 };
