@@ -8,6 +8,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_curl_and_event_scheduler();
 void play_with_event_scheduler();
 void play_with_curl();
 
@@ -18,8 +19,11 @@ int main() {
 
   std::get<dd::DatadogAgentConfig>(config.collector).http_client = nullptr;
 
-  play_with_curl();
-  std::cout << "Done playing with Curl." << std::endl;
+  play_with_curl_and_event_scheduler();
+  std::cout << "Done playing with Curl and event scheduler.\n";
+
+  // play_with_curl();
+  // std::cout << "Done playing with Curl." << std::endl;
 
   // play_with_event_scheduler();
   // std::cout << "Done playing with event scheduler.\n";
@@ -80,4 +84,50 @@ void play_with_curl() {
   }
 
   std::cin.get();
+}
+
+void play_with_curl_and_event_scheduler() {
+  // Send a request every two seconds.
+  // When the user enters input, cancel the event and shut down.
+
+  dd::ThreadedEventScheduler scheduler;
+  dd::Curl client;
+
+  const auto cancel =
+      scheduler.schedule_recurring_event(std::chrono::seconds(2), [&client]() {
+        dd::HTTPClient::URL url;
+        url.scheme = "http";
+        url.authority = "localhost";
+        url.path = "/post";
+
+        const auto set_headers = [](dd::DictWriter& headers) {
+          headers.set("Content-Type", "text");
+        };
+        const std::string body = "Hello, world!";
+        const auto on_response = [](int status, const dd::DictReader& headers,
+                                    std::stringstream& body) {
+          std::cout << "Got response status " << status << '\n';
+          headers.visit([](std::string_view key, std::string_view value) {
+            std::cout << "Got response header " << key << " = " << value
+                      << '\n';
+          });
+          std::cout << "Got response body: " << body.rdbuf() << std::endl;
+        };
+        const auto on_error = [](dd::Error error) {
+          std::cout << "Got error code " << error.code << ": " << error.message
+                    << std::endl;
+        };
+
+        const auto error =
+            client.post(url, set_headers, body, on_response, on_error);
+        if (error) {
+          std::cout << "Curl returned error " << error->code << ": "
+                    << error->message << std::endl;
+        }
+      });
+
+  std::cin.get();
+  std::cout << "()()()() cancelling..." << std::endl;
+  cancel();
+  std::cout << "()()()() shutting down..." << std::endl;
 }
