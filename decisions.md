@@ -1,4 +1,7 @@
 - Which version of C++ do we require?
+- Which C core libraries do we produce binaries for?
+    - glibc
+    - musl
 - Which build systems do we support?
     - CMake
     - Bazel
