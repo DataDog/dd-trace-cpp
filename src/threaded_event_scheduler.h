@@ -52,7 +52,7 @@ class ThreadedEventScheduler : public EventScheduler {
   ThreadedEventScheduler();
   ~ThreadedEventScheduler();
 
-  virtual std::variant<Cancel, Error> schedule_recurring_event(
+  virtual Cancel schedule_recurring_event(
       std::chrono::steady_clock::duration interval,
       std::function<void()> callback) override;
 };

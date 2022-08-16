@@ -27,8 +27,7 @@ ThreadedEventScheduler::~ThreadedEventScheduler() {
   dispatcher_.join();
 }
 
-std::variant<EventScheduler::Cancel, Error>
-ThreadedEventScheduler::schedule_recurring_event(
+EventScheduler::Cancel ThreadedEventScheduler::schedule_recurring_event(
     std::chrono::steady_clock::duration interval,
     std::function<void()> callback) {
   const auto now = std::chrono::steady_clock::now();
@@ -41,7 +40,7 @@ ThreadedEventScheduler::schedule_recurring_event(
   }
 
   // Return a cancellation function.
-  return EventScheduler::Cancel([this, config = std::move(config)]() mutable {
+  return [this, config = std::move(config)]() mutable {
     if (!config) {
       return;
     }
@@ -52,7 +51,7 @@ ThreadedEventScheduler::schedule_recurring_event(
       return !running_current_ || current_.config != config;
     });
     config.reset();
-  });
+  };
 }
 
 void ThreadedEventScheduler::run() {
