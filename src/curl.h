@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
-#include <iostream>  // TODO: no
 #include <iterator>
 #include <list>
 #include <memory>
@@ -20,22 +19,8 @@
 #include "dict_writer.h"
 #include "http_client.h"
 
-// TODO: no
-// CHECK curl_multi_add_handle(multi_handle_, handle);
-// Checker(__LINE__) = curl_multi_add_handle(multi_handle_, handle);
-struct Checker {
-  int line;
-  Checker(int line) : line(line) {}
-
-  void operator=(int code) {
-    if (code != CURLE_OK) {
-      std::cout << "Curl error on line " << line << ": " << code << std::endl;
-    }
-  }
-};
-
-#define CHECK Checker(__LINE__) =
-// end TODO
+// TODO: Everywhere you see CHECK, I need to add error handling.
+#define CHECK
 
 namespace datadog {
 namespace tracing {
@@ -168,20 +153,15 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
   // TODO: Error handling
   std::list<CURL *> node;
   node.push_back(handle);
-  std::cout << "[[ 1 ]]" << std::endl;
   std::lock_guard<std::mutex> lock(mutex_);
-  std::cout << "[[ 2 ]]" << std::endl;
   new_handles_.splice(new_handles_.end(), node);
-  std::cout << "[[ 3 ]]" << std::endl;
   CHECK curl_multi_wakeup(multi_handle_);
-  std::cout << "[[ 4 ]]" << std::endl;
 
   return std::nullopt;
 }
 
 inline std::size_t Curl::on_read_header(char *data, std::size_t,
                                         std::size_t length, void *user_data) {
-  std::cout << "<< on_read_header >>" << std::endl;
   const auto request = static_cast<Request *>(user_data);
   // The idea is:
   //
@@ -212,9 +192,6 @@ inline std::size_t Curl::on_read_header(char *data, std::size_t,
   std::transform(key.begin(), key.end(), std::back_inserter(key_lower),
                  &to_lower);
 
-  std::cout << "<< Parsed header >>  key_lower=" << key_lower
-            << "  value=" << value << std::endl;
-
   request->response_headers_lower.emplace(std::move(key_lower), value);
   return length;
 }
@@ -236,17 +213,10 @@ inline std::string_view Curl::trim(std::string_view source) {
 
 inline std::size_t Curl::on_read_body(char *data, std::size_t,
                                       std::size_t length, void *user_data) {
-  std::cout << "<< on_read_body >>  length=" << length << std::endl;
   const auto request = static_cast<Request *>(user_data);
-  if (!request->response_body) {
-    std::cout << "<< on_ready_body response_body in bad state >>" << std::endl;
-  }
   if (!request->response_body.write(data, length)) {
-    std::cout << "<< on_read_body failed >>  " << std::string_view(data, length)
-              << std::endl;
     return -1;  // Any value other than `length` will do.
   }
-  std::cout << "<< on_read_body succeeded >>" << std::endl;
   return length;
 }
 
@@ -254,38 +224,27 @@ inline void Curl::run() {
   int num_running_handles;
   int num_messages_remaining;
   CURLMsg *message;
-  std::cout << "<< 1 >>" << std::endl;
   std::unique_lock<std::mutex> lock(mutex_);
-  std::cout << "<< 2 >>" << std::endl;
 
   for (;;) {
-    std::cout << "----------\n<< 3 >>" << std::endl;
     CHECK curl_multi_perform(multi_handle_, &num_running_handles);
-    std::cout << "<< 4 >>  num_running_handles: " << num_running_handles
-              << std::endl;
 
     while ((message =
                 curl_multi_info_read(multi_handle_, &num_messages_remaining))) {
-      std::cout << "<< 5 >>  num_messages_remaining: " << num_messages_remaining
-                << std::endl;
       if (message->msg != CURLMSG_DONE) {
-        std::cout << "<< 6 >>" << std::endl;
         continue;
       }
-      std::cout << "<< 7 >>" << std::endl;
+
       auto *const request_handle = message->easy_handle;
       char *user_data;
       // TODO: error handling
       CHECK curl_easy_getinfo(request_handle, CURLINFO_PRIVATE, &user_data);
-      std::cout << "<< 8 >>" << std::endl;
       auto &request = *reinterpret_cast<Request *>(user_data);
 
       // `request` is done.  If we got a response, then call the response
       // handler.  If an error occurred, then call the error handler.
       const auto result = message->data.result;
-      std::cout << "<< 9 >>" << std::endl;
       if (result != CURLE_OK) {
-        std::cout << "<< 10 >>" << std::endl;
         std::string error_message;
         error_message += "Error sending request with libcurl (";
         error_message += curl_easy_strerror(result);
@@ -293,74 +252,52 @@ inline void Curl::run() {
         error_message += request.error_buffer;
         request.on_error(Error{1337 /* TODO */, std::move(error_message)});
       } else {
-        std::cout << "<< 11 >>" << std::endl;
         long status;
         // TODO: error handling
         CHECK curl_easy_getinfo(request_handle, CURLINFO_RESPONSE_CODE,
                                 &status);
         HeaderReader reader(&request.response_headers_lower);
-        std::cout << "<< 12 >>" << std::endl;
         request.on_response(static_cast<int>(status), reader,
                             request.response_body);
-        std::cout << "<< 13 >>" << std::endl;
       }
 
-      std::cout << "<< 14 >>" << std::endl;
       delete &request;
-      std::cout << "<< 15 >>" << std::endl;
       CHECK curl_multi_remove_handle(multi_handle_, request_handle);
-      std::cout << "<< 16 >>" << std::endl;
       curl_easy_cleanup(request_handle);
-      std::cout << "<< 17 >>" << std::endl;
       request_handles_.erase(request_handle);
-      std::cout << "<< 18 >>" << std::endl;
     }
 
     const int max_wait_milliseconds = 10 * 1000;
-    std::cout << "<< 19 >>" << std::endl;
     lock.unlock();
-    std::cout << "<< 20 >>" << std::endl;
     CHECK curl_multi_poll(multi_handle_, nullptr, 0, max_wait_milliseconds,
                           nullptr);
-    std::cout << "<< 21 >>" << std::endl;
     lock.lock();
-    std::cout << "<< 22 >>" << std::endl;
 
     // New requests might have been added while we were sleeping.
     for (; !new_handles_.empty(); new_handles_.pop_front()) {
-      std::cout << "<< 22B >>  " << new_handles_.size() << std::endl;
       CURL *const handle = new_handles_.front();
       CHECK curl_multi_add_handle(multi_handle_, handle);
       request_handles_.insert(handle);
     }
 
     if (shutting_down_) {
-      std::cout << "<< 23 >>" << std::endl;
       break;
     }
-    std::cout << "<< 24 >>" << std::endl;
   }
 
-  std::cout << "<< 25 >>" << std::endl;
   // We're shutting down.  Clean up any remaining request handles.
   for (const auto &handle : request_handles_) {
-    std::cout << "<< 26 >>" << std::endl;
     char *user_data;
     // TODO: error handling
     CHECK curl_easy_getinfo(handle, CURLINFO_PRIVATE, &user_data);
-    std::cout << "<< 27 >>" << std::endl;
     delete reinterpret_cast<Request *>(user_data);
 
-    std::cout << "<< 28 >>" << std::endl;
     CHECK curl_multi_remove_handle(multi_handle_, handle);
   }
-  std::cout << "<< 29 >>" << std::endl;
+
   request_handles_.clear();
-  std::cout << "<< 30 >>" << std::endl;
   CHECK curl_multi_cleanup(multi_handle_);
-  std::cout << "<< 31 >>" << std::endl;
   curl_global_cleanup();
-  std::cout << "<< 32 >>" << std::endl;
 }
 
 inline Curl::Request::~Request() { curl_slist_free_all(request_headers); }
