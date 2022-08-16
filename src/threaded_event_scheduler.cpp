@@ -51,14 +51,9 @@ ThreadedEventScheduler::schedule_recurring_event(
 
 void ThreadedEventScheduler::run() {
   ScheduledRun current;
+  std::unique_lock<std::mutex> lock(mutex_);
 
   for (;;) {
-    std::unique_lock<std::mutex> lock(mutex_);
-
-    if (shutting_down_) {
-      return;
-    }
-
     if (upcoming_.empty()) {
       // Nothing to do.  Wait until either of
       // `schedule_recurring_event` or the destructor pokes us.
@@ -100,6 +95,7 @@ void ThreadedEventScheduler::run() {
         ScheduledRun{current.when + current.config->interval, current.config});
     lock.unlock();
     current.config->callback();
+    lock.lock();
   }
 }
 

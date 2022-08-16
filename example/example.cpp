@@ -23,17 +23,25 @@ int main() {
 void play_with_event_scheduler() {
     dd::ThreadedEventScheduler scheduler;
 
-    const auto result = scheduler.schedule_recurring_event(std::chrono::seconds(3), []() {
+    const auto result1 = scheduler.schedule_recurring_event(std::chrono::seconds(3), []() {
         std::cout << "Here is your recurring event." << std::endl;
     });
-    if (const auto *const error = std::get_if<dd::Error>(&result)) {
+    if (const auto *const error = std::get_if<dd::Error>(&result1)) {
         std::cerr << "Bad thing: " << error->message << '\n';
+        return;
+    }
+
+    const auto result2 = scheduler.schedule_recurring_event(std::chrono::milliseconds(500), []() {
+        std::cout << "Beep!" << std::endl;
+    });
+    if (const auto *const error = std::get_if<dd::Error>(&result2)) {
+        std::cerr << "Also bad thing: " << error->message << '\n';
         return;
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
     std::cout << "Cancelling\n";
-    std::get<dd::ThreadedEventScheduler::Cancel>(result)();
+    std::get<dd::ThreadedEventScheduler::Cancel>(result1)();
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
     std::cout << "Shutting down\n";
