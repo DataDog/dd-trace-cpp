@@ -15,6 +15,8 @@ class EventScheduler {
   virtual Cancel schedule_recurring_event(
       std::chrono::steady_clock::duration interval,
       std::function<void()> callback) = 0;
+
+  virtual ~EventScheduler() = default;
 };
 
 }  // namespace tracing

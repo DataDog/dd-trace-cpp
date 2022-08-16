@@ -26,7 +26,7 @@ class HTTPClient {
                                     ResponseHandler on_response,
                                     ErrorHandler on_error) = 0;
 
-  virtual ~HTTPClient();
+  virtual ~HTTPClient() = default;
 };
 
 }  // namespace tracing
