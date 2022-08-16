@@ -22,7 +22,7 @@ ThreadedEventScheduler::~ThreadedEventScheduler() {
   {
     std::lock_guard guard(mutex_);
     shutting_down_ = true;
-    condition_.notify_one();
+    schedule_or_shutdown_.notify_one();
   }
   dispatcher_.join();
 }
@@ -37,43 +37,48 @@ ThreadedEventScheduler::schedule_recurring_event(
   {
     std::lock_guard<std::mutex> guard(mutex_);
     upcoming_.push(ScheduledRun{now + interval, config});
-    condition_.notify_one();
+    schedule_or_shutdown_.notify_one();
   }
 
   // Return a cancellation function.
-  return EventScheduler::Cancel([config = std::move(config)]() mutable {
-    if (config) {
-      config->cancelled = true;
-      config.reset();
+  return EventScheduler::Cancel([this, config = std::move(config)]() mutable {
+    if (!config) {
+      return;
     }
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    config->cancelled = true;
+    current_done_.wait(lock, [this, &config]() {
+      return !running_current_ || current_.config != config;
+    });
+    config.reset();
   });
 }
 
 void ThreadedEventScheduler::run() {
-  ScheduledRun current;
   std::unique_lock<std::mutex> lock(mutex_);
 
   for (;;) {
     if (upcoming_.empty()) {
       // Nothing to do.  Wait until either of
       // `schedule_recurring_event` or the destructor pokes us.
-      condition_.wait(
+      schedule_or_shutdown_.wait(
           lock, [this]() { return shutting_down_ || !upcoming_.empty(); });
       if (shutting_down_) {
         return;
       }
     }
 
-    current = upcoming_.top();
+    current_ = upcoming_.top();
 
-    if (current.config->cancelled) {
+    if (current_.config->cancelled) {
       upcoming_.pop();
       continue;
     }
 
     const bool changed =
-        condition_.wait_until(lock, current.when, [this, &current]() {
-          return shutting_down_ || upcoming_.top().config != current.config;
+        schedule_or_shutdown_.wait_until(lock, current_.when, [this]() {
+          return shutting_down_ || upcoming_.top().config != current_.config;
         });
 
     if (shutting_down_) {
@@ -85,17 +90,20 @@ void ThreadedEventScheduler::run() {
       continue;
     }
 
-    // We waited for `current` and now it's its turn.
+    // We waited for `current_` and now it's its turn.
     upcoming_.pop();
-    if (current.config->cancelled) {
+    if (current_.config->cancelled) {
       continue;
     }
 
-    upcoming_.push(
-        ScheduledRun{current.when + current.config->interval, current.config});
+    upcoming_.push(ScheduledRun{current_.when + current_.config->interval,
+                                current_.config});
+    running_current_ = true;
     lock.unlock();
-    current.config->callback();
+    current_.config->callback();
     lock.lock();
+    running_current_ = false;
+    current_done_.notify_all();
   }
 }
 

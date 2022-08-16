@@ -35,7 +35,10 @@ class ThreadedEventScheduler : public EventScheduler {
   };
 
   std::mutex mutex_;
-  std::condition_variable condition_;
+  ScheduledRun current_;
+  std::condition_variable schedule_or_shutdown_;
+  bool running_current_;
+  std::condition_variable current_done_;
   std::priority_queue<ScheduledRun, std::vector<ScheduledRun>, GreaterThan>
       upcoming_;
   bool shutting_down_;
