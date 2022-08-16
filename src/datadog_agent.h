@@ -5,9 +5,13 @@
 namespace datadog {
 namespace tracing {
 
+struct DatadogAgentConfig;
+
 class DatadogAgent : public Collector {
   // TODO
  public:
+  explicit DatadogAgent(const DatadogAgentConfig& config);
+
   virtual std::optional<Error> send(
       std::vector<SpanData>&& spans,
       const std::function<void(const CollectorResponse&)>& callback) override;

@@ -9,11 +9,10 @@ class SpanGuard {
   Span span_;
 
  public:
-  // TODO: Which of these deletions is needed?
-  SpanGuard(const SpanGuard&) = delete;
-  SpanGuard() = delete;
+  explicit SpanGuard(Span&&);
 
-  explicit SpanGuard(Span span);
+  SpanGuard(const SpanGuard&) = delete;
+
   ~SpanGuard();
 
   Span& value();

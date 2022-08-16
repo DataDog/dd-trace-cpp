@@ -5,7 +5,7 @@
 #include <string>
 #include <variant>
 
-#include "collector_config.h"
+#include "datadog_agent_config.h"
 #include "propagation_styles.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
@@ -28,7 +28,7 @@ struct TracerConfig {
                              // ...
   } spans;
 
-  std::variant<CollectorConfig, std::shared_ptr<Collector>> collector;
+  std::variant<DatadogAgentConfig, std::shared_ptr<Collector>> collector;
   TraceSamplerConfig trace_sampler;
   SpanSamplerConfig span_sampler;
   std::shared_ptr<Logger> logger;
