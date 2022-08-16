@@ -46,13 +46,9 @@ void play_with_event_scheduler() {
 
 void play_with_curl() {
   dd::Curl client;
-  // https://httpbin.org/post
+  (void)client;
+
   /*
-virtual std::optional<Error> post(const URL& url, HeadersSetter set_headers,
-                                  std::string body,
-                                  ResponseHandler on_response,
-                                  ErrorHandler on_error) = 0;
-  */
   dd::HTTPClient::URL url;
   url.scheme = "http";
   url.authority = "localhost";
@@ -80,6 +76,7 @@ virtual std::optional<Error> post(const URL& url, HeadersSetter set_headers,
     std::cout << "Curl returned error " << error->code << ": " << error->message
               << std::endl;
   }
+  */
 
   std::cin.get();
 }

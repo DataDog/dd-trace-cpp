@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 
 static const char *urls[] = {
     "https://www.microsoft.com",
@@ -86,14 +87,19 @@ int main(void) {
   /* Limit the amount of simultaneous connections curl should allow: */
   curl_multi_setopt(cm, CURLMOPT_MAXCONNECTS, (long)MAX_PARALLEL);
 
-  for (transfers = 0; transfers < MAX_PARALLEL; transfers++)
-    add_transfer(cm, transfers);
+  // TODO
+  // for (transfers = 0; transfers < MAX_PARALLEL; transfers++)
+  //   add_transfer(cm, transfers);
 
   do {
+    std::cout << "<< 1 >>" << std::endl;
     curl_multi_perform(cm, &still_alive);
+    std::cout << "<< 2 >>" << std::endl;
 
     while ((msg = curl_multi_info_read(cm, &msgs_left))) {
+      std::cout << "<< 3 >>" << std::endl;
       if (msg->msg == CURLMSG_DONE) {
+        std::cout << "<< 4 >>" << std::endl;
         char *url;
         CURL *e = msg->easy_handle;
         curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &url);
@@ -102,16 +108,29 @@ int main(void) {
         curl_multi_remove_handle(cm, e);
         curl_easy_cleanup(e);
       } else {
+        std::cout << "<< 5 >>" << std::endl;
         std::fprintf(stderr, "E: CURLMsg (%d)\n", msg->msg);
       }
-      if (transfers < NUM_URLS) add_transfer(cm, transfers++);
     }
-    if (still_alive) curl_multi_wait(cm, NULL, 0, 1000, NULL);
+    if (still_alive) {
+      std::cout << "<< 6 >>" << std::endl;
+      curl_multi_poll(cm, NULL, 0, 1000, NULL);
+      std::cout << "<< 7 >>" << std::endl;
+    }
+    if (transfers < NUM_URLS) {
+      std::cout << "<< 8 >>" << std::endl;
+      add_transfer(cm, transfers++);
+      std::cout << "<< 9 >>" << std::endl;
+    }
 
+    std::cout << "<< 10 >>" << std::endl;
   } while (still_alive || (transfers < NUM_URLS));
 
+  std::cout << "<< 11 >>" << std::endl;
   curl_multi_cleanup(cm);
+  std::cout << "<< 12 >>" << std::endl;
   curl_global_cleanup();
+  std::cout << "<< 13 >>" << std::endl;
 
   return EXIT_SUCCESS;
 }
