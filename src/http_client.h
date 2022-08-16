@@ -21,11 +21,10 @@ class HTTPClient {
   // error-indicating HTTP responses.
   using ErrorHandler = std::function<void(Error)>;
 
-  virtual std::optional<Error> send_request(std::string_view URL,
-                                            HeadersSetter set_headers,
-                                            std::string body,
-                                            ResponseHandler on_response,
-                                            ErrorHandler on_error) = 0;
+  virtual std::optional<Error> post(std::string_view URL,
+                                    HeadersSetter set_headers, std::string body,
+                                    ResponseHandler on_response,
+                                    ErrorHandler on_error) = 0;
 
   virtual ~HTTPClient();
 };
