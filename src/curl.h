@@ -119,7 +119,7 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
                                        std::string body,
                                        ResponseHandler on_response,
                                        ErrorHandler on_error) {
-  auto request = std::make_unique<Request>();
+  auto request = new Request();
 
   request->request_body = std::move(body);
   request->on_response = std::move(on_response);
@@ -131,6 +131,7 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
   // end TODO
 
   // TODO: error handling
+  CHECK curl_easy_setopt(handle, CURLOPT_PRIVATE, request);
   CHECK curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, request->error_buffer);
   CHECK curl_easy_setopt(handle, CURLOPT_POST, 1);
   CHECK curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE,
@@ -138,9 +139,9 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
   CHECK curl_easy_setopt(handle, CURLOPT_POSTFIELDS,
                          request->request_body.data());
   CHECK curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, &on_read_header);
-  CHECK curl_easy_setopt(handle, CURLOPT_HEADERDATA, request.get());
+  CHECK curl_easy_setopt(handle, CURLOPT_HEADERDATA, request);
   CHECK curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &on_read_body);
-  CHECK curl_easy_setopt(handle, CURLOPT_WRITEDATA, request.get());
+  CHECK curl_easy_setopt(handle, CURLOPT_WRITEDATA, request);
   if (url.scheme == "unix" || url.scheme == "http+unix" ||
       url.scheme == "https+unix") {
     CHECK curl_easy_setopt(handle, CURLOPT_UNIX_SOCKET_PATH,
@@ -206,6 +207,9 @@ inline std::size_t Curl::on_read_header(char *data, std::size_t,
   std::transform(key.begin(), key.end(), std::back_inserter(key_lower),
                  &to_lower);
 
+  std::cout << "<< Parsed header >>  key_lower=" << key_lower
+            << "  value=" << value << std::endl;
+
   request->response_headers_lower.emplace(std::move(key_lower), value);
   return length;
 }
@@ -227,11 +231,17 @@ inline std::string_view Curl::trim(std::string_view source) {
 
 inline std::size_t Curl::on_read_body(char *data, std::size_t,
                                       std::size_t length, void *user_data) {
-  std::cout << "<< on_read_body >>" << std::endl;
+  std::cout << "<< on_read_body >>  length=" << length << std::endl;
   const auto request = static_cast<Request *>(user_data);
+  if (!request->response_body) {
+    std::cout << "<< on_ready_body response_body in bad state >>" << std::endl;
+  }
   if (!request->response_body.write(data, length)) {
+    std::cout << "<< on_read_body failed >>  " << std::string_view(data, length)
+              << std::endl;
     return -1;  // Any value other than `length` will do.
   }
+  std::cout << "<< on_read_body succeeded >>" << std::endl;
   return length;
 }
 
@@ -297,7 +307,7 @@ inline void Curl::run() {
       std::cout << "<< 16 >>" << std::endl;
       curl_easy_cleanup(request_handle);
       std::cout << "<< 17 >>" << std::endl;
-      request_handles_.erase(&request);
+      request_handles_.erase(request_handle);
       std::cout << "<< 18 >>" << std::endl;
     }
 
@@ -332,7 +342,7 @@ inline void Curl::run() {
     std::cout << "<< 26 >>" << std::endl;
     char *user_data;
     // TODO: error handling
-    CHECK curl_easy_getinfo(message->easy_handle, CURLINFO_PRIVATE, &user_data);
+    CHECK curl_easy_getinfo(handle, CURLINFO_PRIVATE, &user_data);
     std::cout << "<< 27 >>" << std::endl;
     delete reinterpret_cast<Request *>(user_data);
 
@@ -348,7 +358,11 @@ inline void Curl::run() {
   std::cout << "<< 32 >>" << std::endl;
 }
 
-inline Curl::HeaderWriter::~HeaderWriter() { curl_slist_free_all(list_); }
+// TODO: `list_` has to live as long as the request handle.  Put it in the
+// `Request` instead of here.
+inline Curl::HeaderWriter::~HeaderWriter() { /* TODO curl_slist_free_all(list_);
+                                              */
+}
 
 inline curl_slist *Curl::HeaderWriter::list() { return list_; }
 
