@@ -70,10 +70,13 @@ void play_with_curl() {
               << std::endl;
   };
 
-  const auto error = client.post(url, set_headers, body, on_response, on_error);
-  if (error) {
-    std::cout << "Curl returned error " << error->code << ": " << error->message
-              << std::endl;
+  for (int i = 0; i < 10; ++i) {
+    const auto error =
+        client.post(url, set_headers, body, on_response, on_error);
+    if (error) {
+      std::cout << "Curl returned error " << error->code << ": "
+                << error->message << std::endl;
+    }
   }
 
   std::cin.get();

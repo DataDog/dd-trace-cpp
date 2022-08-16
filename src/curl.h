@@ -8,6 +8,7 @@
 #include <iostream>  // TODO: no
 #include <iterator>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <sstream>
 #include <string_view>
@@ -48,12 +49,15 @@ class Curl : public HTTPClient {
   std::thread event_loop_;
 
   struct Request {
+    curl_slist *request_headers = nullptr;
     std::string request_body;
     ResponseHandler on_response;
     ErrorHandler on_error;
     char error_buffer[CURL_ERROR_SIZE] = "";
     std::unordered_map<std::string, std::string> response_headers_lower;
     std::stringstream response_body;
+
+    ~Request();
   };
 
   class HeaderWriter : public DictWriter {
@@ -62,7 +66,7 @@ class Curl : public HTTPClient {
 
    public:
     ~HeaderWriter();
-    curl_slist *list();
+    curl_slist *release();
     virtual void set(std::string_view key, std::string_view value) override;
   };
 
@@ -158,7 +162,8 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
 
   HeaderWriter writer;
   set_headers(writer);
-  CHECK curl_easy_setopt(handle, CURLOPT_HTTPHEADER, writer.list());
+  request->request_headers = writer.release();
+  CHECK curl_easy_setopt(handle, CURLOPT_HTTPHEADER, request->request_headers);
 
   // TODO: Error handling
   std::list<CURL *> node;
@@ -358,13 +363,15 @@ inline void Curl::run() {
   std::cout << "<< 32 >>" << std::endl;
 }
 
-// TODO: `list_` has to live as long as the request handle.  Put it in the
-// `Request` instead of here.
-inline Curl::HeaderWriter::~HeaderWriter() { /* TODO curl_slist_free_all(list_);
-                                              */
-}
+inline Curl::Request::~Request() { curl_slist_free_all(request_headers); }
 
-inline curl_slist *Curl::HeaderWriter::list() { return list_; }
+inline Curl::HeaderWriter::~HeaderWriter() { curl_slist_free_all(list_); }
+
+inline curl_slist *Curl::HeaderWriter::release() {
+  auto list = list_;
+  list_ = nullptr;
+  return list;
+}
 
 inline void Curl::HeaderWriter::set(std::string_view key,
                                     std::string_view value) {
