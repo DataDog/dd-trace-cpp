@@ -313,6 +313,7 @@ inline void Curl::run() {
 
     // New requests might have been added while we were sleeping.
     for (; !new_handles_.empty(); new_handles_.pop_front()) {
+      std::cout << "<< 22B >>  " << new_handles_.size() << std::endl;
       CURL *const handle = new_handles_.front();
       CHECK curl_multi_add_handle(multi_handle_, handle);
       request_handles_.insert(handle);
