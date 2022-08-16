@@ -48,7 +48,6 @@ void play_with_curl() {
   dd::Curl client;
   (void)client;
 
-  /*
   dd::HTTPClient::URL url;
   url.scheme = "http";
   url.authority = "localhost";
@@ -76,7 +75,6 @@ void play_with_curl() {
     std::cout << "Curl returned error " << error->code << ": " << error->message
               << std::endl;
   }
-  */
 
   std::cin.get();
 }
