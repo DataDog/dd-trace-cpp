@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <iostream>  // TODO: no
 #include <iterator>
 #include <mutex>
 #include <sstream>
@@ -13,7 +14,26 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "dict_reader.h"
+#include "dict_writer.h"
 #include "http_client.h"
+
+// TODO: no
+// CHECK curl_multi_add_handle(multi_handle_, handle);
+// Checker(__LINE__) = curl_multi_add_handle(multi_handle_, handle);
+struct Checker {
+  int line;
+  Checker(int line) : line(line) {}
+
+  void operator=(int code) {
+    if (code != CURLE_OK) {
+      std::cout << "Curl error on line " << line << ": " << code << std::endl;
+    }
+  }
+};
+
+#define CHECK Checker(__LINE__) =
+// end TODO
 
 namespace datadog {
 namespace tracing {
@@ -29,10 +49,33 @@ class Curl : public HTTPClient {
     std::string request_body;
     ResponseHandler on_response;
     ErrorHandler on_error;
-    char error_buffer[CURL_ERROR_SIZE];
-    int response_status;
+    char error_buffer[CURL_ERROR_SIZE] = "";
     std::unordered_map<std::string, std::string> response_headers_lower;
     std::stringstream response_body;
+  };
+
+  class HeaderWriter : public DictWriter {
+    curl_slist *list_ = nullptr;
+    std::string buffer_;
+
+   public:
+    ~HeaderWriter();
+    curl_slist *list();
+    virtual void set(std::string_view key, std::string_view value) override;
+  };
+
+  class HeaderReader : public DictReader {
+    std::unordered_map<std::string, std::string> *response_headers_lower_;
+    mutable std::string buffer_;
+
+   public:
+    explicit HeaderReader(
+        std::unordered_map<std::string, std::string> *response_headers_lower);
+    virtual std::optional<std::string_view> lookup(
+        std::string_view key) const override;
+    virtual void visit(
+        const std::function<void(std::string_view key, std::string_view value)>
+            &visitor) const override;
   };
 
   void run();
@@ -48,8 +91,8 @@ class Curl : public HTTPClient {
   Curl();
   ~Curl();
 
-  virtual std::optional<Error> post(std::string_view URL,
-                                    HeadersSetter set_headers, std::string body,
+  virtual std::optional<Error> post(const URL &url, HeadersSetter set_headers,
+                                    std::string body,
                                     ResponseHandler on_response,
                                     ErrorHandler on_error) override;
 };
@@ -63,13 +106,13 @@ inline Curl::~Curl() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     shutting_down_ = true;
-    curl_multi_wakeup(multi_handle_);
+    CHECK curl_multi_wakeup(multi_handle_);
   }
 
   event_loop_.join();
 }
 
-inline std::optional<Error> Curl::post(std::string_view URL,
+inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
                                        HeadersSetter set_headers,
                                        std::string body,
                                        ResponseHandler on_response,
@@ -82,19 +125,42 @@ inline std::optional<Error> Curl::post(std::string_view URL,
 
   CURL *handle = curl_easy_init();
   // TODO: error handling
-  curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, request->error_buffer);
-  curl_easy_setopt(handle, CURLOPT_POST, 1);
-  curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, request->request_body.size());
-  curl_easy_setopt(handle, CURLOPT_POSTFIELDS, request->request_body.data());
-  curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, &on_read_header);
-  curl_easy_setopt(handle, CURLOPT_HEADERDATA, request.get());
-  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &on_read_body);
-  curl_easy_setopt(handle, CURLOPT_WRITEDATA, request.get());
-  // TODO
-  (void)URL;
-  (void)set_headers;
+  CHECK curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, request->error_buffer);
+  CHECK curl_easy_setopt(handle, CURLOPT_POST, 1);
+  CHECK curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE,
+                         request->request_body.size());
+  CHECK curl_easy_setopt(handle, CURLOPT_POSTFIELDS,
+                         request->request_body.data());
+  CHECK curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, &on_read_header);
+  CHECK curl_easy_setopt(handle, CURLOPT_HEADERDATA, request.get());
+  CHECK curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &on_read_body);
+  CHECK curl_easy_setopt(handle, CURLOPT_WRITEDATA, request.get());
+  if (url.scheme == "unix" || url.scheme == "http+unix" ||
+      url.scheme == "https+unix") {
+    CHECK curl_easy_setopt(handle, CURLOPT_UNIX_SOCKET_PATH,
+                           url.authority.c_str());
+    // The authority section of the URL is ignored when a unix domain socket is
+    // to be used.
+    CHECK curl_easy_setopt(handle, CURLOPT_URL,
+                           ("http://localhost" + url.path).c_str());
+  } else {
+    CHECK curl_easy_setopt(
+        handle, CURLOPT_URL,
+        (url.scheme + "://" + url.authority + url.path).c_str());
+  }
 
-  return std::nullopt;  // TODO
+  HeaderWriter writer;
+  set_headers(writer);
+  CHECK curl_easy_setopt(handle, CURLOPT_HTTPHEADER, writer.list());
+
+  // TODO: Error handling
+  std::lock_guard<std::mutex> lock(mutex_);
+  // TODO request_handles_.insert(request.release());
+  std::cout << "[[ 1 ]]" << std::endl;
+  // TODO CHECK curl_multi_add_handle(multi_handle_, handle);
+  std::cout << "[[ 2 ]]" << std::endl;
+
+  return std::nullopt;
 }
 
 inline std::size_t Curl::on_read_header(char *data, std::size_t,
@@ -158,7 +224,145 @@ inline std::size_t Curl::on_read_body(char *data, std::size_t,
 }
 
 inline void Curl::run() {
-  // TODO
+  int num_running_handles;
+  int num_messages_remaining;
+  CURLMsg *message;
+  std::cout << "<< 1 >>" << std::endl;
+  std::unique_lock<std::mutex> lock(mutex_);
+  std::cout << "<< 2 >>" << std::endl;
+
+  for (;;) {
+    std::cout << "----------\n<< 3 >>" << std::endl;
+    CHECK curl_multi_perform(multi_handle_, &num_running_handles);
+    std::cout << "<< 4 >>" << std::endl;
+
+    while ((message =
+                curl_multi_info_read(multi_handle_, &num_messages_remaining))) {
+      std::cout << "<< 5 >>" << std::endl;
+      if (message->msg != CURLMSG_DONE) {
+        std::cout << "<< 6 >>" << std::endl;
+        continue;
+      }
+      std::cout << "<< 7 >>" << std::endl;
+      auto *const request_handle = message->easy_handle;
+      char *user_data;
+      // TODO: error handling
+      CHECK curl_easy_getinfo(request_handle, CURLINFO_PRIVATE, &user_data);
+      std::cout << "<< 8 >>" << std::endl;
+      auto &request = *reinterpret_cast<Request *>(user_data);
+
+      // `request` is done.  If we got a response, then call the response
+      // handler.  If an error occurred, then call the error handler.
+      const auto result = message->data.result;
+      std::cout << "<< 9 >>" << std::endl;
+      if (result != CURLE_OK) {
+        std::cout << "<< 10 >>" << std::endl;
+        std::string error_message;
+        error_message += "Error sending request with libcurl (";
+        error_message += curl_easy_strerror(result);
+        error_message += "): ";
+        error_message += request.error_buffer;
+        request.on_error(Error{1337 /* TODO */, std::move(error_message)});
+      } else {
+        std::cout << "<< 11 >>" << std::endl;
+        long status;
+        // TODO: error handling
+        CHECK curl_easy_getinfo(request_handle, CURLINFO_RESPONSE_CODE,
+                                &status);
+        HeaderReader reader(&request.response_headers_lower);
+        std::cout << "<< 12 >>" << std::endl;
+        request.on_response(static_cast<int>(status), reader,
+                            request.response_body);
+        std::cout << "<< 13 >>" << std::endl;
+      }
+
+      std::cout << "<< 14 >>" << std::endl;
+      delete &request;
+      std::cout << "<< 15 >>" << std::endl;
+      CHECK curl_multi_remove_handle(multi_handle_, request_handle);
+      std::cout << "<< 16 >>" << std::endl;
+      curl_easy_cleanup(request_handle);
+      std::cout << "<< 17 >>" << std::endl;
+      request_handles_.erase(&request);
+      std::cout << "<< 18 >>" << std::endl;
+    }
+
+    const int max_wait_milliseconds = 10 * 1000;
+    std::cout << "<< 19 >>" << std::endl;
+    lock.unlock();
+    std::cout << "<< 20 >>" << std::endl;
+    CHECK curl_multi_poll(multi_handle_, nullptr, 0, max_wait_milliseconds,
+                          nullptr);
+    std::cout << "<< 21 >>" << std::endl;
+    lock.lock();
+    std::cout << "<< 22 >>" << std::endl;
+
+    if (shutting_down_) {
+      std::cout << "<< 23 >>" << std::endl;
+      break;
+    }
+    std::cout << "<< 24 >>" << std::endl;
+  }
+
+  std::cout << "<< 25 >>" << std::endl;
+  // We're shutting down.  Clean up any remaining request handles.
+  for (const auto &handle : request_handles_) {
+    std::cout << "<< 26 >>" << std::endl;
+    char *user_data;
+    // TODO: error handling
+    CHECK curl_easy_getinfo(message->easy_handle, CURLINFO_PRIVATE, &user_data);
+    std::cout << "<< 27 >>" << std::endl;
+    delete reinterpret_cast<Request *>(user_data);
+
+    std::cout << "<< 28 >>" << std::endl;
+    CHECK curl_multi_remove_handle(multi_handle_, handle);
+  }
+  std::cout << "<< 29 >>" << std::endl;
+  request_handles_.clear();
+  std::cout << "<< 30 >>" << std::endl;
+  CHECK curl_multi_cleanup(multi_handle_);
+  std::cout << "<< 31 >>" << std::endl;
+  curl_global_cleanup();
+  std::cout << "<< 32 >>" << std::endl;
+}
+
+inline Curl::HeaderWriter::~HeaderWriter() { curl_slist_free_all(list_); }
+
+inline curl_slist *Curl::HeaderWriter::list() { return list_; }
+
+inline void Curl::HeaderWriter::set(std::string_view key,
+                                    std::string_view value) {
+  buffer_.clear();
+  buffer_ += key;
+  buffer_ += ": ";
+  buffer_ += value;
+
+  list_ = curl_slist_append(list_, buffer_.c_str());
+}
+
+inline Curl::HeaderReader::HeaderReader(
+    std::unordered_map<std::string, std::string> *response_headers_lower)
+    : response_headers_lower_(response_headers_lower) {}
+
+inline std::optional<std::string_view> Curl::HeaderReader::lookup(
+    std::string_view key) const {
+  buffer_.clear();
+  std::transform(key.begin(), key.end(), std::back_inserter(buffer_),
+                 &to_lower);
+
+  const auto found = response_headers_lower_->find(buffer_);
+  if (found == response_headers_lower_->end()) {
+    return std::nullopt;
+  }
+  return found->second;
+}
+
+inline void Curl::HeaderReader::visit(
+    const std::function<void(std::string_view key, std::string_view value)>
+        &visitor) const {
+  for (const auto &[key, value] : *response_headers_lower_) {
+    visitor(key, value);
+  }
 }
 
 }  // namespace tracing
