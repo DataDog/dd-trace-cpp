@@ -92,6 +92,14 @@ inline std::size_t Curl::on_read_header(char *data, std::size_t, std::size_t len
     //    "    Foo-Bar:   thingy, thingy, thing   "
     //    -> {"foo-bar", "thingy, thingy, thing"}
     //
+    // TODO: Look out!
+    //
+    // > For an HTTP transfer, the status line and the blank line preceding the
+    // > response body are both included as headers and passed to this
+    // > function. 
+    //
+    // https://curl.se/libcurl/c/CURLOPT_HEADERFUNCTION.html
+    //
     // Positions:
     // A. First non-whitespace
     // B. First colon
