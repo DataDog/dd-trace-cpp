@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <iostream>  // TODO: no
 #include <iterator>
+#include <list>
 #include <mutex>
 #include <sstream>
 #include <string_view>
@@ -42,6 +43,7 @@ class Curl : public HTTPClient {
   std::mutex mutex_;
   CURLM *multi_handle_;
   std::unordered_set<CURL *> request_handles_;
+  std::list<CURL *> new_handles_;
   bool shutting_down_;
   std::thread event_loop_;
 
@@ -154,11 +156,15 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
   CHECK curl_easy_setopt(handle, CURLOPT_HTTPHEADER, writer.list());
 
   // TODO: Error handling
-  std::lock_guard<std::mutex> lock(mutex_);
-  // TODO request_handles_.insert(request.release());
+  std::list<CURL *> node;
+  node.push_back(handle);
   std::cout << "[[ 1 ]]" << std::endl;
-  // TODO CHECK curl_multi_add_handle(multi_handle_, handle);
+  std::lock_guard<std::mutex> lock(mutex_);
   std::cout << "[[ 2 ]]" << std::endl;
+  new_handles_.splice(new_handles_.end(), node);
+  std::cout << "[[ 3 ]]" << std::endl;
+  CHECK curl_multi_wakeup(multi_handle_);
+  std::cout << "[[ 4 ]]" << std::endl;
 
   return std::nullopt;
 }
@@ -234,11 +240,13 @@ inline void Curl::run() {
   for (;;) {
     std::cout << "----------\n<< 3 >>" << std::endl;
     CHECK curl_multi_perform(multi_handle_, &num_running_handles);
-    std::cout << "<< 4 >>" << std::endl;
+    std::cout << "<< 4 >>  num_running_handles: " << num_running_handles
+              << std::endl;
 
     while ((message =
                 curl_multi_info_read(multi_handle_, &num_messages_remaining))) {
-      std::cout << "<< 5 >>" << std::endl;
+      std::cout << "<< 5 >>  num_messages_remaining: " << num_messages_remaining
+                << std::endl;
       if (message->msg != CURLMSG_DONE) {
         std::cout << "<< 6 >>" << std::endl;
         continue;
@@ -296,6 +304,13 @@ inline void Curl::run() {
     std::cout << "<< 21 >>" << std::endl;
     lock.lock();
     std::cout << "<< 22 >>" << std::endl;
+
+    // New requests might have been added while we were sleeping.
+    for (; !new_handles_.empty(); new_handles_.pop_front()) {
+      CURL *const handle = new_handles_.front();
+      CHECK curl_multi_add_handle(multi_handle_, handle);
+      request_handles_.insert(handle);
+    }
 
     if (shutting_down_) {
       std::cout << "<< 23 >>" << std::endl;
