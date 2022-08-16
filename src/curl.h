@@ -126,6 +126,10 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
   request->on_error = std::move(on_error);
 
   CURL *handle = curl_easy_init();
+  // TODO: no
+  CHECK curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
+  // end TODO
+
   // TODO: error handling
   CHECK curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, request->error_buffer);
   CHECK curl_easy_setopt(handle, CURLOPT_POST, 1);
@@ -171,6 +175,7 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
 
 inline std::size_t Curl::on_read_header(char *data, std::size_t,
                                         std::size_t length, void *user_data) {
+  std::cout << "<< on_read_header >>" << std::endl;
   const auto request = static_cast<Request *>(user_data);
   // The idea is:
   //
@@ -222,6 +227,7 @@ inline std::string_view Curl::trim(std::string_view source) {
 
 inline std::size_t Curl::on_read_body(char *data, std::size_t,
                                       std::size_t length, void *user_data) {
+  std::cout << "<< on_read_body >>" << std::endl;
   const auto request = static_cast<Request *>(user_data);
   if (!request->response_body.write(data, length)) {
     return -1;  // Any value other than `length` will do.

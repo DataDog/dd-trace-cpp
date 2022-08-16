@@ -19,7 +19,7 @@ int main() {
   std::get<dd::DatadogAgentConfig>(config.collector).http_client = nullptr;
 
   play_with_curl();
-  std::cout << "Done playing with Curl.\n";
+  std::cout << "Done playing with Curl." << std::endl;
 
   // play_with_event_scheduler();
   // std::cout << "Done playing with event scheduler.\n";
@@ -54,8 +54,8 @@ virtual std::optional<Error> post(const URL& url, HeadersSetter set_headers,
                                   ErrorHandler on_error) = 0;
   */
   dd::HTTPClient::URL url;
-  url.scheme = "https";
-  url.authority = "httpbin.org";
+  url.scheme = "http";
+  url.authority = "localhost";
   url.path = "/post";
 
   const auto set_headers = [](dd::DictWriter& headers) {
