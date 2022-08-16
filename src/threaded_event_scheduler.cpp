@@ -58,14 +58,10 @@ void ThreadedEventScheduler::run() {
   std::unique_lock<std::mutex> lock(mutex_);
 
   for (;;) {
-    if (upcoming_.empty()) {
-      // Nothing to do.  Wait until either of
-      // `schedule_recurring_event` or the destructor pokes us.
-      schedule_or_shutdown_.wait(
-          lock, [this]() { return shutting_down_ || !upcoming_.empty(); });
-      if (shutting_down_) {
-        return;
-      }
+    schedule_or_shutdown_.wait(
+        lock, [this]() { return shutting_down_ || !upcoming_.empty(); });
+    if (shutting_down_) {
+      return;
     }
 
     current_ = upcoming_.top();
