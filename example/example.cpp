@@ -1,5 +1,6 @@
 #include <datadog/clock.h>
 #include <datadog/curl.h>
+#include <datadog/span_config.h>
 #include <datadog/span_data.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer_config.h>
@@ -11,6 +12,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_cpp20_syntax();
 void play_with_msgpack();
 void play_with_curl_and_event_scheduler();
 void play_with_event_scheduler();
@@ -18,8 +20,11 @@ void play_with_curl();
 void smoke();
 
 int main() {
-  play_with_msgpack();
-  std::cout << "Done playing with msgpack.\n";
+  play_with_cpp20_syntax();
+  std::cout << "Done playing with C++20 syntax.\n";
+
+  // play_with_msgpack();
+  // std::cout << "Done playing with msgpack.\n";
 
   // play_with_curl_and_event_scheduler();
   // std::cout << "Done playing with Curl and event scheduler.\n";
@@ -33,8 +38,8 @@ int main() {
 
 void smoke() {
   dd::TracerConfig config;
-  config.spans.service = "foosvc";
-  std::cout << "config.spans.service: " << config.spans.service << '\n';
+  config.defaults.service = "foosvc";
+  std::cout << "config.spans.service: " << config.defaults.service << '\n';
 
   std::get<dd::DatadogAgentConfig>(config.collector).http_client = nullptr;
 }
@@ -161,4 +166,18 @@ void play_with_msgpack() {
   out.write(buffer.data(), buffer.size());
 
   std::cout << "span written to /tmp/span.msgpack\n";
+}
+
+void play_with_cpp20_syntax() {
+  const auto print_service = [](const dd::SpanConfig& config) {
+    std::cout << "service: " << config.service.value_or("<null>") << '\n';
+  };
+
+  // C++20 only, and even then GCC -Wextra complains about missing field
+  // initializers.
+  // print_service(dd::SpanConfig{.service = "hello"});
+
+  dd::SpanConfig config;
+  config.service = "hello";
+  print_service(config);
 }

@@ -26,7 +26,8 @@ struct TracerConfig {
     std::optional<std::string>
         operation_override;  // TODO: will we still need this?
                              // ...
-  } spans;
+  } defaults;  // TODO: Do spans inherit values from their parents, from
+               // this, or from both?
 
   std::variant<DatadogAgentConfig, std::shared_ptr<Collector>> collector;
   TraceSamplerConfig trace_sampler;
