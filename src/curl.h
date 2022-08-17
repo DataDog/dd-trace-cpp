@@ -9,7 +9,6 @@
 #include <list>
 #include <memory>
 #include <mutex>
-#include <sstream>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
@@ -40,7 +39,7 @@ class Curl : public HTTPClient {
     ErrorHandler on_error;
     char error_buffer[CURL_ERROR_SIZE] = "";
     std::unordered_map<std::string, std::string> response_headers_lower;
-    std::stringstream response_body;
+    std::string response_body;
 
     ~Request();
   };
@@ -214,9 +213,7 @@ inline std::string_view Curl::trim(std::string_view source) {
 inline std::size_t Curl::on_read_body(char *data, std::size_t,
                                       std::size_t length, void *user_data) {
   const auto request = static_cast<Request *>(user_data);
-  if (!request->response_body.write(data, length)) {
-    return -1;  // Any value other than `length` will do.
-  }
+  request->response_body.append(data, length);
   return length;
 }
 
@@ -258,13 +255,13 @@ inline void Curl::run() {
                                 &status);
         HeaderReader reader(&request.response_headers_lower);
         request.on_response(static_cast<int>(status), reader,
-                            request.response_body);
+                            std::move(request.response_body));
       }
 
-      delete &request;
       CHECK curl_multi_remove_handle(multi_handle_, request_handle);
       curl_easy_cleanup(request_handle);
       request_handles_.erase(request_handle);
+      delete &request;
     }
 
     const int max_wait_milliseconds = 10 * 1000;

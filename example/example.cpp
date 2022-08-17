@@ -62,12 +62,12 @@ void play_with_curl() {
   };
   const std::string body = "Hello, world!";
   const auto on_response = [](int status, const dd::DictReader& headers,
-                              std::stringstream& body) {
+                              std::string body) {
     std::cout << "Got response status " << status << '\n';
     headers.visit([](std::string_view key, std::string_view value) {
       std::cout << "Got response header " << key << " = " << value << '\n';
     });
-    std::cout << "Got response body: " << body.rdbuf() << std::endl;
+    std::cout << "Got response body: " << body << std::endl;
   };
   const auto on_error = [](dd::Error error) {
     std::cout << "Got error code " << error.code << ": " << error.message
@@ -105,13 +105,13 @@ void play_with_curl_and_event_scheduler() {
         };
         const std::string body = "Hello, world!";
         const auto on_response = [](int status, const dd::DictReader& headers,
-                                    std::stringstream& body) {
+                                    std::string body) {
           std::cout << "Got response status " << status << '\n';
           headers.visit([](std::string_view key, std::string_view value) {
             std::cout << "Got response header " << key << " = " << value
                       << '\n';
           });
-          std::cout << "Got response body: " << body.rdbuf() << std::endl;
+          std::cout << "Got response body: " << body << std::endl;
         };
         const auto on_error = [](dd::Error error) {
           std::cout << "Got error code " << error.code << ": " << error.message

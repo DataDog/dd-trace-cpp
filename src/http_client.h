@@ -21,7 +21,7 @@ class HTTPClient {
   };
   using HeadersSetter = std::function<void(DictWriter& headers)>;
   using ResponseHandler = std::function<void(
-      int status, const DictReader& headers, std::stringstream& body)>;
+      int status, const DictReader& headers, std::string body)>;
   // `ErrorHandler` is for errors encountered by `HTTPClient`, not for
   // error-indicating HTTP responses.
   using ErrorHandler = std::function<void(Error)>;
