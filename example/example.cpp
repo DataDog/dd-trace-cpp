@@ -1,32 +1,42 @@
+#include <datadog/clock.h>
 #include <datadog/curl.h>
+#include <datadog/span_data.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer_config.h>
 
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <thread>
 
 namespace dd = datadog::tracing;
 
+void play_with_msgpack();
 void play_with_curl_and_event_scheduler();
 void play_with_event_scheduler();
 void play_with_curl();
+void smoke();
 
 int main() {
-  dd::TracerConfig config;
-  config.spans.service = "foosvc";
-  std::cout << "config.spans.service: " << config.spans.service << '\n';
+  play_with_msgpack();
+  std::cout << "Done playing with msgpack.\n";
 
-  std::get<dd::DatadogAgentConfig>(config.collector).http_client = nullptr;
-
-  play_with_curl_and_event_scheduler();
-  std::cout << "Done playing with Curl and event scheduler.\n";
+  // play_with_curl_and_event_scheduler();
+  // std::cout << "Done playing with Curl and event scheduler.\n";
 
   // play_with_curl();
   // std::cout << "Done playing with Curl." << std::endl;
 
   // play_with_event_scheduler();
   // std::cout << "Done playing with event scheduler.\n";
+}
+
+void smoke() {
+  dd::TracerConfig config;
+  config.spans.service = "foosvc";
+  std::cout << "config.spans.service: " << config.spans.service << '\n';
+
+  std::get<dd::DatadogAgentConfig>(config.collector).http_client = nullptr;
 }
 
 void play_with_event_scheduler() {
@@ -130,4 +140,25 @@ void play_with_curl_and_event_scheduler() {
   std::cout << "()()()() cancelling..." << std::endl;
   cancel();
   std::cout << "()()()() shutting down..." << std::endl;
+}
+
+void play_with_msgpack() {
+  dd::SpanData span;
+  span.trace_id = 123;
+  span.span_id = 456;
+  span.parent_id = 789;
+  span.service = "foosvc";
+  span.name = "do_thing";
+  span.type = "web";
+  span.tags["hello"] = "world";
+  span.numeric_tags["thing"] = -0.34;
+  span.start = dd::default_clock();
+  span.duration = std::chrono::seconds(10);
+
+  std::ofstream out("/tmp/span.msgpack");
+  std::string buffer;
+  dd::msgpack_encode(buffer, span);
+  out.write(buffer.data(), buffer.size());
+
+  std::cout << "span written to /tmp/span.msgpack\n";
 }
