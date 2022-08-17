@@ -18,7 +18,7 @@ struct SpanData {
   std::uint64_t span_id = 0;
   std::uint64_t parent_id = 0;
   TimePoint start;
-  TimePoint::Duration duration;
+  Duration duration;
   bool error = false;
   std::unordered_map<std::string, std::string> tags;
   std::unordered_map<std::string, double> numeric_tags;
