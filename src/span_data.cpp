@@ -61,6 +61,8 @@ void msgpack_encode(std::string& destination, const SpanData& span) {
 
   packer.pack_str("type");
   packer.pack_str(span.type);
+
+  // Be sure to update `num_fields` when adding fields.
 }
 
 }  // namespace tracing

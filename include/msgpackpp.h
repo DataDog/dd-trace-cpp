@@ -4,6 +4,10 @@
 // <https://github.com/ousttrue/msgpackpp/blob/b7a08ac9e56a37499b274039ea2b454fa4be0c5b/msgpackpp/include/msgpackpp/msgpackpp.h>
 // from ousttrue's "msgpackpp"
 // <https://github.com/ousttrue/msgpackpp>
+//
+// I removed all but the `packer` code, and made some modifications:
+// - `class packer` no longer stores its output -- it takes a pointer.
+// - Encoding no longer assumes that the host platform is little endian.
 
 #include <cstdint>
 #include <limits>
