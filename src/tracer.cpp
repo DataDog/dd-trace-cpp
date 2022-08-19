@@ -18,21 +18,9 @@ namespace tracing {
                                          const SpanConfig& config);
 };*/
 
-Tracer::Tracer(const ValidatedTracerConfig& config) {
+Tracer::Tracer(const Validated<TracerConfig>& config) {
   // TODO
   (void)config;
-}
-
-std::variant<ValidatedTracerConfig, Error> validate_config(
-    const TracerConfig& config) {
-  // TODO: environment variables, validation, and other fun.
-  TracerConfig after_env{config};
-
-  if (after_env.defaults.service.empty()) {
-    return Error{1337 /* TODO */, "Service name is required."};
-  }
-
-  return ValidatedTracerConfig(config, std::move(after_env));
 }
 
 }  // namespace tracing

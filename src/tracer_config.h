@@ -6,15 +6,16 @@
 #include <variant>
 
 #include "datadog_agent_config.h"
+#include "error.h"
 #include "propagation_styles.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
+#include "validated.h"
 
 namespace datadog {
 namespace tracing {
 
 class Collector;
-class Logger;
 
 struct TracerConfig {
   struct {
@@ -32,11 +33,13 @@ struct TracerConfig {
   std::variant<DatadogAgentConfig, std::shared_ptr<Collector>> collector;
   TraceSamplerConfig trace_sampler;
   SpanSamplerConfig span_sampler;
-  std::shared_ptr<Logger> logger;
 
   PropagationStyles injection_styles;
   PropagationStyles extraction_styles;
 };
+
+std::variant<Validated<TracerConfig>, Error> validate_config(
+    const TracerConfig& config);
 
 }  // namespace tracing
 }  // namespace datadog

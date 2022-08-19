@@ -197,7 +197,7 @@ void play_with_config() {
       return;
     }
 
-    dd::Tracer tracer{std::get<dd::ValidatedTracerConfig>(maybe_config)};
+    dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
     (void)tracer;
   }
 
@@ -210,11 +210,11 @@ void play_with_config() {
       return;
     }
 
-    dd::Tracer tracer{std::get<dd::ValidatedTracerConfig>(maybe_config)};
+    dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
   }
 
   // "error: use of deleted function
-  // ‘datadog::tracing::ValidatedTracerConfig::ValidatedTracerConfig()’"
-  // dd::ValidatedTracerConfig config;
+  // ‘datadog::tracing::Validated<TracerConfig>::ValidatedTracerConfig()’"
+  // dd::Validated<TracerConfig> config;
   // (void) config;
 }
