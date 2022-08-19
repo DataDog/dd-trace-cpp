@@ -20,11 +20,11 @@ void play_with_curl();
 void smoke();
 
 int main() {
-  play_with_cpp20_syntax();
-  std::cout << "Done playing with C++20 syntax.\n";
+  // play_with_cpp20_syntax();
+  // std::cout << "Done playing with C++20 syntax.\n";
 
-  // play_with_msgpack();
-  // std::cout << "Done playing with msgpack.\n";
+  play_with_msgpack();
+  std::cout << "Done playing with msgpack.\n";
 
   // play_with_curl_and_event_scheduler();
   // std::cout << "Done playing with Curl and event scheduler.\n";

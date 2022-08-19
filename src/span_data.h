@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
 #include "clock.h"
+#include "error.h"
 
 namespace datadog {
 namespace tracing {
@@ -24,7 +26,7 @@ struct SpanData {
   std::unordered_map<std::string, double> numeric_tags;
 };
 
-void msgpack_encode(std::string& destination, const SpanData& span);
+std::optional<Error> msgpack_encode(std::string& destination, const SpanData& span);
 
 }  // namespace tracing
 }  // namespace datadog

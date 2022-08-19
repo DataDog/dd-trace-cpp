@@ -7,7 +7,7 @@
 namespace datadog {
 namespace tracing {
 
-void msgpack_encode(std::string& destination, const SpanData& span) {
+std::optional<Error> msgpack_encode(std::string& destination, const SpanData& span) try {
   msgpackpp::packer packer(&destination);
 
   // Be sure to update `num_fields` when adding fields.
@@ -63,6 +63,9 @@ void msgpack_encode(std::string& destination, const SpanData& span) {
   packer.pack_str(span.type);
 
   // Be sure to update `num_fields` when adding fields.
+  return std::nullopt;
+} catch (const msgpackpp::pack_error& error) {
+  return Error{1337 /*TODO*/, error.what()};
 }
 
 }  // namespace tracing
