@@ -26,7 +26,8 @@ struct SpanData {
   std::unordered_map<std::string, double> numeric_tags;
 };
 
-std::optional<Error> msgpack_encode(std::string& destination, const SpanData& span);
+std::optional<Error> msgpack_encode(std::string& destination,
+                                    const SpanData& span);
 
 }  // namespace tracing
 }  // namespace datadog

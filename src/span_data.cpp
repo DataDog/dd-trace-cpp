@@ -7,7 +7,8 @@
 namespace datadog {
 namespace tracing {
 
-std::optional<Error> msgpack_encode(std::string& destination, const SpanData& span) try {
+std::optional<Error> msgpack_encode(std::string& destination,
+                                    const SpanData& span) try {
   msgpackpp::packer packer(&destination);
 
   // Be sure to update `num_fields` when adding fields.
@@ -66,7 +67,7 @@ std::optional<Error> msgpack_encode(std::string& destination, const SpanData& sp
   return std::nullopt;
 } catch (const msgpackpp::pack_error& error) {
   return Error{1337 /*TODO*/, error.what()};
-}
+}  // TODO: Should we worry about std::bad_alloc too?
 
 }  // namespace tracing
 }  // namespace datadog

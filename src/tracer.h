@@ -4,7 +4,7 @@
 #include "error.h"
 #include "id_generator.h"
 #include "span.h"
-#include "tracer_config.h"
+#include "validated_tracer_config.h"
 
 namespace datadog {
 namespace tracing {
@@ -22,8 +22,8 @@ class Tracer {
   Clock clock;
 
  public:
-  explicit Tracer(const TracerConfig& config);
-  Tracer(const TracerConfig& config, const IDGenerator& generator,
+  explicit Tracer(const ValidatedTracerConfig& config);
+  Tracer(const ValidatedTracerConfig& config, const IDGenerator& generator,
          const Clock& clock);
 
   Span create_span(const SpanConfig& config);
@@ -33,6 +33,9 @@ class Tracer {
   std::variant<Span, Error> extract_span(const DictReader& reader,
                                          const SpanConfig& config);
 };
+
+std::variant<ValidatedTracerConfig, Error> validate_config(
+    const TracerConfig& config);
 
 }  // namespace tracing
 }  // namespace datadog

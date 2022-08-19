@@ -3,6 +3,7 @@
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
 #include <datadog/threaded_event_scheduler.h>
+#include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
 #include <chrono>
@@ -12,6 +13,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_config();
 void play_with_cpp20_syntax();
 void play_with_msgpack();
 void play_with_curl_and_event_scheduler();
@@ -20,11 +22,14 @@ void play_with_curl();
 void smoke();
 
 int main() {
+  play_with_config();
+  std::cout << "Done playing with config.\n";
+
   // play_with_cpp20_syntax();
   // std::cout << "Done playing with C++20 syntax.\n";
 
-  play_with_msgpack();
-  std::cout << "Done playing with msgpack.\n";
+  // play_with_msgpack();
+  // std::cout << "Done playing with msgpack.\n";
 
   // play_with_curl_and_event_scheduler();
   // std::cout << "Done playing with Curl and event scheduler.\n";
@@ -180,4 +185,36 @@ void play_with_cpp20_syntax() {
   dd::SpanConfig config;
   config.service = "hello";
   print_service(config);
+}
+
+void play_with_config() {
+  {
+    dd::TracerConfig raw_config;
+    raw_config.defaults.service = "hello";
+    auto maybe_config = dd::validate_config(raw_config);
+    if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+      std::cout << "Bad config: " << error->message << '\n';
+      return;
+    }
+
+    dd::Tracer tracer{std::get<dd::ValidatedTracerConfig>(maybe_config)};
+    (void)tracer;
+  }
+
+  {
+    dd::TracerConfig raw_config;
+    // raw_config.defaults.service = "hello";
+    auto maybe_config = dd::validate_config(raw_config);
+    if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+      std::cout << "Bad config: " << error->message << '\n';
+      return;
+    }
+
+    dd::Tracer tracer{std::get<dd::ValidatedTracerConfig>(maybe_config)};
+  }
+
+  // "error: use of deleted function
+  // ‘datadog::tracing::ValidatedTracerConfig::ValidatedTracerConfig()’"
+  // dd::ValidatedTracerConfig config;
+  // (void) config;
 }
