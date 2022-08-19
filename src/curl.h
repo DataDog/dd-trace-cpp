@@ -247,7 +247,8 @@ inline void Curl::run() {
         error_message += curl_easy_strerror(result);
         error_message += "): ";
         error_message += request.error_buffer;
-        request.on_error(Error{1337 /* TODO */, std::move(error_message)});
+        request.on_error(
+            Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
       } else {
         long status;
         // TODO: error handling

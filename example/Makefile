@@ -5,6 +5,7 @@ example: example.cpp $(SOURCES) $(HEADERS)
 	$(CXX) \
 		--std=c++17 \
 		-g \
+		-Og \
 		-Wall -Wextra -pedantic -Werror -Wno-non-template-friend \
 		-I../include \
 		-o $@ \

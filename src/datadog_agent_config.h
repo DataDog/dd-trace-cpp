@@ -2,6 +2,9 @@
 
 #include <memory>
 #include <string>
+#include <variant>
+
+#include "validated.h"
 
 namespace datadog {
 namespace tracing {
@@ -15,6 +18,9 @@ struct DatadogAgentConfig {
   std::string agent_url;
   int flush_interval_milliseconds;
 };
+
+std::variant<Validated<DatadogAgentConfig>, Error> validate_config(
+    const DatadogAgentConfig& config);
 
 }  // namespace tracing
 }  // namespace datadog

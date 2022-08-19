@@ -9,7 +9,7 @@ std::variant<Validated<TracerConfig>, Error> validate_config(
   TracerConfig after_env{config};
 
   if (after_env.defaults.service.empty()) {
-    return Error{1337 /* TODO */, "Service name is required."};
+    return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
   }
 
   return Validated<TracerConfig>(config, std::move(after_env));

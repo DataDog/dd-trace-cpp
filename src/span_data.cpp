@@ -66,7 +66,7 @@ std::optional<Error> msgpack_encode(std::string& destination,
   // Be sure to update `num_fields` when adding fields.
   return std::nullopt;
 } catch (const msgpackpp::pack_error& error) {
-  return Error{1337 /*TODO*/, error.what()};
+  return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }  // TODO: Should we worry about std::bad_alloc too?
 
 }  // namespace tracing
