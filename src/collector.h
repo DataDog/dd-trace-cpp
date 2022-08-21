@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -17,7 +18,7 @@ struct CollectorResponse {
 class Collector {
  public:
   virtual std::optional<Error> send(
-      std::vector<SpanData>&& spans,
+      std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::function<void(const CollectorResponse&)>& callback) = 0;
 };
 
