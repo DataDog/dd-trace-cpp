@@ -1,3 +1,12 @@
 #include "trace_sampler.h"
 
-// TODO
+namespace datadog {
+namespace tracing {
+
+TraceSampler::TraceSampler(const Validated<TraceSamplerConfig>& config) {
+  // TODO
+  (void)config;
+}
+
+}  // namespace tracing
+}  // namespace datadog

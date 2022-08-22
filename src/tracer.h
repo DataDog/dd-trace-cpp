@@ -19,8 +19,8 @@ class Tracer {
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
-  IDGenerator generator;
-  Clock clock;
+  IDGenerator generator_;
+  Clock clock_;
 
  public:
   explicit Tracer(const Validated<TracerConfig>& config);

@@ -3,7 +3,9 @@
 namespace datadog {
 namespace tracing {
 
-// TODO
+const IDGenerator default_id_generator = {
+    // TODO
+};
 
 }  // namespace tracing
 }  // namespace datadog

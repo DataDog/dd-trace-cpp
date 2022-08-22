@@ -12,7 +12,7 @@ std::variant<Validated<TracerConfig>, Error> validate_config(
     return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
   }
 
-  return Validated<TracerConfig>(config, std::move(after_env));
+  return Validated<TracerConfig>(std::move(after_env));
 }
 
 }  // namespace tracing

@@ -11,7 +11,7 @@ struct IDGenerator {
   std::function<std::uint64_t()> generate_span_id;
 };
 
-extern IDGenerator default_id_generator;
+extern const IDGenerator default_id_generator;
 
 }  // namespace tracing
 }  // namespace datadog

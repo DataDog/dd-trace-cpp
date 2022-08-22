@@ -9,29 +9,29 @@ namespace tracing {
 class Error;
 
 template <typename Config>
-class Validated {
+class Validated : public Config {
   friend std::variant<Validated<Config>, Error> validate_config(const Config&);
+  template <typename Parent, typename Child>
+  friend Validated<Child> bless(Child Parent::*member,
+                                const Validated<Parent>& parent);
 
-  Config before_env_;
-  Config after_env_;
-
-  Validated(const Config& before_env, Config&& after_env);
+  explicit Validated(const Config&);
+  explicit Validated(Config&&);
 
  public:
   Validated() = delete;
-
-  const Config& operator*() const { return after_env_; }
-  Config& operator*() { return after_env_; }
-  const Config* operator->() const { return &after_env_; }
-  Config* operator->() { return &after_env_; }
-
-  const Config& before_env() const { return before_env_; }
-  const Config& after_env() const { return after_env_; }
 };
 
 template <typename Config>
-Validated<Config>::Validated(const Config& before_env, Config&& after_env)
-    : before_env_(before_env), after_env_(std::move(after_env)) {}
+Validated<Config>::Validated(const Config& config) : Config(config) {}
+
+template <typename Config>
+Validated<Config>::Validated(Config&& config) : Config(std::move(config)) {}
+
+template <typename Parent, typename Child>
+Validated<Child> bless(Child Parent::*member, const Validated<Parent>& parent) {
+  return Validated<Child>{parent.*member};
+}
 
 }  // namespace tracing
 }  // namespace datadog
