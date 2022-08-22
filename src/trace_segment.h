@@ -21,7 +21,7 @@ class SpanSampler;
 class TraceSampler;
 
 class TraceSegment {
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
@@ -48,7 +48,17 @@ class TraceSegment {
   void span_finished();
 
   // TODO: sampling-related stuff
+
+  // TODO: This might be nice for testing.
+  template <typename Visitor>
+  void visit_spans(Visitor&& visitor) const;
 };
+
+template <typename Visitor>
+void TraceSegment::visit_spans(Visitor&& visitor) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  visitor(spans_);
+}
 
 }  // namespace tracing
 }  // namespace datadog

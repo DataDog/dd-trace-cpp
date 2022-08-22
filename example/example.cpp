@@ -4,6 +4,7 @@
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
 #include <datadog/threaded_event_scheduler.h>
+#include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -267,5 +268,10 @@ void play_with_create_span() {
 
   dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
   dd::Span span = tracer.create_span(dd::SpanConfig{});
-  (void)span;
+
+  dd::Span child = span.create_child(dd::SpanConfig{});
+  child.trace_segment().visit_spans(
+      [](const std::vector<std::unique_ptr<dd::SpanData>>& spans) {
+        std::cout << "There are " << spans.size() << " spans in the trace.\n";
+      });
 }
