@@ -9,6 +9,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <string_view>
 #include <thread>
 
 namespace dd = datadog::tracing;
@@ -21,24 +22,43 @@ void play_with_event_scheduler();
 void play_with_curl();
 void smoke();
 
-int main() {
-  play_with_config();
-  std::cout << "Done playing with config.\n";
+void usage(const char* argv0);
 
-  // play_with_cpp20_syntax();
-  // std::cout << "Done playing with C++20 syntax.\n";
+int main(int argc, char* argv[]) {
+  if (argc < 2) {
+    usage(argv[0]);
+    return 1;
+  }
 
-  // play_with_msgpack();
-  // std::cout << "Done playing with msgpack.\n";
+  for (const char* const* arg = argv + 1; *arg; ++arg) {
+    const std::string_view example = *arg;
 
-  // play_with_curl_and_event_scheduler();
-  // std::cout << "Done playing with Curl and event scheduler.\n";
+    if (example == "config") {
+      play_with_config();
+      std::cout << "Done playing with config.\n";
+    } else if (example == "cpp20_syntax") {
+      play_with_cpp20_syntax();
+      std::cout << "Done playing with C++20 syntax.\n";
+    } else if (example == "msgpack") {
+      play_with_msgpack();
+      std::cout << "Done playing with msgpack.\n";
+    } else if (example == "curl_and_event_scheduler") {
+      play_with_curl_and_event_scheduler();
+      std::cout << "Done playing with Curl and event scheduler.\n";
+    } else if (example == "curl") {
+      play_with_curl();
+      std::cout << "Done playing with Curl." << std::endl;
+    } else if (example == "event_scheduler") {
+      play_with_event_scheduler();
+      std::cout << "Done playing with event scheduler.\n";
+    } else {
+      std::cerr << "Unknown example: " << example << '\n';
+    }
+  }
+}
 
-  // play_with_curl();
-  // std::cout << "Done playing with Curl." << std::endl;
-
-  // play_with_event_scheduler();
-  // std::cout << "Done playing with event scheduler.\n";
+void usage(const char* argv0) {
+  std::cerr << "usage: " << argv0 << " EXAMPLE_NAME\n";
 }
 
 void smoke() {
