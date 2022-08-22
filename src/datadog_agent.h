@@ -13,7 +13,7 @@ class DatadogAgent : public Collector {
   explicit DatadogAgent(const DatadogAgentConfig& config);
 
   virtual std::optional<Error> send(
-      std::vector<SpanData>&& spans,
+      std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::function<void(const CollectorResponse&)>& callback) override;
 };
 
