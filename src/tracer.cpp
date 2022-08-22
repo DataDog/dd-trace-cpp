@@ -1,5 +1,7 @@
 #include "tracer.h"
 
+#include "datadog_agent.h"
+#include "span_sampler.h"
 #include "trace_sampler.h"
 
 namespace datadog {
@@ -25,13 +27,20 @@ Tracer::Tracer(const Validated<TracerConfig>& config)
 
 Tracer::Tracer(const Validated<TracerConfig>& config,
                const IDGenerator& generator, const Clock& clock)
-    : collector_(/* TODO */),
+    : collector_(/* see constructor body */),
       trace_sampler_(std::make_shared<TraceSampler>(
           bless(&TracerConfig::trace_sampler, config))),
-      span_sampler_(/* TODO */),
+      span_sampler_(std::make_shared<SpanSampler>(
+          bless(&TracerConfig::span_sampler, config))),
       generator_(generator),
       clock_(clock) {
-  (void)config;
+  if (auto* collector =
+          std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
+    collector_ = *collector;
+  } else {
+    collector_ =
+        std::make_shared<DatadogAgent>(bless(&TracerConfig::collector, config));
+  }
 }
 
 }  // namespace tracing

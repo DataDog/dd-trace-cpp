@@ -10,12 +10,15 @@ struct Error {
   std::string message;
 
   enum {
+    // TODO: enumerating all of the error codes means that
+    // every time I add an error to a component, I have to recompile
+    // all components.
     SERVICE_NAME_REQUIRED = 1,
     MESSAGEPACK_ENCODE_FAILURE = 2,
     CURL_REQUEST_FAILURE = 3,
-    YOU_DID_A_BAD_THING,
-    UH_OH_NOT_AGAIN,
-    DO_YOU_EVEN_KNOW_WHAT_SHAME_IS
+    DATADOG_AGENT_NULL_HTTP_CLIENT = 4,
+    DATADOG_AGENT_NULL_EVENT_SCHEDULER = 5,
+    DATADOG_AGENT_INVALID_FLUSH_INTERVAL = 6
   };
 };
 

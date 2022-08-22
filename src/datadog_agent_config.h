@@ -4,6 +4,7 @@
 #include <string>
 #include <variant>
 
+#include "error.h"
 #include "validated.h"
 
 namespace datadog {

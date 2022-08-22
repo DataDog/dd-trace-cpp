@@ -24,9 +24,7 @@ struct TracerConfig {
     std::optional<std::string> environment;
     std::optional<std::string> version;
     std::optional<std::string> operation;  // a.k.a. name
-    std::optional<std::string>
-        operation_override;  // TODO: will we still need this?
-                             // ...
+    // ...
   } defaults;  // TODO: Do spans inherit values from their parents, from
                // this, or from both?
 
