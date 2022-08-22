@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -10,6 +11,9 @@
 
 namespace datadog {
 namespace tracing {
+
+struct SpanConfig;
+struct SpanDefaults;
 
 struct SpanData {
   std::string service;
@@ -24,6 +28,10 @@ struct SpanData {
   bool error = false;
   std::unordered_map<std::string, std::string> tags;
   std::unordered_map<std::string, double> numeric_tags;
+
+  static std::unique_ptr<SpanData> with_config(const SpanDefaults& defaults,
+                                               const SpanConfig& config,
+                                               Clock clock);
 };
 
 std::optional<Error> msgpack_encode(std::string& destination,

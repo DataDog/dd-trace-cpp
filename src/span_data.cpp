@@ -3,9 +3,49 @@
 #include <string_view>
 
 #include "msgpackpp.h"
+#include "span_config.h"
+#include "span_defaults.h"
+#include "tags.h"
 
 namespace datadog {
 namespace tracing {
+
+std::unique_ptr<SpanData> SpanData::with_config(const SpanDefaults& defaults,
+                                                const SpanConfig& config,
+                                                Clock clock) {
+  auto span_data = std::make_unique<SpanData>();
+
+  span_data->service = config.service.value_or(defaults.service);
+  span_data->name = config.name.value_or(defaults.name);
+
+  span_data->tags = defaults.tags;
+  std::string environment = config.environment.value_or(defaults.environment);
+  if (!environment.empty()) {
+    // span_data->tags[tags::environment] = std::move(environment);
+    // span_data->tags.insert_or_assign(tags::environment,
+    // std::move(environment));
+    span_data->tags.insert_or_assign(tags::environment, environment);
+  }
+  std::string version = config.version.value_or(defaults.version);
+  if (!version.empty()) {
+    // span_data->tags[tags::version] = std::move(version);
+    // span_data->tags.insert_or_assign(tags::version, std::move(version));
+    span_data->tags.insert_or_assign(tags::version, version);
+  }
+  for (const auto& [key, value] : config.tags) {
+    span_data->tags.insert_or_assign(key, value);
+  }
+
+  span_data->resource = config.resource.value_or(span_data->name);
+  span_data->service_type = config.service_type.value_or(defaults.service_type);
+  if (config.start) {
+    span_data->start = *config.start;
+  } else {
+    span_data->start = clock();
+  }
+
+  return span_data;
+}
 
 std::optional<Error> msgpack_encode(std::string& destination,
                                     const SpanData& span) try {

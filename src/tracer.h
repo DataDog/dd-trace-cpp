@@ -21,7 +21,7 @@ class Tracer {
   std::shared_ptr<SpanSampler> span_sampler_;
   IDGenerator generator_;
   Clock clock_;
-  TracerConfig::SpanDefaults defaults_;
+  std::shared_ptr<const SpanDefaults> defaults_;
 
  public:
   explicit Tracer(const Validated<TracerConfig>& config);

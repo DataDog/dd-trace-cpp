@@ -16,6 +16,7 @@ class Collector;
 class DictReader;
 class DictWriter;
 class SpanData;
+class SpanDefaults;
 class SpanSampler;
 class TraceSampler;
 
@@ -24,6 +25,7 @@ class TraceSegment {
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
+  std::shared_ptr<const SpanDefaults> defaults_;
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   std::optional<SamplingDecision> sampling_decision_;
@@ -32,8 +34,11 @@ class TraceSegment {
   TraceSegment(const std::shared_ptr<Collector>& collector,
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
+               const std::shared_ptr<const SpanDefaults>& defaults,
                const std::optional<SamplingDecision>& sampling_decision,
                std::unique_ptr<SpanData> local_root);
+
+  const SpanDefaults& defaults() const;
 
   // These are for sampling delegation, not for trace propagation.
   std::optional<Error> extract(const DictReader& reader);

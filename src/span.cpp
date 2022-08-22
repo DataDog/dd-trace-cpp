@@ -18,7 +18,11 @@ Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
   assert(clock);
 }
 
-// TODO
+/*
+Span Span::create_child(const SpanConfig& config) const {
+  // TODO
+}
+*/
 
 }  // namespace tracing
 }  // namespace datadog
