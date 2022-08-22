@@ -13,11 +13,11 @@ digraph {
     Tracer -> "SpanSampler 🔒" [label=" shared", fontsize=8];
     Tracer -> "TraceSampler 🔒" [label=" shared", fontsize=8];
     
-    Span -> TraceSegment [label=" shared", fontsize=8];
+    Span -> "TraceSegment 🔒" [label=" shared", fontsize=8];
     Span -> SpanData [label=< <B> raw</B> >, fontsize=8];
     
-    TraceSegment -> SpanData [label=< <B> unique</B> >, fontsize=8];
-    TraceSegment -> "Collector 🔒" [label=" shared", fontsize=8];
-    TraceSegment -> "SpanSampler 🔒" [label=" shared", fontsize=8];
-    TraceSegment -> "TraceSampler 🔒" [label=" shared", fontsize=8];
+    "TraceSegment 🔒" -> SpanData [label=< <B> unique</B> >, fontsize=8];
+    "TraceSegment 🔒" -> "Collector 🔒" [label=" shared", fontsize=8];
+    "TraceSegment 🔒" -> "SpanSampler 🔒" [label=" shared", fontsize=8];
+    "TraceSegment 🔒" -> "TraceSampler 🔒" [label=" shared", fontsize=8];
 }

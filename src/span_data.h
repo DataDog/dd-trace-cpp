@@ -13,14 +13,14 @@ namespace tracing {
 
 struct SpanData {
   std::string service;
+  std::string service_type;
   std::string name;
   std::string resource;
-  std::string type;
   std::uint64_t trace_id = 0;
   std::uint64_t span_id = 0;
   std::uint64_t parent_id = 0;
   TimePoint start;
-  Duration duration;
+  Duration duration = Duration::zero();
   bool error = false;
   std::unordered_map<std::string, std::string> tags;
   std::unordered_map<std::string, double> numeric_tags;

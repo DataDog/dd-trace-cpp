@@ -1,9 +1,20 @@
 #include "error.h"
 
+#include <ostream>
+#include <sstream>
+
 namespace datadog {
 namespace tracing {
 
-// TODO
+std::ostream& operator<<(std::ostream& stream, const Error& error) {
+  return stream << "[error code " << error.code << "] " << error.message;
+}
+
+std::string Error::to_string() const {
+  std::ostringstream stream;
+  stream << *this;
+  return stream.str();
+}
 
 }  // namespace tracing
 }  // namespace datadog

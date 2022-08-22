@@ -1,13 +1,20 @@
 #pragma once
 
+#include <iosfwd>
 #include <string>
 
 namespace datadog {
 namespace tracing {
 
+struct Error;
+
+std::ostream& operator<<(std::ostream&, const Error&);
+
 struct Error {
   int code;
   std::string message;
+
+  std::string to_string() const;
 
   enum {
     // TODO: enumerating all of the error codes means that
@@ -17,8 +24,8 @@ struct Error {
     MESSAGEPACK_ENCODE_FAILURE = 2,
     CURL_REQUEST_FAILURE = 3,
     DATADOG_AGENT_NULL_HTTP_CLIENT = 4,
-    DATADOG_AGENT_NULL_EVENT_SCHEDULER = 5,
-    DATADOG_AGENT_INVALID_FLUSH_INTERVAL = 6
+    DATADOG_AGENT_INVALID_FLUSH_INTERVAL = 5,
+    NULL_COLLECTOR = 6
   };
 };
 

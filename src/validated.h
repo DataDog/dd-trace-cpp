@@ -22,7 +22,6 @@ class Validated : public Config {
   explicit Validated(const Config&);
   explicit Validated(Config&&);
 
- public:
   Validated() = delete;
 };
 

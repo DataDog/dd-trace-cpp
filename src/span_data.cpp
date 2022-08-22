@@ -61,7 +61,7 @@ std::optional<Error> msgpack_encode(std::string& destination,
   }
 
   packer.pack_str("type");
-  packer.pack_str(span.type);
+  packer.pack_str(span.service_type);
 
   // Be sure to update `num_fields` when adding fields.
   return std::nullopt;

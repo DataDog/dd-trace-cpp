@@ -7,6 +7,7 @@
 
 #include "clock.h"
 #include "error.h"
+#include "validated.h"
 
 namespace datadog {
 namespace tracing {
@@ -27,10 +28,11 @@ class Span {
        const std::function<std::uint64_t()>& generate_span_id,
        const Clock& clock);
   Span(const Span&) = delete;
+  Span(Span&&) = default;
 
   void finish();
 
-  Span create_child(const SpanConfig& config) const;
+  Span create_child(const Validated<SpanConfig>& config) const;
   // ...
 
   std::optional<std::string_view> lookup_tag(std::string_view name) const;

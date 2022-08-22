@@ -1,5 +1,6 @@
 #include <datadog/clock.h>
 #include <datadog/curl.h>
+#include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
 #include <datadog/threaded_event_scheduler.h>
@@ -14,6 +15,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_create_span();
 void play_with_config();
 void play_with_cpp20_syntax();
 void play_with_msgpack();
@@ -33,7 +35,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "config") {
+    if (example == "create_span") {
+      play_with_create_span();
+      std::cout << "Done playing with create_span.\n";
+    } else if (example == "config") {
       play_with_config();
       std::cout << "Done playing with config.\n";
     } else if (example == "cpp20_syntax") {
@@ -179,7 +184,7 @@ void play_with_msgpack() {
   span.parent_id = 789;
   span.service = "foosvc";
   span.name = "do_thing";
-  span.type = "web";
+  span.service_type = "web";
   span.tags["hello"] = "world";
   span.numeric_tags["thing"] = -0.34;
   span.start = dd::default_clock();
@@ -208,9 +213,15 @@ void play_with_cpp20_syntax() {
 }
 
 void play_with_config() {
+  const auto http_client = std::make_shared<dd::Curl>();
+
   {
     dd::TracerConfig raw_config;
     raw_config.defaults.service = "hello";
+
+    auto& agent_config = std::get<dd::DatadogAgentConfig>(raw_config.collector);
+    agent_config.http_client = http_client;
+
     auto maybe_config = dd::validate_config(raw_config);
     if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
       std::cout << "Bad config: " << error->message << '\n';
@@ -237,4 +248,24 @@ void play_with_config() {
   // ‘datadog::tracing::Validated<TracerConfig>::ValidatedTracerConfig()’"
   // dd::Validated<TracerConfig> config;
   // (void) config;
+}
+
+void play_with_create_span() {
+  const auto http_client = std::make_shared<dd::Curl>();
+
+  dd::TracerConfig config;
+  config.defaults.service = "hello";
+
+  auto& agent_config = std::get<dd::DatadogAgentConfig>(config.collector);
+  agent_config.http_client = http_client;
+
+  auto maybe_config = dd::validate_config(config);
+  if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+    std::cout << "Bad config: " << error->message << '\n';
+    return;
+  }
+
+  dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
+  dd::Span span = tracer.create_span(dd::SpanConfig{});
+  (void)span;
 }

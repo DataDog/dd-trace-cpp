@@ -15,9 +15,9 @@ class HTTPClient;
 
 struct DatadogAgentConfig {
   std::shared_ptr<HTTPClient> http_client;
-  std::shared_ptr<EventScheduler> event_scheduler;
-  std::string agent_url;
-  int flush_interval_milliseconds;
+  std::shared_ptr<EventScheduler> event_scheduler = nullptr;
+  std::string agent_url = "http://localhost:8126";
+  int flush_interval_milliseconds = 2000;
 };
 
 std::variant<Validated<DatadogAgentConfig>, Error> validate_config(
