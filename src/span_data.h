@@ -29,9 +29,8 @@ struct SpanData {
   std::unordered_map<std::string, std::string> tags;
   std::unordered_map<std::string, double> numeric_tags;
 
-  static std::unique_ptr<SpanData> with_config(const SpanDefaults& defaults,
-                                               const SpanConfig& config,
-                                               Clock clock);
+  void apply_config(const SpanDefaults& defaults, const SpanConfig& config,
+                    Clock clock);
 };
 
 std::optional<Error> msgpack_encode(std::string& destination,

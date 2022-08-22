@@ -11,19 +11,19 @@ namespace tracing {
 Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
            const std::function<std::uint64_t()>& generate_span_id,
            const Clock& clock)
-    : data_(data),
-      trace_segment_(trace_segment),
+    : trace_segment_(trace_segment),
+      data_(data),
       generate_span_id_(generate_span_id),
       clock_(clock) {
-  assert(data_);
   assert(trace_segment_);
+  assert(data_);
   assert(generate_span_id_);
   assert(clock_);
 }
 
 Span Span::create_child(const SpanConfig& config) const {
-  auto span_data =
-      SpanData::with_config(trace_segment_->defaults(), config, clock_);
+  auto span_data = std::make_unique<SpanData>();
+  span_data->apply_config(trace_segment_->defaults(), config, clock_);
   span_data->trace_id = data_->trace_id;
   span_data->parent_id = data_->span_id;
   span_data->span_id = generate_span_id_();

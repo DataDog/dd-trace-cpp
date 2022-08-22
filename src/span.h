@@ -18,8 +18,8 @@ class SpanData;
 class TraceSegment;
 
 class Span {
-  SpanData* data_;
   std::shared_ptr<TraceSegment> trace_segment_;
+  SpanData* data_;
   std::function<std::uint64_t()> generate_span_id_;
   Clock clock_;
 
@@ -36,6 +36,7 @@ class Span {
 
   std::optional<std::string_view> lookup_tag(std::string_view name) const;
   void set_tag(std::string_view name, std::string_view value);
+  void remove_tag(std::string_view name);
 
   std::optional<Error> inject(DictWriter& writer) const;
 

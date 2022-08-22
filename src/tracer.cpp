@@ -35,7 +35,8 @@ Tracer::Tracer(const Validated<TracerConfig>& config,
 }
 
 Span Tracer::create_span(const SpanConfig& config) {
-  auto span_data = SpanData::with_config(*defaults_, config, clock_);
+  auto span_data = std::make_unique<SpanData>();
+  span_data->apply_config(*defaults_, config, clock_);
   span_data->span_id = generator_.generate_span_id();
   span_data->trace_id = span_data->span_id;
   span_data->parent_id = 0;
