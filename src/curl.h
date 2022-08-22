@@ -96,9 +96,8 @@ inline Curl::~Curl() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     shutting_down_ = true;
-    CHECK curl_multi_wakeup(multi_handle_);
   }
-
+  CHECK curl_multi_wakeup(multi_handle_);
   event_loop_.join();
 }
 
@@ -152,8 +151,10 @@ inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
   // TODO: Error handling
   std::list<CURL *> node;
   node.push_back(handle);
-  std::lock_guard<std::mutex> lock(mutex_);
-  new_handles_.splice(new_handles_.end(), node);
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    new_handles_.splice(new_handles_.end(), node);
+  }
   CHECK curl_multi_wakeup(multi_handle_);
 
   return std::nullopt;
