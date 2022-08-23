@@ -54,6 +54,8 @@ std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
 }
 
 void Span::set_tag(std::string_view name, std::string_view value) {
+  // TODO: special cases for special tags.
+
   data_->tags.insert_or_assign(std::string(name), std::string(value));
 }
 
