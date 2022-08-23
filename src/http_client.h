@@ -1,8 +1,10 @@
 #pragma once
 
 #include <functional>
+#include <iosfwd>
 #include <optional>
 #include <string_view>
+#include <variant>
 
 #include "error.h"
 
@@ -18,7 +20,10 @@ class HTTPClient {
     std::string scheme;     // http, https, or unix
     std::string authority;  // domain:port or /path/to/socket
     std::string path;       // resource, e.g. /v0.4/traces
+
+    static std::variant<URL, Error> parse(std::string_view);
   };
+
   using HeadersSetter = std::function<void(DictWriter& headers)>;
   using ResponseHandler = std::function<void(
       int status, const DictReader& headers, std::string body)>;
@@ -33,6 +38,8 @@ class HTTPClient {
 
   virtual ~HTTPClient() = default;
 };
+
+std::ostream& operator<<(std::ostream&, const HTTPClient::URL&);
 
 }  // namespace tracing
 }  // namespace datadog

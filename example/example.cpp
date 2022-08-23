@@ -16,6 +16,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_parse_url();
 void play_with_span_tags();
 void play_with_create_span();
 void play_with_config();
@@ -37,7 +38,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "span_tags") {
+    if (example == "parse_url") {
+      play_with_parse_url();
+      std::cout << "Done playing with parsing URLs.\n";
+    } else if (example == "span_tags") {
       play_with_span_tags();
       std::cout << "Done playing with span tags.\n";
     } else if (example == "create_span") {
@@ -315,4 +319,27 @@ void play_with_span_tags() {
   lookup_result = span.lookup_tag("foo");
   std::cout << "result of looking up \"foo\": "
             << lookup_result.value_or("<not_found>") << '\n';
+}
+
+void play_with_parse_url() {
+  const auto try_url = [](std::string_view raw) {
+    std::cout << raw << "\n  ->  ";
+    const auto result = dd::HTTPClient::URL::parse(raw);
+    struct Visitor {
+      void operator()(const dd::HTTPClient::URL& url) const {
+        std::cout << url;
+      }
+      void operator()(const dd::Error error) const { std::cout << error; }
+    };
+    std::visit(Visitor(), result);
+    std::cout << "\n\n";
+  };
+
+  try_url("");
+  try_url("smtp://fred@flinstones.cc");
+  try_url("http://google.com");
+  try_url("http://staging.datadog.hq/something/or/another");
+  try_url("http://dd-agent:8126/api/v0.4/traces");
+  try_url("unix:///var/run/dd-agent.sock");
+  try_url("http+unix://var/run/dd-agent.sock");
 }
