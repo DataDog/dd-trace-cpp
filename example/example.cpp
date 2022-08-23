@@ -273,12 +273,7 @@ void play_with_create_span() {
   dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
   dd::Span span = tracer.create_span(dd::SpanConfig{});
 
-  auto result = span.create_child(dd::SpanConfig{});
-  if (const auto* error = std::get_if<dd::Error>(&result)) {
-    std::cout << "Error creating child span: " << *error << '\n';
-    return;
-  }
-  auto& child = std::get<dd::Span>(result);
+  dd::Span child = span.create_child(dd::SpanConfig{});
   child.trace_segment().visit_spans(
       [](const std::vector<std::unique_ptr<dd::SpanData>>& spans) {
         std::cout << "There are " << spans.size() << " spans in the trace.\n";
