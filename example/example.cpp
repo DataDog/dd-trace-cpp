@@ -40,31 +40,31 @@ int main(int argc, char* argv[]) {
 
     if (example == "parse_url") {
       play_with_parse_url();
-      std::cout << "Done playing with parsing URLs.\n";
+      std::cout << "\nDone playing with parsing URLs.\n";
     } else if (example == "span_tags") {
       play_with_span_tags();
-      std::cout << "Done playing with span tags.\n";
+      std::cout << "\nDone playing with span tags.\n";
     } else if (example == "create_span") {
       play_with_create_span();
-      std::cout << "Done playing with create_span.\n";
+      std::cout << "\nDone playing with create_span.\n";
     } else if (example == "config") {
       play_with_config();
-      std::cout << "Done playing with config.\n";
+      std::cout << "\nDone playing with config.\n";
     } else if (example == "cpp20_syntax") {
       play_with_cpp20_syntax();
-      std::cout << "Done playing with C++20 syntax.\n";
+      std::cout << "\nDone playing with C++20 syntax.\n";
     } else if (example == "msgpack") {
       play_with_msgpack();
-      std::cout << "Done playing with msgpack.\n";
+      std::cout << "\nDone playing with msgpack.\n";
     } else if (example == "curl_and_event_scheduler") {
       play_with_curl_and_event_scheduler();
-      std::cout << "Done playing with Curl and event scheduler.\n";
+      std::cout << "\nDone playing with Curl and event scheduler.\n";
     } else if (example == "curl") {
       play_with_curl();
-      std::cout << "Done playing with Curl." << std::endl;
+      std::cout << "\nDone playing with Curl." << std::endl;
     } else if (example == "event_scheduler") {
       play_with_event_scheduler();
-      std::cout << "Done playing with event scheduler.\n";
+      std::cout << "\nDone playing with event scheduler.\n";
     } else {
       std::cerr << "Unknown example: " << example << '\n';
     }
