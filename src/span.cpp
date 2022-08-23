@@ -21,7 +21,14 @@ Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
   assert(clock_);
 }
 
-Span::~Span() { trace_segment_->span_finished(); }
+Span::~Span() {
+  if (!trace_segment_) {
+    // We were moved from.
+    return;
+  }
+
+  trace_segment_->span_finished();
+}
 
 Span Span::create_child(const SpanConfig& config) const {
   auto span_data = std::make_unique<SpanData>();
