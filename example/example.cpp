@@ -16,6 +16,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_span_tags();
 void play_with_create_span();
 void play_with_config();
 void play_with_cpp20_syntax();
@@ -36,7 +37,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "create_span") {
+    if (example == "span_tags") {
+      play_with_span_tags();
+      std::cout << "Done playing with span tags.\n";
+    } else if (example == "create_span") {
       play_with_create_span();
       std::cout << "Done playing with create_span.\n";
     } else if (example == "config") {
@@ -269,9 +273,51 @@ void play_with_create_span() {
   dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
   dd::Span span = tracer.create_span(dd::SpanConfig{});
 
-  dd::Span child = span.create_child(dd::SpanConfig{});
+  auto result = span.create_child(dd::SpanConfig{});
+  if (const auto* error = std::get_if<dd::Error>(&result)) {
+    std::cout << "Error creating child span: " << *error << '\n';
+    return;
+  }
+  auto& child = std::get<dd::Span>(result);
   child.trace_segment().visit_spans(
       [](const std::vector<std::unique_ptr<dd::SpanData>>& spans) {
         std::cout << "There are " << spans.size() << " spans in the trace.\n";
       });
+}
+
+void play_with_span_tags() {
+  const auto http_client = std::make_shared<dd::Curl>();
+
+  dd::TracerConfig config;
+  config.defaults.service = "hello";
+
+  auto& agent_config = std::get<dd::DatadogAgentConfig>(config.collector);
+  agent_config.http_client = http_client;
+
+  auto maybe_config = dd::validate_config(config);
+  if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+    std::cout << "Bad config: " << error->message << '\n';
+    return;
+  }
+
+  dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
+  dd::Span span = tracer.create_span(dd::SpanConfig{});
+
+  span.set_tag("foo", "bar");
+  span.set_tag("foo", "I am foo");
+  span.set_tag("hello.world", "123");
+  auto lookup_result = span.lookup_tag("chicken");
+  std::cout << "result of looking up \"chicken\": "
+            << lookup_result.value_or("<not_found>") << '\n';
+  lookup_result = span.lookup_tag("foo");
+  std::cout << "result of looking up \"foo\": "
+            << lookup_result.value_or("<not_found>") << '\n';
+  lookup_result = span.lookup_tag("hello.world");
+  std::cout << "result of looking up \"hello.world\": "
+            << lookup_result.value_or("<not_found>") << '\n';
+  std::cout << "Removing \"foo\"...\n";
+  span.remove_tag("foo");
+  lookup_result = span.lookup_tag("foo");
+  std::cout << "result of looking up \"foo\": "
+            << lookup_result.value_or("<not_found>") << '\n';
 }

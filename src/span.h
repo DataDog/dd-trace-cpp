@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <variant>
 
 #include "clock.h"
 #include "error.h"
@@ -31,8 +32,9 @@ class Span {
   Span(Span&&) = default;
 
   void finish();
+  bool finished() const;
 
-  Span create_child(const SpanConfig& config) const;
+  std::variant<Span, Error> create_child(const SpanConfig& config) const;
 
   std::optional<std::string_view> lookup_tag(std::string_view name) const;
   void set_tag(std::string_view name, std::string_view value);
