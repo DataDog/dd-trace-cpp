@@ -23,7 +23,7 @@ std::variant<HTTPClient::URL, Error> DatadogAgentConfig::parse(
                                         separator.begin(), separator.end());
   if (after_scheme == input.end()) {
     std::string message;
-    message += "URL is missing the \"://\" separator: \"";
+    message += "Datadog Agent URL is missing the \"://\" separator: \"";
     message += input;
     message += '\"';
     return Error{Error::URL_MISSING_SEPARATOR, std::move(message)};
@@ -38,7 +38,7 @@ std::variant<HTTPClient::URL, Error> DatadogAgentConfig::parse(
     std::string message;
     message += "Unsupported URI scheme \"";
     message += scheme;
-    message += "\" in URL \"";
+    message += "\" in Datadog Agent URL \"";
     message += input;
     message += "\". The following are supported:";
     for (const auto& supported_scheme : supported) {
@@ -62,7 +62,8 @@ std::variant<HTTPClient::URL, Error> DatadogAgentConfig::parse(
     if (authority_and_path.empty() || authority_and_path[0] != '/') {
       std::string message;
       message +=
-          "Unix domain socket paths must be absolute, i.e. must begin with a "
+          "Unix domain socket paths for Datadog Agent must be absolute, i.e. "
+          "must begin with a "
           "\"/\". The path \"";
       message += authority_and_path;
       message += "\" is not absolute. Error occurred for URL: \"";
@@ -104,7 +105,12 @@ std::variant<Validated<DatadogAgentConfig>, Error> validate_config(
                  "DatadogAgent: Flush interval must be a positive number of "
                  "milliseconds."};
   }
-  // TODO: parse agent_url
+
+  auto result = config.parse(config.agent_url);
+  if (auto* error = std::get_if<Error>(&result)) {
+    return *error;
+  }
+
   return Validated<DatadogAgentConfig>{config};
 }
 

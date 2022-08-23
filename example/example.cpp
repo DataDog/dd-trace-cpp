@@ -342,4 +342,18 @@ void play_with_parse_url() {
   try_url("http://dd-agent:8126/api/v0.4/traces");
   try_url("unix:///var/run/dd-agent.sock");
   try_url("http+unix://var/run/dd-agent.sock");
+
+  const auto http_client = std::make_shared<dd::Curl>();
+  dd::DatadogAgentConfig config;
+  config.http_client = http_client;
+  config.agent_url = "unix://var/run/i.did.it.wrong.sock";
+  std::cout << config.agent_url << "\n  ->  ";
+  auto result = validate_config(config);
+  if (auto* error = std::get_if<dd::Error>(&result)) {
+    std::cout << *error;
+  } else {
+    const auto& validated = std::get<0>(result);
+    std::cout << validated.agent_url;
+  }
+  std::cout << '\n';
 }
