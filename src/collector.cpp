@@ -1,3 +1,1 @@
 #include "collector.h"
-
-// TODO
