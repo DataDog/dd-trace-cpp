@@ -324,7 +324,7 @@ void play_with_span_tags() {
 void play_with_parse_url() {
   const auto try_url = [](std::string_view raw) {
     std::cout << raw << "\n  ->  ";
-    const auto result = dd::HTTPClient::URL::parse(raw);
+    const auto result = dd::DatadogAgentConfig::parse(raw);
     struct Visitor {
       void operator()(const dd::HTTPClient::URL& url) const {
         std::cout << url;
