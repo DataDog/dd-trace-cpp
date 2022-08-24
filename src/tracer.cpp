@@ -1,6 +1,7 @@
 #include "tracer.h"
 
 #include "datadog_agent.h"
+#include "dict_reader.h"
 #include "span.h"
 #include "span_config.h"
 #include "span_data.h"
@@ -59,28 +60,38 @@ std::variant<std::uint64_t, Error> parse_uint64(std::string_view input,
 
 struct ExtractionPolicy {
   virtual std::variant<std::optional<std::uint64_t>, Error> trace_id(
-      const DictReader&) = 0;
+      const DictReader& headers) = 0;
   virtual std::variant<std::optional<std::uint64_t>, Error> parent_id(
-      const DictReader&) = 0;
+      const DictReader& headers) = 0;
   virtual std::variant<std::optional<int>, Error> sampling_priority(
-      const DictReader&) = 0;
+      const DictReader& headers) = 0;
   virtual std::variant<std::optional<std::string>, Error> origin(
-      const DictReader&) = 0;
+      const DictReader& headers) = 0;
   virtual std::variant<std::unordered_map<std::string, std::string>, Error>
   trace_tags(const DictReader&) = 0;
 };
 
 struct DatadogExtractionPolicy : public ExtractionPolicy {
   std::variant<std::optional<std::uint64_t>, Error> trace_id(
-      const DictReader&) override;
+      const DictReader& headers) override {
+    auto maybe_value = headers.lookup("x-datadog-trace-id");
+    if (!maybe_value) {
+      return std::nullopt;
+    }
+    auto result = parse_uint64(*maybe_value, 10);
+    if (auto* error = std::get_if<Error>(&result)) {
+      return error->with_prefix("Could not extract Datadog style trace ID: ");
+    }
+    return std::get<std::uint64_t>(result);
+  }
   std::variant<std::optional<std::uint64_t>, Error> parent_id(
-      const DictReader&) override;
+      const DictReader& headers) override;
   std::variant<std::optional<int>, Error> sampling_priority(
-      const DictReader&) override;
+      const DictReader& headers) override;
   std::variant<std::optional<std::string>, Error> origin(
-      const DictReader&) override;
+      const DictReader& headers) override;
   std::variant<std::unordered_map<std::string, std::string>, Error> trace_tags(
-      const DictReader&) override;
+      const DictReader& headers) override;
 };
 
 }  // namespace
