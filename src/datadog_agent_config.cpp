@@ -111,7 +111,7 @@ std::variant<Validated<DatadogAgentConfig>, Error> validate_config(
     return *error;
   }
 
-  return Validated<DatadogAgentConfig>{config};
+  return Validated<DatadogAgentConfig>{after_env};
 }
 
 }  // namespace tracing
