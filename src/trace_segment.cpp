@@ -52,10 +52,9 @@ void TraceSegment::span_finished() {
   // On the other hand, there's nobody left to contend for the mutex, so it
   // doesn't make any difference.
 
-  // All of our spans are finished.  Run the span sampler, and then send the
-  // spans to the collector.
+  // All of our spans are finished.  Run the span sampler, finalize the spans,
+  // and then send the spans to the collector.
   // TODO: span sampler
-
   // TODO: Finalize the spans, e.g. add special tags to local root span.
 
   const auto error = collector_->send(
