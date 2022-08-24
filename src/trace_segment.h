@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "error.h"
+#include "propagation_styles.h"
 #include "sampling_decision.h"
 
 namespace datadog {
@@ -26,6 +27,7 @@ class TraceSegment {
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const SpanDefaults> defaults_;
+  const PropagationStyles injection_styles_;
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   std::optional<SamplingDecision> sampling_decision_;
@@ -35,10 +37,12 @@ class TraceSegment {
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
+               const PropagationStyles& injection_styles,
                const std::optional<SamplingDecision>& sampling_decision,
                std::unique_ptr<SpanData> local_root);
 
   const SpanDefaults& defaults() const;
+  const PropagationStyles& injection_styles() const;
 
   // These are for sampling delegation, not for trace propagation.
   std::optional<Error> extract(const DictReader& reader);

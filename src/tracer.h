@@ -22,6 +22,8 @@ class Tracer {
   IDGenerator generator_;
   Clock clock_;
   std::shared_ptr<const SpanDefaults> defaults_;
+  PropagationStyles injection_styles_;
+  PropagationStyles extraction_styles_;
 
  public:
   explicit Tracer(const Validated<TracerConfig>& config);
