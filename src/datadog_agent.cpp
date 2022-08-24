@@ -1,14 +1,14 @@
 #include "datadog_agent.h"
 
 #include <cassert>
-#include <cctype>    // TODO: no
-#include <iomanip>   // TODO: no
 #include <iostream>  // TODO: no
+#include <string>
+#include <unordered_map>
 
 #include "collector_response.h"
 #include "datadog_agent_config.h"
 #include "dict_writer.h"
-#include "json.hpp" // TODO
+#include "json.hpp"
 #include "msgpackpp.h"
 #include "span_data.h"
 
@@ -61,6 +61,91 @@ std::optional<Error> msgpack_encode(
   return std::nullopt;
 }
 
+std::variant<CollectorResponse, std::string> parse_agent_traces_response(
+    std::string_view body) try {
+  nlohmann::json response = nlohmann::json::parse(body);
+
+  std::string_view type = response.type_name();
+  if (type != "object") {
+    std::string message;
+    message +=
+        "Parsing the Datadog Agent's response to traces we sent it failed.  "
+        "The response is expected to be a JSON object, but instead it's a JSON "
+        "value with type \"";
+    message += type;
+    message += '\"';
+    message += "\nError occurred for response body (begins on next line):\n";
+    message += body;
+    return message;
+  }
+
+  const std::string_view sample_rates_property = "rate_by_service";
+  const auto found = response.find(sample_rates_property);
+  if (found == response.end()) {
+    return CollectorResponse{};
+  }
+  const auto& rates_json = found.value();
+  type = rates_json.type_name();
+  if (type != "object") {
+    std::string message;
+    message +=
+        "Parsing the Datadog Agent's response to traces we sent it failed.  "
+        "The \"";
+    message += sample_rates_property;
+    message +=
+        "\" property of the response is expected to be a JSON object, but "
+        "instead it's a JSON value with type \"";
+    message += type;
+    message += '\"';
+    message += "\nError occurred for response body (begins on next line):\n";
+    message += body;
+    return message;
+  }
+
+  std::unordered_map<std::string, double> sample_rates;
+  for (const auto& [key, value] : rates_json.items()) {
+    type = value.type_name();
+    if (type != "number") {
+      std::string message;
+      message +=
+          "Datadog Agent response to traces included an invalid sample rate "
+          "for the key \"";
+      message += key;
+      message += "\". Rate should be a number, but it's a \"";
+      message += type;
+      message += "\" instead.";
+      message += "\nError occurred for response body (begins on next line):\n";
+      message += body;
+      return message;
+    }
+    const double rate = value;
+    if (!(rate >= 0 && rate <= 1)) {
+      std::string message;
+      message +=
+          "Datadog Agent response to traces included an invalid sample rate "
+          "for the key \"";
+      message += key;
+      message += "\". Rate should be between zero and one, but it's ";
+      message += std::to_string(rate);
+      message += " instead.";
+      message += "\nError occurred for response body (begins on next line):\n";
+      message += body;
+      return message;
+    }
+    sample_rates.emplace(key, rate);
+  }
+  return CollectorResponse{std::move(sample_rates)};
+} catch (const nlohmann::json::exception& error) {
+  std::string message;
+  message +=
+      "Parsing the Datadog Agent's response to traces we sent it failed with a "
+      "JSON error: ";
+  message += error.what();
+  message += "\nError occurred for response body (begins on next line):\n";
+  message += body;
+  return message;
+}
+
 }  // namespace
 
 DatadogAgent::DatadogAgent(const Validated<DatadogAgentConfig>& config)
@@ -96,6 +181,7 @@ void DatadogAgent::flush() {
     std::string body;
     if (const auto maybe_error = msgpack_encode(body, outgoing_trace_chunks_)) {
       // TODO: need a logger
+      std::cout << *maybe_error << '\n';
       (void)maybe_error;
       continue;
     }
@@ -119,20 +205,19 @@ void DatadogAgent::flush() {
             [callback = std::move(chunk.callback)](
                 int response_status, const DictReader& /*response_headers*/,
                 std::string response_body) {
-              // TODO: response handler
-              std::cout << "Received HTTP response status " << std::dec
-                        << response_status << '\n';
-              std::cout << "Received HTTP response body (begins on following "
-                           "line):\n";
-              for (const unsigned char byte : response_body) {
-                if (std::isprint(byte)) {
-                  std::cout << static_cast<char>(byte);
-                } else {
-                  std::cout << "\\x" << std::hex << std::setfill('0')
-                            << std::setw(2) << static_cast<unsigned>(byte);
-                }
+              if (response_status < 200 || response_status >= 300) {
+                // TODO: need a logger
+                std::cout << "Unexpected response status " << response_status
+                          << '\n';
+                return;
               }
-              std::cout << '\n';
+              auto result = parse_agent_traces_response(response_body);
+              if (const auto* error_message =
+                      std::get_if<std::string>(&result)) {
+                // TODO: need a logger
+                std::cout << *error_message << '\n';
+              }
+              callback(std::move(std::get<CollectorResponse>(result)));
             },
             // This is the callback for if something goes wrong sending the
             // request or retrieving the response.  It's invoked
@@ -143,7 +228,7 @@ void DatadogAgent::flush() {
                         << '\n';
             })) {
       // TODO: need logger
-      (void)maybe_error;
+      std::cout << *maybe_error << '\n';
     }
   }
 }
