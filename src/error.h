@@ -2,6 +2,7 @@
 
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 namespace datadog {
 namespace tracing {
@@ -15,6 +16,7 @@ struct Error {
   std::string message;
 
   std::string to_string() const;
+  Error with_prefix(std::string_view) const;
 
   enum {
     // TODO: enumerating all of the error codes means that
@@ -30,6 +32,11 @@ struct Error {
     URL_UNSUPPORTED_SCHEME = 8,
     URL_UNIX_DOMAIN_SOCKET_PATH_NOT_ABSOLUTE = 9,
     NO_SPAN_TO_EXTRACT = 10,
+    NOT_IMPLEMENTED = 11,
+    MISSING_SPAN_INJECTION_STYLE = 12,
+    MISSING_SPAN_EXTRACTION_STYLE = 13,
+    OUT_OF_RANGE_OF_UINT64 = 14,
+    INVALID_INTEGER = 15,
   };
 };
 

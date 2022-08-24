@@ -16,6 +16,9 @@
 #include <unistd.h>
 #endif
 
+#include <cassert>
+#include <charconv>  // for `std::from_chars`
+
 namespace datadog {
 namespace tracing {
 namespace {
@@ -28,6 +31,57 @@ std::optional<std::string> get_hostname() {
   }
   return buffer;
 }
+
+std::variant<std::uint64_t, Error> parse_uint64(std::string_view input,
+                                                int base) {
+  std::uint64_t value;
+  const auto status = std::from_chars(input.begin(), input.end(), value, base);
+  if (status.ec == std::errc::invalid_argument) {
+    std::string message;
+    message += "Is not a valid integer: \"";
+    message += input;
+    message += '\"';
+    return Error{Error::INVALID_INTEGER, std::move(message)};
+  } else if (status.ptr != input.end()) {
+    std::string message;
+    message += "Integer has trailing characters in: \"";
+    message += input;
+    message += '\"';
+    return Error{Error::INVALID_INTEGER, std::move(message)};
+  } else if (status.ec == std::errc::result_out_of_range) {
+    std::string message;
+    message += "Integer is not within the range of 64-bit unsigned: ";
+    message += input;
+    return Error{Error::OUT_OF_RANGE_OF_UINT64, std::move(message)};
+  }
+  return value;
+}
+
+struct ExtractionPolicy {
+  virtual std::variant<std::optional<std::uint64_t>, Error> trace_id(
+      const DictReader&) = 0;
+  virtual std::variant<std::optional<std::uint64_t>, Error> parent_id(
+      const DictReader&) = 0;
+  virtual std::variant<std::optional<int>, Error> sampling_priority(
+      const DictReader&) = 0;
+  virtual std::variant<std::optional<std::string>, Error> origin(
+      const DictReader&) = 0;
+  virtual std::variant<std::unordered_map<std::string, std::string>, Error>
+  trace_tags(const DictReader&) = 0;
+};
+
+struct DatadogExtractionPolicy : public ExtractionPolicy {
+  std::variant<std::optional<std::uint64_t>, Error> trace_id(
+      const DictReader&) override;
+  std::variant<std::optional<std::uint64_t>, Error> parent_id(
+      const DictReader&) override;
+  std::variant<std::optional<int>, Error> sampling_priority(
+      const DictReader&) override;
+  std::variant<std::optional<std::string>, Error> origin(
+      const DictReader&) override;
+  std::variant<std::unordered_map<std::string, std::string>, Error> trace_tags(
+      const DictReader&) override;
+};
 
 }  // namespace
 
@@ -71,6 +125,22 @@ Span Tracer::create_span(const SpanConfig& config) {
       std::nullopt /* sampling_decision */, std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
   return span;
+}
+
+std::variant<Span, Error> Tracer::extract_span(const DictReader& reader) {
+  return extract_span(reader, SpanConfig{});
+}
+
+std::variant<Span, Error> Tracer::extract_span(const DictReader& reader,
+                                               const SpanConfig& config) {
+  // TODO: I can assume this because of the current config validator.
+  assert(extraction_styles_.datadog && !extraction_styles_.b3 &&
+         !extraction_styles_.w3c);
+  // end TODO
+
+  // TODO: ExtractionPolicy
+  (void)reader;
+  (void)config;
 }
 
 }  // namespace tracing

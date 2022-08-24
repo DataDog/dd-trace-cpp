@@ -16,5 +16,11 @@ std::string Error::to_string() const {
   return stream.str();
 }
 
+Error Error::with_prefix(std::string_view prefix) const {
+  Error result = *this;
+  result.message.insert(message.begin(), prefix.begin(), prefix.end());
+  return result;
+}
+
 }  // namespace tracing
 }  // namespace datadog
