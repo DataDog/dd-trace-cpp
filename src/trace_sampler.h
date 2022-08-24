@@ -20,7 +20,7 @@ class TraceSampler {
  public:
   explicit TraceSampler(const Validated<TraceSamplerConfig>& config);
 
-  void handle_collector_response(CollectorResponse);
+  void handle_collector_response(const CollectorResponse&);
 };
 
 }  // namespace tracing

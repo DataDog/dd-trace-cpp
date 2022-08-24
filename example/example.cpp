@@ -419,16 +419,7 @@ void play_with_agent() {
         chunk.push_back(std::move(parent));
         chunk.push_back(std::move(child));
 
-        collector.send(
-            std::move(chunk), [](const dd::CollectorResponse& response) {
-              std::cout
-                  << "Collector called my response handler.  The response has "
-                  << response.sample_rate_by_key.size() << " elements:";
-              for (const auto& [key, rate] : response.sample_rate_by_key) {
-                std::cout << " \"" << key << "\"=" << rate;
-              }
-              std::cout << '\n';
-            });
+        collector.send(std::move(chunk), nullptr);
       });
 
   std::cin.get();

@@ -10,7 +10,8 @@ TraceSampler::TraceSampler(const Validated<TraceSamplerConfig>& config) {
   (void)config;
 }
 
-void TraceSampler::handle_collector_response(CollectorResponse response) {
+void TraceSampler::handle_collector_response(
+    const CollectorResponse& response) {
   const auto found =
       response.sample_rate_by_key.find(response.key_of_default_rate);
   std::lock_guard<std::mutex> lock(mutex_);
@@ -19,7 +20,7 @@ void TraceSampler::handle_collector_response(CollectorResponse response) {
     collector_default_sample_rate_ = found->second;
   }
 
-  collector_sample_rates_ = std::move(response.sample_rate_by_key);
+  collector_sample_rates_ = response.sample_rate_by_key;
 }
 
 }  // namespace tracing

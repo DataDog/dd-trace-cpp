@@ -63,11 +63,7 @@ void TraceSegment::span_finished() {
   // TODO: span sampler
   // TODO: Finalize the spans, e.g. add special tags to local root span.
 
-  const auto error = collector_->send(
-      std::move(spans_),
-      [trace_sampler_ = trace_sampler_](const CollectorResponse& response) {
-        trace_sampler_->handle_collector_response(response);
-      });
+  const auto error = collector_->send(std::move(spans_), trace_sampler_);
 
   if (error) {
     // TODO: Looks like we do need a logger.

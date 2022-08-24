@@ -14,12 +14,13 @@ namespace tracing {
 
 struct DatadogAgentConfig;
 struct SpanData;
+class TraceSampler;
 
 class DatadogAgent : public Collector {
  public:
   struct TraceChunk {
     std::vector<std::unique_ptr<SpanData>> spans;
-    std::function<void(CollectorResponse)> callback;
+    std::shared_ptr<TraceSampler> response_handler;
   };
 
  private:
@@ -41,7 +42,7 @@ class DatadogAgent : public Collector {
 
   virtual std::optional<Error> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
-      const std::function<void(CollectorResponse)>& callback) override;
+      const std::shared_ptr<TraceSampler>& response_handler) override;
 };
 
 }  // namespace tracing

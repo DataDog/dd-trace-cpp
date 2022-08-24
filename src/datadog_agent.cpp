@@ -5,6 +5,7 @@
 #include <iostream>  // TODO: no
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "collector_response.h"
 #include "datadog_agent_config.h"
@@ -12,6 +13,7 @@
 #include "json.hpp"
 #include "msgpack.h"
 #include "span_data.h"
+#include "trace_sampler.h"
 
 namespace datadog {
 namespace tracing {
@@ -159,9 +161,10 @@ DatadogAgent::~DatadogAgent() { cancel_scheduled_flush_(); }
 
 std::optional<Error> DatadogAgent::send(
     std::vector<std::unique_ptr<SpanData>>&& spans,
-    const std::function<void(CollectorResponse)>& on_response) {
+    const std::shared_ptr<TraceSampler>& response_handler) {
   std::lock_guard<std::mutex> lock(mutex_);
-  incoming_trace_chunks_.push_back(TraceChunk{std::move(spans), on_response});
+  incoming_trace_chunks_.push_back(
+      TraceChunk{std::move(spans), response_handler});
   return std::nullopt;
 }
 
@@ -173,63 +176,71 @@ void DatadogAgent::flush() {
     swap(incoming_trace_chunks_, outgoing_trace_chunks_);
   }
 
-  // For X-Datadog-Trace-Count, below.
-  const std::string trace_count = std::to_string(outgoing_trace_chunks_.size());
+  std::string body;
+  if (const auto maybe_error = msgpack_encode(body, outgoing_trace_chunks_)) {
+    // TODO: need a logger
+    std::cout << *maybe_error << '\n';
+    (void)maybe_error;
+    return;
+  }
 
+  // One HTTP request to the Agent could possibly involve trace chunks from
+  // multiple tracers, and thus multiple trace samplers might need to have
+  // their rates updated. Unlikely, but possible.
+  std::unordered_set<std::shared_ptr<TraceSampler>> response_handlers;
   for (auto& chunk : outgoing_trace_chunks_) {
-    std::string body;
-    if (const auto maybe_error = msgpack_encode(body, outgoing_trace_chunks_)) {
-      // TODO: need a logger
-      std::cout << *maybe_error << '\n';
-      (void)maybe_error;
-      continue;
-    }
+    response_handlers.insert(std::move(chunk.response_handler));
+  }
 
-    if (const auto maybe_error = http_client_->post(
-            traces_endpoint_,
-            // This is the callback for setting request headers.
-            // It's invoked synchronously (before `post` returns).
-            [&trace_count](DictWriter& headers) {
-              headers.set("Content-Type", "application/msgpack");
-              headers.set("Datadog-Meta-Lang", "cpp");
-              headers.set("Datadog-Meta-Lang-Version",
-                          std::to_string(__cplusplus));
-              headers.set("Datadog-Meta-Tracer-Version", "TODO");
-              headers.set("X-Datadog-Trace-Count", trace_count);
-            },
-            // This is the request body.
-            std::move(body),
-            // This is the callback for the HTTP response.  It's invoked
-            // asynchronously.
-            [callback = std::move(chunk.callback)](
-                int response_status, const DictReader& /*response_headers*/,
-                std::string response_body) {
-              if (response_status < 200 || response_status >= 300) {
-                // TODO: need a logger
-                std::cout << "Unexpected response status " << response_status
-                          << " with body (starts on next line):\n"
-                          << response_body << '\n';
-                return;
+  if (const auto maybe_error = http_client_->post(
+          traces_endpoint_,
+          // This is the callback for setting request headers.
+          // It's invoked synchronously (before `post` returns).
+          [this](DictWriter& headers) {
+            headers.set("Content-Type", "application/msgpack");
+            headers.set("Datadog-Meta-Lang", "cpp");
+            headers.set("Datadog-Meta-Lang-Version",
+                        std::to_string(__cplusplus));
+            headers.set("Datadog-Meta-Tracer-Version", "TODO");
+            headers.set("X-Datadog-Trace-Count",
+                        std::to_string(outgoing_trace_chunks_.size()));
+          },
+          // This is the request body.
+          std::move(body),
+          // This is the callback for the HTTP response.  It's invoked
+          // asynchronously.
+          [samplers = std::move(response_handlers)](
+              int response_status, const DictReader& /*response_headers*/,
+              std::string response_body) {
+            if (response_status < 200 || response_status >= 300) {
+              // TODO: need a logger
+              std::cout << "Unexpected response status " << response_status
+                        << " with body (starts on next line):\n"
+                        << response_body << '\n';
+              return;
+            }
+            auto result = parse_agent_traces_response(response_body);
+            if (const auto* error_message = std::get_if<std::string>(&result)) {
+              // TODO: need a logger
+              std::cout << *error_message << '\n';
+            }
+            const auto& response = std::get<CollectorResponse>(result);
+            for (const auto& sampler : samplers) {
+              if (sampler) {
+                sampler->handle_collector_response(response);
               }
-              auto result = parse_agent_traces_response(response_body);
-              if (const auto* error_message =
-                      std::get_if<std::string>(&result)) {
-                // TODO: need a logger
-                std::cout << *error_message << '\n';
-              }
-              callback(std::move(std::get<CollectorResponse>(result)));
-            },
-            // This is the callback for if something goes wrong sending the
-            // request or retrieving the response.  It's invoked
-            // asynchronously.
-            [](Error error) {
-              // TODO: error handler
-              std::cout << "Error occurred during HTTP request: " << error
-                        << '\n';
-            })) {
-      // TODO: need logger
-      std::cout << *maybe_error << '\n';
-    }
+            }
+          },
+          // This is the callback for if something goes wrong sending the
+          // request or retrieving the response.  It's invoked
+          // asynchronously.
+          [](Error error) {
+            // TODO: error handler
+            std::cout << "Error occurred during HTTP request: " << error
+                      << '\n';
+          })) {
+    // TODO: need logger
+    std::cout << *maybe_error << '\n';
   }
 }
 
