@@ -9,8 +9,27 @@
 #include "trace_sampler.h"
 #include "trace_segment.h"
 
+// for `::gethostname`
+#ifdef _MSC_VER
+#include <winsock.h>
+#else
+#include <unistd.h>
+#endif
+
 namespace datadog {
 namespace tracing {
+namespace {
+
+std::optional<std::string> get_hostname() {
+  char buffer[256];
+  if (::gethostname(buffer, sizeof buffer)) {
+    // TODO: log an error?
+    return std::nullopt;
+  }
+  return buffer;
+}
+
+}  // namespace
 
 Tracer::Tracer(const Validated<TracerConfig>& config)
     : Tracer(config, default_id_generator, default_clock) {}
@@ -26,7 +45,8 @@ Tracer::Tracer(const Validated<TracerConfig>& config,
       clock_(clock),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       injection_styles_(config.injection_styles),
-      extraction_styles_(config.extraction_styles) {
+      extraction_styles_(config.extraction_styles),
+      hostname_(config.report_hostname ? get_hostname() : std::nullopt) {
   if (auto* collector =
           std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
     collector_ = *collector;
@@ -46,7 +66,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       collector_, trace_sampler_, span_sampler_, defaults_, injection_styles_,
-      std::nullopt /* sampling_decision */, std::move(span_data));
+      hostname_, std::nullopt /* sampling_decision */, std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
   return span;
 }

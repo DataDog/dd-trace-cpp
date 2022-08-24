@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "clock.h"
 #include "error.h"
 #include "id_generator.h"
@@ -24,6 +26,7 @@ class Tracer {
   std::shared_ptr<const SpanDefaults> defaults_;
   PropagationStyles injection_styles_;
   PropagationStyles extraction_styles_;
+  std::optional<std::string> hostname_;
 
  public:
   explicit Tracer(const Validated<TracerConfig>& config);

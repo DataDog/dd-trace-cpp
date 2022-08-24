@@ -16,6 +16,7 @@ TraceSegment::TraceSegment(
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
     const PropagationStyles& injection_styles,
+    const std::optional<std::string>& hostname,
     const std::optional<SamplingDecision>& sampling_decision,
     std::unique_ptr<SpanData> local_root)
     : collector_(collector),
@@ -23,6 +24,7 @@ TraceSegment::TraceSegment(
       span_sampler_(span_sampler),
       defaults_(defaults),
       injection_styles_(injection_styles),
+      hostname_(hostname),
       num_finished_spans_(0),
       sampling_decision_(sampling_decision) {
   assert(collector_);

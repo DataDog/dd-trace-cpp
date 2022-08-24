@@ -23,11 +23,15 @@ class TraceSampler;
 
 class TraceSegment {
   mutable std::mutex mutex_;
+
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
+
   std::shared_ptr<const SpanDefaults> defaults_;
   const PropagationStyles injection_styles_;
+  const std::optional<std::string> hostname_;
+
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   std::optional<SamplingDecision> sampling_decision_;
@@ -38,6 +42,7 @@ class TraceSegment {
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
                const PropagationStyles& injection_styles,
+               const std::optional<std::string>& hostname,
                const std::optional<SamplingDecision>& sampling_decision,
                std::unique_ptr<SpanData> local_root);
 

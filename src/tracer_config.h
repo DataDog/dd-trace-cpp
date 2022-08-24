@@ -25,6 +25,8 @@ struct TracerConfig {
 
   PropagationStyles injection_styles;
   PropagationStyles extraction_styles;
+
+  bool report_hostname = false;
 };
 
 std::variant<Validated<TracerConfig>, Error> validate_config(
