@@ -14,44 +14,36 @@ namespace msgpack {
 // First, declare all functions, so that I don't have to topologically sort
 // their inline definitions.
 
-template <typename Buffer, typename Integer>
-void push_number_big_endian(Buffer& buffer, Integer integer);
+template <typename Integer>
+void push_number_big_endian(std::string& buffer, Integer integer);
 
-template <typename Buffer, typename Range>
-void push(Buffer& buffer, const Range& range);
+template <typename Range>
+void push(std::string& buffer, const Range& range);
 
-template <typename Buffer>
-void pack_nil(Buffer& buffer);
+void pack_nil(std::string& buffer);
 
-template <typename Buffer>
-void pack_negative(Buffer& buffer, std::int64_t value);
+void pack_negative(std::string& buffer, std::int64_t value);
 
-template <typename Buffer>
-void pack_nonnegative(Buffer& buffer, std::uint64_t value);
+void pack_nonnegative(std::string& buffer, std::uint64_t value);
 
-template <typename Buffer, typename T>
-void pack_integer(Buffer& buffer, T value);
+template <typename Integer>
+void pack_integer(std::string& buffer, Integer value);
 
-template <typename Buffer>
-void pack_double(Buffer& buffer, double value);
+void pack_double(std::string& buffer, double value);
 
-template <typename Buffer>
-void pack_bool(Buffer& buffer, bool value);
+void pack_bool(std::string& buffer, bool value);
 
-template <typename Buffer>
-void pack_str(Buffer& buffer, const char* cstr);
+void pack_str(std::string& buffer, const char* cstr);
 
-template <typename Buffer, typename Range>
-void pack_str(Buffer& buffer, const Range& range);
+template <typename Range>
+void pack_str(std::string& buffer, const Range& range);
 
-template <typename Buffer, typename Range>
-void pack_bin(Buffer& buffer, const Range& range);
+template <typename Range>
+void pack_bin(std::string& buffer, const Range& range);
 
-template <typename Buffer>
-void pack_array(Buffer& buffer, size_t size);
+void pack_array(std::string& buffer, size_t size);
 
-template <typename Buffer>
-void pack_map(Buffer& buffer, size_t size);
+void pack_map(std::string& buffer, size_t size);
 
 std::string make_overflow_message(std::string_view type, std::size_t actual,
                                   std::size_t max);
@@ -114,8 +106,8 @@ inline std::string make_overflow_message(std::string_view type,
   return message;
 }
 
-template <typename Buffer, typename Integer>
-void push_number_big_endian(Buffer& buffer, Integer integer) {
+template <typename Integer>
+void push_number_big_endian(std::string& buffer, Integer integer) {
   // Assume two's complement.
   const std::make_unsigned_t<Integer> value = integer;
 
@@ -138,18 +130,16 @@ void push_number_big_endian(Buffer& buffer, Integer integer) {
   buffer.append(buf, sizeof buf);
 }
 
-template <typename Buffer, typename Range>
-void push(Buffer& buffer, const Range& range) {
+template <typename Range>
+void push(std::string& buffer, const Range& range) {
   buffer.insert(buffer.end(), std::begin(range), std::end(range));
 }
 
-template <typename Buffer>
-void pack_nil(Buffer& buffer) {
+inline void pack_nil(std::string& buffer) {
   buffer.push_back(static_cast<char>(pack_type::NIL));
 }
 
-template <typename Buffer>
-void pack_negative(Buffer& buffer, std::int64_t value) {
+inline void pack_negative(std::string& buffer, std::int64_t value) {
   if (value >= -32) {
     buffer.push_back(pack_type::NEGATIVE_FIXNUM |
                      static_cast<std::uint8_t>((value + 32)));
@@ -168,8 +158,7 @@ void pack_negative(Buffer& buffer, std::int64_t value) {
   }
 }
 
-template <typename Buffer>
-void pack_nonnegative(Buffer& buffer, std::uint64_t value) {
+inline void pack_nonnegative(std::string& buffer, std::uint64_t value) {
   if (value <= 0x7F) {
     buffer.push_back(static_cast<char>(static_cast<std::uint8_t>(value)));
   } else if (value <= std::numeric_limits<std::uint8_t>::max()) {
@@ -187,8 +176,8 @@ void pack_nonnegative(Buffer& buffer, std::uint64_t value) {
   }
 }
 
-template <typename Buffer, typename T>
-void pack_integer(Buffer& buffer, T value) {
+template <typename Integer>
+void pack_integer(std::string& buffer, Integer value) {
   if (value < 0) {
     return pack_negative(buffer, value);
   } else {
@@ -196,8 +185,7 @@ void pack_integer(Buffer& buffer, T value) {
   }
 }
 
-template <typename Buffer>
-void pack_double(Buffer& buffer, double value) {
+inline void pack_double(std::string& buffer, double value) {
   buffer.push_back(static_cast<char>(pack_type::DOUBLE));
 
   // The following is lifted from the "msgpack-c" project.
@@ -221,8 +209,7 @@ void pack_double(Buffer& buffer, double value) {
   push_number_big_endian(buffer, memory.as_integer);
 }
 
-template <typename Buffer>
-void pack_bool(Buffer& buffer, bool value) {
+inline void pack_bool(std::string& buffer, bool value) {
   if (value) {
     buffer.push_back(static_cast<char>(pack_type::TRUE));
   } else {
@@ -230,13 +217,12 @@ void pack_bool(Buffer& buffer, bool value) {
   }
 }
 
-template <typename Buffer>
-void pack_str(Buffer& buffer, const char* cstr) {
+inline void pack_str(std::string& buffer, const char* cstr) {
   return pack_str(buffer, std::string_view(cstr));
 }
 
-template <typename Buffer, typename Range>
-void pack_str(Buffer& buffer, const Range& range) {
+template <typename Range>
+void pack_str(std::string& buffer, const Range& range) {
   auto size =
       static_cast<size_t>(std::distance(std::begin(range), std::end(range)));
   if (size < 32) {
@@ -261,8 +247,8 @@ void pack_str(Buffer& buffer, const Range& range) {
   }
 }
 
-template <typename Buffer, typename Range>
-void pack_bin(Buffer& buffer, const Range& range) {
+template <typename Range>
+void pack_bin(std::string& buffer, const Range& range) {
   auto size =
       static_cast<size_t>(std::distance(std::begin(range), std::end(range)));
   if (size <= std::numeric_limits<std::uint8_t>::max()) {
@@ -283,8 +269,7 @@ void pack_bin(Buffer& buffer, const Range& range) {
   }
 }
 
-template <typename Buffer>
-void pack_array(Buffer& buffer, size_t size) {
+inline void pack_array(std::string& buffer, size_t size) {
   if (size <= 15) {
     buffer.push_back(static_cast<char>(pack_type::FIX_ARRAY |
                                        static_cast<std::uint8_t>(size)));
@@ -300,8 +285,7 @@ void pack_array(Buffer& buffer, size_t size) {
   }
 }
 
-template <typename Buffer>
-void pack_map(Buffer& buffer, size_t size) {
+inline void pack_map(std::string& buffer, size_t size) {
   if (size <= 15) {
     buffer.push_back(static_cast<char>(pack_type::FIX_MAP |
                                        static_cast<std::uint8_t>(size)));
