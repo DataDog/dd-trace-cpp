@@ -1,5 +1,5 @@
 SOURCES := $(wildcard ../src/*.cpp)
-HEADERS := $(wildcard ../src/*.h) ../include/msgpackpp.h
+HEADERS := $(wildcard ../src/*.h) ../src/msgpackpp.h ../src/json.hpp
 
 example: example.cpp $(SOURCES) $(HEADERS)
 	$(CXX) \

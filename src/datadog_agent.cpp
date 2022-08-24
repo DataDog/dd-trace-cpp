@@ -8,6 +8,7 @@
 #include "collector_response.h"
 #include "datadog_agent_config.h"
 #include "dict_writer.h"
+#include "json.hpp" // TODO
 #include "msgpackpp.h"
 #include "span_data.h"
 
