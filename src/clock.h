@@ -15,7 +15,7 @@ struct TimePoint {
       std::chrono::steady_clock::time_point();
 };
 
-inline Duration operator-(const TimePoint& before, const TimePoint& after) {
+inline Duration operator-(const TimePoint& after, const TimePoint& before) {
   return after.tick - before.tick;
 }
 
