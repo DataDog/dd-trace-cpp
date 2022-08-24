@@ -189,7 +189,7 @@ void DatadogAgent::flush() {
     if (const auto maybe_error = http_client_->post(
             traces_endpoint_,
             // This is the callback for setting request headers.
-            // This is invoked immediately before `post` returns.
+            // It's invoked synchronously (before `post` returns).
             [&trace_count](DictWriter& headers) {
               headers.set("Content-Type", "application/msgpack");
               headers.set("Datadog-Meta-Lang", "cpp");
@@ -208,7 +208,8 @@ void DatadogAgent::flush() {
               if (response_status < 200 || response_status >= 300) {
                 // TODO: need a logger
                 std::cout << "Unexpected response status " << response_status
-                          << '\n';
+                          << " with body (starts on next line):\n"
+                          << response_body << '\n';
                 return;
               }
               auto result = parse_agent_traces_response(response_body);

@@ -389,8 +389,8 @@ void play_with_agent() {
     return *reinterpret_cast<std::uint64_t*>(&buffer[0]);
   };
 
-  const auto cancel = scheduler->schedule_recurring_event(
-      std::chrono::milliseconds(1000), [&]() {
+  const auto cancel =
+      scheduler->schedule_recurring_event(std::chrono::milliseconds(50), [&]() {
         // Create a trace having two spans, and then send it to the collector.
         const auto now = dd::default_clock();
         auto parent = std::make_unique<dd::SpanData>();
@@ -402,6 +402,7 @@ void play_with_agent() {
         parent->service = "dd-trace-cpp-example";
         parent->name = "do.thing";
         parent->tags[dd::tags::environment] = "dev";
+        parent->numeric_tags["_sampling_priority_v1"] = 1;
 
         auto child = std::make_unique<dd::SpanData>();
         child->start = parent->start;
