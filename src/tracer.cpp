@@ -67,6 +67,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto segment = std::make_shared<TraceSegment>(
       collector_, trace_sampler_, span_sampler_, defaults_, injection_styles_,
       hostname_, std::nullopt /* origin */,
+      std::unordered_map<std::string, std::string>{} /* trace_tags */,
       std::nullopt /* sampling_decision */, std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
   return span;

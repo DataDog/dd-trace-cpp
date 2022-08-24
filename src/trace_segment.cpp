@@ -11,15 +11,17 @@
 namespace datadog {
 namespace tracing {
 
-TraceSegment::TraceSegment(const std::shared_ptr<Collector>& collector,
-                           const std::shared_ptr<TraceSampler>& trace_sampler,
-                           const std::shared_ptr<SpanSampler>& span_sampler,
-                           const std::shared_ptr<const SpanDefaults>& defaults,
-                           const PropagationStyles& injection_styles,
-                           const std::optional<std::string>& hostname,
-                           std::optional<std::string> origin,
-                           std::optional<SamplingDecision> sampling_decision,
-                           std::unique_ptr<SpanData> local_root)
+TraceSegment::TraceSegment(
+    const std::shared_ptr<Collector>& collector,
+    const std::shared_ptr<TraceSampler>& trace_sampler,
+    const std::shared_ptr<SpanSampler>& span_sampler,
+    const std::shared_ptr<const SpanDefaults>& defaults,
+    const PropagationStyles& injection_styles,
+    const std::optional<std::string>& hostname,
+    std::optional<std::string> origin,
+    std::unordered_map<std::string, std::string> trace_tags,
+    std::optional<SamplingDecision> sampling_decision,
+    std::unique_ptr<SpanData> local_root)
     : collector_(collector),
       trace_sampler_(trace_sampler),
       span_sampler_(span_sampler),
@@ -27,6 +29,7 @@ TraceSegment::TraceSegment(const std::shared_ptr<Collector>& collector,
       injection_styles_(injection_styles),
       hostname_(hostname),
       origin_(std::move(origin)),
+      trace_tags_(std::move(trace_tags)),
       num_finished_spans_(0),
       sampling_decision_(std::move(sampling_decision)) {
   assert(collector_);
