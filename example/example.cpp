@@ -1,21 +1,28 @@
 #include <datadog/clock.h>
+#include <datadog/collector_response.h>
 #include <datadog/curl.h>
+#include <datadog/datadog_agent.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
+#include <datadog/tags.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <cassert>
 #include <chrono>
+#include <cstddef>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string_view>
 #include <thread>
 
 namespace dd = datadog::tracing;
 
+void play_with_agent();
 void play_with_parse_url();
 void play_with_span_tags();
 void play_with_create_span();
@@ -38,7 +45,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "parse_url") {
+    if (example == "agent") {
+      play_with_agent();
+      std::cout << "\nDone playing with agent.\n";
+    } else if (example == "parse_url") {
       play_with_parse_url();
       std::cout << "\nDone playing with parsing URLs.\n";
     } else if (example == "span_tags") {
@@ -356,4 +366,63 @@ void play_with_parse_url() {
     std::cout << validated.agent_url;
   }
   std::cout << '\n';
+}
+
+void play_with_agent() {
+  const auto scheduler = std::make_shared<dd::ThreadedEventScheduler>();
+  const auto http_client = std::make_shared<dd::Curl>();
+  dd::DatadogAgentConfig config;
+  config.http_client = http_client;
+  config.event_scheduler = scheduler;
+
+  const auto result = dd::validate_config(config);
+  const auto* validated =
+      std::get_if<dd::Validated<dd::DatadogAgentConfig>>(&result);
+  assert(validated);
+  dd::DatadogAgent collector{*validated};
+
+  std::ifstream dev_urandom{"/dev/urandom", std::ios::binary};
+  const auto rand_uint64 = [&dev_urandom]() {
+    char buffer[sizeof(std::uint64_t)];
+    dev_urandom.read(buffer, sizeof buffer);
+    assert(dev_urandom);
+    return *reinterpret_cast<std::uint64_t*>(&buffer[0]);
+  };
+
+  const auto cancel =
+      scheduler->schedule_recurring_event(std::chrono::seconds(1), [&]() {
+        // Create a trace having two spans, and then send it to the collector.
+        const auto now = dd::default_clock();
+        auto parent = std::make_unique<dd::SpanData>();
+        parent->start = now;
+        parent->duration = std::chrono::seconds(1);
+        parent->trace_id = rand_uint64();
+        parent->span_id = parent->trace_id;
+        parent->parent_id = 0;
+        parent->service = "dd-trace-cpp-example";
+        parent->name = "do.thing";
+        parent->tags[dd::tags::environment] = "dev";
+
+        auto child = std::make_unique<dd::SpanData>();
+        child->start = parent->start;
+        child->duration = std::chrono::milliseconds(200);
+        child->trace_id = parent->trace_id;
+        child->span_id = rand_uint64();
+        child->parent_id = parent->span_id;
+        child->service = "dd-trace-cpp-example";
+        child->name = "do.another.thing";
+        child->tags[dd::tags::environment] = "dev";
+        child->tags["editorial.note"] = "I'm the spicy one.";
+
+        std::vector<std::unique_ptr<dd::SpanData>> chunk;
+        chunk.push_back(std::move(parent));
+        chunk.push_back(std::move(child));
+
+        collector.send(std::move(chunk), [](const dd::CollectorResponse&) {
+          std::cout << "Collector called my response handler.\n";
+        });
+      });
+
+  std::cin.get();
+  cancel();
 }
