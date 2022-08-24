@@ -31,6 +31,7 @@ class TraceSegment {
   std::shared_ptr<const SpanDefaults> defaults_;
   const PropagationStyles injection_styles_;
   const std::optional<std::string> hostname_;
+  const std::optional<std::string> origin_;
 
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
@@ -43,7 +44,8 @@ class TraceSegment {
                const std::shared_ptr<const SpanDefaults>& defaults,
                const PropagationStyles& injection_styles,
                const std::optional<std::string>& hostname,
-               const std::optional<SamplingDecision>& sampling_decision,
+               std::optional<std::string> origin,
+               std::optional<SamplingDecision> sampling_decision,
                std::unique_ptr<SpanData> local_root);
 
   const SpanDefaults& defaults() const;
