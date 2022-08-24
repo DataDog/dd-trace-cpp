@@ -27,6 +27,9 @@ Span::~Span() {
     return;
   }
 
+  const auto now = clock_();
+  data_->duration = now - data_->start;
+
   trace_segment_->span_finished();
 }
 

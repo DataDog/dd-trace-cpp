@@ -176,6 +176,10 @@ void DatadogAgent::flush() {
     swap(incoming_trace_chunks_, outgoing_trace_chunks_);
   }
 
+  if (outgoing_trace_chunks_.empty()) {
+    return;
+  }
+
   std::string body;
   if (const auto maybe_error = msgpack_encode(body, outgoing_trace_chunks_)) {
     // TODO: need a logger
@@ -216,6 +220,10 @@ void DatadogAgent::flush() {
                 << response_body << '\n';
       return;
     }
+    // TODO: no
+    std::cout << "Response body (begins on next line):\n"
+              << response_body << '\n';
+    // end TODO
     auto result = parse_agent_traces_response(response_body);
     if (const auto* error_message = std::get_if<std::string>(&result)) {
       // TODO: need a logger

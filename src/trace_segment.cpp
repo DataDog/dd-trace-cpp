@@ -63,6 +63,10 @@ void TraceSegment::span_finished() {
   // TODO: span sampler
   // TODO: Finalize the spans, e.g. add special tags to local root span.
 
+  // TODO hack for now
+  spans_.front()->numeric_tags["_sampling_priority_v1"] = 1;
+  // end TODO
+
   const auto error = collector_->send(std::move(spans_), trace_sampler_);
 
   if (error) {
