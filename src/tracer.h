@@ -30,11 +30,26 @@ class Tracer {
   Tracer(const Validated<TracerConfig>& config, const IDGenerator& generator,
          const Clock& clock);
 
+  // Create a new trace and return the root span of the trace.  Optionally
+  // specify a `config` indicating the attributes of the root span.
   Span create_span(const SpanConfig& config);
 
+  // Return a span whose parent and other context is parsed from the specified
+  // `reader`, and whose attributes are determined by the optionally specified
+  // `config`.  If there is no tracing information in `reader`, then return an
+  // error with code `Error::NO_SPAN_TO_EXTRACT`.  If a failure occurs, then
+  // return an error with some other code.
   std::variant<Span, Error> extract_span(const DictReader& reader);
   std::variant<Span, Error> extract_span(const DictReader& reader,
                                          const SpanConfig& config);
+
+  // Return a span extracted from the specified `reader` (see `extract_span`).
+  // If there is no span to extract, then return a span that is the root of a
+  // new trace (see `create_span`).  Optionally specify a `config` indicating
+  // the attributes of the span.  If a failure occurs, then return an error.
+  std::variant<Span, Error> extract_or_create_span(const DictReader& reader);
+  std::variant<Span, Error> extract_or_create_span(const DictReader& reader,
+                                                   const SpanConfig& config);
 };
 
 }  // namespace tracing
