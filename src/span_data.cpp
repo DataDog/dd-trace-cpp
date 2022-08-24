@@ -1,8 +1,9 @@
 #include "span_data.h"
 
+#include <exception>
 #include <string_view>
 
-#include "msgpackpp.h"
+#include "msgpack.h"
 #include "span_config.h"
 #include "span_defaults.h"
 #include "tags.h"
@@ -39,65 +40,65 @@ void SpanData::apply_config(const SpanDefaults& defaults,
 
 std::optional<Error> msgpack_encode(std::string& destination,
                                     const SpanData& span) try {
-  msgpackpp::packer packer(&destination);
-
   // Be sure to update `num_fields` when adding fields.
   const int num_fields = 12;
-  packer.pack_map(num_fields);
+  msgpack::pack_map(destination, num_fields);
 
-  packer.pack_str("service");
-  packer.pack_str(span.service);
+  msgpack::pack_str(destination, "service");
+  msgpack::pack_str(destination, span.service);
 
-  packer.pack_str("name");
-  packer.pack_str(span.name);
+  msgpack::pack_str(destination, "name");
+  msgpack::pack_str(destination, span.name);
 
-  packer.pack_str("resource");
-  packer.pack_str(span.resource);
+  msgpack::pack_str(destination, "resource");
+  msgpack::pack_str(destination, span.resource);
 
-  packer.pack_str("trace_id");
-  packer.pack_integer(span.trace_id);
+  msgpack::pack_str(destination, "trace_id");
+  msgpack::pack_integer(destination, span.trace_id);
 
-  packer.pack_str("span_id");
-  packer.pack_integer(span.span_id);
+  msgpack::pack_str(destination, "span_id");
+  msgpack::pack_integer(destination, span.span_id);
 
-  packer.pack_str("parent_id");
-  packer.pack_integer(span.parent_id);
+  msgpack::pack_str(destination, "parent_id");
+  msgpack::pack_integer(destination, span.parent_id);
 
-  packer.pack_str("start");
-  packer.pack_integer(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                          span.start.wall.time_since_epoch())
-                          .count());
+  msgpack::pack_str(destination, "start");
+  msgpack::pack_integer(destination,
+                        std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            span.start.wall.time_since_epoch())
+                            .count());
 
-  packer.pack_str("duration");
-  packer.pack_integer(
+  msgpack::pack_str(destination, "duration");
+  msgpack::pack_integer(
+      destination,
       std::chrono::duration_cast<std::chrono::nanoseconds>(span.duration)
           .count());
 
-  packer.pack_str("error");
-  packer.pack_integer(std::int32_t(span.error));
+  msgpack::pack_str(destination, "error");
+  msgpack::pack_integer(destination, std::int32_t(span.error));
 
-  packer.pack_str("meta");
-  packer.pack_map(span.tags.size());
+  msgpack::pack_str(destination, "meta");
+  msgpack::pack_map(destination, span.tags.size());
   for (const auto& [key, value] : span.tags) {
-    packer.pack_str(key);
-    packer.pack_str(value);
+    msgpack::pack_str(destination, key);
+    msgpack::pack_str(destination, value);
   }
 
-  packer.pack_str("metrics");
-  packer.pack_map(span.numeric_tags.size());
+  msgpack::pack_str(destination, "metrics");
+  msgpack::pack_map(destination, span.numeric_tags.size());
   for (const auto& [key, value] : span.numeric_tags) {
-    packer.pack_str(key);
-    packer.pack_double(value);
+    msgpack::pack_str(destination, key);
+    msgpack::pack_double(destination, value);
   }
 
-  packer.pack_str("type");
-  packer.pack_str(span.service_type);
+  msgpack::pack_str(destination, "type");
+  msgpack::pack_str(destination, span.service_type);
 
   // Be sure to update `num_fields` when adding fields.
   return std::nullopt;
-} catch (const msgpackpp::pack_error& error) {
+} catch (const std::exception& error) {
   return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
-}  // TODO: Should we worry about std::bad_alloc too?
+}
 
 }  // namespace tracing
 }  // namespace datadog

@@ -1,6 +1,7 @@
 #include "datadog_agent.h"
 
 #include <cassert>
+#include <exception>
 #include <iostream>  // TODO: no
 #include <string>
 #include <unordered_map>
@@ -9,7 +10,7 @@
 #include "datadog_agent_config.h"
 #include "dict_writer.h"
 #include "json.hpp"
-#include "msgpackpp.h"
+#include "msgpack.h"
 #include "span_data.h"
 
 namespace datadog {
@@ -28,11 +29,8 @@ HTTPClient::URL traces_endpoint(std::string_view agent_url) {
 
 std::optional<Error> msgpack_encode(
     std::string& destination,
-    const std::vector<std::unique_ptr<SpanData>>& spans) {
-  {
-    msgpackpp::packer packer{&destination};
-    packer.pack_array(spans.size());
-  }
+    const std::vector<std::unique_ptr<SpanData>>& spans) try {
+  msgpack::pack_array(destination, spans.size());
 
   for (const auto& span_ptr : spans) {
     assert(span_ptr);
@@ -42,15 +40,14 @@ std::optional<Error> msgpack_encode(
   }
 
   return std::nullopt;
+} catch (const std::exception& error) {
+  return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }
 
 std::optional<Error> msgpack_encode(
     std::string& destination,
-    const std::vector<DatadogAgent::TraceChunk>& trace_chunks) {
-  {
-    msgpackpp::packer packer{&destination};
-    packer.pack_array(trace_chunks.size());
-  }
+    const std::vector<DatadogAgent::TraceChunk>& trace_chunks) try {
+  msgpack::pack_array(destination, trace_chunks.size());
 
   for (const auto& chunk : trace_chunks) {
     if (auto maybe_error = msgpack_encode(destination, chunk.spans)) {
@@ -59,6 +56,8 @@ std::optional<Error> msgpack_encode(
   }
 
   return std::nullopt;
+} catch (const std::exception& error) {
+  return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }
 
 std::variant<CollectorResponse, std::string> parse_agent_traces_response(

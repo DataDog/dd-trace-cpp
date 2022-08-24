@@ -10,4 +10,4 @@ cd "$repo"
 rm -rf include/datadog
 mkdir include/datadog
 cd include/datadog
-find ../../src -type f -name '*.h' -not -name 'msgpackpp.h' | xargs ln -s -t .
+find ../../src -type f -name '*.h' | xargs ln -s -t .
