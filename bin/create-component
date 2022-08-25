@@ -15,14 +15,6 @@
 create_component() {
     component=$1
 
-    if [ "$component" = "" ]; then
-        >&2 echo 'usage: bin/create-component COMPONENT_NAME'
-        exit 1
-    fi
-
-    bin_dir=$(dirname "$0")
-    cd "$bin_dir"/..
-
     >"src/$component.h" cat <<END_HEADER
 #pragma once
 
@@ -47,6 +39,14 @@ namespace tracing {
 }  // namespace datadog
 END_SOURCE
 }
+
+if [ $# -eq 0  ]; then
+    >&2 echo 'usage: bin/create-component COMPONENT_NAME'
+    exit 1
+fi
+
+bin_dir=$(dirname "$0")
+cd "$bin_dir"/..
 
 for arg in "$@"; do
     create_component "$arg"

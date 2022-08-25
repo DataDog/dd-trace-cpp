@@ -38,6 +38,7 @@ class TraceSegment {
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   std::optional<SamplingDecision> sampling_decision_;
+  bool awaiting_delegated_sampling_decision_ = false;
 
  public:
   TraceSegment(const std::shared_ptr<Collector>& collector,
@@ -52,14 +53,17 @@ class TraceSegment {
                std::unique_ptr<SpanData> local_root);
 
   const SpanDefaults& defaults() const;
-  const PropagationStyles& injection_styles() const;
   const std::optional<std::string>& hostname() const;
   const std::optional<std::string>& origin() const;
   std::optional<SamplingDecision> sampling_decision() const;
 
+  // This is for trace propagation.
+  void inject(DictWriter&, const SpanData&);
+
   // These are for sampling delegation, not for trace propagation.
+  // TODO
   std::optional<Error> extract(const DictReader& reader);
-  std::optional<Error> inject(DictWriter& writer) const;
+  void inject(DictWriter& writer) const;
 
   void register_span(std::unique_ptr<SpanData> span);
   void span_finished();
@@ -69,6 +73,9 @@ class TraceSegment {
   // TODO: This might be nice for testing.
   template <typename Visitor>
   void visit_spans(Visitor&& visitor) const;
+
+ private:
+  void make_sampling_decision_if_null();
 };
 
 template <typename Visitor>

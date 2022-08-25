@@ -11,6 +11,14 @@
 namespace datadog {
 namespace tracing {
 
+std::optional<std::string_view> SpanData::environment() const {
+  const auto found = tags.find(tags::environment);
+  if (found != tags.end()) {
+    return found->second;
+  }
+  return std::nullopt;
+}
+
 void SpanData::apply_config(const SpanDefaults& defaults,
                             const SpanConfig& config, Clock clock) {
   service = config.service.value_or(defaults.service);

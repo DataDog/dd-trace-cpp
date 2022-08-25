@@ -1,5 +1,7 @@
 #pragma once
 
+#include "sampling_mechanism.h"
+
 namespace datadog {
 namespace tracing {
 

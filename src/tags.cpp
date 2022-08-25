@@ -13,6 +13,13 @@ const std::string manual_keep = "manual.keep";
 const std::string manual_drop = "manual.drop";
 const std::string version = "version";
 
+namespace internal {
+
+const std::string propagation_error = "_dd.propagation_error";
+const std::string decision_maker = "_dd.p.dm";
+
+}  // namespace internal
+
 }  // namespace tags
 }  // namespace tracing
 }  // namespace datadog

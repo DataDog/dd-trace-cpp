@@ -103,7 +103,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
     return message;
   }
 
-  std::unordered_map<std::string, double> sample_rates;
+  std::unordered_map<std::string, Rate> sample_rates;
   for (const auto& [key, value] : rates_json.items()) {
     type = value.type_name();
     if (type != "number") {
@@ -119,21 +119,20 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
       message += body;
       return message;
     }
-    const double rate = value;
-    if (!(rate >= 0 && rate <= 1)) {
+    auto maybe_rate = Rate::from(value);
+    if (auto* error = std::get_if<Error>(&maybe_rate)) {
       std::string message;
       message +=
-          "Datadog Agent response to traces included an invalid sample rate "
+          "Datadog Agent response trace traces included an invalid sample rate "
           "for the key \"";
       message += key;
-      message += "\". Rate should be between zero and one, but it's ";
-      message += std::to_string(rate);
-      message += " instead.";
+      message += "\": ";
+      message += error->message;
       message += "\nError occurred for response body (begins on next line):\n";
       message += body;
       return message;
     }
-    sample_rates.emplace(key, rate);
+    sample_rates.emplace(key, std::get<Rate>(maybe_rate));
   }
   return CollectorResponse{std::move(sample_rates)};
 } catch (const nlohmann::json::exception& error) {

@@ -1,7 +1,9 @@
 #include "span.h"
 
 #include <cassert>
+#include <string>
 
+#include "dict_writer.h"
 #include "span_data.h"
 #include "trace_segment.h"
 
@@ -44,6 +46,10 @@ Span Span::create_child(const SpanConfig& config) const {
   trace_segment_->register_span(std::move(span_data));
   // TODO: Consider making `generate_span_id` a method of `TraceSegment`.
   return Span(span_data_ptr, trace_segment_, generate_span_id_, clock_);
+}
+
+void Span::inject(DictWriter& writer) const {
+  trace_segment_->inject(writer, *data_);
 }
 
 std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {

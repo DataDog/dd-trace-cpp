@@ -218,6 +218,7 @@ std::variant<Span, Error> Tracer::extract_span(const DictReader& reader,
   std::optional<std::uint64_t> parent_id;
   std::optional<std::string> origin;
   std::unordered_map<std::string, std::string> trace_tags;
+  std::optional<std::string> trace_tags_extraction_error;
   std::optional<SamplingDecision> sampling_decision;
   // TODO: Whether the requester delegated its sampling decision will also be
   // important eventually.
@@ -274,9 +275,9 @@ std::variant<Span, Error> Tracer::extract_span(const DictReader& reader,
   auto sampling_priority = std::get<0>(maybe_sampling_priority);
   if (sampling_priority) {
     SamplingDecision decision;
-    decision.keep = *sampling_priority > 0;
-    // We might have something to say about `decision.mechanism` later when
-    // "trace tags" are extracted.  For now we don't know the mechanism.
+    decision.priority = *sampling_priority;
+    // `decision.mechanism` is null.  We might be able to infer it once we
+    // extract `trace_tags`, but we would have no use for it, so we won't.
     decision.origin = SamplingDecision::Origin::EXTRACTED;
 
     sampling_decision = decision;
@@ -287,8 +288,11 @@ std::variant<Span, Error> Tracer::extract_span(const DictReader& reader,
     // Failure to parse trace tags is tolerated, with a diagnostic.
     // TODO: need a logger
     std::cout << *error << '\n';
-    // TODO: mark that extracting this failed, so we can set a tag on the span.
-    // _dd.propagation_error:decoding_error
+    if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
+      trace_tags_extraction_error = "extract_max_size";
+    } else {
+      trace_tags_extraction_error = "decoding_error";
+    }
   } else {
     trace_tags = std::get<0>(maybe_trace_tags);
   }
@@ -303,6 +307,10 @@ std::variant<Span, Error> Tracer::extract_span(const DictReader& reader,
   span_data->span_id = generator_.generate_span_id();
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
+  if (trace_tags_extraction_error) {
+    span_data->tags[tags::internal::propagation_error] =
+        *trace_tags_extraction_error;
+  }
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(

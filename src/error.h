@@ -12,13 +12,7 @@ struct Error;
 std::ostream& operator<<(std::ostream&, const Error&);
 
 struct Error {
-  int code;
-  std::string message;
-
-  std::string to_string() const;
-  Error with_prefix(std::string_view) const;
-
-  enum {
+  enum Code {
     SERVICE_NAME_REQUIRED = 1,
     MESSAGEPACK_ENCODE_FAILURE = 2,
     CURL_REQUEST_FAILURE = 3,
@@ -35,7 +29,15 @@ struct Error {
     OUT_OF_RANGE_INTEGER = 14,
     INVALID_INTEGER = 15,
     MISSING_PARENT_SPAN_ID = 16,
+    RATE_OUT_OF_RANGE = 17,
+    TRACE_TAGS_EXCEED_MAXIMUM_LENGTH = 18,
   };
+
+  Code code;
+  std::string message;
+
+  std::string to_string() const;
+  Error with_prefix(std::string_view) const;
 };
 
 }  // namespace tracing

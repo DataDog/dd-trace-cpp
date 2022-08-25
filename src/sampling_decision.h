@@ -11,10 +11,9 @@ namespace tracing {
 struct SamplingDecision {
   enum class Origin { EXTRACTED, LOCAL, DELEGATED };
 
-  bool keep;
-  std::optional<SamplingMechanism> mechanism;
+  int priority;
+  std::optional<int> mechanism;
   Origin origin;
-  bool awaiting_delegated_decision;
 
   // TODO: I'm using this during development.  Not sure
   // if it's worth keeping.  Maybe for error messages.

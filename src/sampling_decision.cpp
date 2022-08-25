@@ -1,15 +1,14 @@
 #include "sampling_decision.h"
 
-#include <iomanip>
 #include <ostream>
 
 namespace datadog {
 namespace tracing {
 
 void SamplingDecision::to_json(std::ostream& stream) const {
-  stream << "{\"keep\": " << std::boolalpha << keep << ", \"mechanism\": ";
+  stream << "{\"priority\": " << priority << ", \"mechanism\": ";
   if (mechanism) {
-    stream << int(*mechanism);
+    stream << *mechanism;
   } else {
     stream << "null";
   }
@@ -25,9 +24,7 @@ void SamplingDecision::to_json(std::ostream& stream) const {
       stream << "DELEGATED(";
       break;
   }
-  stream << int(origin)
-         << ")\", \"awaiting_delegated_decision\": " << std::boolalpha
-         << awaiting_delegated_decision << "}";
+  stream << int(origin) << ")\"}";
 }
 
 }  // namespace tracing

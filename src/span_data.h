@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 #include "clock.h"
@@ -28,6 +29,8 @@ struct SpanData {
   bool error = false;
   std::unordered_map<std::string, std::string> tags;
   std::unordered_map<std::string, double> numeric_tags;
+
+  std::optional<std::string_view> environment() const;
 
   void apply_config(const SpanDefaults& defaults, const SpanConfig& config,
                     Clock clock);

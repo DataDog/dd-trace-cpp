@@ -38,7 +38,7 @@ class Span {
   void set_tag(std::string_view name, std::string_view value);
   void remove_tag(std::string_view name);
 
-  std::optional<Error> inject(DictWriter& writer) const;
+  void inject(DictWriter& writer) const;
 
   TraceSegment& trace_segment();
   const TraceSegment& trace_segment() const;

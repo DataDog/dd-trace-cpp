@@ -7,7 +7,7 @@ namespace datadog {
 namespace tracing {
 
 std::ostream& operator<<(std::ostream& stream, const Error& error) {
-  return stream << "[error code " << error.code << "] " << error.message;
+  return stream << "[error code " << int(error.code) << "] " << error.message;
 }
 
 std::string Error::to_string() const {
