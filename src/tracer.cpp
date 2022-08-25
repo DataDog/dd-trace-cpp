@@ -205,12 +205,12 @@ Span Tracer::create_span(const SpanConfig& config) {
   return span;
 }
 
-std::variant<Span, Error> Tracer::extract_span(const DictReader& reader) {
+Expected<Span> Tracer::extract_span(const DictReader& reader) {
   return extract_span(reader, SpanConfig{});
 }
 
-std::variant<Span, Error> Tracer::extract_span(const DictReader& reader,
-                                               const SpanConfig& config) {
+Expected<Span> Tracer::extract_span(const DictReader& reader,
+                                    const SpanConfig& config) {
   // TODO: I can assume this because of the current config validator.
   assert(extraction_styles_.datadog && !extraction_styles_.b3 &&
          !extraction_styles_.w3c);

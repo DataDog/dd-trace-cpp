@@ -4,6 +4,7 @@
 
 #include "clock.h"
 #include "error.h"
+#include "expected.h"
 #include "id_generator.h"
 #include "span.h"
 #include "tracer_config.h"
@@ -42,9 +43,9 @@ class Tracer {
   // `config`.  If there is no tracing information in `reader`, then return an
   // error with code `Error::NO_SPAN_TO_EXTRACT`.  If a failure occurs, then
   // return an error with some other code.
-  std::variant<Span, Error> extract_span(const DictReader& reader);
-  std::variant<Span, Error> extract_span(const DictReader& reader,
-                                         const SpanConfig& config);
+  Expected<Span> extract_span(const DictReader& reader);
+  Expected<Span> extract_span(const DictReader& reader,
+                              const SpanConfig& config);
 
   // Return a span extracted from the specified `reader` (see `extract_span`).
   // If there is no span to extract, then return a span that is the root of a
