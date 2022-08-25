@@ -27,6 +27,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_inject();
 void play_with_extract();
 void play_with_agent();
 void play_with_parse_url();
@@ -51,7 +52,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "extract") {
+    if (example == "inject") {
+      play_with_inject();
+      std::cout << "\nDone playing with inject.\n";
+    } else if (example == "extract") {
       play_with_extract();
       std::cout << "\nDone playing with extract.\n";
     } else if (example == "agent") {
@@ -513,4 +517,34 @@ void play_with_extract() {
                 << "parent_id: " << span_data.parent_id << '\n';
     }
   });
+}
+
+class HeaderStreamWriter : public dd::DictWriter {
+  std::ostream* stream_;
+
+ public:
+  explicit HeaderStreamWriter(std::ostream& stream) : stream_(&stream) {}
+
+  void set(std::string_view key, std::string_view value) {
+    *stream_ << key << ": " << value << "\r\n";
+  }
+};
+
+void play_with_inject() {
+  dd::TracerConfig config;
+  config.defaults.service = "hello";
+  config.collector = std::make_shared<NoOpCollector>();
+
+  auto maybe_config = dd::validate_config(config);
+  if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+    std::cout << "Bad config: " << error->message << '\n';
+    return;
+  }
+  dd::Tracer tracer{std::get<0>(maybe_config)};
+
+  dd::Span span = tracer.create_span(dd::SpanConfig{});
+
+  HeaderStreamWriter writer{std::cout};
+  std::cout << '\n';
+  span.inject(writer);
 }
