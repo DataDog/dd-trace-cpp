@@ -1,7 +1,9 @@
 #include <datadog/clock.h>
+#include <datadog/collector.h>
 #include <datadog/collector_response.h>
 #include <datadog/curl.h>
 #include <datadog/datadog_agent.h>
+#include <datadog/dict_reader.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
@@ -12,16 +14,20 @@
 #include <datadog/tracer_config.h>
 
 #include <cassert>
+#include <cctype>
 #include <chrono>
 #include <cstddef>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 
 namespace dd = datadog::tracing;
 
+void play_with_extract();
 void play_with_agent();
 void play_with_parse_url();
 void play_with_span_tags();
@@ -45,7 +51,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "agent") {
+    if (example == "extract") {
+      play_with_extract();
+      std::cout << "\nDone playing with extract.\n";
+    } else if (example == "agent") {
       play_with_agent();
       std::cout << "\nDone playing with agent.\n";
     } else if (example == "parse_url") {
@@ -424,4 +433,84 @@ void play_with_agent() {
 
   std::cin.get();
   cancel();
+}
+
+class NoOpCollector : public dd::Collector {
+ public:
+  std::optional<dd::Error> send(
+      std::vector<std::unique_ptr<dd::SpanData>>&&,
+      const std::shared_ptr<dd::TraceSampler>&) override {
+    return std::nullopt;
+  }
+};
+
+class LowerCaseMapReader : public dd::DictReader {
+  const std::unordered_map<std::string, std::string>* map_;
+  mutable std::string buffer_;
+
+ public:
+  explicit LowerCaseMapReader(
+      const std::unordered_map<std::string, std::string>& map)
+      : map_(&map) {}
+
+  std::optional<std::string_view> lookup(std::string_view key) const override {
+    buffer_.clear();
+    std::transform(key.begin(), key.end(), std::back_inserter(buffer_),
+                   [](unsigned char ch) { return std::tolower(ch); });
+    auto found = map_->find(buffer_);
+    if (found == map_->end()) {
+      return std::nullopt;
+    }
+    return found->second;
+  }
+
+  void visit(
+      const std::function<void(std::string_view key, std::string_view value)>&
+          visitor) const override {
+    for (const auto& [key, value] : *map_) {
+      visitor(key, value);
+    }
+  }
+};
+
+void play_with_extract() {
+  dd::TracerConfig config;
+  config.defaults.service = "hello";
+  config.collector = std::make_shared<NoOpCollector>();
+
+  auto maybe_config = dd::validate_config(config);
+  if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+    std::cout << "Bad config: " << error->message << '\n';
+    return;
+  }
+  dd::Tracer tracer{std::get<0>(maybe_config)};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "123"},
+      {"x-datadog-parent-id", "456"},
+      {"x-datadog-sampling-priority", "0"},
+      {"x-frobnostication-index", "-1"}};
+
+  auto maybe_span = tracer.extract_span(LowerCaseMapReader{headers});
+  if (auto* error = std::get_if<dd::Error>(&maybe_span)) {
+    std::cout << *error << '\n';
+    return;
+  }
+  auto& span = std::get<dd::Span>(maybe_span);
+  std::cout << "sampling_decision: ";
+  if (const auto& decision = span.trace_segment().sampling_decision()) {
+    decision->to_json(std::cout);
+  }
+  std::cout << "\norigin: " << span.trace_segment().origin().value_or("");
+  // TODO trace tags
+  std::cout << "\nspans:\n";
+  span.trace_segment().visit_spans([](const auto& spans) {
+    for (const auto& span_data_ptr : spans) {
+      const auto& span_data = *span_data_ptr;
+      std::cout << "-------------------\n"
+                << "trace_id: " << span_data.trace_id << '\n'
+                << "span_id: " << span_data.span_id << '\n'
+                << "parent_id: " << span_data.parent_id << '\n';
+    }
+  });
 }

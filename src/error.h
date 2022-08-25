@@ -19,9 +19,6 @@ struct Error {
   Error with_prefix(std::string_view) const;
 
   enum {
-    // TODO: enumerating all of the error codes means that
-    // every time I add an error to a component, I have to recompile
-    // all components.
     SERVICE_NAME_REQUIRED = 1,
     MESSAGEPACK_ENCODE_FAILURE = 2,
     CURL_REQUEST_FAILURE = 3,
@@ -35,8 +32,9 @@ struct Error {
     NOT_IMPLEMENTED = 11,
     MISSING_SPAN_INJECTION_STYLE = 12,
     MISSING_SPAN_EXTRACTION_STYLE = 13,
-    OUT_OF_RANGE_OF_UINT64 = 14,
+    OUT_OF_RANGE_INTEGER = 14,
     INVALID_INTEGER = 15,
+    MISSING_PARENT_SPAN_ID = 16,
   };
 };
 

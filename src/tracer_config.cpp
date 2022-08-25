@@ -19,9 +19,9 @@ std::variant<Validated<TracerConfig>, Error> validate_config(
     }
   } else {
     const auto& agent_config = std::get<DatadogAgentConfig>(config.collector);
-    const auto result = validate_config(agent_config);
-    if (const auto* error = std::get_if<Error>(&result)) {
-      return *error;
+    auto result = validate_config(agent_config);
+    if (auto* error = std::get_if<Error>(&result)) {
+      return std::move(*error);
     }
     after_env.collector = std::get<Validated<DatadogAgentConfig>>(result);
   }

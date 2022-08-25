@@ -53,6 +53,9 @@ class TraceSegment {
 
   const SpanDefaults& defaults() const;
   const PropagationStyles& injection_styles() const;
+  const std::optional<std::string>& hostname() const;
+  const std::optional<std::string>& origin() const;
+  std::optional<SamplingDecision> sampling_decision() const;
 
   // These are for sampling delegation, not for trace propagation.
   std::optional<Error> extract(const DictReader& reader);

@@ -108,7 +108,7 @@ std::variant<Validated<DatadogAgentConfig>, Error> validate_config(
 
   auto result = config.parse(config.agent_url);
   if (auto* error = std::get_if<Error>(&result)) {
-    return *error;
+    return std::move(*error);
   }
 
   return Validated<DatadogAgentConfig>{after_env};

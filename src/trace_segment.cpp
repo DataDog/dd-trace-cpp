@@ -46,6 +46,20 @@ const PropagationStyles& TraceSegment::injection_styles() const {
   return injection_styles_;
 }
 
+const std::optional<std::string>& TraceSegment::hostname() const {
+  return hostname_;
+}
+
+const std::optional<std::string>& TraceSegment::origin() const {
+  return origin_;
+}
+
+std::optional<SamplingDecision> TraceSegment::sampling_decision() const {
+  // `sampling_decision_` can change, so we need a lock.
+  std::lock_guard<std::mutex> lock(mutex_);
+  return sampling_decision_;
+}
+
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
