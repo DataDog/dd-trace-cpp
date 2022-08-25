@@ -227,6 +227,7 @@ void DatadogAgent::flush() {
     if (const auto* error_message = std::get_if<std::string>(&result)) {
       // TODO: need a logger
       std::cout << *error_message << '\n';
+      return;
     }
     const auto& response = std::get<CollectorResponse>(result);
     for (const auto& sampler : samplers) {

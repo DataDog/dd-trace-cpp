@@ -17,16 +17,20 @@
 #include <cctype>
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace dd = datadog::tracing;
 
+void play_with_propagation(int argc, const char* const* argv);
 void play_with_inject();
 void play_with_extract();
 void play_with_agent();
@@ -52,7 +56,9 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "inject") {
+    if (example == "propagation") {
+      play_with_propagation(argc, argv);
+    } else if (example == "inject") {
       play_with_inject();
       std::cout << "\nDone playing with inject.\n";
     } else if (example == "extract") {
@@ -547,4 +553,115 @@ void play_with_inject() {
   HeaderStreamWriter writer{std::cout};
   std::cout << '\n';
   span.inject(writer);
+}
+
+// single quoting
+std::string quote(std::string_view value) {
+  std::string result;
+  result += '\'';
+  for (const char ch : value) {
+    result += ch;
+    if (ch == '\'') {
+      // end quote, escape a quote character, begin a new quote
+      result += "'\\''";
+    }
+  }
+  result += '\'';
+  return result;
+}
+
+class ShellDictWriter : public dd::DictWriter {
+  std::vector<std::string>* output_;
+
+ public:
+  explicit ShellDictWriter(std::vector<std::string>& output)
+      : output_(&output) {}
+
+  void set(std::string_view key, std::string_view value) {
+    output_->push_back(quote(key));
+    output_->push_back(quote(value));
+  }
+};
+
+void play_with_propagation(int argc, const char* const* argv) {
+  std::string service;
+  if (argc < 3) {
+    service = "dd-trace-cpp-example-sender";
+  } else {
+    service = "dd-trace-cpp-example-receiver";
+  }
+
+  const auto http_client = std::make_shared<dd::Curl>();
+  dd::DatadogAgentConfig agent_config;
+  agent_config.http_client = http_client;
+  dd::TracerConfig config;
+  config.collector = agent_config;
+  config.defaults.service = service;
+  const auto validated = dd::validate_config(config);
+  if (const auto* error = std::get_if<dd::Error>(&validated)) {
+    std::cout << "Invalid tracer config: " << *error << '\n';
+    return;
+  }
+  dd::Tracer tracer{std::get<0>(validated)};
+
+  if (service == "dd-trace-cpp-example-sender") {
+    std::cout << "I'm the sender.\n";
+    dd::SpanConfig properties;
+    properties.name = "send.something";
+    {
+      dd::Span root = tracer.create_span(properties);
+      root.set_tag("poutine", "michigan");
+
+      std::vector<std::string> args{quote(argv[0]), quote(argv[1])};
+      ShellDictWriter writer{args};
+      root.inject(writer);
+      std::string command;
+      std::cout << '$';
+      for (const auto& arg : args) {
+        std::cout << ' ' << arg;
+        command += ' ';
+        command += arg;
+      }
+      std::cout << '\n';
+      std::cout << "Sending request.\n";
+      int rc = std::system(command.c_str());
+      (void)rc;
+      std::cout << "Done sending request.\n";
+    }
+    // Give the collector time to do its thing.
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+  } else {
+    std::cout << "I'm the receiver.\n";
+
+    // Parse "headers" from the command line arguments.
+    std::unordered_map<std::string, std::string> headers;
+    for (const char* const* arg = argv + 2; *arg; ++arg) {
+      std::string key = *arg;
+      std::transform(key.begin(), key.end(), key.begin(),
+                     [](unsigned char ch) { return std::tolower(ch); });
+
+      ++arg;
+      assert(arg);
+      std::string value = *arg;
+      headers.emplace(std::move(key), std::move(value));
+    }
+
+    dd::SpanConfig properties;
+    properties.name = "receive.something";
+    {
+      auto maybe_span =
+          tracer.extract_span(LowerCaseMapReader{headers}, properties);
+      if (auto* error = std::get_if<dd::Error>(&maybe_span)) {
+        std::cout << "Unable to extract span: " << *error << '\n';
+        return;
+      }
+      dd::Span& child = std::get<dd::Span>(maybe_span);
+      child.set_tag("bacon.number", "7");
+      std::cout << "Extracted a span :D\n";
+      // Give the span some duration.
+      std::this_thread::sleep_for(std::chrono::seconds(3));
+    }
+    // Give the collector time to do its thing.
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+  }
 }

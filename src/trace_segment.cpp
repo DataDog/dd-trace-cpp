@@ -50,7 +50,10 @@ class DatadogInjectionPolicy : public InjectionPolicy {
 
   std::optional<Error> trace_tags(
       DictWriter&,
-      const std::unordered_map<std::string, std::string>&) override {
+      const std::unordered_map<std::string, std::string>& tags) override {
+    if (tags.empty()) {
+      return std::nullopt;
+    }
     // TODO
     return Error{Error::NOT_IMPLEMENTED,
                  "Trace tags are not yet implemented, so I'm not going to "

@@ -71,7 +71,8 @@ std::variant<int, Error> parse_int(std::string_view input, int base) {
   return parse_integer<int>(input, base, "int");
 }
 
-struct ExtractionPolicy {
+class ExtractionPolicy {
+ public:
   virtual std::variant<std::optional<std::uint64_t>, Error> trace_id(
       const DictReader& headers) = 0;
   virtual std::variant<std::optional<std::uint64_t>, Error> parent_id(
@@ -83,7 +84,7 @@ struct ExtractionPolicy {
   trace_tags(const DictReader&) = 0;
 };
 
-struct DatadogExtractionPolicy : public ExtractionPolicy {
+class DatadogExtractionPolicy : public ExtractionPolicy {
   std::variant<std::optional<std::uint64_t>, Error> id(
       const DictReader& headers, std::string_view header,
       std::string_view kind) {
@@ -106,6 +107,7 @@ struct DatadogExtractionPolicy : public ExtractionPolicy {
     return std::get<std::uint64_t>(result);
   }
 
+ public:
   std::variant<std::optional<std::uint64_t>, Error> trace_id(
       const DictReader& headers) override {
     return id(headers, "x-datadog-trace-id", "trace");
