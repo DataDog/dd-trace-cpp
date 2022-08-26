@@ -396,8 +396,8 @@ void play_with_agent() {
     return *reinterpret_cast<std::uint64_t*>(&buffer[0]);
   };
 
-  const auto cancel =
-      scheduler->schedule_recurring_event(std::chrono::milliseconds(50), [&]() {
+  const auto cancel = scheduler->schedule_recurring_event(
+      std::chrono::milliseconds(1000), [&]() {
         // Create a trace having two spans, and then send it to the collector.
         const auto now = dd::default_clock();
         auto parent = std::make_unique<dd::SpanData>();

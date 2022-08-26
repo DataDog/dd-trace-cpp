@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <exception>
-#include <iostream>  // TODO: no
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -53,8 +52,8 @@ Expected<void> msgpack_encode(
   msgpack::pack_array(destination, trace_chunks.size());
 
   for (const auto& chunk : trace_chunks) {
-    if (auto maybe_error = msgpack_encode(destination, chunk.spans)) {
-      return maybe_error;
+    if (auto* error = msgpack_encode(destination, chunk.spans).if_error()) {
+      return *error;
     }
   }
 
@@ -186,8 +185,7 @@ void DatadogAgent::flush() {
 
   std::string body;
   if (auto* error = msgpack_encode(body, outgoing_trace_chunks_).if_error()) {
-    // TODO: need a logger
-    std::cout << *error << '\n';
+    logger_->log_error([&](auto& stream) { stream << *error; });
     return;
   }
 
@@ -212,25 +210,22 @@ void DatadogAgent::flush() {
 
   // This is the callback for the HTTP response.  It's invoked
   // asynchronously.
-  auto on_response = [samplers = std::move(response_handlers)](
-                         int response_status,
-                         const DictReader& /*response_headers*/,
-                         std::string response_body) {
+  auto on_response = [samplers = std::move(response_handlers),
+                      logger = logger_](int response_status,
+                                        const DictReader& /*response_headers*/,
+                                        std::string response_body) {
     if (response_status < 200 || response_status >= 300) {
-      // TODO: need a logger
-      std::cout << "Unexpected response status " << response_status
-                << " with body (starts on next line):\n"
-                << response_body << '\n';
+      logger->log_error([&](auto& stream) {
+        stream << "Unexpected response status " << response_status
+               << " with body (starts on next line):\n"
+               << response_body;
+      });
       return;
     }
-    // TODO: no
-    std::cout << "Response body (begins on next line):\n"
-              << response_body << '\n';
-    // end TODO
+
     auto result = parse_agent_traces_response(response_body);
     if (const auto* error_message = std::get_if<std::string>(&result)) {
-      // TODO: need a logger
-      std::cout << *error_message << '\n';
+      logger->log_error([&](auto& stream) { stream << *error_message; });
       return;
     }
     const auto& response = std::get<CollectorResponse>(result);
@@ -244,18 +239,24 @@ void DatadogAgent::flush() {
   // This is the callback for if something goes wrong sending the
   // request or retrieving the response.  It's invoked
   // asynchronously.
-  auto on_error = [](Error error) {
-    // TODO: error handler
-    std::cout << "Error occurred during HTTP request: " << error << '\n';
+  auto on_error = [logger = logger_](Error error) {
+    logger->log_error([&](auto& stream) {
+      stream << "Error occurred during HTTP request: " << error;
+    });
   };
 
+  // TODO: no
+  logger_->log_error([&](auto& stream) {
+    stream << "About to send " << outgoing_trace_chunks_.size()
+           << " trace chunks.";
+  });
+  // end TODO
   if (auto* error = http_client_
                         ->post(traces_endpoint_, std::move(set_request_headers),
                                std::move(body), std::move(on_response),
                                std::move(on_error))
                         .if_error()) {
-    // TODO: need logger
-    std::cout << *error << '\n';
+    logger_->log_error([&](auto& stream) { stream << *error; });
   }
 }
 
