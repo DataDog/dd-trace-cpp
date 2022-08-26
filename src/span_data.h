@@ -8,7 +8,7 @@
 #include <unordered_map>
 
 #include "clock.h"
-#include "error.h"
+#include "expected.h"
 
 namespace datadog {
 namespace tracing {
@@ -36,8 +36,7 @@ struct SpanData {
                     Clock clock);
 };
 
-std::optional<Error> msgpack_encode(std::string& destination,
-                                    const SpanData& span);
+Expected<void> msgpack_encode(std::string& destination, const SpanData& span);
 
 }  // namespace tracing
 }  // namespace datadog

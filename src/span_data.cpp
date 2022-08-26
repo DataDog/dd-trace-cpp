@@ -3,6 +3,7 @@
 #include <exception>
 #include <string_view>
 
+#include "error.h"
 #include "msgpack.h"
 #include "span_config.h"
 #include "span_defaults.h"
@@ -46,8 +47,8 @@ void SpanData::apply_config(const SpanDefaults& defaults,
   }
 }
 
-std::optional<Error> msgpack_encode(std::string& destination,
-                                    const SpanData& span) try {
+Expected<void> msgpack_encode(std::string& destination,
+                              const SpanData& span) try {
   // Be sure to update `num_fields` when adding fields.
   const int num_fields = 12;
   msgpack::pack_map(destination, num_fields);

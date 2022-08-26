@@ -36,8 +36,8 @@ Expected<void> msgpack_encode(
 
   for (const auto& span_ptr : spans) {
     assert(span_ptr);
-    if (auto maybe_error = msgpack_encode(destination, *span_ptr)) {
-      return maybe_error;
+    if (auto* error = msgpack_encode(destination, *span_ptr).if_error()) {
+      return *error;
     }
   }
 
