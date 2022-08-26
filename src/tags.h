@@ -19,6 +19,15 @@ extern const std::string version;
 namespace internal {
 extern const std::string propagation_error;
 extern const std::string decision_maker;
+extern const std::string origin;
+extern const std::string hostname;
+extern const std::string sampling_priority;
+extern const std::string rule_sample_rate;
+extern const std::string rule_limiter_sample_rate;
+extern const std::string agent_sample_rate;
+extern const std::string span_sampling_mechanism;
+extern const std::string span_sampling_rule_rate;
+extern const std::string span_sampling_limit;
 }  // namespace internal
 
 }  // namespace tags

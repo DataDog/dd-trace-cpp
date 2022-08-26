@@ -135,9 +135,20 @@ void TraceSegment::span_finished() {
   // TODO: span sampler
 
   // TODO: Finalize the spans, e.g. add special tags to local root span.
-  spans_.front()->tags.insert(trace_tags_.begin(), trace_tags_.end());
-  // TODO hack for now
-  spans_.front()->numeric_tags["_sampling_priority_v1"] = 1;
+  // TODO need more here
+  void make_sampling_decision_if_null();
+
+  auto& local_root = *spans_.front();
+  local_root.tags.insert(trace_tags_.begin(), trace_tags_.end());
+  local_root.numeric_tags[tags::internal::sampling_priority] =
+      sampling_decision_->priority;
+  if (origin_) {
+    local_root.tags[tags::internal::origin] = *origin_;
+  }
+  if (hostname_) {
+    local_root.tags[tags::internal::hostname] = *hostname_;
+  }
+  // TODO: rule sampling rates
   // end TODO
 
   const auto error = collector_->send(std::move(spans_), trace_sampler_);

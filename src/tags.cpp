@@ -17,6 +17,15 @@ namespace internal {
 
 const std::string propagation_error = "_dd.propagation_error";
 const std::string decision_maker = "_dd.p.dm";
+const std::string origin = "_dd.origin";
+const std::string hostname = "_dd.hostname";
+const std::string sampling_priority = "_sampling_priority_v1";
+const std::string rule_sample_rate = "_dd.rule_psr";
+const std::string rule_limiter_sample_rate = "_dd.limit_psr";
+const std::string agent_sample_rate = "_dd.agent_psr";
+const std::string span_sampling_mechanism = "_dd.span_sampling.mechanism";
+const std::string span_sampling_rule_rate = "_dd.span_sampling.rule_rate";
+const std::string span_sampling_limit = "_dd.span_sampling.max_per_second";
 
 }  // namespace internal
 
