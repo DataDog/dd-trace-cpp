@@ -245,12 +245,6 @@ void DatadogAgent::flush() {
     });
   };
 
-  // TODO: no
-  logger_->log_error([&](auto& stream) {
-    stream << "About to send " << outgoing_trace_chunks_.size()
-           << " trace chunks.";
-  });
-  // end TODO
   if (auto* error = http_client_
                         ->post(traces_endpoint_, std::move(set_request_headers),
                                std::move(body), std::move(on_response),
