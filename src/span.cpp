@@ -29,8 +29,12 @@ Span::~Span() {
     return;
   }
 
-  const auto now = clock_();
-  data_->duration = now - data_->start;
+  if (end_time_) {
+    data_->duration = *end_time_ - data_->start.tick;
+  } else {
+    const auto now = clock_();
+    data_->duration = now - data_->start;
+  }
 
   trace_segment_->span_finished();
 }
@@ -70,6 +74,12 @@ void Span::set_tag(std::string_view name, std::string_view value) {
 
 void Span::remove_tag(std::string_view name) {
   data_->tags.erase(std::string(name));
+}
+
+void Span::set_operation_name(std::string_view value) { data_->name = value; }
+
+void Span::set_end_time(std::chrono::steady_clock::time_point end_time) {
+  end_time_ = end_time;
 }
 
 TraceSegment& Span::trace_segment() { return *trace_segment_; }

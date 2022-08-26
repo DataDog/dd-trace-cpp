@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -21,6 +22,7 @@ class Span {
   SpanData* data_;
   std::function<std::uint64_t()> generate_span_id_;
   Clock clock_;
+  std::optional<std::chrono::steady_clock::time_point> end_time_;
 
  public:
   Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
@@ -36,6 +38,9 @@ class Span {
   std::optional<std::string_view> lookup_tag(std::string_view name) const;
   void set_tag(std::string_view name, std::string_view value);
   void remove_tag(std::string_view name);
+
+  void set_operation_name(std::string_view);
+  void set_end_time(std::chrono::steady_clock::time_point);
 
   void inject(DictWriter& writer) const;
 
