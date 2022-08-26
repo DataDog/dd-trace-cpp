@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 
+#include "default_http_client.h"
 #include "threaded_event_scheduler.h"
 
 namespace datadog {
@@ -92,13 +93,18 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& config) {
   FinalizedDatadogAgentConfig result;
 
-  // TODO: A build that includes libcurl could default to `Curl`,
-  // but I won't for now.
   if (!config.http_client) {
-    return Error{Error::DATADOG_AGENT_NULL_HTTP_CLIENT,
-                 "DatadogAgent: HTTP client cannot be null."};
+    result.http_client = default_http_client();
+    // `default_http_client` might return a `Curl` instance depending on how
+    // this library was built.  If it returns `nullptr`, then there's no
+    // built-in default, and so the user must provide a value.
+    if (!result.http_client) {
+      return Error{Error::DATADOG_AGENT_NULL_HTTP_CLIENT,
+                   "DatadogAgent: HTTP client cannot be null."};
+    }
+  } else {
+    result.http_client = config.http_client;
   }
-  result.http_client = config.http_client;
 
   if (!config.event_scheduler) {
     result.event_scheduler = std::make_shared<ThreadedEventScheduler>();

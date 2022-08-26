@@ -4,6 +4,7 @@
 #include <datadog/collector_response.h>
 #include <datadog/curl.h>
 #include <datadog/datadog_agent.h>
+#include <datadog/default_http_client.h>
 #include <datadog/dict_reader.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
@@ -31,6 +32,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_default_http_client();
 void play_with_propagation(int argc, const char* const* argv);
 void play_with_inject();
 void play_with_extract();
@@ -56,7 +58,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "propagation") {
+    if (example == "default_http_client") {
+      play_with_default_http_client();
+      std::cout << "\nDone playing with default_http_client.\n";
+    } else if (example == "propagation") {
       play_with_propagation(argc, argv);
     } else if (example == "inject") {
       play_with_inject();
@@ -645,4 +650,10 @@ void play_with_propagation(int argc, const char* const* argv) {
     // Give the collector time to do its thing.
     std::this_thread::sleep_for(std::chrono::seconds(3));
   }
+}
+
+void play_with_default_http_client() {
+  auto client = dd::default_http_client();
+  std::cout << "default HTTP client address: "
+            << static_cast<const void*>(client.get()) << '\n';
 }

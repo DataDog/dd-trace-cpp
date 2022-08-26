@@ -1,4 +1,4 @@
-SOURCES := $(wildcard ../src/*.cpp)
+SOURCES := $(shell find ../src/ -type f -name '*.cpp' -not -name 'default_http_client_curl.cpp')
 HEADERS := $(wildcard ../src/*.h) ../src/json.hpp
 
 example: example.cpp $(SOURCES) $(HEADERS)
