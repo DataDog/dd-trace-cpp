@@ -79,8 +79,7 @@ class ExtractionPolicy {
   virtual Expected<std::optional<int>> sampling_priority(
       const DictReader& headers) = 0;
   virtual std::optional<std::string> origin(const DictReader& headers) = 0;
-  virtual Expected<std::unordered_map<std::string, std::string>> trace_tags(
-      const DictReader&) = 0;
+  virtual std::optional<std::string> trace_tags(const DictReader&) = 0;
 };
 
 class DatadogExtractionPolicy : public ExtractionPolicy {
@@ -145,28 +144,36 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
     return std::nullopt;
   }
 
-  Expected<std::unordered_map<std::string, std::string>> trace_tags(
-      const DictReader& headers) override {
+  std::optional<std::string> trace_tags(const DictReader& headers) override {
     auto found = headers.lookup("x-datadog-tags");
-    if (!found) {
-      return std::unordered_map<std::string, std::string>{};
+    if (found) {
+      return std::string(*found);
     }
-    // TODO
-    std::string message;
-    message += "Tag propagation is not implemented yet, so I won't parse: \"";
-    message += *found;
-    message += '\"';
-    return Error{Error::NOT_IMPLEMENTED, std::move(message)};
+    return std::nullopt;
   }
+};
+
+class B3ExtractionPolicy : public DatadogExtractionPolicy {
+  // TODO
+};
+
+class W3CExtractionPolicy : public DatadogExtractionPolicy {
+  // TODO
 };
 
 struct ExtractedData {
   std::optional<std::uint64_t> trace_id;
   std::optional<std::uint64_t> parent_id;
   std::optional<std::string> origin;
-  Expected<std::unordered_map<std::string, std::string>> maybe_trace_tags;
-  std::optional<SamplingDecision> sampling_decision;
+  std::optional<std::string> trace_tags;
+  std::optional<int> sampling_priority;
 };
+
+bool operator!=(const ExtractedData& left, const ExtractedData& right) {
+  return left.trace_id != right.trace_id || left.parent_id != right.parent_id ||
+         left.origin != right.origin || left.trace_tags != right.trace_tags ||
+         left.sampling_priority != right.sampling_priority;
+}
 
 Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
                                      const DictReader& reader) {
@@ -175,8 +182,8 @@ Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
   auto& trace_id = extracted_data.trace_id;
   auto& parent_id = extracted_data.parent_id;
   auto& origin = extracted_data.origin;
-  auto& maybe_trace_tags = extracted_data.maybe_trace_tags;
-  auto& sampling_decision = extracted_data.sampling_decision;
+  auto& trace_tags = extracted_data.trace_tags;
+  auto& sampling_priority = extracted_data.sampling_priority;
 
   auto maybe_trace_id = extract.trace_id(reader);
   if (auto* error = maybe_trace_id.if_error()) {
@@ -196,18 +203,9 @@ Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
   if (auto* error = maybe_sampling_priority.if_error()) {
     return std::move(*error);
   }
-  auto sampling_priority = *maybe_sampling_priority;
-  if (sampling_priority) {
-    SamplingDecision decision;
-    decision.priority = *sampling_priority;
-    // `decision.mechanism` is null.  We might be able to infer it once we
-    // extract `trace_tags`, but we would have no use for it, so we won't.
-    decision.origin = SamplingDecision::Origin::EXTRACTED;
+  sampling_priority = *maybe_sampling_priority;
 
-    sampling_decision = decision;
-  }
-
-  maybe_trace_tags = extract.trace_tags(reader);
+  trace_tags = extract.trace_tags(reader);
 
   return extracted_data;
 }
@@ -268,17 +266,58 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
          !extraction_styles_.w3c);
   // end TODO
 
-  DatadogExtractionPolicy extract;
-  auto extracted_data = extract_data(extract, reader);
-  if (auto* error = extracted_data.if_error()) {
-    return std::move(*error);
+  std::optional<ExtractedData> extracted_data;
+  const char* extracted_by;
+
+  if (extraction_styles_.datadog) {
+    DatadogExtractionPolicy extract;
+    auto data = extract_data(extract, reader);
+    if (auto* error = data.if_error()) {
+      return std::move(*error);
+    }
+    extracted_data = *data;
+    extracted_by = "Datadog";
+  }
+
+  if (extraction_styles_.b3) {
+    B3ExtractionPolicy extract;
+    auto data = extract_data(extract, reader);
+    if (auto* error = data.if_error()) {
+      return std::move(*error);
+    }
+    if (extracted_data && *data != *extracted_data) {
+      std::string message;
+      message += "B3 extracted different data than did ";
+      message += extracted_by;
+      // TODO: diagnose difference
+      return Error{Error::INCONSISTENT_EXTRACTION_STYLES, std::move(message)};
+    }
+    extracted_data = *data;
+    extracted_by = "B3";
+  }
+
+  if (extraction_styles_.w3c) {
+    W3CExtractionPolicy extract;
+    auto data = extract_data(extract, reader);
+    if (auto* error = data.if_error()) {
+      return std::move(*error);
+    }
+    if (extracted_data && *data != *extracted_data) {
+      std::string message;
+      message += "W3C extracted different data than did ";
+      message += extracted_by;
+      // TODO: diagnose difference
+      return Error{Error::INCONSISTENT_EXTRACTION_STYLES, std::move(message)};
+    }
+    extracted_data = *data;
+    extracted_by = "W3C";
   }
 
   auto& trace_id = extracted_data->trace_id;
   auto& parent_id = extracted_data->parent_id;
   auto& origin = extracted_data->origin;
-  auto& maybe_trace_tags = extracted_data->maybe_trace_tags;
-  auto& sampling_decision = extracted_data->sampling_decision;
+  auto& trace_tags = extracted_data->trace_tags;
+  auto& sampling_priority = extracted_data->sampling_priority;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -320,23 +359,40 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
 
-  std::unordered_map<std::string, std::string> trace_tags;
-  if (auto* error = maybe_trace_tags.if_error()) {
-    logger_->log_error(*error);
-    if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
-      span_data->tags[tags::internal::propagation_error] = "extract_max_size";
+  std::optional<SamplingDecision> sampling_decision;
+  if (sampling_priority) {
+    SamplingDecision decision;
+    decision.priority = *sampling_priority;
+    // `decision.mechanism` is null.  We might be able to infer it once we
+    // extract `trace_tags`, but we would have no use for it, so we won't.
+    decision.origin = SamplingDecision::Origin::EXTRACTED;
+
+    sampling_decision = decision;
+  }
+
+  std::unordered_map<std::string, std::string> decoded_trace_tags;
+  if (trace_tags) {
+    /* TODO: parsing trace tags is another thing...
+    if (trace_tags)
+    if (auto* error = maybe_trace_tags.if_error()) {
+      logger_->log_error(*error);
+      if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
+        span_data->tags[tags::internal::propagation_error] = "extract_max_size";
+      } else {
+        span_data->tags[tags::internal::propagation_error] = "decoding_error";
+      }
     } else {
-      span_data->tags[tags::internal::propagation_error] = "decoding_error";
+      trace_tags = std::move(*maybe_trace_tags);
     }
-  } else {
-    trace_tags = std::move(*maybe_trace_tags);
+    */
   }
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
-      injection_styles_, hostname_, std::move(origin), std::move(trace_tags),
-      std::move(sampling_decision), std::move(span_data));
+      injection_styles_, hostname_, std::move(origin),
+      std::move(decoded_trace_tags), std::move(sampling_decision),
+      std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
   return span;
 }
