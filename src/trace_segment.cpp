@@ -1,7 +1,6 @@
 #include "trace_segment.h"
 
 #include <cassert>
-#include <iostream>  // TODO: no
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -190,8 +189,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
 
   // TODO: configurable maximum size
   if (auto* error = inject.trace_tags(writer, trace_tags_).if_error()) {
-    // TODO: need a logger
-    std::cout << *error << '\n';
+    logger_->log_error(*error);
     SpanData& local_root = *spans_.front();
     if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
       local_root.tags[tags::internal::propagation_error] = "inject_max_size";

@@ -1,9 +1,17 @@
 #include "logger.h"
 
+#include "error.h"
+
 namespace datadog {
 namespace tracing {
 
-// TODO
+void Logger::log_error(const Error& error) {
+  log_error([&](auto& stream) { stream << error; });
+}
+
+void Logger::log_error(std::string_view message) {
+  log_error([&](auto& stream) { stream << message; });
+}
 
 }  // namespace tracing
 }  // namespace datadog

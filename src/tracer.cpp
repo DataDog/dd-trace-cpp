@@ -2,6 +2,7 @@
 
 #include "datadog_agent.h"
 #include "dict_reader.h"
+#include "logger.h"
 #include "span.h"
 #include "span_config.h"
 #include "span_data.h"
@@ -19,7 +20,6 @@
 
 #include <cassert>
 #include <charconv>  // for `std::from_chars`
-#include <iostream>  // TODO: no
 
 namespace datadog {
 namespace tracing {
@@ -287,9 +287,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   auto maybe_trace_tags = extract.trace_tags(reader);
   if (auto* error = maybe_trace_tags.if_error()) {
-    // Failure to parse trace tags is tolerated, with a diagnostic.
-    // TODO: need a logger
-    std::cout << *error << '\n';
+    logger_->log_error(*error);
     if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
       trace_tags_extraction_error = "extract_max_size";
     } else {

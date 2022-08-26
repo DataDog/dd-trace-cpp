@@ -185,7 +185,7 @@ void DatadogAgent::flush() {
 
   std::string body;
   if (auto* error = msgpack_encode(body, outgoing_trace_chunks_).if_error()) {
-    logger_->log_error([&](auto& stream) { stream << *error; });
+    logger_->log_error(*error);
     return;
   }
 
@@ -225,7 +225,7 @@ void DatadogAgent::flush() {
 
     auto result = parse_agent_traces_response(response_body);
     if (const auto* error_message = std::get_if<std::string>(&result)) {
-      logger->log_error([&](auto& stream) { stream << *error_message; });
+      logger->log_error(*error_message);
       return;
     }
     const auto& response = std::get<CollectorResponse>(result);
@@ -256,7 +256,7 @@ void DatadogAgent::flush() {
                                std::move(body), std::move(on_response),
                                std::move(on_error))
                         .if_error()) {
-    logger_->log_error([&](auto& stream) { stream << *error; });
+    logger_->log_error(*error);
   }
 }
 
