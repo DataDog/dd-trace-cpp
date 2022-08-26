@@ -1,5 +1,7 @@
 #include "tracer_config.h"
 
+#include "cerr_logger.h"
+
 namespace datadog {
 namespace tracing {
 
@@ -53,6 +55,12 @@ Expected<Validated<TracerConfig>> validate_config(const TracerConfig& config) {
   } else if (!config.injection_styles.datadog) {
     return Error{Error::MISSING_SPAN_INJECTION_STYLE,
                  "At least one injection style must be specified."};
+  }
+
+  if (config.logger) {
+    after_env.logger = config.logger;
+  } else {
+    after_env.logger = std::make_shared<CerrLogger>();
   }
 
   return Validated<TracerConfig>(std::move(after_env));

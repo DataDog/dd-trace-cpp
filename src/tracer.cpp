@@ -167,7 +167,8 @@ Tracer::Tracer(const Validated<TracerConfig>& config)
 
 Tracer::Tracer(const Validated<TracerConfig>& config,
                const IDGenerator& generator, const Clock& clock)
-    : collector_(/* see constructor body */),
+    : logger_(config.logger),
+      collector_(/* see constructor body */),
       trace_sampler_(std::make_shared<TraceSampler>(
           bless(&TracerConfig::trace_sampler, config))),
       span_sampler_(std::make_shared<SpanSampler>(
@@ -182,8 +183,8 @@ Tracer::Tracer(const Validated<TracerConfig>& config,
           std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
     collector_ = *collector;
   } else {
-    collector_ =
-        std::make_shared<DatadogAgent>(bless(&TracerConfig::collector, config));
+    collector_ = std::make_shared<DatadogAgent>(
+        bless(&TracerConfig::collector, config), logger_);
   }
 }
 
@@ -196,8 +197,8 @@ Span Tracer::create_span(const SpanConfig& config) {
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
-      collector_, trace_sampler_, span_sampler_, defaults_, injection_styles_,
-      hostname_, std::nullopt /* origin */,
+      logger_, collector_, trace_sampler_, span_sampler_, defaults_,
+      injection_styles_, hostname_, std::nullopt /* origin */,
       std::unordered_map<std::string, std::string>{} /* trace_tags */,
       std::nullopt /* sampling_decision */, std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
@@ -315,8 +316,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
-      collector_, trace_sampler_, span_sampler_, defaults_, injection_styles_,
-      hostname_, origin, trace_tags, sampling_decision, std::move(span_data));
+      logger_, collector_, trace_sampler_, span_sampler_, defaults_,
+      injection_styles_, hostname_, origin, trace_tags, sampling_decision,
+      std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
   return span;
 }

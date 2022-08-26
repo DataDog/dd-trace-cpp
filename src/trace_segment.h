@@ -17,6 +17,7 @@ namespace tracing {
 class Collector;
 class DictReader;
 class DictWriter;
+class Logger;
 class SpanData;
 class SpanDefaults;
 class SpanSampler;
@@ -25,6 +26,7 @@ class TraceSampler;
 class TraceSegment {
   mutable std::mutex mutex_;
 
+  std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
@@ -41,7 +43,8 @@ class TraceSegment {
   bool awaiting_delegated_sampling_decision_ = false;
 
  public:
-  TraceSegment(const std::shared_ptr<Collector>& collector,
+  TraceSegment(const std::shared_ptr<Logger>& logger,
+               const std::shared_ptr<Collector>& collector,
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,

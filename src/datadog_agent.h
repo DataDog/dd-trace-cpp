@@ -13,6 +13,7 @@ namespace datadog {
 namespace tracing {
 
 struct DatadogAgentConfig;
+class Logger;
 struct SpanData;
 class TraceSampler;
 
@@ -25,6 +26,7 @@ class DatadogAgent : public Collector {
 
  private:
   std::mutex mutex_;
+  std::shared_ptr<Logger> logger_;
   // `incoming_trace_chunks_` are what `send` appends to.
   std::vector<TraceChunk> incoming_trace_chunks_;
   // `outgoing_trace_chunks_` are what `flush` consumes from.
@@ -37,7 +39,8 @@ class DatadogAgent : public Collector {
   void flush();
 
  public:
-  explicit DatadogAgent(const Validated<DatadogAgentConfig>& config);
+  DatadogAgent(const Validated<DatadogAgentConfig>&,
+               const std::shared_ptr<Logger>&);
   ~DatadogAgent();
 
   virtual Expected<void> send(

@@ -16,6 +16,7 @@ namespace datadog {
 namespace tracing {
 
 class Collector;
+class Logger;
 
 struct TracerConfig {
   SpanDefaults defaults;
@@ -28,6 +29,7 @@ struct TracerConfig {
   PropagationStyles extraction_styles;
 
   bool report_hostname = false;
+  std::shared_ptr<Logger> logger = nullptr;
 };
 
 Expected<Validated<TracerConfig>> validate_config(const TracerConfig& config);

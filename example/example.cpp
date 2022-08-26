@@ -1,3 +1,4 @@
+#include <datadog/cerr_logger.h>
 #include <datadog/clock.h>
 #include <datadog/collector.h>
 #include <datadog/collector_response.h>
@@ -385,7 +386,7 @@ void play_with_agent() {
 
   const auto validated = dd::validate_config(config);
   assert(validated);
-  dd::DatadogAgent collector{*validated};
+  dd::DatadogAgent collector{*validated, std::make_shared<dd::CerrLogger>()};
 
   std::ifstream dev_urandom{"/dev/urandom", std::ios::binary};
   const auto rand_uint64 = [&dev_urandom]() {

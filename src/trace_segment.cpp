@@ -11,6 +11,7 @@
 #include "collector_response.h"
 #include "dict_writer.h"
 #include "error.h"
+#include "logger.h"
 #include "span_data.h"
 #include "tags.h"
 #include "trace_sampler.h"
@@ -64,6 +65,7 @@ class DatadogInjectionPolicy : public InjectionPolicy {
 }  // namespace
 
 TraceSegment::TraceSegment(
+    const std::shared_ptr<Logger>& logger,
     const std::shared_ptr<Collector>& collector,
     const std::shared_ptr<TraceSampler>& trace_sampler,
     const std::shared_ptr<SpanSampler>& span_sampler,
@@ -74,7 +76,8 @@ TraceSegment::TraceSegment(
     std::unordered_map<std::string, std::string> trace_tags,
     std::optional<SamplingDecision> sampling_decision,
     std::unique_ptr<SpanData> local_root)
-    : collector_(collector),
+    : logger_(logger),
+      collector_(collector),
       trace_sampler_(trace_sampler),
       span_sampler_(span_sampler),
       defaults_(defaults),
@@ -84,6 +87,7 @@ TraceSegment::TraceSegment(
       trace_tags_(std::move(trace_tags)),
       num_finished_spans_(0),
       sampling_decision_(std::move(sampling_decision)) {
+  assert(logger_);
   assert(collector_);
   assert(trace_sampler_);
   assert(span_sampler_);
