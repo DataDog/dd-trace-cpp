@@ -9,14 +9,20 @@ namespace datadog {
 namespace tracing {
 
 template <typename Value>
-class Expected : public std::variant<Value, Error> {
- public:
-  using ValueType = Value;
+class Expected {
+  std::variant<Value, Error> data_;
 
-  using std::variant<Value, Error>::variant;
-  using std::variant<Value, Error>::operator=;
-  using std::variant<Value, Error>::swap;
-  using std::variant<Value, Error>::emplace;
+ public:
+  Expected(const Expected&) = default;
+  Expected(Expected&) = default;
+  Expected(Expected&&) = default;
+  Expected& operator=(const Expected&) = default;
+  Expected& operator=(Expected&&) = default;
+
+  template <typename Other>
+  Expected(Other&&);
+  template <typename Other>
+  Expected& operator=(Other&&);
 
   bool has_value() const noexcept;
   explicit operator bool() const noexcept;
@@ -38,11 +44,25 @@ class Expected : public std::variant<Value, Error> {
   const Error& error() const&;
   Error&& error() &&;
   const Error&& error() const&&;
+
+  Error* if_error();
+  const Error* if_error() const;
 };
 
 template <typename Value>
+template <typename Other>
+Expected<Value>::Expected(Other&& other) : data_(std::forward<Other>(other)) {}
+
+template <typename Value>
+template <typename Other>
+Expected<Value>& Expected<Value>::operator=(Other&& other) {
+  data_ = std::forward<Other>(other);
+  return *this;
+}
+
+template <typename Value>
 bool Expected<Value>::has_value() const noexcept {
-  return std::holds_alternative<Value>(*this);
+  return std::holds_alternative<Value>(data_);
 }
 template <typename Value>
 Expected<Value>::operator bool() const noexcept {
@@ -51,19 +71,19 @@ Expected<Value>::operator bool() const noexcept {
 
 template <typename Value>
 Value& Expected<Value>::value() & {
-  return std::get<Value>(*this);
+  return std::get<0>(data_);
 }
 template <typename Value>
 const Value& Expected<Value>::value() const& {
-  return std::get<Value>(*this);
+  return std::get<0>(data_);
 }
 template <typename Value>
 Value&& Expected<Value>::value() && {
-  return std::move(std::get<Value>(*this));
+  return std::move(std::get<0>(data_));
 }
 template <typename Value>
 const Value&& Expected<Value>::value() const&& {
-  return std::move(std::get<Value>(*this));
+  return std::move(std::get<0>(data_));
 }
 
 template <typename Value>
@@ -94,28 +114,47 @@ const Value* Expected<Value>::operator->() const {
 
 template <typename Value>
 Error& Expected<Value>::error() & {
-  return std::get<Error>(*this);
+  return std::get<1>(data_);
 }
 template <typename Value>
 const Error& Expected<Value>::error() const& {
-  return std::get<Error>(*this);
+  return std::get<1>(data_);
 }
 template <typename Value>
 Error&& Expected<Value>::error() && {
-  return std::move(std::get<Error>(*this));
+  return std::move(std::get<1>(data_));
 }
 template <typename Value>
 const Error&& Expected<Value>::error() const&& {
-  return std::move(std::get<Error>(*this));
+  return std::move(std::get<1>(data_));
+}
+
+template <typename Value>
+Error* Expected<Value>::if_error() {
+  return std::get_if<1>(&data_);
+}
+template <typename Value>
+const Error* Expected<Value>::if_error() const {
+  return std::get_if<1>(&data_);
 }
 
 template <>
-class Expected<void> : public std::optional<Error> {
+class Expected<void> {
+  std::optional<Error> data_;
+
  public:
-  using std::optional<Error>::optional;
-  using std::optional<Error>::operator=;
-  using std::optional<Error>::swap;
-  using std::optional<Error>::emplace;
+  Expected(const Expected&) = default;
+  Expected(Expected&) = default;
+  Expected(Expected&&) = default;
+  Expected& operator=(const Expected&) = default;
+  Expected& operator=(Expected&&) = default;
+
+  template <typename Other>
+  Expected(Other&&);
+  template <typename Other>
+  Expected& operator=(Other&&);
+
+  void swap(Expected& other);
 
   bool has_value() const;
   explicit operator bool() const;
@@ -124,20 +163,35 @@ class Expected<void> : public std::optional<Error> {
   const Error& error() const&;
   Error&& error() &&;
   const Error&& error() const&&;
+
+  Error* if_error();
+  const Error* if_error() const;
 };
 
-inline bool Expected<void>::has_value() const {
-  return !std::optional<Error>::has_value();
-}
-inline Expected<void>::operator bool() const {
-  return Expected<void>::has_value();
+template <typename Other>
+Expected<void>::Expected(Other&& other) : data_(std::forward<Other>(other)) {}
+
+template <typename Other>
+Expected<void>& Expected<void>::operator=(Other&& other) {
+  data_ = std::forward<Other>(other);
+  return *this;
 }
 
-inline Error& Expected<void>::error() & { return **this; }
-inline const Error& Expected<void>::error() const& { return **this; }
-inline Error&& Expected<void>::error() && { return std::move(**this); }
+inline void Expected<void>::swap(Expected& other) { data_.swap(other.data_); }
+
+inline bool Expected<void>::has_value() const { return !data_.has_value(); }
+inline Expected<void>::operator bool() const { return has_value(); }
+
+inline Error& Expected<void>::error() & { return *data_; }
+inline const Error& Expected<void>::error() const& { return *data_; }
+inline Error&& Expected<void>::error() && { return std::move(*data_); }
 inline const Error&& Expected<void>::error() const&& {
-  return std::move(**this);
+  return std::move(*data_);
+}
+
+inline Error* Expected<void>::if_error() { return data_ ? &*data_ : nullptr; }
+inline const Error* Expected<void>::if_error() const {
+  return data_ ? &*data_ : nullptr;
 }
 
 }  // namespace tracing

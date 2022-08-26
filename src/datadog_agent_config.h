@@ -5,7 +5,7 @@
 #include <string_view>
 #include <variant>
 
-#include "error.h"
+#include "expected.h"
 #include "http_client.h"
 #include "validated.h"
 
@@ -20,10 +20,10 @@ struct DatadogAgentConfig {
   std::string agent_url = "http://localhost:8126";
   int flush_interval_milliseconds = 2000;
 
-  static std::variant<HTTPClient::URL, Error> parse(std::string_view);
+  static Expected<HTTPClient::URL> parse(std::string_view);
 };
 
-std::variant<Validated<DatadogAgentConfig>, Error> validate_config(
+Expected<Validated<DatadogAgentConfig>> validate_config(
     const DatadogAgentConfig& config);
 
 }  // namespace tracing

@@ -3,8 +3,7 @@
 namespace datadog {
 namespace tracing {
 
-std::variant<Validated<TracerConfig>, Error> validate_config(
-    const TracerConfig& config) {
+Expected<Validated<TracerConfig>> validate_config(const TracerConfig& config) {
   // TODO: environment variables, validation, and other fun.
   TracerConfig after_env{config};
 
@@ -19,11 +18,11 @@ std::variant<Validated<TracerConfig>, Error> validate_config(
     }
   } else {
     const auto& agent_config = std::get<DatadogAgentConfig>(config.collector);
-    auto result = validate_config(agent_config);
-    if (auto* error = std::get_if<Error>(&result)) {
+    auto validated = validate_config(agent_config);
+    if (auto* error = validated.if_error()) {
       return std::move(*error);
     }
-    after_env.collector = std::get<Validated<DatadogAgentConfig>>(result);
+    after_env.collector = std::move(*validated);
   }
 
   // TODO trace_sampler, span_sampler

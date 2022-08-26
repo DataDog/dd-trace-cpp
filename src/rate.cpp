@@ -5,7 +5,7 @@
 namespace datadog {
 namespace tracing {
 
-std::variant<Rate, Error> Rate::from(double value) {
+Expected<Rate> Rate::from(double value) {
   if (value >= 0 && value <= 1) {
     return Rate(value);
   }

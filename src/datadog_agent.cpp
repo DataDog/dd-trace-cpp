@@ -24,7 +24,7 @@ const std::string_view traces_api_path = "/v0.4/traces";
 HTTPClient::URL traces_endpoint(std::string_view agent_url) {
   // `agent_url` came from a validated configuration, so it is guaranteed to
   // parse successfully.
-  auto url = std::get<HTTPClient::URL>(DatadogAgentConfig::parse(agent_url));
+  auto url = *DatadogAgentConfig::parse(agent_url);
   url.path += traces_api_path;
   return url;
 }
@@ -120,7 +120,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
       return message;
     }
     auto maybe_rate = Rate::from(value);
-    if (auto* error = std::get_if<Error>(&maybe_rate)) {
+    if (auto* error = maybe_rate.if_error()) {
       std::string message;
       message +=
           "Datadog Agent response trace traces included an invalid sample rate "
@@ -132,7 +132,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
       message += body;
       return message;
     }
-    sample_rates.emplace(key, std::get<Rate>(maybe_rate));
+    sample_rates.emplace(key, *maybe_rate);
   }
   return CollectorResponse{std::move(sample_rates)};
 } catch (const nlohmann::json::exception& error) {

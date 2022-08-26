@@ -16,8 +16,7 @@ std::string_view range(BeginIterator begin, EndIterator end) {
 
 }  // namespace
 
-std::variant<HTTPClient::URL, Error> DatadogAgentConfig::parse(
-    std::string_view input) {
+Expected<HTTPClient::URL> DatadogAgentConfig::parse(std::string_view input) {
   const std::string_view separator = "://";
   const auto after_scheme = std::search(input.begin(), input.end(),
                                         separator.begin(), separator.end());
@@ -89,7 +88,7 @@ std::variant<HTTPClient::URL, Error> DatadogAgentConfig::parse(
       std::string(range(after_authority, authority_and_path.end()))};
 }
 
-std::variant<Validated<DatadogAgentConfig>, Error> validate_config(
+Expected<Validated<DatadogAgentConfig>> validate_config(
     const DatadogAgentConfig& config) {
   DatadogAgentConfig after_env{config};
 
@@ -106,8 +105,8 @@ std::variant<Validated<DatadogAgentConfig>, Error> validate_config(
                  "milliseconds."};
   }
 
-  auto result = config.parse(config.agent_url);
-  if (auto* error = std::get_if<Error>(&result)) {
+  auto url = config.parse(config.agent_url);
+  if (auto* error = url.if_error()) {
     return std::move(*error);
   }
 

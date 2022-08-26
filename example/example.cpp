@@ -43,7 +43,6 @@ void play_with_msgpack();
 void play_with_curl_and_event_scheduler();
 void play_with_event_scheduler();
 void play_with_curl();
-void smoke();
 
 void usage(const char* argv0);
 
@@ -102,14 +101,6 @@ int main(int argc, char* argv[]) {
 
 void usage(const char* argv0) {
   std::cerr << "usage: " << argv0 << " EXAMPLE_NAME\n";
-}
-
-void smoke() {
-  dd::TracerConfig config;
-  config.defaults.service = "foosvc";
-  std::cout << "config.spans.service: " << config.defaults.service << '\n';
-
-  std::get<dd::DatadogAgentConfig>(config.collector).http_client = nullptr;
 }
 
 void play_with_event_scheduler() {
@@ -256,17 +247,16 @@ void play_with_config() {
   {
     dd::TracerConfig raw_config;
     raw_config.defaults.service = "hello";
-
-    auto& agent_config = std::get<dd::DatadogAgentConfig>(raw_config.collector);
+    dd::DatadogAgentConfig agent_config;
     agent_config.http_client = http_client;
 
-    auto maybe_config = dd::validate_config(raw_config);
-    if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+    auto validated = dd::validate_config(raw_config);
+    if (const auto* const error = validated.if_error()) {
       std::cout << "Bad config: " << error->message << '\n';
       return;
     }
 
-    dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
+    dd::Tracer tracer{*validated};
     (void)tracer;
   }
 
@@ -274,12 +264,12 @@ void play_with_config() {
     dd::TracerConfig raw_config;
     // raw_config.defaults.service = "hello";
     auto maybe_config = dd::validate_config(raw_config);
-    if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+    if (const auto* const error = maybe_config.if_error()) {
       std::cout << "Bad config: " << error->message << '\n';
       return;
     }
 
-    dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
+    dd::Tracer tracer{*maybe_config};
   }
 
   // "error: use of deleted function
@@ -293,17 +283,17 @@ void play_with_create_span() {
 
   dd::TracerConfig config;
   config.defaults.service = "hello";
-
-  auto& agent_config = std::get<dd::DatadogAgentConfig>(config.collector);
+  dd::DatadogAgentConfig agent_config;
   agent_config.http_client = http_client;
+  config.collector = agent_config;
 
   auto maybe_config = dd::validate_config(config);
-  if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+  if (const auto* const error = maybe_config.if_error()) {
     std::cout << "Bad config: " << error->message << '\n';
     return;
   }
 
-  dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
+  dd::Tracer tracer{*maybe_config};
   dd::Span span = tracer.create_span(dd::SpanConfig{});
 
   dd::Span child = span.create_child(dd::SpanConfig{});
@@ -318,17 +308,17 @@ void play_with_span_tags() {
 
   dd::TracerConfig config;
   config.defaults.service = "hello";
-
-  auto& agent_config = std::get<dd::DatadogAgentConfig>(config.collector);
+  dd::DatadogAgentConfig agent_config;
   agent_config.http_client = http_client;
+  config.collector = agent_config;
 
   auto maybe_config = dd::validate_config(config);
-  if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+  if (const auto* const error = maybe_config.if_error()) {
     std::cout << "Bad config: " << error->message << '\n';
     return;
   }
 
-  dd::Tracer tracer{std::get<dd::Validated<dd::TracerConfig>>(maybe_config)};
+  dd::Tracer tracer{*maybe_config};
   dd::Span span = tracer.create_span(dd::SpanConfig{});
 
   span.set_tag("foo", "bar");
@@ -360,7 +350,7 @@ void play_with_parse_url() {
       }
       void operator()(const dd::Error error) const { std::cout << error; }
     };
-    std::visit(Visitor(), result);
+    // TODO std::visit(Visitor(), result);
     std::cout << "\n\n";
   };
 
@@ -378,10 +368,10 @@ void play_with_parse_url() {
   config.agent_url = "unix://var/run/i.did.it.wrong.sock";
   std::cout << config.agent_url << "\n  ->  ";
   auto result = validate_config(config);
-  if (auto* error = std::get_if<dd::Error>(&result)) {
+  if (auto* error = result.if_error()) {
     std::cout << *error;
   } else {
-    const auto& validated = std::get<0>(result);
+    const auto& validated = *result;
     std::cout << validated.agent_url;
   }
   std::cout << '\n';
@@ -394,9 +384,7 @@ void play_with_agent() {
   config.http_client = http_client;
   config.event_scheduler = scheduler;
 
-  const auto result = dd::validate_config(config);
-  const auto* validated =
-      std::get_if<dd::Validated<dd::DatadogAgentConfig>>(&result);
+  const auto validated = dd::validate_config(config);
   assert(validated);
   dd::DatadogAgent collector{*validated};
 
@@ -489,11 +477,11 @@ void play_with_extract() {
   config.collector = std::make_shared<NoOpCollector>();
 
   auto maybe_config = dd::validate_config(config);
-  if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+  if (const auto* const error = maybe_config.if_error()) {
     std::cout << "Bad config: " << error->message << '\n';
     return;
   }
-  dd::Tracer tracer{std::get<0>(maybe_config)};
+  dd::Tracer tracer{*maybe_config};
 
   const std::unordered_map<std::string, std::string> headers{
       {"x-datadog-trace-id", "123"},
@@ -502,11 +490,11 @@ void play_with_extract() {
       {"x-frobnostication-index", "-1"}};
 
   auto maybe_span = tracer.extract_span(LowerCaseMapReader{headers});
-  if (auto* error = std::get_if<dd::Error>(&maybe_span)) {
+  if (auto* error = maybe_span.if_error()) {
     std::cout << *error << '\n';
     return;
   }
-  auto& span = std::get<dd::Span>(maybe_span);
+  auto& span = *maybe_span;
   std::cout << "sampling_decision: ";
   if (const auto& decision = span.trace_segment().sampling_decision()) {
     decision->to_json(std::cout);
@@ -542,11 +530,11 @@ void play_with_inject() {
   config.collector = std::make_shared<NoOpCollector>();
 
   auto maybe_config = dd::validate_config(config);
-  if (const auto* const error = std::get_if<dd::Error>(&maybe_config)) {
+  if (const auto* const error = maybe_config.if_error()) {
     std::cout << "Bad config: " << error->message << '\n';
     return;
   }
-  dd::Tracer tracer{std::get<0>(maybe_config)};
+  dd::Tracer tracer{*maybe_config};
 
   dd::Span span = tracer.create_span(dd::SpanConfig{});
 
@@ -598,11 +586,11 @@ void play_with_propagation(int argc, const char* const* argv) {
   config.collector = agent_config;
   config.defaults.service = service;
   const auto validated = dd::validate_config(config);
-  if (const auto* error = std::get_if<dd::Error>(&validated)) {
+  if (const auto* error = validated.if_error()) {
     std::cout << "Invalid tracer config: " << *error << '\n';
     return;
   }
-  dd::Tracer tracer{std::get<0>(validated)};
+  dd::Tracer tracer{*validated};
 
   if (service == "dd-trace-cpp-example-sender") {
     std::cout << "I'm the sender.\n";
@@ -651,11 +639,11 @@ void play_with_propagation(int argc, const char* const* argv) {
     {
       auto maybe_span =
           tracer.extract_span(LowerCaseMapReader{headers}, properties);
-      if (auto* error = std::get_if<dd::Error>(&maybe_span)) {
+      if (auto* error = maybe_span.if_error()) {
         std::cout << "Unable to extract span: " << *error << '\n';
         return;
       }
-      dd::Span& child = std::get<dd::Span>(maybe_span);
+      dd::Span& child = *maybe_span;
       child.set_tag("bacon.number", "7");
       std::cout << "Extracted a span :D\n";
       // Give the span some duration.

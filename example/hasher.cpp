@@ -136,16 +136,17 @@ int main() {
   auto http_client = std::make_shared<dd::Curl>();
   config.defaults.service = "dd-trace-cpp-example";
   config.defaults.environment = "dev";
-  std::get<dd::DatadogAgentConfig>(config.collector).http_client = http_client;
+  dd::DatadogAgentConfig agent_config;
+  agent_config.http_client = http_client;
+  config.collector = agent_config;
 
-  auto check = dd::validate_config(config);
-  if (auto *error = std::get_if<dd::Error>(&check)) {
+  auto validated = dd::validate_config(config);
+  if (auto *error = validated.if_error()) {
     std::cerr << "Invalid config: " << *error << '\n';
     return 1;
   }
 
-  auto &valid_config = std::get<dd::Validated<dd::TracerConfig>>(check);
-  dd::Tracer tracer{valid_config};
+  dd::Tracer tracer{*validated};
 
   const std::string prompt = "enter a file or directory (ctrl+d to quit): ";
   std::string input_path;

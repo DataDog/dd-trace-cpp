@@ -3,14 +3,14 @@
 #include <utility>
 #include <variant>
 
+#include "expected.h"
+
 namespace datadog {
 namespace tracing {
 
-class Error;
-
 template <typename Config>
 class Validated : public Config {
-  friend std::variant<Validated<Config>, Error> validate_config(const Config&);
+  friend Expected<Validated<Config>> validate_config(const Config&);
   template <typename Parent, typename Child>
   friend Validated<Child> bless(Child Parent::*member,
                                 const Validated<Parent>& parent);

@@ -2,7 +2,7 @@
 
 #include <variant>
 
-#include "error.h"
+#include "expected.h"
 
 namespace datadog {
 namespace tracing {
@@ -20,7 +20,7 @@ class Rate {
   static Rate one() { return Rate(1.0); }
   static Rate zero() { return Rate(0.0); }
 
-  static std::variant<Rate, Error> from(double);
+  static Expected<Rate> from(double);
 };
 
 }  // namespace tracing

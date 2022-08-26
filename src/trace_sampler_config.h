@@ -3,6 +3,7 @@
 #include <variant>
 
 #include "error.h"
+#include "expected.h"
 #include "validated.h"
 
 namespace datadog {
@@ -12,7 +13,7 @@ struct TraceSamplerConfig {
   // TODO
 };
 
-std::variant<Validated<TraceSamplerConfig>, Error> validate_config(
+Expected<Validated<TraceSamplerConfig>> validate_config(
     const TraceSamplerConfig& config);
 
 }  // namespace tracing

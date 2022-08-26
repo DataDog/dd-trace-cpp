@@ -35,8 +35,8 @@ std::optional<std::string> get_hostname() {
 }
 
 template <typename Integer>
-std::variant<Integer, Error> parse_integer(std::string_view input, int base,
-                                           std::string_view kind) {
+Expected<Integer> parse_integer(std::string_view input, int base,
+                                std::string_view kind) {
   Integer value;
   const auto status = std::from_chars(input.begin(), input.end(), value, base);
   if (status.ec == std::errc::invalid_argument) {
@@ -62,38 +62,37 @@ std::variant<Integer, Error> parse_integer(std::string_view input, int base,
   return value;
 }
 
-std::variant<std::uint64_t, Error> parse_uint64(std::string_view input,
-                                                int base) {
+Expected<std::uint64_t> parse_uint64(std::string_view input, int base) {
   return parse_integer<std::uint64_t>(input, base, "64-bit unsigned");
 }
 
-std::variant<int, Error> parse_int(std::string_view input, int base) {
+Expected<int> parse_int(std::string_view input, int base) {
   return parse_integer<int>(input, base, "int");
 }
 
 class ExtractionPolicy {
  public:
-  virtual std::variant<std::optional<std::uint64_t>, Error> trace_id(
+  virtual Expected<std::optional<std::uint64_t>> trace_id(
       const DictReader& headers) = 0;
-  virtual std::variant<std::optional<std::uint64_t>, Error> parent_id(
+  virtual Expected<std::optional<std::uint64_t>> parent_id(
       const DictReader& headers) = 0;
-  virtual std::variant<std::optional<int>, Error> sampling_priority(
+  virtual Expected<std::optional<int>> sampling_priority(
       const DictReader& headers) = 0;
   virtual std::optional<std::string> origin(const DictReader& headers) = 0;
-  virtual std::variant<std::unordered_map<std::string, std::string>, Error>
-  trace_tags(const DictReader&) = 0;
+  virtual Expected<std::unordered_map<std::string, std::string>> trace_tags(
+      const DictReader&) = 0;
 };
 
 class DatadogExtractionPolicy : public ExtractionPolicy {
-  std::variant<std::optional<std::uint64_t>, Error> id(
-      const DictReader& headers, std::string_view header,
-      std::string_view kind) {
+  Expected<std::optional<std::uint64_t>> id(const DictReader& headers,
+                                            std::string_view header,
+                                            std::string_view kind) {
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
     }
     auto result = parse_uint64(*found, 10);
-    if (auto* error = std::get_if<Error>(&result)) {
+    if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Could not extract Datadog-style ";
       prefix += kind;
@@ -104,21 +103,21 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
       prefix += ' ';
       return error->with_prefix(prefix);
     }
-    return std::get<std::uint64_t>(result);
+    return *result;
   }
 
  public:
-  std::variant<std::optional<std::uint64_t>, Error> trace_id(
+  Expected<std::optional<std::uint64_t>> trace_id(
       const DictReader& headers) override {
     return id(headers, "x-datadog-trace-id", "trace");
   }
 
-  std::variant<std::optional<std::uint64_t>, Error> parent_id(
+  Expected<std::optional<std::uint64_t>> parent_id(
       const DictReader& headers) override {
     return id(headers, "x-datadog-parent-id", "parent span");
   }
 
-  std::variant<std::optional<int>, Error> sampling_priority(
+  Expected<std::optional<int>> sampling_priority(
       const DictReader& headers) override {
     const std::string_view header = "x-datadog-sampling-priority";
     auto found = headers.lookup(header);
@@ -126,7 +125,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
       return std::nullopt;
     }
     auto result = parse_int(*found, 10);
-    if (auto* error = std::get_if<Error>(&result)) {
+    if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Could not extract Datadog-style sampling priority from ";
       prefix += header;
@@ -135,7 +134,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
       prefix += ' ';
       return error->with_prefix(prefix);
     }
-    return std::get<int>(result);
+    return *result;
   }
 
   std::optional<std::string> origin(const DictReader& headers) override {
@@ -146,7 +145,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
     return std::nullopt;
   }
 
-  std::variant<std::unordered_map<std::string, std::string>, Error> trace_tags(
+  Expected<std::unordered_map<std::string, std::string>> trace_tags(
       const DictReader& headers) override {
     auto found = headers.lookup("x-datadog-tags");
     if (!found) {
@@ -228,18 +227,18 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   DatadogExtractionPolicy extract;
 
   auto maybe_trace_id = extract.trace_id(reader);
-  if (auto* error = std::get_if<Error>(&maybe_trace_id)) {
+  if (auto* error = maybe_trace_id.if_error()) {
     return std::move(*error);
   }
-  trace_id = std::get<0>(maybe_trace_id);
+  trace_id = *maybe_trace_id;
 
   origin = extract.origin(reader);
 
   auto maybe_parent_id = extract.parent_id(reader);
-  if (auto* error = std::get_if<Error>(&maybe_parent_id)) {
+  if (auto* error = maybe_parent_id.if_error()) {
     return std::move(*error);
   }
-  parent_id = std::get<0>(maybe_parent_id);
+  parent_id = *maybe_parent_id;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -271,10 +270,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   auto maybe_sampling_priority = extract.sampling_priority(reader);
-  if (auto* error = std::get_if<Error>(&maybe_sampling_priority)) {
+  if (auto* error = maybe_sampling_priority.if_error()) {
     return std::move(*error);
   }
-  auto sampling_priority = std::get<0>(maybe_sampling_priority);
+  auto sampling_priority = *maybe_sampling_priority;
   if (sampling_priority) {
     SamplingDecision decision;
     decision.priority = *sampling_priority;
@@ -286,7 +285,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   auto maybe_trace_tags = extract.trace_tags(reader);
-  if (auto* error = std::get_if<Error>(&maybe_trace_tags)) {
+  if (auto* error = maybe_trace_tags.if_error()) {
     // Failure to parse trace tags is tolerated, with a diagnostic.
     // TODO: need a logger
     std::cout << *error << '\n';
@@ -296,7 +295,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       trace_tags_extraction_error = "decoding_error";
     }
   } else {
-    trace_tags = std::get<0>(maybe_trace_tags);
+    trace_tags = *maybe_trace_tags;
   }
 
   // We're done extracting fields.  Now create the span.

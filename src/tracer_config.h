@@ -5,6 +5,7 @@
 
 #include "datadog_agent_config.h"
 #include "error.h"
+#include "expected.h"
 #include "propagation_styles.h"
 #include "span_defaults.h"
 #include "span_sampler_config.h"
@@ -29,8 +30,7 @@ struct TracerConfig {
   bool report_hostname = false;
 };
 
-std::variant<Validated<TracerConfig>, Error> validate_config(
-    const TracerConfig& config);
+Expected<Validated<TracerConfig>> validate_config(const TracerConfig& config);
 
 }  // namespace tracing
 }  // namespace datadog

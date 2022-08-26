@@ -2,6 +2,7 @@
 
 #include <variant>
 
+#include "expected.h"
 #include "validated.h"
 
 namespace datadog {
@@ -11,7 +12,7 @@ struct SpanSamplerConfig {
   // TODO
 };
 
-std::variant<Validated<SpanSamplerConfig>, Error> validate_config(
+Expected<Validated<SpanSamplerConfig>> validate_config(
     const SpanSamplerConfig& config);
 
 }  // namespace tracing

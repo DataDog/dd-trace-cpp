@@ -52,9 +52,9 @@ class Tracer {
   // new trace (see `create_span`).  Optionally specify a `config` indicating
   // the attributes of the span.  If a failure occurs, then return an error.
   // Note that the absence of a span to extract is not considered an error.
-  std::variant<Span, Error> extract_or_create_span(const DictReader& reader);
-  std::variant<Span, Error> extract_or_create_span(const DictReader& reader,
-                                                   const SpanConfig& config);
+  Expected<Span> extract_or_create_span(const DictReader& reader);
+  Expected<Span> extract_or_create_span(const DictReader& reader,
+                                        const SpanConfig& config);
 };
 
 }  // namespace tracing
