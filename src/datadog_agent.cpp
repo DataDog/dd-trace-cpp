@@ -37,7 +37,7 @@ Expected<void> msgpack_encode(
   for (const auto& span_ptr : spans) {
     assert(span_ptr);
     if (auto* error = msgpack_encode(destination, *span_ptr).if_error()) {
-      return *error;
+      return std::move(*error);
     }
   }
 
@@ -53,7 +53,7 @@ Expected<void> msgpack_encode(
 
   for (const auto& chunk : trace_chunks) {
     if (auto* error = msgpack_encode(destination, chunk.spans).if_error()) {
-      return *error;
+      return std::move(*error);
     }
   }
 
