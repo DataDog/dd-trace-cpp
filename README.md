@@ -16,48 +16,6 @@ Example Usage
 -------------
 TODO
 
-Operations
-----------
-Tracing libraries do certain things.  Here's how this library does those
-things.
-
-### Create a new trace
-```c++
-auto span = tracer.create_span({/*options*/});
-```
-
-### Extract a span from somewhere
-```c++
-auto result = tracer.extract_span(source, {/*options*/});
-if (Error *error = get_if<Error>(result)) {
-  // handle error
-}
-auto span = result.get<Span>();
-```
-
-### Inject a span somewhere
-```c++
-span.inject(destination);
-```
-
-### Create a child span
-```c++
-auto child = parent.create_child({/*options*/);
-```
-
-### Finish a span
-```c++
-span.finish();
-```
-
-### Scope a span's extent
-```c++
-{
-    SpanGuard span = returns_a_span();
-    span->set_tag("color", "purple");
-}  // span finishes here
-```
-
 Objects
 -------
 - _Span_ has a beginning, end, and tags.  It is associated with a _TraceSegment_.
@@ -67,7 +25,7 @@ Objects
   sampler modifications, if applicable.
 - _Tracer_ is responsible for creating trace segments. It contains the
   instances of, and configuration for, the _Collector_, _TraceSampler_, and
-  _SpanSampler_.  A tracer is created from a _Config_.
+  _SpanSampler_.  A tracer is created from a _TracerConfig_.
 - _TraceSampler_ is used by trace segments to decide when to keep or drop
   themselves.
 - _SpanSampler_ is used by trace segments to decide which spans to keep when
@@ -82,8 +40,8 @@ Intended usage is:
 3. Use the `Tracer` to create and/or extract local root `Span`s.
 4. Use `Span` to create children and/or inject context.
 5. Use a `Span`'s `TraceSegment` to perform trace-wide operations.
-6. When all `Span`s in ` TraceSegment` are `finish`ed, the segment is sent to
-   the `Collector`.
+6. When all `Span`s in ` TraceSegment` are finished, the segment is sent to the
+   `Collector`.
 
 Different instances of `Tracer` are independent of each other.  If an
 application wishes to reconfigure tracing at runtime, it can create another

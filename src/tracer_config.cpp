@@ -27,11 +27,7 @@ Expected<Validated<TracerConfig>> validate_config(const TracerConfig& config) {
 
   // TODO trace_sampler, span_sampler
 
-  /*struct PropagationStyles {
-    bool datadog = true;
-    bool b3 = false;
-    bool w3c = false;
-  };*/
+  // TODO: implement the other ones
   const auto not_implemented = [](std::string_view style,
                                   std::string_view operation) {
     std::string message;
