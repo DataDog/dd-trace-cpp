@@ -13,6 +13,7 @@ class Expected {
   std::variant<Value, Error> data_;
 
  public:
+  Expected() = default;
   Expected(const Expected&) = default;
   Expected(Expected&) = default;
   Expected(Expected&&) = default;
@@ -143,6 +144,7 @@ class Expected<void> {
   std::optional<Error> data_;
 
  public:
+  Expected() = default;
   Expected(const Expected&) = default;
   Expected(Expected&) = default;
   Expected(Expected&&) = default;
