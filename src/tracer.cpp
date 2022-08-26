@@ -160,6 +160,58 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
   }
 };
 
+struct ExtractedData {
+  std::optional<std::uint64_t> trace_id;
+  std::optional<std::uint64_t> parent_id;
+  std::optional<std::string> origin;
+  Expected<std::unordered_map<std::string, std::string>> maybe_trace_tags;
+  std::optional<SamplingDecision> sampling_decision;
+};
+
+Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
+                                     const DictReader& reader) {
+  ExtractedData extracted_data;
+
+  auto& trace_id = extracted_data.trace_id;
+  auto& parent_id = extracted_data.parent_id;
+  auto& origin = extracted_data.origin;
+  auto& maybe_trace_tags = extracted_data.maybe_trace_tags;
+  auto& sampling_decision = extracted_data.sampling_decision;
+
+  auto maybe_trace_id = extract.trace_id(reader);
+  if (auto* error = maybe_trace_id.if_error()) {
+    return std::move(*error);
+  }
+  trace_id = *maybe_trace_id;
+
+  origin = extract.origin(reader);
+
+  auto maybe_parent_id = extract.parent_id(reader);
+  if (auto* error = maybe_parent_id.if_error()) {
+    return std::move(*error);
+  }
+  parent_id = *maybe_parent_id;
+
+  auto maybe_sampling_priority = extract.sampling_priority(reader);
+  if (auto* error = maybe_sampling_priority.if_error()) {
+    return std::move(*error);
+  }
+  auto sampling_priority = *maybe_sampling_priority;
+  if (sampling_priority) {
+    SamplingDecision decision;
+    decision.priority = *sampling_priority;
+    // `decision.mechanism` is null.  We might be able to infer it once we
+    // extract `trace_tags`, but we would have no use for it, so we won't.
+    decision.origin = SamplingDecision::Origin::EXTRACTED;
+
+    sampling_decision = decision;
+  }
+
+  maybe_trace_tags = extract.trace_tags(reader);
+
+  return extracted_data;
+}
+
 }  // namespace
 
 Tracer::Tracer(const Validated<TracerConfig>& config)
@@ -216,30 +268,17 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
          !extraction_styles_.w3c);
   // end TODO
 
-  std::optional<std::uint64_t> trace_id;
-  std::optional<std::uint64_t> parent_id;
-  std::optional<std::string> origin;
-  std::unordered_map<std::string, std::string> trace_tags;
-  std::optional<std::string> trace_tags_extraction_error;
-  std::optional<SamplingDecision> sampling_decision;
-  // TODO: Whether the requester delegated its sampling decision will also be
-  // important eventually.
-
   DatadogExtractionPolicy extract;
-
-  auto maybe_trace_id = extract.trace_id(reader);
-  if (auto* error = maybe_trace_id.if_error()) {
+  auto extracted_data = extract_data(extract, reader);
+  if (auto* error = extracted_data.if_error()) {
     return std::move(*error);
   }
-  trace_id = *maybe_trace_id;
 
-  origin = extract.origin(reader);
-
-  auto maybe_parent_id = extract.parent_id(reader);
-  if (auto* error = maybe_parent_id.if_error()) {
-    return std::move(*error);
-  }
-  parent_id = *maybe_parent_id;
+  auto& trace_id = extracted_data->trace_id;
+  auto& parent_id = extracted_data->parent_id;
+  auto& origin = extracted_data->origin;
+  auto& maybe_trace_tags = extracted_data->maybe_trace_tags;
+  auto& sampling_decision = extracted_data->sampling_decision;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -270,33 +309,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     parent_id = 0;
   }
 
-  auto maybe_sampling_priority = extract.sampling_priority(reader);
-  if (auto* error = maybe_sampling_priority.if_error()) {
-    return std::move(*error);
-  }
-  auto sampling_priority = *maybe_sampling_priority;
-  if (sampling_priority) {
-    SamplingDecision decision;
-    decision.priority = *sampling_priority;
-    // `decision.mechanism` is null.  We might be able to infer it once we
-    // extract `trace_tags`, but we would have no use for it, so we won't.
-    decision.origin = SamplingDecision::Origin::EXTRACTED;
-
-    sampling_decision = decision;
-  }
-
-  auto maybe_trace_tags = extract.trace_tags(reader);
-  if (auto* error = maybe_trace_tags.if_error()) {
-    logger_->log_error(*error);
-    if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
-      trace_tags_extraction_error = "extract_max_size";
-    } else {
-      trace_tags_extraction_error = "decoding_error";
-    }
-  } else {
-    trace_tags = *maybe_trace_tags;
-  }
-
   // We're done extracting fields.  Now create the span.
   // This is similar to what we do in `create_span`.
   assert(parent_id);
@@ -307,16 +319,24 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   span_data->span_id = generator_.generate_span_id();
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
-  if (trace_tags_extraction_error) {
-    span_data->tags[tags::internal::propagation_error] =
-        *trace_tags_extraction_error;
+
+  std::unordered_map<std::string, std::string> trace_tags;
+  if (auto* error = maybe_trace_tags.if_error()) {
+    logger_->log_error(*error);
+    if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
+      span_data->tags[tags::internal::propagation_error] = "extract_max_size";
+    } else {
+      span_data->tags[tags::internal::propagation_error] = "decoding_error";
+    }
+  } else {
+    trace_tags = std::move(*maybe_trace_tags);
   }
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
-      injection_styles_, hostname_, origin, trace_tags, sampling_decision,
-      std::move(span_data));
+      injection_styles_, hostname_, std::move(origin), std::move(trace_tags),
+      std::move(sampling_decision), std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
   return span;
 }
