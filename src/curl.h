@@ -81,10 +81,9 @@ class Curl : public HTTPClient {
   Curl();
   ~Curl();
 
-  virtual std::optional<Error> post(const URL &url, HeadersSetter set_headers,
-                                    std::string body,
-                                    ResponseHandler on_response,
-                                    ErrorHandler on_error) override;
+  virtual Expected<void> post(const URL &url, HeadersSetter set_headers,
+                              std::string body, ResponseHandler on_response,
+                              ErrorHandler on_error) override;
 };
 
 inline Curl::Curl()
@@ -101,11 +100,10 @@ inline Curl::~Curl() {
   event_loop_.join();
 }
 
-inline std::optional<Error> Curl::post(const HTTPClient::URL &url,
-                                       HeadersSetter set_headers,
-                                       std::string body,
-                                       ResponseHandler on_response,
-                                       ErrorHandler on_error) {
+inline Expected<void> Curl::post(const HTTPClient::URL &url,
+                                 HeadersSetter set_headers, std::string body,
+                                 ResponseHandler on_response,
+                                 ErrorHandler on_error) {
   auto request = new Request();
 
   request->request_body = std::move(body);

@@ -40,7 +40,7 @@ class DatadogAgent : public Collector {
   explicit DatadogAgent(const Validated<DatadogAgentConfig>& config);
   ~DatadogAgent();
 
-  virtual std::optional<Error> send(
+  virtual Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) override;
 };

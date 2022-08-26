@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "error.h"
+#include "expected.h"
 
 namespace datadog {
 namespace tracing {
@@ -27,10 +28,9 @@ class HTTPClient {
   // error-indicating HTTP responses.
   using ErrorHandler = std::function<void(Error)>;
 
-  virtual std::optional<Error> post(const URL& url, HeadersSetter set_headers,
-                                    std::string body,
-                                    ResponseHandler on_response,
-                                    ErrorHandler on_error) = 0;
+  virtual Expected<void> post(const URL& url, HeadersSetter set_headers,
+                              std::string body, ResponseHandler on_response,
+                              ErrorHandler on_error) = 0;
 
   virtual ~HTTPClient() = default;
 };

@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 
-#include "error.h"
+#include "expected.h"
 
 namespace datadog {
 namespace tracing {
@@ -14,7 +14,7 @@ class TraceSampler;
 
 class Collector {
  public:
-  virtual std::optional<Error> send(
+  virtual Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) = 0;
 };

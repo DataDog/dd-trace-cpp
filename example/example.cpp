@@ -149,9 +149,8 @@ void play_with_curl() {
   };
 
   for (int i = 0; i < 10; ++i) {
-    const auto error =
-        client.post(url, set_headers, body, on_response, on_error);
-    if (error) {
+    if (auto* error = client.post(url, set_headers, body, on_response, on_error)
+                          .if_error()) {
       std::cout << "Curl returned error " << error->code << ": "
                 << error->message << std::endl;
     }
@@ -192,9 +191,9 @@ void play_with_curl_and_event_scheduler() {
                     << std::endl;
         };
 
-        const auto error =
-            client.post(url, set_headers, body, on_response, on_error);
-        if (error) {
+        if (auto* error =
+                client.post(url, set_headers, body, on_response, on_error)
+                    .if_error()) {
           std::cout << "Curl returned error " << error->code << ": "
                     << error->message << std::endl;
         }
@@ -435,9 +434,8 @@ void play_with_agent() {
 
 class NoOpCollector : public dd::Collector {
  public:
-  std::optional<dd::Error> send(
-      std::vector<std::unique_ptr<dd::SpanData>>&&,
-      const std::shared_ptr<dd::TraceSampler>&) override {
+  dd::Expected<void> send(std::vector<std::unique_ptr<dd::SpanData>>&&,
+                          const std::shared_ptr<dd::TraceSampler>&) override {
     return std::nullopt;
   }
 };

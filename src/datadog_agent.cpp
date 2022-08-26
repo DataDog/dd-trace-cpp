@@ -29,7 +29,7 @@ HTTPClient::URL traces_endpoint(std::string_view agent_url) {
   return url;
 }
 
-std::optional<Error> msgpack_encode(
+Expected<void> msgpack_encode(
     std::string& destination,
     const std::vector<std::unique_ptr<SpanData>>& spans) try {
   msgpack::pack_array(destination, spans.size());
@@ -46,7 +46,7 @@ std::optional<Error> msgpack_encode(
   return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }
 
-std::optional<Error> msgpack_encode(
+Expected<void> msgpack_encode(
     std::string& destination,
     const std::vector<DatadogAgent::TraceChunk>& trace_chunks) try {
   msgpack::pack_array(destination, trace_chunks.size());
@@ -158,7 +158,7 @@ DatadogAgent::DatadogAgent(const Validated<DatadogAgentConfig>& config)
 
 DatadogAgent::~DatadogAgent() { cancel_scheduled_flush_(); }
 
-std::optional<Error> DatadogAgent::send(
+Expected<void> DatadogAgent::send(
     std::vector<std::unique_ptr<SpanData>>&& spans,
     const std::shared_ptr<TraceSampler>& response_handler) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -180,10 +180,9 @@ void DatadogAgent::flush() {
   }
 
   std::string body;
-  if (const auto maybe_error = msgpack_encode(body, outgoing_trace_chunks_)) {
+  if (auto* error = msgpack_encode(body, outgoing_trace_chunks_).if_error()) {
     // TODO: need a logger
-    std::cout << *maybe_error << '\n';
-    (void)maybe_error;
+    std::cout << *error << '\n';
     return;
   }
 
@@ -245,11 +244,13 @@ void DatadogAgent::flush() {
     std::cout << "Error occurred during HTTP request: " << error << '\n';
   };
 
-  if (const auto maybe_error = http_client_->post(
-          traces_endpoint_, std::move(set_request_headers), std::move(body),
-          std::move(on_response), std::move(on_error))) {
+  if (auto* error = http_client_
+                        ->post(traces_endpoint_, std::move(set_request_headers),
+                               std::move(body), std::move(on_response),
+                               std::move(on_error))
+                        .if_error()) {
     // TODO: need logger
-    std::cout << *maybe_error << '\n';
+    std::cout << *error << '\n';
   }
 }
 
