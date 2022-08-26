@@ -88,29 +88,39 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(std::string_view input) {
       std::string(range(after_authority, authority_and_path.end()))};
 }
 
-Expected<Validated<DatadogAgentConfig>> validate_config(
+Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& config) {
-  DatadogAgentConfig after_env{config};
+  FinalizedDatadogAgentConfig result;
 
+  // TODO: A build that includes libcurl could default to `Curl`,
+  // but I won't for now.
   if (!config.http_client) {
     return Error{Error::DATADOG_AGENT_NULL_HTTP_CLIENT,
                  "DatadogAgent: HTTP client cannot be null."};
   }
+  result.http_client = config.http_client;
+
   if (!config.event_scheduler) {
-    after_env.event_scheduler = std::make_shared<ThreadedEventScheduler>();
+    result.event_scheduler = std::make_shared<ThreadedEventScheduler>();
+  } else {
+    result.event_scheduler = config.event_scheduler;
   }
+
   if (config.flush_interval_milliseconds <= 0) {
     return Error{Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL,
                  "DatadogAgent: Flush interval must be a positive number of "
                  "milliseconds."};
   }
+  result.flush_interval =
+      std::chrono::milliseconds(config.flush_interval_milliseconds);
 
   auto url = config.parse(config.agent_url);
   if (auto* error = url.if_error()) {
     return std::move(*error);
   }
+  result.agent_url = *url;
 
-  return Validated<DatadogAgentConfig>{after_env};
+  return result;
 }
 
 }  // namespace tracing

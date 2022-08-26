@@ -7,12 +7,11 @@
 #include "collector.h"
 #include "event_scheduler.h"
 #include "http_client.h"
-#include "validated.h"
 
 namespace datadog {
 namespace tracing {
 
-struct DatadogAgentConfig;
+struct FinalizedDatadogAgentConfig;
 class Logger;
 struct SpanData;
 class TraceSampler;
@@ -39,7 +38,7 @@ class DatadogAgent : public Collector {
   void flush();
 
  public:
-  DatadogAgent(const Validated<DatadogAgentConfig>&,
+  DatadogAgent(const FinalizedDatadogAgentConfig&,
                const std::shared_ptr<Logger>&);
   ~DatadogAgent();
 

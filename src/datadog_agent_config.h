@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -7,7 +8,6 @@
 
 #include "expected.h"
 #include "http_client.h"
-#include "validated.h"
 
 namespace datadog {
 namespace tracing {
@@ -23,7 +23,20 @@ struct DatadogAgentConfig {
   static Expected<HTTPClient::URL> parse(std::string_view);
 };
 
-Expected<Validated<DatadogAgentConfig>> validate_config(
+class FinalizedDatadogAgentConfig {
+  friend Expected<FinalizedDatadogAgentConfig> finalize_config(
+      const DatadogAgentConfig& config);
+
+  FinalizedDatadogAgentConfig() = default;
+
+ public:
+  std::shared_ptr<HTTPClient> http_client;
+  std::shared_ptr<EventScheduler> event_scheduler;
+  HTTPClient::URL agent_url;
+  std::chrono::steady_clock::duration flush_interval;
+};
+
+Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& config);
 
 }  // namespace tracing

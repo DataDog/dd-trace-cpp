@@ -250,7 +250,7 @@ void play_with_config() {
     dd::DatadogAgentConfig agent_config;
     agent_config.http_client = http_client;
 
-    auto validated = dd::validate_config(raw_config);
+    auto validated = dd::finalize_config(raw_config);
     if (const auto* const error = validated.if_error()) {
       std::cout << "Bad config: " << error->message << '\n';
       return;
@@ -263,7 +263,7 @@ void play_with_config() {
   {
     dd::TracerConfig raw_config;
     // raw_config.defaults.service = "hello";
-    auto maybe_config = dd::validate_config(raw_config);
+    auto maybe_config = dd::finalize_config(raw_config);
     if (const auto* const error = maybe_config.if_error()) {
       std::cout << "Bad config: " << error->message << '\n';
       return;
@@ -273,8 +273,8 @@ void play_with_config() {
   }
 
   // "error: use of deleted function
-  // ‘datadog::tracing::Validated<TracerConfig>::ValidatedTracerConfig()’"
-  // dd::Validated<TracerConfig> config;
+  // ‘datadog::tracing::FinalizedTracerConfig::ValidatedTracerConfig()’"
+  // dd::FinalizedTracerConfig config;
   // (void) config;
 }
 
@@ -283,11 +283,9 @@ void play_with_create_span() {
 
   dd::TracerConfig config;
   config.defaults.service = "hello";
-  dd::DatadogAgentConfig agent_config;
-  agent_config.http_client = http_client;
-  config.collector = agent_config;
+  config.agent.http_client = http_client;
 
-  auto maybe_config = dd::validate_config(config);
+  auto maybe_config = dd::finalize_config(config);
   if (const auto* const error = maybe_config.if_error()) {
     std::cout << "Bad config: " << error->message << '\n';
     return;
@@ -308,11 +306,9 @@ void play_with_span_tags() {
 
   dd::TracerConfig config;
   config.defaults.service = "hello";
-  dd::DatadogAgentConfig agent_config;
-  agent_config.http_client = http_client;
-  config.collector = agent_config;
+  config.agent.http_client = http_client;
 
-  auto maybe_config = dd::validate_config(config);
+  auto maybe_config = dd::finalize_config(config);
   if (const auto* const error = maybe_config.if_error()) {
     std::cout << "Bad config: " << error->message << '\n';
     return;
@@ -367,7 +363,7 @@ void play_with_parse_url() {
   config.http_client = http_client;
   config.agent_url = "unix://var/run/i.did.it.wrong.sock";
   std::cout << config.agent_url << "\n  ->  ";
-  auto result = validate_config(config);
+  auto result = finalize_config(config);
   if (auto* error = result.if_error()) {
     std::cout << *error;
   } else {
@@ -384,7 +380,7 @@ void play_with_agent() {
   config.http_client = http_client;
   config.event_scheduler = scheduler;
 
-  const auto validated = dd::validate_config(config);
+  const auto validated = dd::finalize_config(config);
   assert(validated);
   dd::DatadogAgent collector{*validated, std::make_shared<dd::CerrLogger>()};
 
@@ -475,7 +471,7 @@ void play_with_extract() {
   config.defaults.service = "hello";
   config.collector = std::make_shared<NoOpCollector>();
 
-  auto maybe_config = dd::validate_config(config);
+  auto maybe_config = dd::finalize_config(config);
   if (const auto* const error = maybe_config.if_error()) {
     std::cout << "Bad config: " << error->message << '\n';
     return;
@@ -528,7 +524,7 @@ void play_with_inject() {
   config.defaults.service = "hello";
   config.collector = std::make_shared<NoOpCollector>();
 
-  auto maybe_config = dd::validate_config(config);
+  auto maybe_config = dd::finalize_config(config);
   if (const auto* const error = maybe_config.if_error()) {
     std::cout << "Bad config: " << error->message << '\n';
     return;
@@ -579,12 +575,10 @@ void play_with_propagation(int argc, const char* const* argv) {
   }
 
   const auto http_client = std::make_shared<dd::Curl>();
-  dd::DatadogAgentConfig agent_config;
-  agent_config.http_client = http_client;
   dd::TracerConfig config;
-  config.collector = agent_config;
+  config.agent.http_client = http_client;
   config.defaults.service = service;
-  const auto validated = dd::validate_config(config);
+  const auto validated = dd::finalize_config(config);
   if (const auto* error = validated.if_error()) {
     std::cout << "Invalid tracer config: " << *error << '\n';
     return;

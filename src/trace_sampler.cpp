@@ -31,7 +31,7 @@ std::uint64_t max_id_from_rate(Rate rate) {
 
 }  // namespace
 
-TraceSampler::TraceSampler(const Validated<TraceSamplerConfig>& config) {
+TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config) {
   // TODO
   (void)config;
 }

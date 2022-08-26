@@ -140,7 +140,7 @@ int main() {
   agent_config.http_client = http_client;
   config.collector = agent_config;
 
-  auto validated = dd::validate_config(config);
+  auto validated = dd::finalize_config(config);
   if (auto *error = validated.if_error()) {
     std::cerr << "Invalid config: " << *error << '\n';
     return 1;

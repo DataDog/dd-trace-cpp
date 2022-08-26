@@ -21,12 +21,10 @@ namespace {
 
 const std::string_view traces_api_path = "/v0.4/traces";
 
-HTTPClient::URL traces_endpoint(std::string_view agent_url) {
-  // `agent_url` came from a validated configuration, so it is guaranteed to
-  // parse successfully.
-  auto url = *DatadogAgentConfig::parse(agent_url);
-  url.path += traces_api_path;
-  return url;
+HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
+  auto traces_url = agent_url;
+  traces_url.path += traces_api_path;
+  return traces_url;
 }
 
 Expected<void> msgpack_encode(
@@ -148,15 +146,14 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 
 }  // namespace
 
-DatadogAgent::DatadogAgent(const Validated<DatadogAgentConfig>& config,
+DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
                            const std::shared_ptr<Logger>& logger)
     : logger_(logger),
       traces_endpoint_(traces_endpoint(config.agent_url)),
       http_client_(config.http_client),
       event_scheduler_(config.event_scheduler),
       cancel_scheduled_flush_(event_scheduler_->schedule_recurring_event(
-          std::chrono::milliseconds(config.flush_interval_milliseconds),
-          [this]() { flush(); })) {
+          config.flush_interval, [this]() { flush(); })) {
   assert(logger_);
 }
 

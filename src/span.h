@@ -7,7 +7,6 @@
 
 #include "clock.h"
 #include "error.h"
-#include "validated.h"
 
 namespace datadog {
 namespace tracing {

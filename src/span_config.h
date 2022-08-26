@@ -6,7 +6,6 @@
 #include <variant>
 
 #include "clock.h"
-#include "validated.h"
 
 namespace datadog {
 namespace tracing {

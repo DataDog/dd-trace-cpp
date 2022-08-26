@@ -1,35 +1,52 @@
 #include "tracer_config.h"
 
 #include "cerr_logger.h"
+#include "datadog_agent.h"
+#include "span_sampler.h"
+#include "trace_sampler.h"
 
 namespace datadog {
 namespace tracing {
 
-Expected<Validated<TracerConfig>> validate_config(const TracerConfig& config) {
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config) {
   // TODO: environment variables, validation, and other fun.
-  TracerConfig after_env{config};
+  FinalizedTracerConfig result;
 
-  if (after_env.defaults.service.empty()) {
+  if (config.defaults.service.empty()) {
     return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
   }
 
-  if (const auto* collector =
-          std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
-    if (!*collector) {
-      return Error{Error::NULL_COLLECTOR, "Collector must not be null."};
-    }
+  result.defaults = config.defaults;
+
+  if (config.logger) {
+    result.logger = config.logger;
   } else {
-    const auto& agent_config = std::get<DatadogAgentConfig>(config.collector);
-    auto validated = validate_config(agent_config);
-    if (auto* error = validated.if_error()) {
-      return std::move(*error);
-    }
-    after_env.collector = std::move(*validated);
+    result.logger = std::make_shared<CerrLogger>();
   }
 
-  // TODO trace_sampler, span_sampler
+  if (!config.collector) {
+    auto finalized = finalize_config(config.agent);
+    if (auto* error = finalized.if_error()) {
+      return std::move(*error);
+    }
+    result.collector =
+        std::make_shared<DatadogAgent>(*finalized, result.logger);
+  }
 
-  // TODO: implement the other ones
+  if (auto trace_sampler_config = finalize_config(config.trace_sampler)) {
+    result.trace_sampler =
+        std::make_shared<TraceSampler>(*trace_sampler_config);
+  } else {
+    return std::move(trace_sampler_config.error());
+  }
+
+  if (auto span_sampler_config = finalize_config(config.span_sampler)) {
+    result.span_sampler = std::make_shared<SpanSampler>(*span_sampler_config);
+  } else {
+    return std::move(span_sampler_config.error());
+  }
+
+  // TODO: implement the other styles
   const auto not_implemented = [](std::string_view style,
                                   std::string_view operation) {
     std::string message;
@@ -57,13 +74,12 @@ Expected<Validated<TracerConfig>> validate_config(const TracerConfig& config) {
                  "At least one injection style must be specified."};
   }
 
-  if (config.logger) {
-    after_env.logger = config.logger;
-  } else {
-    after_env.logger = std::make_shared<CerrLogger>();
-  }
+  result.injection_styles = config.injection_styles;
+  result.extraction_styles = config.extraction_styles;
 
-  return Validated<TracerConfig>(std::move(after_env));
+  result.report_hostname = config.report_hostname;
+
+  return result;
 }
 
 }  // namespace tracing

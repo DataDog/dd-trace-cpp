@@ -212,31 +212,21 @@ Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
 
 }  // namespace
 
-Tracer::Tracer(const Validated<TracerConfig>& config)
+Tracer::Tracer(const FinalizedTracerConfig& config)
     : Tracer(config, default_id_generator, default_clock) {}
 
-Tracer::Tracer(const Validated<TracerConfig>& config,
+Tracer::Tracer(const FinalizedTracerConfig& config,
                const IDGenerator& generator, const Clock& clock)
     : logger_(config.logger),
-      collector_(/* see constructor body */),
-      trace_sampler_(std::make_shared<TraceSampler>(
-          bless(&TracerConfig::trace_sampler, config))),
-      span_sampler_(std::make_shared<SpanSampler>(
-          bless(&TracerConfig::span_sampler, config))),
+      collector_(config.collector),
+      trace_sampler_(config.trace_sampler),
+      span_sampler_(config.span_sampler),
       generator_(generator),
       clock_(clock),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
-      hostname_(config.report_hostname ? get_hostname() : std::nullopt) {
-  if (auto* collector =
-          std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
-    collector_ = *collector;
-  } else {
-    collector_ = std::make_shared<DatadogAgent>(
-        bless(&TracerConfig::collector, config), logger_);
-  }
-}
+      hostname_(config.report_hostname ? get_hostname() : std::nullopt) {}
 
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();

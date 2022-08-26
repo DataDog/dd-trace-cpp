@@ -4,7 +4,6 @@
 
 #include "error.h"
 #include "expected.h"
-#include "validated.h"
 
 namespace datadog {
 namespace tracing {
@@ -13,7 +12,17 @@ struct TraceSamplerConfig {
   // TODO
 };
 
-Expected<Validated<TraceSamplerConfig>> validate_config(
+class FinalizedTraceSamplerConfig {
+  friend Expected<FinalizedTraceSamplerConfig> finalize_config(
+      const TraceSamplerConfig& config);
+
+  FinalizedTraceSamplerConfig() = default;
+
+ public:
+  // TODO
+};
+
+Expected<FinalizedTraceSamplerConfig> finalize_config(
     const TraceSamplerConfig& config);
 
 }  // namespace tracing

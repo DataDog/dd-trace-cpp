@@ -3,7 +3,6 @@
 #include <variant>
 
 #include "expected.h"
-#include "validated.h"
 
 namespace datadog {
 namespace tracing {
@@ -12,7 +11,17 @@ struct SpanSamplerConfig {
   // TODO
 };
 
-Expected<Validated<SpanSamplerConfig>> validate_config(
+class FinalizedSpanSamplerConfig {
+  friend Expected<FinalizedSpanSamplerConfig> finalize_config(
+      const SpanSamplerConfig& config);
+
+  FinalizedSpanSamplerConfig() = default;
+
+ public:
+  // TODO
+};
+
+Expected<FinalizedSpanSamplerConfig> finalize_config(
     const SpanSamplerConfig& config);
 
 }  // namespace tracing

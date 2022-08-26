@@ -8,7 +8,6 @@
 #include "id_generator.h"
 #include "span.h"
 #include "tracer_config.h"
-#include "validated.h"
 
 namespace datadog {
 namespace tracing {
@@ -31,8 +30,8 @@ class Tracer {
   std::optional<std::string> hostname_;
 
  public:
-  explicit Tracer(const Validated<TracerConfig>& config);
-  Tracer(const Validated<TracerConfig>& config, const IDGenerator& generator,
+  explicit Tracer(const FinalizedTracerConfig& config);
+  Tracer(const FinalizedTracerConfig& config, const IDGenerator& generator,
          const Clock& clock);
 
   // Create a new trace and return the root span of the trace.  Optionally

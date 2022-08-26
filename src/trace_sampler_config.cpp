@@ -4,10 +4,10 @@ namespace tracing {
 
 // TODO
 
-Expected<Validated<TraceSamplerConfig>> validate_config(
-    const TraceSamplerConfig& config) {
+Expected<FinalizedTraceSamplerConfig> finalize_config(
+    const TraceSamplerConfig&) {
   // TODO
-  return Validated<TraceSamplerConfig>{config};
+  return FinalizedTraceSamplerConfig{};
 }
 
 }  // namespace tracing

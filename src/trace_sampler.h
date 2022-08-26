@@ -7,7 +7,6 @@
 
 #include "rate.h"
 #include "trace_sampler_config.h"
-#include "validated.h"
 
 namespace datadog {
 namespace tracing {
@@ -22,7 +21,7 @@ class TraceSampler {
   // TODO: sampling rules
 
  public:
-  explicit TraceSampler(const Validated<TraceSamplerConfig>& config);
+  explicit TraceSampler(const FinalizedTraceSamplerConfig& config);
 
   SamplingDecision decide(std::uint64_t trace_id, std::string_view service,
                           std::string_view operation_name,
