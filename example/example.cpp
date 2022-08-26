@@ -366,14 +366,14 @@ void play_with_parse_url() {
   const auto http_client = std::make_shared<dd::Curl>();
   dd::DatadogAgentConfig config;
   config.http_client = http_client;
-  config.agent_url = "unix://var/run/i.did.it.wrong.sock";
-  std::cout << config.agent_url << "\n  ->  ";
+  config.url = "unix://var/run/i.did.it.wrong.sock";
+  std::cout << config.url << "\n  ->  ";
   auto result = finalize_config(config);
   if (auto* error = result.if_error()) {
     std::cout << *error;
   } else {
     const auto& validated = *result;
-    std::cout << validated.agent_url;
+    std::cout << validated.url;
   }
   std::cout << '\n';
 }

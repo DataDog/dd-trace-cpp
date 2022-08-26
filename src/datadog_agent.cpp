@@ -149,7 +149,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
                            const std::shared_ptr<Logger>& logger)
     : logger_(logger),
-      traces_endpoint_(traces_endpoint(config.agent_url)),
+      traces_endpoint_(traces_endpoint(config.url)),
       http_client_(config.http_client),
       event_scheduler_(config.event_scheduler),
       cancel_scheduled_flush_(event_scheduler_->schedule_recurring_event(

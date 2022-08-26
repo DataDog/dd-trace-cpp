@@ -17,7 +17,7 @@ class EventScheduler;
 struct DatadogAgentConfig {
   std::shared_ptr<HTTPClient> http_client;
   std::shared_ptr<EventScheduler> event_scheduler = nullptr;
-  std::string agent_url = "http://localhost:8126";
+  std::string url = "http://localhost:8126";
   int flush_interval_milliseconds = 2000;
 
   static Expected<HTTPClient::URL> parse(std::string_view);
@@ -32,7 +32,7 @@ class FinalizedDatadogAgentConfig {
  public:
   std::shared_ptr<HTTPClient> http_client;
   std::shared_ptr<EventScheduler> event_scheduler;
-  HTTPClient::URL agent_url;
+  HTTPClient::URL url;
   std::chrono::steady_clock::duration flush_interval;
 };
 

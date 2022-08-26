@@ -120,11 +120,11 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.flush_interval =
       std::chrono::milliseconds(config.flush_interval_milliseconds);
 
-  auto url = config.parse(config.agent_url);
+  auto url = config.parse(config.url);
   if (auto* error = url.if_error()) {
     return std::move(*error);
   }
-  result.agent_url = *url;
+  result.url = *url;
 
   return result;
 }
