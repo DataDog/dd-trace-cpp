@@ -11,3 +11,4 @@
 /example/scratch
 
 /bazel-*
+/.build/
