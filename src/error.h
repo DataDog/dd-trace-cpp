@@ -7,10 +7,6 @@
 namespace datadog {
 namespace tracing {
 
-struct Error;
-
-std::ostream& operator<<(std::ostream&, const Error&);
-
 struct Error {
   enum Code {
     SERVICE_NAME_REQUIRED = 1,
@@ -39,6 +35,8 @@ struct Error {
   std::string to_string() const;
   Error with_prefix(std::string_view) const;
 };
+
+std::ostream& operator<<(std::ostream&, const Error&);
 
 }  // namespace tracing
 }  // namespace datadog

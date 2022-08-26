@@ -17,9 +17,9 @@ std::string Error::to_string() const {
 }
 
 Error Error::with_prefix(std::string_view prefix) const {
-  Error result = *this;
-  result.message.insert(message.begin(), prefix.begin(), prefix.end());
-  return result;
+  std::string new_message{prefix.begin(), prefix.end()};
+  new_message += prefix;
+  return Error{code, std::move(new_message)};
 }
 
 }  // namespace tracing
