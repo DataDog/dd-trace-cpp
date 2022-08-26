@@ -25,7 +25,7 @@ class InjectionPolicy {
   virtual void parent_id(DictWriter&, std::uint64_t) = 0;
   virtual void sampling_priority(DictWriter&, int) = 0;
   virtual void origin(DictWriter&, const std::string&) = 0;
-  virtual std::optional<Error> trace_tags(
+  virtual Expected<void> trace_tags(
       DictWriter&, const std::unordered_map<std::string, std::string>&) = 0;
 };
 
@@ -48,7 +48,7 @@ class DatadogInjectionPolicy : public InjectionPolicy {
     writer.set("x-datadog-origin", origin);
   }
 
-  std::optional<Error> trace_tags(
+  Expected<void> trace_tags(
       DictWriter&,
       const std::unordered_map<std::string, std::string>& tags) override {
     if (tags.empty()) {
@@ -185,7 +185,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   }
 
   // TODO: configurable maximum size
-  if (const auto error = inject.trace_tags(writer, trace_tags_)) {
+  if (auto* error = inject.trace_tags(writer, trace_tags_).if_error()) {
     // TODO: need a logger
     std::cout << *error << '\n';
     SpanData& local_root = *spans_.front();

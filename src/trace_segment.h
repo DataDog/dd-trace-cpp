@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "error.h"
+#include "expected.h"
 #include "propagation_styles.h"
 #include "sampling_decision.h"
 
@@ -62,7 +62,7 @@ class TraceSegment {
 
   // These are for sampling delegation, not for trace propagation.
   // TODO
-  std::optional<Error> extract(const DictReader& reader);
+  Expected<void> extract(const DictReader& reader);
   void inject(DictWriter& writer) const;
 
   void register_span(std::unique_ptr<SpanData> span);
