@@ -56,6 +56,10 @@ void Span::inject(DictWriter& writer) const {
   trace_segment_->inject(writer, *data_);
 }
 
+std::uint64_t Span::id() const { return data_->span_id; }
+
+std::uint64_t Span::trace_id() const { return data_->trace_id; }
+
 std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
   // TODO: special cases for special tags.
 
