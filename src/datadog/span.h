@@ -30,6 +30,7 @@ class Span {
        const Clock& clock);
   Span(const Span&) = delete;
   Span(Span&&) = default;
+  Span& operator=(Span&&) = default;
 
   ~Span();
 
