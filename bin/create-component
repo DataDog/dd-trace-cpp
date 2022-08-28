@@ -9,7 +9,6 @@
 #
 #     src/foo_bar.h
 #     src/foo_bar.cpp
-#     include/datadog/foo_bar.h  ->  ../../src/foo_bar.h
 #
 
 create_component() {
@@ -51,5 +50,3 @@ cd "$bin_dir"/..
 for arg in "$@"; do
     create_component "$arg"
 done
-
-"$bin_dir"/update-includes

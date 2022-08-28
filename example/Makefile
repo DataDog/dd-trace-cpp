@@ -1,5 +1,5 @@
 SOURCES := $(shell find ../src/ -type f -name '*.cpp' -not -name 'default_http_client_curl.cpp')
-HEADERS := $(wildcard ../src/*.h) ../src/json.hpp
+HEADERS := $(wildcard ../src/*.h) ../src/datadog/json.hpp
 
 example: example.cpp $(SOURCES) $(HEADERS)
 	$(CXX) \
@@ -7,7 +7,7 @@ example: example.cpp $(SOURCES) $(HEADERS)
 		-g \
 		-Og \
 		-Wall -Wextra -pedantic -Werror -Wno-non-template-friend \
-		-I../include \
+		-I../src \
 		-o $@ \
 		$< $(SOURCES) \
 		-L/usr/local/lib -lcurl
@@ -18,7 +18,7 @@ hasher: hasher.cpp $(SOURCES) $(HEADERS)
 		-g \
 		-Og \
 		-Wall -Wextra -pedantic -Werror -Wno-non-template-friend \
-		-I../include \
+		-I../src \
 		-o $@ \
 		$< $(SOURCES) \
 		-L/usr/local/lib -lcurl
