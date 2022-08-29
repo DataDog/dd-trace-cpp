@@ -137,18 +137,31 @@ void TraceSegment::span_finished() {
   // TODO: Finalize the spans, e.g. add special tags to local root span.
   // TODO need more here
   make_sampling_decision_if_null();
+  const SamplingDecision& decision = *sampling_decision_;
 
   auto& local_root = *spans_.front();
   local_root.tags.insert(trace_tags_.begin(), trace_tags_.end());
   local_root.numeric_tags[tags::internal::sampling_priority] =
-      sampling_decision_->priority;
+      decision.priority;
   if (origin_) {
     local_root.tags[tags::internal::origin] = *origin_;
   }
   if (hostname_) {
     local_root.tags[tags::internal::hostname] = *hostname_;
   }
-  // TODO: rule sampling rates
+  if (decision.origin == SamplingDecision::Origin::LOCAL) {
+    if (decision.mechanism == int(SamplingMechanism::AGENT_RATE)) {
+      local_root.numeric_tags[tags::internal::agent_sample_rate] =
+          *decision.configured_rate;
+    } else if (decision.mechanism == int(SamplingMechanism::RULE)) {
+      local_root.numeric_tags[tags::internal::rule_sample_rate] =
+          *decision.configured_rate;
+      if (decision.limiter_effective_rate) {
+        local_root.numeric_tags[tags::internal::rule_limiter_sample_rate] =
+            *decision.limiter_effective_rate;
+      }
+    }
+  }
   // end TODO
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);
