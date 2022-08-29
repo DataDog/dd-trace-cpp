@@ -12,8 +12,7 @@ namespace datadog {
 namespace tracing {
 
 struct TraceSamplerConfig {
-  struct Rule {
-    SpanMatcher root_span;
+  struct Rule : public SpanMatcher {
     double sample_rate = 1.0;
   };
 
@@ -30,8 +29,7 @@ class FinalizedTraceSamplerConfig {
   FinalizedTraceSamplerConfig() = default;
 
  public:
-  struct Rule {
-    SpanMatcher root_span;
+  struct Rule : public SpanMatcher {
     Rate sample_rate;
   };
 

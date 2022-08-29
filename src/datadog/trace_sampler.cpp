@@ -42,9 +42,9 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
   decision.origin = SamplingDecision::Origin::LOCAL;
 
   // First check sampling rules.
-  auto found_rule = std::find_if(
-      rules_.begin(), rules_.end(),
-      [&](const auto& rule) { return rule.root_span.match(span); });
+  auto found_rule =
+      std::find_if(rules_.begin(), rules_.end(),
+                   [&](const auto& rule) { return rule.match(span); });
 
   if (found_rule != rules_.end()) {
     const auto& rule = *found_rule;

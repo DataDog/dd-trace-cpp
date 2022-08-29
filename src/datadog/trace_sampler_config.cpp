@@ -13,13 +13,13 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       prefix +=
           "Unable to parse sample_rate in trace sampling rule with root span "
           "pattern ";
-      prefix += rule.root_span.to_json();
+      prefix += rule.to_json();
       prefix += ": ";
       return error->with_prefix(prefix);
     }
 
     FinalizedTraceSamplerConfig::Rule finalized;
-    finalized.root_span = rule.root_span;
+    static_cast<SpanMatcher &>(finalized) = rule;
     finalized.sample_rate = *maybe_rate;
     result.rules.push_back(std::move(finalized));
   }

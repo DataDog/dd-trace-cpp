@@ -683,12 +683,12 @@ void play_with_trace_sampling() {
   config.sample_rate = 0.1;
 
   dd::TraceSamplerConfig::Rule rule;
-  rule.root_span.service = "foosvc";
+  rule.service = "foosvc";
   rule.sample_rate = 0;
   config.rules.push_back(rule);
 
   rule = dd::TraceSamplerConfig::Rule{};
-  rule.root_span.tags["user.id"] = "admin-*";
+  rule.tags["user.id"] = "admin-*";
   rule.sample_rate = 1.0;
   config.rules.push_back(rule);
 
