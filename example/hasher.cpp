@@ -133,12 +133,8 @@ int sha256_traced(Digest &digest, const fs::path &path,
 
 int main() {
   dd::TracerConfig config;
-  auto http_client = std::make_shared<dd::Curl>();
   config.defaults.service = "dd-trace-cpp-example";
   config.defaults.environment = "dev";
-  dd::DatadogAgentConfig agent_config;
-  agent_config.http_client = http_client;
-  config.collector = agent_config;
 
   auto validated = dd::finalize_config(config);
   if (auto *error = validated.if_error()) {
