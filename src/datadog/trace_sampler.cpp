@@ -8,34 +8,17 @@
 #include "collector_response.h"
 #include "sampling_decision.h"
 #include "sampling_priority.h"
+#include "sampling_util.h"
 #include "span_data.h"
 
 namespace datadog {
 namespace tracing {
-namespace {
-
-std::uint64_t knuth_hash(std::uint64_t value) {
-  return value * UINT64_C(1111111111111111111);
-}
-
-std::uint64_t max_id_from_rate(Rate rate) {
-  // `double(std::numeric_limits<uint64_t>::max())` is slightly larger than the
-  // largest `uint64_t`, but consider it a fun fact that the largest `double`
-  // less than 1.0 (i.e. the "previous value" to 1.0), when multiplied by the
-  // max `uint64_t`, results in a number not greater than the max `uint64_t`.
-  // So, the only special case to consider is 1.0.
-  if (rate == 1.0) {
-    return std::numeric_limits<uint64_t>::max();
-  }
-
-  return rate * static_cast<double>(std::numeric_limits<std::uint64_t>::max());
-}
-
-}  // namespace
 
 TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config,
                            const Clock& clock)
-    : rules_(config.rules), limiter_(clock, config.max_per_second) {}
+    : rules_(config.rules),
+      limiter_(clock, config.max_per_second),
+      limiter_max_per_second_(config.max_per_second) {}
 
 SamplingDecision TraceSampler::decide(const SpanData& span) {
   SamplingDecision decision;
@@ -46,9 +29,14 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
       std::find_if(rules_.begin(), rules_.end(),
                    [&](const auto& rule) { return rule.match(span); });
 
+  // `mutex_` protects `limiter_`, `collector_sample_rates_`, and
+  // `collector_default_sample_rate_`, so let's lock it here.
+  std::lock_guard lock(mutex_);
+
   if (found_rule != rules_.end()) {
     const auto& rule = *found_rule;
     decision.mechanism = int(SamplingMechanism::RULE);
+    decision.limiter_max_per_second = limiter_max_per_second_;
     decision.configured_rate = rule.sample_rate;
     const std::uint64_t threshold = max_id_from_rate(rule.sample_rate);
     if (knuth_hash(span.trace_id) < threshold) {
@@ -68,7 +56,6 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
 
   // No sampling rule matched.  Find the appropriate collector-controlled
   // sample rate.
-  std::lock_guard lock(mutex_);
   auto found_rate = collector_sample_rates_.find(
       CollectorResponse::key(span.service, span.environment().value_or("")));
   if (found_rate != collector_sample_rates_.end()) {

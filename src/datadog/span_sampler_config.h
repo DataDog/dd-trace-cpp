@@ -1,14 +1,22 @@
 #pragma once
 
-#include <variant>
+#include <optional>
+#include <vector>
 
 #include "expected.h"
+#include "rate.h"
+#include "span_matcher.h"
 
 namespace datadog {
 namespace tracing {
 
 struct SpanSamplerConfig {
-  // TODO
+  struct Rule : public SpanMatcher {
+    double sample_rate = 1.0;
+    std::optional<double> max_per_second;
+  };
+
+  std::vector<Rule> rules;
 };
 
 class FinalizedSpanSamplerConfig {
@@ -19,7 +27,12 @@ class FinalizedSpanSamplerConfig {
   FinalizedSpanSamplerConfig() = default;
 
  public:
-  // TODO
+  struct Rule : public SpanMatcher {
+    Rate sample_rate;
+    std::optional<double> max_per_second;
+  };
+
+  std::vector<Rule> rules;
 };
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(

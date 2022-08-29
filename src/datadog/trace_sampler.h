@@ -18,13 +18,14 @@ struct SamplingDecision;
 struct SpanData;
 
 class TraceSampler {
-  mutable std::mutex mutex_;
+  std::mutex mutex_;
 
   std::optional<Rate> collector_default_sample_rate_;
   std::unordered_map<std::string, Rate> collector_sample_rates_;
 
   std::vector<FinalizedTraceSamplerConfig::Rule> rules_;
   Limiter limiter_;
+  double limiter_max_per_second_;
 
  public:
   TraceSampler(const FinalizedTraceSamplerConfig& config, const Clock& clock);

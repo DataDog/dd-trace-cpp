@@ -3,7 +3,6 @@
 #include <optional>
 #include <vector>
 
-#include "error.h"
 #include "expected.h"
 #include "rate.h"
 #include "span_matcher.h"
