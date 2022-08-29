@@ -31,6 +31,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config) {
     }
     result.collector =
         std::make_shared<DatadogAgent>(*finalized, result.logger);
+  } else {
+    result.collector = config.collector;
   }
 
   if (auto trace_sampler_config = finalize_config(config.trace_sampler)) {
