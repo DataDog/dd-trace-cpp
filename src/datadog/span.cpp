@@ -62,6 +62,7 @@ std::uint64_t Span::trace_id() const { return data_->trace_id; }
 
 std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
   // TODO: special cases for special tags.
+  // https://github.com/DataDog/dd-opentracing-cpp/blob/e0fb951308f30a0e73bdb8eea9ddc04bffd4ab04/src/span.cpp#L137
 
   const auto found = data_->tags.find(std::string(name));
   if (found == data_->tags.end()) {
@@ -72,6 +73,7 @@ std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
 
 void Span::set_tag(std::string_view name, std::string_view value) {
   // TODO: special cases for special tags.
+  // https://github.com/DataDog/dd-opentracing-cpp/blob/e0fb951308f30a0e73bdb8eea9ddc04bffd4ab04/src/span.cpp#L137
 
   data_->tags.insert_or_assign(std::string(name), std::string(value));
 }
