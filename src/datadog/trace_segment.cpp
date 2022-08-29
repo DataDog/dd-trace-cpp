@@ -13,56 +13,12 @@
 #include "logger.h"
 #include "span_data.h"
 #include "span_sampler.h"
+#include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
 
 namespace datadog {
 namespace tracing {
-namespace {
-
-class InjectionPolicy {
- public:
-  virtual void trace_id(DictWriter&, std::uint64_t) = 0;
-  virtual void parent_id(DictWriter&, std::uint64_t) = 0;
-  virtual void sampling_priority(DictWriter&, int) = 0;
-  virtual void origin(DictWriter&, const std::string&) = 0;
-  virtual Expected<void> trace_tags(
-      DictWriter&, const std::unordered_map<std::string, std::string>&) = 0;
-};
-
-class DatadogInjectionPolicy : public InjectionPolicy {
- public:
-  void trace_id(DictWriter& writer, std::uint64_t trace_id) override {
-    writer.set("x-datadog-trace-id", std::to_string(trace_id));
-  }
-
-  void parent_id(DictWriter& writer, std::uint64_t span_id) override {
-    writer.set("x-datadog-parent-id", std::to_string(span_id));
-  }
-
-  void sampling_priority(DictWriter& writer, int sampling_priority) override {
-    writer.set("x-datadog-sampling-priority",
-               std::to_string(sampling_priority));
-  }
-
-  void origin(DictWriter& writer, const std::string& origin) override {
-    writer.set("x-datadog-origin", origin);
-  }
-
-  Expected<void> trace_tags(
-      DictWriter&,
-      const std::unordered_map<std::string, std::string>& tags) override {
-    if (tags.empty()) {
-      return std::nullopt;
-    }
-    // TODO: Don't forget to report an error when the value is too long.
-    return Error{Error::NOT_IMPLEMENTED,
-                 "Trace tags are not yet implemented, so I'm not going to "
-                 "serialize them."};
-  }
-};
-
-}  // namespace
 
 TraceSegment::TraceSegment(
     const std::shared_ptr<Logger>& logger,
@@ -217,37 +173,46 @@ void TraceSegment::make_sampling_decision_if_null() {
 
 void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   // TODO: I can assume this because of the current trace config validator.
-  const PropagationStyles& styles = injection_styles_;
-  assert(styles.datadog && !styles.b3 && !styles.w3c);
-  (void)styles;
+  assert(injection_styles_.datadog);
+  assert(!injection_styles_.b3);
+  assert(!injection_styles_.w3c);
   // end TODO
-
-  DatadogInjectionPolicy inject;
-
-  inject.trace_id(writer, span.trace_id);
-  inject.parent_id(writer, span.span_id);
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
     make_sampling_decision_if_null();
   }
 
-  inject.sampling_priority(writer, sampling_decision_->priority);
-
+  // Origin and trace tag headers are always propagated.
+  // Other headers depend on the injection styles.
   if (origin_) {
-    inject.origin(writer, *origin_);
+    writer.set("x-datadog-origin", *origin_);
+  }
+  const std::string encoded_trace_tags = encode_tags(trace_tags_);
+  if (encoded_trace_tags.size() > tags_header_max_size_) {
+    std::string message;
+    message +=
+        "Serialized x-datadog-tags header value is too large.  The configured "
+        "maximum size is ";
+    message += std::to_string(tags_header_max_size_);
+    message += " bytes, but the encoded value is ";
+    message += std::to_string(encoded_trace_tags.size());
+    message += " bytes.";
+    logger_->log_error(message);
+    SpanData& local_root = *spans_.front();
+    local_root.tags[tags::internal::propagation_error] = "inject_max_size";
+  } else {
+    writer.set("x-datadog-tags", encoded_trace_tags);
   }
 
-  // TODO: configurable maximum size
-  if (auto* error = inject.trace_tags(writer, trace_tags_).if_error()) {
-    logger_->log_error(*error);
-    SpanData& local_root = *spans_.front();
-    if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
-      local_root.tags[tags::internal::propagation_error] = "inject_max_size";
-    } else {
-      local_root.tags[tags::internal::propagation_error] = "encoding_error";
-    }
+  if (injection_styles_.datadog) {
+    writer.set("x-datadog-trace-id", std::to_string(span.trace_id));
+    writer.set("x-datadog-parent-id", std::to_string(span.span_id));
+    writer.set("x-datadog-sampling-priority",
+               std::to_string(sampling_decision_->priority));
   }
+
+  // TODO: other styles
 }
 
 }  // namespace tracing
