@@ -10,6 +10,8 @@
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
+#include <datadog/span_sampler.h>
+#include <datadog/span_sampler_config.h>
 #include <datadog/tags.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/trace_sampler.h>
@@ -35,6 +37,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_span_sampling();
 void play_with_trace_sampling();
 void play_with_id_generator();
 void play_with_default_http_client();
@@ -63,7 +66,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "trace_sampling") {
+    if (example == "span_sampling") {
+      play_with_span_sampling();
+      std::cout << "\nDone playing with span sampling.\n";
+    } else if (example == "trace_sampling") {
       play_with_trace_sampling();
       std::cout << "\nDone playing with trace sampling.\n";
     } else if (example == "id_generator") {
@@ -704,7 +710,7 @@ void play_with_trace_sampling() {
             << " rules.\n";
   dd::TraceSampler sampler{*finalized, dd::default_clock};
 
-  dd::SpanData span = dd::SpanData();
+  dd::SpanData span = dd::SpanData{};
   span.trace_id = dd::default_id_generator.generate_trace_id();
   span.span_id = dd::default_id_generator.generate_span_id();
   span.service = "foosvc";
@@ -719,4 +725,61 @@ void play_with_trace_sampling() {
   decision = sampler.decide(span);
   decision.to_json(std::cout);
   std::cout << '\n';
+}
+
+void play_with_span_sampling() {
+  dd::SpanSamplerConfig config;
+
+  dd::SpanSamplerConfig::Rule rule;
+  rule.name = "mysql.*";
+  rule.max_per_second = 10;
+  rule.sample_rate = 4e-12;
+  config.rules.push_back(rule);
+
+  rule = dd::SpanSamplerConfig::Rule{};
+  rule.service = "somethingsvc";
+  rule.name = "do.the.thing";
+  rule.tags["internal.error"] = "*";
+  config.rules.push_back(rule);
+
+  auto finalized = finalize_config(config);
+  if (auto* error = finalized.if_error()) {
+    std::cout << *error << '\n';
+    return;
+  }
+
+  dd::SpanSampler span_sampler{*finalized, dd::default_clock};
+
+  dd::SpanData span{};
+  span.trace_id = dd::default_id_generator.generate_trace_id();
+  span.span_id = dd::default_id_generator.generate_span_id();
+  span.service = "crud.app";
+  span.name = "mysql.query";
+
+  auto* maybe_rule = span_sampler.match(span);
+  if (maybe_rule == nullptr) {
+    std::cout << "The first span didn't match any span sampling rules.\n";
+  } else {
+    auto decision = maybe_rule->decide(span);
+    std::cout << "The first span matched a span sampling rule, and the "
+                 "sampling decision is: ";
+    decision.to_json(std::cout);
+    std::cout << '\n';
+  }
+
+  span = dd::SpanData{};
+  span.service = "somethingsvc";
+  span.name = "do.the.thing";
+  span.tags["internal.error"] = "the thing is way too thing";
+
+  maybe_rule = span_sampler.match(span);
+  if (maybe_rule == nullptr) {
+    std::cout << "The second span didn't match any span sampling rules.\n";
+  } else {
+    auto decision = maybe_rule->decide(span);
+    std::cout << "The second span matched a span sampling rule, and the "
+                 "sampling decision is: ";
+    decision.to_json(std::cout);
+    std::cout << '\n';
+  }
 }

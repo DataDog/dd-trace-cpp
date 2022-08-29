@@ -24,7 +24,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
       message += "Span sampling rule with pattern ";
       message += rule.to_json();
       message +=
-          " should have a max_per_second value be greater than zero, but the "
+          " should have a max_per_second value greater than zero, but the "
           "following value was given: ";
       message += std::to_string(*rule.max_per_second);
       return Error{Error::MAX_PER_SECOND_OUT_OF_RANGE, std::move(message)};
