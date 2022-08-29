@@ -18,8 +18,11 @@
 #include <unistd.h>
 #endif
 
+#include <algorithm>
 #include <cassert>
+#include <cctype>    // for `std::isspace`
 #include <charconv>  // for `std::from_chars`
+#include <cstddef>   // for `std::size_t`
 
 namespace datadog {
 namespace tracing {
@@ -34,10 +37,22 @@ std::optional<std::string> get_hostname() {
   return buffer;
 }
 
+std::string_view strip(std::string_view input) {
+  const auto not_whitespace = [](unsigned char ch) {
+    return !std::isspace(ch);
+  };
+  const char* const begin =
+      std::find_if(input.begin(), input.end(), not_whitespace);
+  const char* const end =
+      std::find_if(input.rbegin(), input.rend(), not_whitespace).base();
+  return std::string_view{begin, std::size_t(end - begin)};
+}
+
 template <typename Integer>
 Expected<Integer> parse_integer(std::string_view input, int base,
                                 std::string_view kind) {
   Integer value;
+  input = strip(input);
   const auto status = std::from_chars(input.begin(), input.end(), value, base);
   if (status.ec == std::errc::invalid_argument) {
     std::string message;
