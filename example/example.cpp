@@ -711,4 +711,12 @@ void play_with_trace_sampling() {
 
   dd::SamplingDecision decision = sampler.decide(span);
   decision.to_json(std::cout);
+  std::cout << '\n';
+
+  span.service = "someothersvc";
+  span.tags["user.id"] = "admin-db-migrator";
+
+  decision = sampler.decide(span);
+  decision.to_json(std::cout);
+  std::cout << '\n';
 }
