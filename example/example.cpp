@@ -6,6 +6,7 @@
 #include <datadog/datadog_agent.h>
 #include <datadog/default_http_client.h>
 #include <datadog/dict_reader.h>
+#include <datadog/id_generator.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
@@ -32,6 +33,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_id_generator();
 void play_with_default_http_client();
 void play_with_propagation(int argc, const char* const* argv);
 void play_with_inject();
@@ -58,7 +60,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "default_http_client") {
+    if (example == "id_generator") {
+      play_with_id_generator();
+      std::cout << "\nDone playing with id_generator.\n";
+    } else if (example == "default_http_client") {
       play_with_default_http_client();
       std::cout << "\nDone playing with default_http_client.\n";
     } else if (example == "propagation") {
@@ -656,4 +661,13 @@ void play_with_default_http_client() {
   auto client = dd::default_http_client();
   std::cout << "default HTTP client address: "
             << static_cast<const void*>(client.get()) << '\n';
+}
+
+void play_with_id_generator() {
+  for (int i = 0; i < 10; ++i) {
+    std::cout << "Here's a trace ID: "
+              << dd::default_id_generator.generate_trace_id() << '\n';
+    std::cout << "Here's a span ID: "
+              << dd::default_id_generator.generate_span_id() << '\n';
+  }
 }
