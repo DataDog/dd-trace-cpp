@@ -21,7 +21,7 @@ std::optional<std::string_view> SpanData::environment() const {
 }
 
 void SpanData::apply_config(const SpanDefaults& defaults,
-                            const SpanConfig& config, Clock clock) {
+                            const SpanConfig& config, const Clock& clock) {
   service = config.service.value_or(defaults.service);
   name = config.name.value_or(defaults.name);
 

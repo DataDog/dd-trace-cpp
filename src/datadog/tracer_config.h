@@ -46,8 +46,8 @@ class FinalizedTracerConfig {
 
   std::shared_ptr<Collector> collector;
 
-  std::shared_ptr<TraceSampler> trace_sampler;
-  std::shared_ptr<SpanSampler> span_sampler;
+  FinalizedTraceSamplerConfig trace_sampler;
+  FinalizedSpanSamplerConfig span_sampler;
 
   PropagationStyles injection_styles;
   PropagationStyles extraction_styles;

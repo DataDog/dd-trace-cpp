@@ -2,8 +2,6 @@
 
 #include "cerr_logger.h"
 #include "datadog_agent.h"
-#include "span_sampler.h"
-#include "trace_sampler.h"
 
 namespace datadog {
 namespace tracing {
@@ -36,14 +34,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config) {
   }
 
   if (auto trace_sampler_config = finalize_config(config.trace_sampler)) {
-    result.trace_sampler =
-        std::make_shared<TraceSampler>(*trace_sampler_config);
+    result.trace_sampler = std::move(*trace_sampler_config);
   } else {
     return std::move(trace_sampler_config.error());
   }
 
   if (auto span_sampler_config = finalize_config(config.span_sampler)) {
-    result.span_sampler = std::make_shared<SpanSampler>(*span_sampler_config);
+    result.span_sampler = std::move(*span_sampler_config);
   } else {
     return std::move(span_sampler_config.error());
   }

@@ -2,6 +2,7 @@
 
 #include <mutex>
 
+#include "clock.h"
 #include "span_sampler_config.h"
 
 namespace datadog {
@@ -11,7 +12,8 @@ class SpanSampler {
   std::mutex mutex_;
 
  public:
-  explicit SpanSampler(const FinalizedSpanSamplerConfig& config);
+  explicit SpanSampler(const FinalizedSpanSamplerConfig& config,
+                       const Clock& clock);
 };
 
 }  // namespace tracing

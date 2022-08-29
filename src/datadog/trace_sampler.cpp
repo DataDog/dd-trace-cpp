@@ -1,5 +1,6 @@
 #include "trace_sampler.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <limits>
@@ -7,6 +8,7 @@
 #include "collector_response.h"
 #include "sampling_decision.h"
 #include "sampling_priority.h"
+#include "span_data.h"
 
 namespace datadog {
 namespace tracing {
@@ -31,47 +33,65 @@ std::uint64_t max_id_from_rate(Rate rate) {
 
 }  // namespace
 
-TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config) {
-  // TODO
-  (void)config;
-}
+TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config,
+                           const Clock& clock)
+    : rules_(config.rules), limiter_(clock, config.max_per_second) {}
 
-SamplingDecision TraceSampler::decide(std::uint64_t trace_id,
-                                      std::string_view service,
-                                      std::string_view /*operation_name*/,
-                                      std::string_view environment) const {
+SamplingDecision TraceSampler::decide(const SpanData& span) {
+  SamplingDecision decision;
+  decision.origin = SamplingDecision::Origin::LOCAL;
+
+  // First check sampling rules.
+  auto found_rule = std::find_if(
+      rules_.begin(), rules_.end(),
+      [&](const auto& rule) { return rule.root_span.match(span); });
+
+  if (found_rule != rules_.end()) {
+    const auto& rule = *found_rule;
+    decision.mechanism = int(SamplingMechanism::RULE);
+    decision.configured_rate = rule.sample_rate;
+    const std::uint64_t threshold = max_id_from_rate(rule.sample_rate);
+    if (knuth_hash(span.trace_id) < threshold) {
+      const auto result = limiter_.allow();
+      if (result.allowed) {
+        decision.priority = int(SamplingPriority::USER_KEEP);
+      } else {
+        decision.priority = int(SamplingPriority::USER_DROP);
+      }
+      decision.limiter_effective_rate = result.effective_rate;
+    } else {
+      decision.priority = int(SamplingPriority::USER_DROP);
+    }
+
+    return decision;
+  }
+
+  // No sampling rule matched.  Find the appropriate collector-controlled
+  // sample rate.
   std::lock_guard lock(mutex_);
-  // TODO: sampling rules
-
-  // Find the appropriate rate and mechanism.
-  Rate rate;
-  SamplingMechanism mechanism;
-  auto found = collector_sample_rates_.find(
-      CollectorResponse::key(service, environment));
-  if (found != collector_sample_rates_.end()) {
-    rate = found->second;
-    mechanism = SamplingMechanism::AGENT_RATE;
+  auto found_rate = collector_sample_rates_.find(
+      CollectorResponse::key(span.service, span.environment().value_or("")));
+  if (found_rate != collector_sample_rates_.end()) {
+    decision.configured_rate = found_rate->second;
+    decision.mechanism = int(SamplingMechanism::AGENT_RATE);
   } else {
     if (collector_default_sample_rate_) {
-      rate = *collector_default_sample_rate_;
-      mechanism = SamplingMechanism::AGENT_RATE;
+      decision.configured_rate = *collector_default_sample_rate_;
+      decision.mechanism = int(SamplingMechanism::AGENT_RATE);
     } else {
       // We have yet to receive a default rate from the collector.  This
       // corresponds to the `DEFAULT` sampling mechanism.
-      rate = Rate::one();
-      mechanism = SamplingMechanism::DEFAULT;
+      decision.configured_rate = Rate::one();
+      decision.mechanism = int(SamplingMechanism::DEFAULT);
     }
   }
 
-  const std::uint64_t threshold = max_id_from_rate(rate);
-  SamplingDecision decision;
-  if (knuth_hash(trace_id) < threshold) {
+  const std::uint64_t threshold = max_id_from_rate(*decision.configured_rate);
+  if (knuth_hash(span.trace_id) < threshold) {
     decision.priority = int(SamplingPriority::AUTO_KEEP);
   } else {
     decision.priority = int(SamplingPriority::AUTO_DROP);
   }
-  decision.mechanism = int(mechanism);
-  decision.origin = SamplingDecision::Origin::LOCAL;
 
   return decision;
 }

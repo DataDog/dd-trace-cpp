@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "clock.h"
+#include "limiter.h"
 #include "rate.h"
 #include "trace_sampler_config.h"
 
@@ -13,19 +15,21 @@ namespace tracing {
 
 class CollectorResponse;
 struct SamplingDecision;
+struct SpanData;
 
 class TraceSampler {
   mutable std::mutex mutex_;
+
   std::optional<Rate> collector_default_sample_rate_;
   std::unordered_map<std::string, Rate> collector_sample_rates_;
-  // TODO: sampling rules
+
+  std::vector<FinalizedTraceSamplerConfig::Rule> rules_;
+  Limiter limiter_;
 
  public:
-  explicit TraceSampler(const FinalizedTraceSamplerConfig& config);
+  TraceSampler(const FinalizedTraceSamplerConfig& config, const Clock& clock);
 
-  SamplingDecision decide(std::uint64_t trace_id, std::string_view service,
-                          std::string_view operation_name,
-                          std::string_view environment) const;
+  SamplingDecision decide(const SpanData&);
 
   void handle_collector_response(const CollectorResponse&);
 };

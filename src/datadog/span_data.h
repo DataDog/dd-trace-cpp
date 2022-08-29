@@ -33,7 +33,7 @@ struct SpanData {
   std::optional<std::string_view> environment() const;
 
   void apply_config(const SpanDefaults& defaults, const SpanConfig& config,
-                    Clock clock);
+                    const Clock& clock);
 };
 
 Expected<void> msgpack_encode(std::string& destination, const SpanData& span);

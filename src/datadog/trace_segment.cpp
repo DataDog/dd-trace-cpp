@@ -166,9 +166,7 @@ void TraceSegment::make_sampling_decision_if_null() {
   }
 
   const SpanData& local_root = *spans_.front();
-  sampling_decision_ = trace_sampler_->decide(
-      local_root.trace_id, local_root.service, local_root.name,
-      local_root.environment().value_or(""));
+  sampling_decision_ = trace_sampler_->decide(local_root);
 
   // Update the decision maker trace tag.
   if (sampling_decision_->priority <= 0) {

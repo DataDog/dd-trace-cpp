@@ -3,9 +3,11 @@
 namespace datadog {
 namespace tracing {
 
-SpanSampler::SpanSampler(const FinalizedSpanSamplerConfig& config) {
+SpanSampler::SpanSampler(const FinalizedSpanSamplerConfig& config,
+                         const Clock& clock) {
   // TODO
   (void)config;
+  (void)clock;
 }
 
 }  // namespace tracing

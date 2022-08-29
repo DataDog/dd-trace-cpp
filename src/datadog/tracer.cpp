@@ -234,8 +234,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
                const IDGenerator& generator, const Clock& clock)
     : logger_(config.logger),
       collector_(config.collector),
-      trace_sampler_(config.trace_sampler),
-      span_sampler_(config.span_sampler),
+      trace_sampler_(
+          std::make_shared<TraceSampler>(config.trace_sampler, clock)),
+      span_sampler_(std::make_shared<SpanSampler>(config.span_sampler, clock)),
       generator_(generator),
       clock_(clock),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),

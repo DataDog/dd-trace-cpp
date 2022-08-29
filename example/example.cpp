@@ -12,6 +12,8 @@
 #include <datadog/span_data.h>
 #include <datadog/tags.h>
 #include <datadog/threaded_event_scheduler.h>
+#include <datadog/trace_sampler.h>
+#include <datadog/trace_sampler_config.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
@@ -33,6 +35,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_trace_sampling();
 void play_with_id_generator();
 void play_with_default_http_client();
 void play_with_propagation(int argc, const char* const* argv);
@@ -60,7 +63,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "id_generator") {
+    if (example == "trace_sampling") {
+      play_with_trace_sampling();
+      std::cout << "\nDone playing with trace sampling.\n";
+    } else if (example == "id_generator") {
       play_with_id_generator();
       std::cout << "\nDone playing with id_generator.\n";
     } else if (example == "default_http_client") {
@@ -670,4 +676,39 @@ void play_with_id_generator() {
     std::cout << "Here's a span ID: "
               << dd::default_id_generator.generate_span_id() << '\n';
   }
+}
+
+void play_with_trace_sampling() {
+  dd::TraceSamplerConfig config;
+  config.sample_rate = 0.1;
+
+  dd::TraceSamplerConfig::Rule rule;
+  rule.root_span.service = "foosvc";
+  rule.sample_rate = 0;
+  config.rules.push_back(rule);
+
+  rule = dd::TraceSamplerConfig::Rule{};
+  rule.root_span.tags["user.id"] = "admin-*";
+  rule.sample_rate = 1.0;
+  config.rules.push_back(rule);
+
+  config.max_per_second = 1000;
+
+  auto finalized = dd::finalize_config(config);
+  if (auto* error = finalized.if_error()) {
+    std::cout << *error << '\n';
+    return;
+  }
+
+  std::cout << "Finalized configuration has " << finalized->rules.size()
+            << " rules.\n";
+  dd::TraceSampler sampler{*finalized, dd::default_clock};
+
+  dd::SpanData span = dd::SpanData();
+  span.trace_id = dd::default_id_generator.generate_trace_id();
+  span.span_id = dd::default_id_generator.generate_span_id();
+  span.service = "foosvc";
+
+  dd::SamplingDecision decision = sampler.decide(span);
+  decision.to_json(std::cout);
 }

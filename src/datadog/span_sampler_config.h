@@ -14,6 +14,7 @@ struct SpanSamplerConfig {
 class FinalizedSpanSamplerConfig {
   friend Expected<FinalizedSpanSamplerConfig> finalize_config(
       const SpanSamplerConfig& config);
+  friend class FinalizedTracerConfig;
 
   FinalizedSpanSamplerConfig() = default;
 

@@ -14,7 +14,7 @@
 create_component() {
     component=$1
 
-    >"src/$component.h" cat <<END_HEADER
+    >"src/datadog/$component.h" cat <<END_HEADER
 #pragma once
 
 namespace datadog {
@@ -26,7 +26,7 @@ namespace tracing {
 }  // namespace datadog
 END_HEADER
 
->"src/$component.cpp" cat <<END_SOURCE
+>"src/datadog/$component.cpp" cat <<END_SOURCE
 #include "$component.h"
 
 namespace datadog {
