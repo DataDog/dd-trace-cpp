@@ -151,15 +151,15 @@ void TraceSegment::span_finished() {
   // TODO: rule sampling rates
   // end TODO
 
-  const auto error = collector_->send(std::move(spans_), trace_sampler_);
-
-  if (error) {
-    // TODO: Looks like we do need a logger.
+  const auto result = collector_->send(std::move(spans_), trace_sampler_);
+  if (auto* error = result.if_error()) {
+    logger_->log_error(
+        error->with_prefix("Error sending spans to collector: "));
   }
 }
 
 void TraceSegment::make_sampling_decision_if_null() {
-  // `mutex_` must already be locked.
+  // Depending on the context, `mutex_` might need already to be locked.
 
   if (sampling_decision_) {
     return;
@@ -191,7 +191,11 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   inject.trace_id(writer, span.trace_id);
   inject.parent_id(writer, span.span_id);
 
-  make_sampling_decision_if_null();
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    make_sampling_decision_if_null();
+  }
+
   inject.sampling_priority(writer, sampling_decision_->priority);
 
   if (origin_) {
