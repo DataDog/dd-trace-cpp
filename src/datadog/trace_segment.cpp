@@ -12,6 +12,7 @@
 #include "error.h"
 #include "logger.h"
 #include "span_data.h"
+#include "span_sampler.h"
 #include "tags.h"
 #include "trace_sampler.h"
 
@@ -129,23 +130,39 @@ void TraceSegment::span_finished() {
   // We don't need the lock anymore.  There's nobody left to call our methods.
   // On the other hand, there's nobody left to contend for the mutex, so it
   // doesn't make any difference.
+  make_sampling_decision_if_null();
 
   // All of our spans are finished.  Run the span sampler, finalize the spans,
   // and then send the spans to the collector.
-  // TODO: span sampler
+  if (sampling_decision_->priority <= 0) {
+    // Span sampling happens when the trace is dropped.
+    for (const auto& span_ptr : spans_) {
+      SpanData& span = *span_ptr;
+      auto* rule = span_sampler_->match(span);
+      if (!rule) {
+        continue;
+      }
+      const SamplingDecision decision = rule->decide(span);
+      if (decision.priority <= 0) {
+        continue;
+      }
+      span.numeric_tags[tags::internal::span_sampling_mechanism] =
+          *decision.mechanism;
+      span.numeric_tags[tags::internal::span_sampling_rule_rate] =
+          *decision.configured_rate;
+      if (decision.limiter_max_per_second) {
+        span.numeric_tags[tags::internal::span_sampling_limit] =
+            *decision.limiter_max_per_second;
+      }
+    }
+  }
 
-  // TODO: Finalize the spans, e.g. add special tags to local root span.
-  // TODO need more here
-  make_sampling_decision_if_null();
   const SamplingDecision& decision = *sampling_decision_;
 
   auto& local_root = *spans_.front();
   local_root.tags.insert(trace_tags_.begin(), trace_tags_.end());
   local_root.numeric_tags[tags::internal::sampling_priority] =
       decision.priority;
-  if (origin_) {
-    local_root.tags[tags::internal::origin] = *origin_;
-  }
   if (hostname_) {
     local_root.tags[tags::internal::hostname] = *hostname_;
   }
@@ -162,7 +179,14 @@ void TraceSegment::span_finished() {
       }
     }
   }
-  // end TODO
+
+  // Origin is repeated on all spans.
+  if (origin_) {
+    for (const auto& span_ptr : spans_) {
+      SpanData& span = *span_ptr;
+      span.tags[tags::internal::origin] = *origin_;
+    }
+  }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);
   if (auto* error = result.if_error()) {
