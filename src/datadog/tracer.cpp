@@ -387,5 +387,24 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   return span;
 }
 
+Expected<Span> Tracer::extract_or_create_span(const DictReader& reader) {
+  return extract_or_create_span(reader, SpanConfig{});
+}
+
+Expected<Span> Tracer::extract_or_create_span(const DictReader& reader,
+                                              const SpanConfig& config) {
+  auto maybe_span = extract_span(reader, config);
+  if (auto* error = maybe_span.if_error()) {
+    // If the error is `NO_SPAN_TO_EXTRACT`, then fine, we'll create a span
+    // instead.
+    // If, however, there was some other error, then return the error.
+    if (error->code != Error::NO_SPAN_TO_EXTRACT) {
+      return maybe_span;
+    }
+  }
+
+  return create_span(config);
+}
+
 }  // namespace tracing
 }  // namespace datadog
