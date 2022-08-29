@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <functional>
@@ -19,7 +18,7 @@ class ThreadedEventScheduler : public EventScheduler {
   struct EventConfig {
     std::function<void()> callback;
     std::chrono::steady_clock::duration interval;
-    std::atomic_bool cancelled;
+    bool cancelled;
 
     EventConfig(std::function<void()> callback,
                 std::chrono::steady_clock::duration interval);
