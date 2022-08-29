@@ -55,7 +55,7 @@ class DatadogInjectionPolicy : public InjectionPolicy {
     if (tags.empty()) {
       return std::nullopt;
     }
-    // TODO
+    // TODO: Don't forget to report an error when the value is too long.
     return Error{Error::NOT_IMPLEMENTED,
                  "Trace tags are not yet implemented, so I'm not going to "
                  "serialize them."};
@@ -72,7 +72,7 @@ TraceSegment::TraceSegment(
     const std::shared_ptr<const SpanDefaults>& defaults,
     const PropagationStyles& injection_styles,
     const std::optional<std::string>& hostname,
-    std::optional<std::string> origin,
+    std::optional<std::string> origin, std::size_t tags_header_max_size,
     std::unordered_map<std::string, std::string> trace_tags,
     std::optional<SamplingDecision> sampling_decision,
     std::unique_ptr<SpanData> local_root)
@@ -84,6 +84,7 @@ TraceSegment::TraceSegment(
       injection_styles_(injection_styles),
       hostname_(hostname),
       origin_(std::move(origin)),
+      tags_header_max_size_(tags_header_max_size),
       trace_tags_(std::move(trace_tags)),
       num_finished_spans_(0),
       sampling_decision_(std::move(sampling_decision)) {

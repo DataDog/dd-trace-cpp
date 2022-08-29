@@ -28,6 +28,7 @@ class Tracer {
   PropagationStyles injection_styles_;
   PropagationStyles extraction_styles_;
   std::optional<std::string> hostname_;
+  std::size_t tags_header_max_size_;
 
  public:
   explicit Tracer(const FinalizedTracerConfig& config);

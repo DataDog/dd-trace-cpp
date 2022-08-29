@@ -7,6 +7,7 @@
 #include "span_config.h"
 #include "span_data.h"
 #include "span_sampler.h"
+#include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
 #include "trace_segment.h"
@@ -242,7 +243,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
-      hostname_(config.report_hostname ? get_hostname() : std::nullopt) {}
+      hostname_(config.report_hostname ? get_hostname() : std::nullopt),
+      tags_header_max_size_(config.tags_header_size) {}
 
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
@@ -255,6 +257,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, std::nullopt /* origin */,
+      tags_header_max_size_,
       std::unordered_map<std::string, std::string>{} /* trace_tags */,
       std::nullopt /* sampling_decision */, std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
@@ -378,25 +381,19 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   std::unordered_map<std::string, std::string> decoded_trace_tags;
   if (trace_tags) {
-    /* TODO: parsing trace tags is another thing...
-    if (trace_tags)
+    auto maybe_trace_tags = decode_tags(*trace_tags);
     if (auto* error = maybe_trace_tags.if_error()) {
       logger_->log_error(*error);
-      if (error->code == Error::TRACE_TAGS_EXCEED_MAXIMUM_LENGTH) {
-        span_data->tags[tags::internal::propagation_error] = "extract_max_size";
-      } else {
-        span_data->tags[tags::internal::propagation_error] = "decoding_error";
-      }
+      span_data->tags[tags::internal::propagation_error] = "decoding_error";
     } else {
-      trace_tags = std::move(*maybe_trace_tags);
+      decoded_trace_tags = std::move(*maybe_trace_tags);
     }
-    */
   }
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
-      injection_styles_, hostname_, std::move(origin),
+      injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
       std::move(decoded_trace_tags), std::move(sampling_decision),
       std::move(span_data));
   Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};

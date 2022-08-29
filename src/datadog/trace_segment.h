@@ -35,6 +35,7 @@ class TraceSegment {
   const PropagationStyles injection_styles_;
   const std::optional<std::string> hostname_;
   const std::optional<std::string> origin_;
+  const std::size_t tags_header_max_size_;
   std::unordered_map<std::string, std::string> trace_tags_;
 
   std::vector<std::unique_ptr<SpanData>> spans_;
@@ -51,6 +52,7 @@ class TraceSegment {
                const PropagationStyles& injection_styles,
                const std::optional<std::string>& hostname,
                std::optional<std::string> origin,
+               std::size_t tags_header_max_size,
                std::unordered_map<std::string, std::string> trace_tags,
                std::optional<SamplingDecision> sampling_decision,
                std::unique_ptr<SpanData> local_root);

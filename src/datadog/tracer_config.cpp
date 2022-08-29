@@ -77,6 +77,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config) {
   result.extraction_styles = config.extraction_styles;
 
   result.report_hostname = config.report_hostname;
+  result.tags_header_size = config.tags_header_size;
 
   return result;
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <variant>
 
@@ -33,6 +34,7 @@ struct TracerConfig {
   PropagationStyles extraction_styles;
 
   bool report_hostname = false;
+  std::size_t tags_header_size = 512;
   std::shared_ptr<Logger> logger = nullptr;
 };
 
@@ -53,6 +55,7 @@ class FinalizedTracerConfig {
   PropagationStyles extraction_styles;
 
   bool report_hostname;
+  std::size_t tags_header_size;
   std::shared_ptr<Logger> logger;
 };
 
