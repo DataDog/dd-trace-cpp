@@ -136,7 +136,7 @@ void TraceSegment::span_finished() {
 
   // TODO: Finalize the spans, e.g. add special tags to local root span.
   // TODO need more here
-  void make_sampling_decision_if_null();
+  make_sampling_decision_if_null();
 
   auto& local_root = *spans_.front();
   local_root.tags.insert(trace_tags_.begin(), trace_tags_.end());
