@@ -29,6 +29,7 @@ add_library(dd_trace_cpp-object OBJECT
 #     src/datadog/default_http_client_null.cpp use libcurl
     src/datadog/dict_reader.cpp
     src/datadog/dict_writer.cpp
+    src/datadog/environment.cpp
     src/datadog/error.cpp
     src/datadog/event_scheduler.cpp
     src/datadog/expected.cpp
