@@ -200,7 +200,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     return std::move(trace_sampler_config.error());
   }
 
-  if (auto span_sampler_config = finalize_config(config.span_sampler)) {
+  if (auto span_sampler_config =
+          finalize_config(config.span_sampler, *result.logger)) {
     result.span_sampler = std::move(*span_sampler_config);
   } else {
     return std::move(span_sampler_config.error());

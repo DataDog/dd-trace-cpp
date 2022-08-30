@@ -1,7 +1,9 @@
 #include "span_matcher.h"
 
 #include <algorithm>
+#include <optional>
 
+#include "error.h"
 #include "glob.h"
 #include "json.hpp"
 #include "span_data.h"
@@ -34,6 +36,92 @@ bool SpanMatcher::match(const SpanData& span) const {
            auto found = span.tags.find(name);
            return found != span.tags.end() && is_match(pattern, found->second);
          });
+}
+
+Expected<SpanMatcher> SpanMatcher::from_json(const nlohmann::json& json) {
+  SpanMatcher result;
+
+  std::string type = json.type_name();
+  if (type != "object") {
+    std::string message;
+    message += "A rule must be a JSON object, but this is of type \"";
+    message += type;
+    message += "\": ";
+    message += json.dump();
+    return Error{Error::RULE_WRONG_TYPE, std::move(message)};
+  }
+
+  const auto check_property_type =
+      [&](std::string_view property, const nlohmann::json& value,
+          std::string_view expected_type) -> std::optional<Error> {
+    type = value.type_name();
+    if (type == expected_type) {
+      return std::nullopt;
+    }
+
+    std::string message;
+    message += "Rule property \"";
+    message += property;
+    message += "\" should have type \"";
+    message += expected_type;
+    message += "\", but has type \"";
+    message += type;
+    message += "\": ";
+    message += value.dump();
+    message += " in rule ";
+    message += json.dump();
+    return Error{Error::RULE_PROPERTY_WRONG_TYPE, std::move(message)};
+  };
+
+  for (const auto& [key, value] : json.items()) {
+    if (key == "service") {
+      if (auto error = check_property_type(key, value, "string")) {
+        return *error;
+      }
+      result.service = value;
+    } else if (key == "name") {
+      if (auto error = check_property_type(key, value, "string")) {
+        return *error;
+      }
+      result.name = value;
+    } else if (key == "resource") {
+      if (auto error = check_property_type(key, value, "string")) {
+        return *error;
+      }
+      result.resource = value;
+    } else if (key == "tags") {
+      if (auto error = check_property_type(key, value, "object")) {
+        return *error;
+      }
+      for (const auto& [tag_name, tag_value] : value.items()) {
+        type = tag_value.type_name();
+        if (type != "string") {
+          std::string message;
+          message += "Rule tag pattern must be a string, but ";
+          message += tag_value.dump();
+          message += " has type \"";
+          message += type;
+          message += "\" for tag named \"";
+          message += tag_name;
+          message += "\" in rule: ";
+          message += json.dump();
+          return Error{Error::RULE_TAG_WRONG_TYPE, std::move(message)};
+        }
+        result.tags.emplace(std::string(tag_name), std::string(tag_value));
+      }
+    } else {
+      std::string message;
+      message += "Encountered unknown property \"";
+      message += key;
+      message += "\" with value ";
+      message += value.dump();
+      message += " in rule: ";
+      message += json.dump();
+      return Error{Error::RULE_UNKNOWN_PROPERTY, std::move(message)};
+    }
+  }
+
+  return result;
 }
 
 }  // namespace tracing

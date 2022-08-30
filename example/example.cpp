@@ -10,6 +10,7 @@
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
+#include <datadog/span_matcher.h>
 #include <datadog/span_sampler.h>
 #include <datadog/span_sampler_config.h>
 #include <datadog/tags.h>
@@ -25,6 +26,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdlib>
+#include <datadog/json.hpp>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -37,6 +39,7 @@
 
 namespace dd = datadog::tracing;
 
+void play_with_span_matcher_json();
 void play_with_span_sampling();
 void play_with_trace_sampling();
 void play_with_id_generator();
@@ -66,7 +69,10 @@ int main(int argc, char* argv[]) {
   for (const char* const* arg = argv + 1; *arg; ++arg) {
     const std::string_view example = *arg;
 
-    if (example == "span_sampling") {
+    if (example == "span_matcher_json") {
+      play_with_span_matcher_json();
+      std::cout << "\nDone playing with span matcher JSON.\n";
+    } else if (example == "span_sampling") {
       play_with_span_sampling();
       std::cout << "\nDone playing with span sampling.\n";
     } else if (example == "trace_sampling") {
@@ -748,7 +754,8 @@ void play_with_span_sampling() {
   rule.tags["internal.error"] = "*";
   config.rules.push_back(rule);
 
-  auto finalized = finalize_config(config);
+  dd::CerrLogger logger;
+  auto finalized = finalize_config(config, logger);
   if (auto* error = finalized.if_error()) {
     std::cout << *error << '\n';
     return;
@@ -787,5 +794,90 @@ void play_with_span_sampling() {
                  "sampling decision is: ";
     decision.to_json(std::cout);
     std::cout << '\n';
+  }
+}
+
+void play_with_span_matcher_json() {
+  auto matcher = dd::SpanMatcher::from_json(nlohmann::json::parse(R"json({
+    "service": "foosvc",
+    "extra": 123,
+    "tags": {
+      "zig": "zag",
+      "xylem": "phloem"
+    }
+  })json"));
+  if (auto* error = matcher.if_error()) {
+    std::cout << *error << "\n\n";
+  } else {
+    std::cout << matcher->to_json() << "\n\n";
+  }
+
+  matcher = dd::SpanMatcher::from_json(nlohmann::json::parse(R"json({
+    "service": "foosvc",
+    "tags": {
+      "zig": "zag",
+      "xylem": "phloem"
+    }
+  })json"));
+  if (auto* error = matcher.if_error()) {
+    std::cout << *error << "\n\n";
+  } else {
+    std::cout << matcher->to_json() << "\n\n";
+  }
+
+  matcher = dd::SpanMatcher::from_json(nlohmann::json::parse(R"json({
+    "service": "foosvc",
+    "tags": {
+      "zig": "zag",
+      "xylem": null
+    }
+  })json"));
+  if (auto* error = matcher.if_error()) {
+    std::cout << *error << "\n\n";
+  } else {
+    std::cout << matcher->to_json() << "\n\n";
+  }
+
+  matcher = dd::SpanMatcher::from_json(nlohmann::json::parse(R"json({
+    "service": "foosvc",
+    "name": default,
+    "tags": {
+      "zig": "zag",
+      "xylem": "phloem"
+    }
+  })json"));
+  if (auto* error = matcher.if_error()) {
+    std::cout << *error << "\n\n";
+  } else {
+    std::cout << matcher->to_json() << "\n\n";
+  }
+
+  matcher = dd::SpanMatcher::from_json(nlohmann::json::parse(R"json({
+    "service": "foosvc",
+    "name": 4,
+    "tags": {
+      "zig": "zag",
+      "xylem": null
+    }
+  })json"));
+  if (auto* error = matcher.if_error()) {
+    std::cout << *error << "\n\n";
+  } else {
+    std::cout << matcher->to_json() << "\n\n";
+  }
+
+  matcher = dd::SpanMatcher::from_json(nlohmann::json::parse(R"json({
+    "service": "foosvc",
+    "name": "four",
+    "resource": "five",
+    "tags": {
+      "zig": "zag",
+      "xylem": null
+    }
+  })json"));
+  if (auto* error = matcher.if_error()) {
+    std::cout << *error << "\n\n";
+  } else {
+    std::cout << matcher->to_json() << "\n\n";
   }
 }

@@ -1,11 +1,17 @@
 #include "span_sampler_config.h"
 
+#include "logger.h"
+
 namespace datadog {
 namespace tracing {
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(
-    const SpanSamplerConfig &config) {
+    const SpanSamplerConfig &config, Logger &logger) {
   FinalizedSpanSamplerConfig result;
+
+  // TODO
+  (void)logger;
+  // end TODO
 
   for (const auto &rule : config.rules) {
     auto maybe_rate = Rate::from(rule.sample_rate);
