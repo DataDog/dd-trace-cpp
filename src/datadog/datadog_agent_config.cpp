@@ -4,6 +4,7 @@
 #include <cstddef>
 
 #include "default_http_client.h"
+#include "environment.h"
 #include "threaded_event_scheduler.h"
 
 namespace datadog {
@@ -120,7 +121,21 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.flush_interval =
       std::chrono::milliseconds(config.flush_interval_milliseconds);
 
-  auto url = config.parse(config.url);
+  auto env_host = lookup(environment::DD_AGENT_HOST);
+  auto env_port = lookup(environment::DD_TRACE_AGENT_PORT);
+
+  std::string configured_url = config.url;
+  if (auto url_env = lookup(environment::DD_TRACE_AGENT_URL)) {
+    configured_url = *url_env;
+  } else if (env_host || env_port) {
+    configured_url.clear();
+    configured_url += "http://";
+    configured_url += env_host.value_or("localhost");
+    configured_url += ':';
+    configured_url += env_port.value_or("8126");
+  }
+
+  auto url = config.parse(configured_url);
   if (auto* error = url.if_error()) {
     return std::move(*error);
   }
