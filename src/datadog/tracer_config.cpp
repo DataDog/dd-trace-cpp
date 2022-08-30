@@ -1,10 +1,12 @@
 #include "tracer_config.h"
 
+#include <algorithm>
 #include <cctype>
-#include <regex>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 #include "cerr_logger.h"
 #include "datadog_agent.h"
@@ -14,6 +16,52 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+// List items are separated by an optional comma (",") and any amount of
+// whitespace.
+// Leading and trailing whitespace is ignored.
+std::vector<std::string_view> parse_list(std::string_view input) {
+  using uchar = unsigned char;
+
+  std::vector<std::string_view> items;
+  if (input.empty()) {
+    return items;
+  }
+
+  const char *current = input.begin();
+  const char *const end = input.end();
+
+  bool preceded_by_comma = false;
+  for (;;) {
+    const char *begin_item =
+        std::find_if(current, end, [](uchar ch) { return !std::isspace(ch); });
+    const char *begin_delim = std::find_if(begin_item, end, [](uchar ch) {
+      return std::isspace(ch) || ch == ',';
+    });
+
+    if (begin_item == end) {
+      if (preceded_by_comma) {
+        items.emplace_back();
+      }
+      break;
+    }
+    items.emplace_back(begin_item, std::size_t(begin_delim - begin_item));
+
+    const char *end_delim = std::find_if(
+        begin_delim, end, [](uchar ch) { return !std::isspace(ch); });
+
+    if (end_delim != end && *end_delim == ',') {
+      ++end_delim;
+      preceded_by_comma = true;
+    } else {
+      preceded_by_comma = false;
+    }
+
+    current = end_delim;
+  }
+
+  return items;
+}
+
 void to_lower(std::string &text) {
   std::transform(text.begin(), text.end(), text.begin(),
                  [](unsigned char ch) { return std::tolower(ch); });
@@ -21,18 +69,10 @@ void to_lower(std::string &text) {
 
 Expected<PropagationStyles> parse_propagation_styles(std::string_view input) {
   PropagationStyles styles{false, false, false};
-  if (std::all_of(input.begin(), input.end(),
-                  [](unsigned char ch) { return std::isspace(ch); })) {
-    return styles;
-  }
 
   // Style names are separated by spaces, or a comma, or some combination.
-  std::regex separator{R"pcre(\s*,\s*|\s+)pcre"};
-  const auto begin =
-      std::cregex_token_iterator{input.begin(), input.end(), separator, -1};
-  const auto end = std::cregex_token_iterator{};
-  for (auto iter = begin; iter != end; ++iter) {
-    std::string token = *iter;
+  for (const std::string_view &item : parse_list(input)) {
+    auto token = std::string(item);
     to_lower(token);
     if (token == "datadog") {
       styles.datadog = true;
@@ -57,20 +97,9 @@ Expected<PropagationStyles> parse_propagation_styles(std::string_view input) {
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
     std::string_view input) {
   std::unordered_map<std::string, std::string> tags;
-  if (std::all_of(input.begin(), input.end(),
-                  [](unsigned char ch) { return std::isspace(ch); })) {
-    return tags;
-  }
 
-  // Tags are separated by spaces, or a comma, or some combination.
   // Within a tag, the key and value are separated by a colon (":").
-  // This regex just separates the tags from each other.
-  std::regex separator{R"pcre(\s*,\s*|\s+)pcre"};
-  const auto begin =
-      std::cregex_token_iterator{input.begin(), input.end(), separator, -1};
-  const auto end = std::cregex_token_iterator{};
-  for (auto iter = begin; iter != end; ++iter) {
-    std::string token = *iter;
+  for (const std::string_view &token : parse_list(input)) {
     const auto separator = std::find(token.begin(), token.end(), ':');
     if (separator == token.end()) {
       std::string message;
