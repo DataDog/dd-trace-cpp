@@ -62,6 +62,8 @@ class TraceSegment {
   const std::optional<std::string>& origin() const;
   std::optional<SamplingDecision> sampling_decision() const;
 
+  Logger& logger() const;
+
   // This is for trace propagation.
   void inject(DictWriter&, const SpanData&);
 
@@ -73,7 +75,7 @@ class TraceSegment {
   void register_span(std::unique_ptr<SpanData> span);
   void span_finished();
 
-  // TODO: sampling-related stuff
+  void override_sampling_priority(int priority);
 
   // TODO: This might be nice for testing.
   template <typename Visitor>

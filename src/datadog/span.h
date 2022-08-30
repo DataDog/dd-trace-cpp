@@ -43,7 +43,12 @@ class Span {
   void set_tag(std::string_view name, std::string_view value);
   void remove_tag(std::string_view name);
 
+  void set_service_name(std::string_view);
+  void set_service_type(std::string_view);
   void set_operation_name(std::string_view);
+  void set_resource_name(std::string_view);
+  void set_error(std::string_view);
+  void set_error(bool);
   void set_end_time(std::chrono::steady_clock::time_point);
 
   void inject(DictWriter& writer) const;

@@ -69,6 +69,8 @@ std::optional<SamplingDecision> TraceSegment::sampling_decision() const {
   return sampling_decision_;
 }
 
+Logger& TraceSegment::logger() const { return *logger_; }
+
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
@@ -150,6 +152,16 @@ void TraceSegment::span_finished() {
     logger_->log_error(
         error->with_prefix("Error sending spans to collector: "));
   }
+}
+
+void TraceSegment::override_sampling_priority(int priority) {
+  SamplingDecision decision;
+  decision.priority = priority;
+  decision.mechanism = int(SamplingMechanism::MANUAL);
+  decision.origin = SamplingDecision::Origin::LOCAL;
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  sampling_decision_ = decision;
 }
 
 void TraceSegment::make_sampling_decision_if_null() {
