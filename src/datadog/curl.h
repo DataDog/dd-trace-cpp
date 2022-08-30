@@ -115,7 +115,6 @@ inline Expected<void> Curl::post(const HTTPClient::URL &url,
   CHECK curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
   // end TODO
 
-  // TODO: error handling
   CHECK curl_easy_setopt(handle, CURLOPT_PRIVATE, request);
   CHECK curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, request->error_buffer);
   CHECK curl_easy_setopt(handle, CURLOPT_POST, 1);
@@ -146,7 +145,6 @@ inline Expected<void> Curl::post(const HTTPClient::URL &url,
   request->request_headers = writer.release();
   CHECK curl_easy_setopt(handle, CURLOPT_HTTPHEADER, request->request_headers);
 
-  // TODO: Error handling
   std::list<CURL *> node;
   node.push_back(handle);
   {
@@ -233,7 +231,6 @@ inline void Curl::run() {
 
       auto *const request_handle = message->easy_handle;
       char *user_data;
-      // TODO: error handling
       CHECK curl_easy_getinfo(request_handle, CURLINFO_PRIVATE, &user_data);
       auto &request = *reinterpret_cast<Request *>(user_data);
 
@@ -250,7 +247,6 @@ inline void Curl::run() {
             Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
       } else {
         long status;
-        // TODO: error handling
         CHECK curl_easy_getinfo(request_handle, CURLINFO_RESPONSE_CODE,
                                 &status);
         HeaderReader reader(&request.response_headers_lower);
@@ -285,7 +281,6 @@ inline void Curl::run() {
   // We're shutting down.  Clean up any remaining request handles.
   for (const auto &handle : request_handles_) {
     char *user_data;
-    // TODO: error handling
     CHECK curl_easy_getinfo(handle, CURLINFO_PRIVATE, &user_data);
     delete reinterpret_cast<Request *>(user_data);
 

@@ -362,13 +362,11 @@ void play_with_parse_url() {
   const auto try_url = [](std::string_view raw) {
     std::cout << raw << "\n  ->  ";
     const auto result = dd::DatadogAgentConfig::parse(raw);
-    struct Visitor {
-      void operator()(const dd::HTTPClient::URL& url) const {
-        std::cout << url;
-      }
-      void operator()(const dd::Error error) const { std::cout << error; }
-    };
-    // TODO std::visit(Visitor(), result);
+    if (result) {
+      std::cout << *result;
+    } else {
+      std::cout << result.error();
+    }
     std::cout << "\n\n";
   };
 
@@ -517,7 +515,6 @@ void play_with_extract() {
     decision->to_json(std::cout);
   }
   std::cout << "\norigin: " << span.trace_segment().origin().value_or("");
-  // TODO trace tags
   std::cout << "\nspans:\n";
   span.trace_segment().visit_spans([](const auto& spans) {
     for (const auto& span_data_ptr : spans) {

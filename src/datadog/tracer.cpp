@@ -30,7 +30,6 @@ namespace {
 std::optional<std::string> get_hostname() {
   char buffer[256];
   if (::gethostname(buffer, sizeof buffer)) {
-    // TODO: log an error?
     return std::nullopt;
   }
   return buffer;

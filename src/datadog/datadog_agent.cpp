@@ -14,6 +14,7 @@
 #include "msgpack.h"
 #include "span_data.h"
 #include "trace_sampler.h"
+#include "version.h"
 
 namespace datadog {
 namespace tracing {
@@ -200,7 +201,7 @@ void DatadogAgent::flush() {
     headers.set("Content-Type", "application/msgpack");
     headers.set("Datadog-Meta-Lang", "cpp");
     headers.set("Datadog-Meta-Lang-Version", std::to_string(__cplusplus));
-    headers.set("Datadog-Meta-Tracer-Version", "TODO");
+    headers.set("Datadog-Meta-Tracer-Version", tracer_version);
     headers.set("X-Datadog-Trace-Count",
                 std::to_string(outgoing_trace_chunks_.size()));
   };
