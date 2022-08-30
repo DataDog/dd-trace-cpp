@@ -172,8 +172,8 @@ void play_with_curl() {
   };
 
   for (int i = 0; i < 10; ++i) {
-    if (auto* error = client.post(url, set_headers, body, on_response, on_error)
-                          .if_error()) {
+    auto result = client.post(url, set_headers, body, on_response, on_error);
+    if (auto* error = result.if_error()) {
       std::cout << "Curl returned error " << error->code << ": "
                 << error->message << std::endl;
     }
@@ -214,9 +214,9 @@ void play_with_curl_and_event_scheduler() {
                     << std::endl;
         };
 
-        if (auto* error =
-                client.post(url, set_headers, body, on_response, on_error)
-                    .if_error()) {
+        auto result =
+            client.post(url, set_headers, body, on_response, on_error);
+        if (auto* error = result.if_error()) {
           std::cout << "Curl returned error " << error->code << ": "
                     << error->message << std::endl;
         }
@@ -522,7 +522,12 @@ void play_with_extract() {
       std::cout << "-------------------\n"
                 << "trace_id: " << span_data.trace_id << '\n'
                 << "span_id: " << span_data.span_id << '\n'
-                << "parent_id: " << span_data.parent_id << '\n';
+                << "parent_id: " << span_data.parent_id << '\n'
+                << "tags:";
+      for (const auto& [key, value] : span_data.tags) {
+        std::cout << ' ' << key << ':' << value;
+      }
+      std::cout << '\n';
     }
   });
 }
