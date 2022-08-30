@@ -77,7 +77,8 @@ Expected<std::unordered_map<std::string, std::string>> decode_tags(
   decltype(iter) next;
   do {
     next = std::find(iter, end, ',');
-    if (auto* error = decode_tag(tags, range(iter, next)).if_error()) {
+    auto result = decode_tag(tags, range(iter, next));
+    if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Error decoding trace tags \"";
       prefix += header_value;

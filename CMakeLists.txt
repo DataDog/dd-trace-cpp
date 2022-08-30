@@ -3,9 +3,6 @@ cmake_minimum_required(VERSION 3.13)
 project(dd-trace-cpp)
 
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
-# https://www.mail-archive.com/search?l=gcc-bugs@gcc.gnu.org&q=subject:%22%5C%5BBug+tree%5C-optimization%5C%2F80635%5C%5D+%5C%5B8%5C%2F9%5C%2F10%5C%2F11+regression%5C%5D+std%5C%3A%5C%3Aoptional+and+bogus+%5C-Wmaybe%5C-uninitialized+warning%22&o=newest&f=1
-add_compile_options(-Wno-error=maybe-uninitialized)
-
 # set(CMAKE_BUILD_TYPE "Debug")
 
 set(CMAKE_CXX_STANDARD 17)

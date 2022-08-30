@@ -35,7 +35,8 @@ Expected<void> msgpack_encode(
 
   for (const auto& span_ptr : spans) {
     assert(span_ptr);
-    if (auto* error = msgpack_encode(destination, *span_ptr).if_error()) {
+    auto result = msgpack_encode(destination, *span_ptr);
+    if (auto* error = result.if_error()) {
       return std::move(*error);
     }
   }
@@ -51,7 +52,8 @@ Expected<void> msgpack_encode(
   msgpack::pack_array(destination, trace_chunks.size());
 
   for (const auto& chunk : trace_chunks) {
-    if (auto* error = msgpack_encode(destination, chunk.spans).if_error()) {
+    auto result = msgpack_encode(destination, chunk.spans);
+    if (auto* error = result.if_error()) {
       return std::move(*error);
     }
   }
@@ -182,7 +184,8 @@ void DatadogAgent::flush() {
   }
 
   std::string body;
-  if (auto* error = msgpack_encode(body, outgoing_trace_chunks_).if_error()) {
+  auto encode_result = msgpack_encode(body, outgoing_trace_chunks_);
+  if (auto* error = encode_result.if_error()) {
     logger_->log_error(*error);
     return;
   }
@@ -243,11 +246,10 @@ void DatadogAgent::flush() {
     });
   };
 
-  if (auto* error = http_client_
-                        ->post(traces_endpoint_, std::move(set_request_headers),
-                               std::move(body), std::move(on_response),
-                               std::move(on_error))
-                        .if_error()) {
+  auto post_result = http_client_->post(
+      traces_endpoint_, std::move(set_request_headers), std::move(body),
+      std::move(on_response), std::move(on_error));
+  if (auto* error = post_result.if_error()) {
     logger_->log_error(*error);
   }
 }

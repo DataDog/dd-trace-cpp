@@ -46,8 +46,11 @@ class Expected {
   Error&& error() &&;
   const Error&& error() const&&;
 
-  Error* if_error();
-  const Error* if_error() const;
+  Error* if_error() &;
+  const Error* if_error() const&;
+  // Don't use `if_error` on an rvalue (temporary).
+  Error* if_error() && = delete;
+  const Error* if_error() const&& = delete;
 };
 
 template <typename Value>
@@ -131,11 +134,11 @@ const Error&& Expected<Value>::error() const&& {
 }
 
 template <typename Value>
-Error* Expected<Value>::if_error() {
+Error* Expected<Value>::if_error() & {
   return std::get_if<1>(&data_);
 }
 template <typename Value>
-const Error* Expected<Value>::if_error() const {
+const Error* Expected<Value>::if_error() const& {
   return std::get_if<1>(&data_);
 }
 
@@ -166,8 +169,11 @@ class Expected<void> {
   Error&& error() &&;
   const Error&& error() const&&;
 
-  Error* if_error();
-  const Error* if_error() const;
+  Error* if_error() &;
+  const Error* if_error() const&;
+  // Don't use `if_error` on an rvalue (temporary).
+  Error* if_error() && = delete;
+  const Error* if_error() const&& = delete;
 };
 
 template <typename Other>
@@ -191,8 +197,8 @@ inline const Error&& Expected<void>::error() const&& {
   return std::move(*data_);
 }
 
-inline Error* Expected<void>::if_error() { return data_ ? &*data_ : nullptr; }
-inline const Error* Expected<void>::if_error() const {
+inline Error* Expected<void>::if_error() & { return data_ ? &*data_ : nullptr; }
+inline const Error* Expected<void>::if_error() const& {
   return data_ ? &*data_ : nullptr;
 }
 
