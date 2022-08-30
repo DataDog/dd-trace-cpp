@@ -528,6 +528,10 @@ void play_with_extract() {
         std::cout << ' ' << key << ':' << value;
       }
       std::cout << '\n';
+      std::cout << "environment: " << span_data.environment().value_or("")
+                << '\n'
+                << "service: " << span_data.service << '\n'
+                << "version: " << span_data.version().value_or("") << '\n';
     }
   });
 }

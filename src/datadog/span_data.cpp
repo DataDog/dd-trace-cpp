@@ -11,13 +11,26 @@
 
 namespace datadog {
 namespace tracing {
+namespace {
 
-std::optional<std::string_view> SpanData::environment() const {
-  const auto found = tags.find(tags::environment);
-  if (found != tags.end()) {
+std::optional<std::string_view> lookup(
+    const std::string& key,
+    const std::unordered_map<std::string, std::string>& map) {
+  const auto found = map.find(key);
+  if (found != map.end()) {
     return found->second;
   }
   return std::nullopt;
+}
+
+}  // namespace
+
+std::optional<std::string_view> SpanData::environment() const {
+  return lookup(tags::environment, tags);
+}
+
+std::optional<std::string_view> SpanData::version() const {
+  return lookup(tags::version, tags);
 }
 
 void SpanData::apply_config(const SpanDefaults& defaults,

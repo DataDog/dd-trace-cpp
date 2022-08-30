@@ -193,7 +193,12 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       hostname_(config.report_hostname ? get_hostname() : std::nullopt),
-      tags_header_max_size_(config.tags_header_size) {}
+      tags_header_max_size_(config.tags_header_size) {
+  if (config.log_on_startup) {
+    logger_->log_startup(
+        [](auto& stream) { stream << "TODO: Here is your startup message."; });
+  }
+}
 
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();

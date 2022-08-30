@@ -31,6 +31,7 @@ struct SpanData {
   std::unordered_map<std::string, double> numeric_tags;
 
   std::optional<std::string_view> environment() const;
+  std::optional<std::string_view> version() const;
 
   void apply_config(const SpanDefaults& defaults, const SpanConfig& config,
                     const Clock& clock);

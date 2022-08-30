@@ -11,10 +11,22 @@
 #include "cerr_logger.h"
 #include "datadog_agent.h"
 #include "environment.h"
+#include "null_collector.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
+
+void to_lower(std::string &text) {
+  std::transform(text.begin(), text.end(), text.begin(),
+                 [](unsigned char ch) { return std::tolower(ch); });
+}
+
+bool falsy(std::string_view text) {
+  auto lower = std::string{text};
+  to_lower(lower);
+  return lower == "0" || lower == "false" || lower == "no";
+}
 
 // List items are separated by an optional comma (",") and any amount of
 // whitespace.
@@ -60,11 +72,6 @@ std::vector<std::string_view> parse_list(std::string_view input) {
   }
 
   return items;
-}
-
-void to_lower(std::string &text) {
-  std::transform(text.begin(), text.end(), text.begin(),
-                 [](unsigned char ch) { return std::tolower(ch); });
 }
 
 Expected<PropagationStyles> parse_propagation_styles(std::string_view input) {
@@ -124,14 +131,23 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
 }  // namespace
 
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
-  // TODO: environment variables, validation, and other fun.
   FinalizedTracerConfig result;
 
-  if (config.defaults.service.empty()) {
+  result.defaults = config.defaults;
+
+  if (auto service_env = lookup(environment::DD_SERVICE)) {
+    result.defaults.service = *service_env;
+  }
+  if (result.defaults.service.empty()) {
     return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
   }
 
-  result.defaults = config.defaults;
+  if (auto environment_env = lookup(environment::DD_ENV)) {
+    result.defaults.environment = *environment_env;
+  }
+  if (auto version_env = lookup(environment::DD_VERSION)) {
+    result.defaults.version = *version_env;
+  }
 
   if (auto tags_env = lookup(environment::DD_TAGS)) {
     auto tags = parse_tags(*tags_env);
@@ -151,7 +167,23 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     result.logger = std::make_shared<CerrLogger>();
   }
 
-  if (!config.collector) {
+  result.log_on_startup = config.log_on_startup;
+  if (auto startup_env = lookup(environment::DD_TRACE_STARTUP_LOGS)) {
+    if (falsy(*startup_env)) {
+      result.log_on_startup = false;
+    }
+  }
+
+  bool report_traces = config.report_traces;
+  if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
+    if (falsy(*enabled_env)) {
+      report_traces = false;
+    }
+  }
+
+  if (!report_traces) {
+    result.collector = std::make_shared<NullCollector>();
+  } else if (!config.collector) {
     auto finalized = finalize_config(config.agent);
     if (auto *error = finalized.if_error()) {
       return std::move(*error);

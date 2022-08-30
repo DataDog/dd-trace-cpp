@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include <iosfwd>
+#include <ostream>  // more considerate than <iosfwd>
 #include <string_view>
 
 namespace datadog {
