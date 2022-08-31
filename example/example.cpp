@@ -275,8 +275,7 @@ void play_with_config() {
   {
     dd::TracerConfig raw_config;
     raw_config.defaults.service = "hello";
-    dd::DatadogAgentConfig agent_config;
-    agent_config.http_client = http_client;
+    raw_config.agent.http_client = http_client;
 
     auto validated = dd::finalize_config(raw_config);
     if (const auto* const error = validated.if_error()) {
@@ -408,7 +407,8 @@ void play_with_agent() {
 
   const auto validated = dd::finalize_config(config);
   assert(validated);
-  dd::DatadogAgent collector{*validated, std::make_shared<dd::CerrLogger>()};
+  dd::DatadogAgent collector{*validated, dd::default_clock,
+                             std::make_shared<dd::CerrLogger>()};
 
   std::ifstream dev_urandom{"/dev/urandom", std::ios::binary};
   const auto rand_uint64 = [&dev_urandom]() {

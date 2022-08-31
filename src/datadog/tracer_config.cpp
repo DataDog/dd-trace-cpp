@@ -188,8 +188,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     if (auto *error = finalized.if_error()) {
       return std::move(*error);
     }
-    result.collector =
-        std::make_shared<DatadogAgent>(*finalized, result.logger);
+    result.collector = *finalized;
   } else {
     result.collector = config.collector;
   }

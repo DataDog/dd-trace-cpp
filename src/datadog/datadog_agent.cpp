@@ -1,6 +1,7 @@
 #include "datadog_agent.h"
 
 #include <cassert>
+#include <chrono>
 #include <exception>
 #include <string>
 #include <unordered_map>
@@ -150,8 +151,10 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 }  // namespace
 
 DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
+                           const Clock& clock,
                            const std::shared_ptr<Logger>& logger)
-    : logger_(logger),
+    : clock_(clock),
+      logger_(logger),
       traces_endpoint_(traces_endpoint(config.url)),
       http_client_(config.http_client),
       event_scheduler_(config.event_scheduler),
@@ -160,7 +163,10 @@ DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
   assert(logger_);
 }
 
-DatadogAgent::~DatadogAgent() { cancel_scheduled_flush_(); }
+DatadogAgent::~DatadogAgent() {
+  cancel_scheduled_flush_();
+  http_client_->drain(clock_().tick + std::chrono::seconds(2));
+}
 
 Expected<void> DatadogAgent::send(
     std::vector<std::unique_ptr<SpanData>>&& spans,

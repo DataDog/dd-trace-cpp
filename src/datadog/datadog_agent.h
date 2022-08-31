@@ -4,6 +4,7 @@
 #include <mutex>
 #include <vector>
 
+#include "clock.h"
 #include "collector.h"
 #include "event_scheduler.h"
 #include "http_client.h"
@@ -25,6 +26,7 @@ class DatadogAgent : public Collector {
 
  private:
   std::mutex mutex_;
+  Clock clock_;
   std::shared_ptr<Logger> logger_;
   // `incoming_trace_chunks_` are what `send` appends to.
   std::vector<TraceChunk> incoming_trace_chunks_;
@@ -38,7 +40,7 @@ class DatadogAgent : public Collector {
   void flush();
 
  public:
-  DatadogAgent(const FinalizedDatadogAgentConfig&,
+  DatadogAgent(const FinalizedDatadogAgentConfig&, const Clock& clock,
                const std::shared_ptr<Logger>&);
   ~DatadogAgent();
 

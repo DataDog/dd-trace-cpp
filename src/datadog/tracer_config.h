@@ -49,7 +49,9 @@ class FinalizedTracerConfig {
  public:
   SpanDefaults defaults;
 
-  std::shared_ptr<Collector> collector;
+  std::variant<std::monostate, FinalizedDatadogAgentConfig,
+               std::shared_ptr<Collector>>
+      collector;
 
   FinalizedTraceSamplerConfig trace_sampler;
   FinalizedSpanSamplerConfig span_sampler;

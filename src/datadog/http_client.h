@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <iosfwd>
 #include <optional>
@@ -31,6 +32,10 @@ class HTTPClient {
   virtual Expected<void> post(const URL& url, HeadersSetter set_headers,
                               std::string body, ResponseHandler on_response,
                               ErrorHandler on_error) = 0;
+
+  // Wait until there are no more outstanding requests, or until the specified
+  // `deadline`.
+  virtual void drain(std::chrono::steady_clock::time_point deadline) = 0;
 
   virtual ~HTTPClient() = default;
 };

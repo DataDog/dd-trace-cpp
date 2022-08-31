@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <iterator>
 #include <list>
@@ -30,6 +32,8 @@ class Curl : public HTTPClient {
   std::unordered_set<CURL *> request_handles_;
   std::list<CURL *> new_handles_;
   bool shutting_down_;
+  int num_active_handles_;
+  std::condition_variable no_requests_;
   std::thread event_loop_;
 
   struct Request {
@@ -84,11 +88,14 @@ class Curl : public HTTPClient {
   virtual Expected<void> post(const URL &url, HeadersSetter set_headers,
                               std::string body, ResponseHandler on_response,
                               ErrorHandler on_error) override;
+
+  virtual void drain(std::chrono::steady_clock::time_point deadline) override;
 };
 
 inline Curl::Curl()
     : multi_handle_((curl_global_init(CURL_GLOBAL_ALL), curl_multi_init())),
       shutting_down_(false),
+      num_active_handles_(0),
       event_loop_([this]() { run(); }) {}
 
 inline Curl::~Curl() {
@@ -156,6 +163,12 @@ inline Expected<void> Curl::post(const HTTPClient::URL &url,
   return std::nullopt;
 }
 
+void Curl::drain(std::chrono::steady_clock::time_point deadline) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  no_requests_.wait_until(lock, deadline,
+                          [this]() { return num_active_handles_ == 0; });
+}
+
 inline std::size_t Curl::on_read_header(char *data, std::size_t,
                                         std::size_t length, void *user_data) {
   const auto request = static_cast<Request *>(user_data);
@@ -215,13 +228,15 @@ inline std::size_t Curl::on_read_body(char *data, std::size_t,
 }
 
 inline void Curl::run() {
-  int num_running_handles;
   int num_messages_remaining;
   CURLMsg *message;
   std::unique_lock<std::mutex> lock(mutex_);
 
   for (;;) {
-    CHECK curl_multi_perform(multi_handle_, &num_running_handles);
+    CHECK curl_multi_perform(multi_handle_, &num_active_handles_);
+    if (num_active_handles_ == 0) {
+      no_requests_.notify_all();
+    }
 
     while ((message =
                 curl_multi_info_read(multi_handle_, &num_messages_remaining))) {
