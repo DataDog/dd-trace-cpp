@@ -16,6 +16,9 @@ struct SpanSamplerConfig {
   struct Rule : public SpanMatcher {
     double sample_rate = 1.0;
     std::optional<double> max_per_second;
+
+    Rule(const SpanMatcher&);
+    Rule() = default;
   };
 
   std::vector<Rule> rules;
