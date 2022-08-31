@@ -13,6 +13,9 @@ namespace tracing {
 struct TraceSamplerConfig {
   struct Rule : public SpanMatcher {
     double sample_rate = 1.0;
+
+    Rule(const SpanMatcher&);
+    Rule() = default;
   };
 
   std::optional<double> sample_rate;

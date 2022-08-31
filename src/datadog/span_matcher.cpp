@@ -110,14 +110,9 @@ Expected<SpanMatcher> SpanMatcher::from_json(const nlohmann::json& json) {
         result.tags.emplace(std::string(tag_name), std::string(tag_value));
       }
     } else {
-      std::string message;
-      message += "Encountered unknown property \"";
-      message += key;
-      message += "\" with value ";
-      message += value.dump();
-      message += " in rule: ";
-      message += json.dump();
-      return Error{Error::RULE_UNKNOWN_PROPERTY, std::move(message)};
+      // Unknown properties are OK.  `SpanMatcher` is used as a base class for
+      // trace sampling rules and span sampling rules.  Those derived types
+      // will have additional properties in their JSON representations.
     }
   }
 
