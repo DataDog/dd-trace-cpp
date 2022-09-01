@@ -184,7 +184,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   if (!report_traces) {
     result.collector = std::make_shared<NullCollector>();
   } else if (!config.collector) {
-    auto finalized = finalize_config(config.agent);
+    auto finalized = finalize_config(config.agent, result.logger);
     if (auto *error = finalized.if_error()) {
       return std::move(*error);
     }

@@ -152,7 +152,7 @@ void play_with_event_scheduler() {
 }
 
 void play_with_curl() {
-  dd::Curl client;
+  dd::Curl client{std::make_shared<dd::CerrLogger>()};
   (void)client;
 
   dd::HTTPClient::URL url;
@@ -193,7 +193,7 @@ void play_with_curl_and_event_scheduler() {
   // When the user enters input, cancel the event and shut down.
 
   dd::ThreadedEventScheduler scheduler;
-  dd::Curl client;
+  dd::Curl client{std::make_shared<dd::CerrLogger>()};
 
   const auto cancel =
       scheduler.schedule_recurring_event(std::chrono::seconds(2), [&client]() {
@@ -270,12 +270,9 @@ void play_with_cpp20_syntax() {
 }
 
 void play_with_config() {
-  const auto http_client = std::make_shared<dd::Curl>();
-
   {
     dd::TracerConfig raw_config;
     raw_config.defaults.service = "hello";
-    raw_config.agent.http_client = http_client;
 
     auto validated = dd::finalize_config(raw_config);
     if (const auto* const error = validated.if_error()) {
@@ -306,11 +303,8 @@ void play_with_config() {
 }
 
 void play_with_create_span() {
-  const auto http_client = std::make_shared<dd::Curl>();
-
   dd::TracerConfig config;
   config.defaults.service = "hello";
-  config.agent.http_client = http_client;
 
   auto maybe_config = dd::finalize_config(config);
   if (const auto* const error = maybe_config.if_error()) {
@@ -329,11 +323,8 @@ void play_with_create_span() {
 }
 
 void play_with_span_tags() {
-  const auto http_client = std::make_shared<dd::Curl>();
-
   dd::TracerConfig config;
   config.defaults.service = "hello";
-  config.agent.http_client = http_client;
 
   auto maybe_config = dd::finalize_config(config);
   if (const auto* const error = maybe_config.if_error()) {
@@ -383,12 +374,10 @@ void play_with_parse_url() {
   try_url("unix:///var/run/dd-agent.sock");
   try_url("http+unix://var/run/dd-agent.sock");
 
-  const auto http_client = std::make_shared<dd::Curl>();
   dd::DatadogAgentConfig config;
-  config.http_client = http_client;
   config.url = "unix://var/run/i.did.it.wrong.sock";
   std::cout << config.url << "\n  ->  ";
-  auto result = finalize_config(config);
+  auto result = finalize_config(config, std::make_shared<dd::CerrLogger>());
   if (auto* error = result.if_error()) {
     std::cout << *error;
   } else {
@@ -399,13 +388,12 @@ void play_with_parse_url() {
 }
 
 void play_with_agent() {
-  const auto scheduler = std::make_shared<dd::ThreadedEventScheduler>();
-  const auto http_client = std::make_shared<dd::Curl>();
+  auto scheduler = std::make_shared<dd::ThreadedEventScheduler>();
   dd::DatadogAgentConfig config;
-  config.http_client = http_client;
   config.event_scheduler = scheduler;
 
-  const auto validated = dd::finalize_config(config);
+  const auto validated =
+      dd::finalize_config(config, std::shared_ptr<dd::CerrLogger>());
   assert(validated);
   dd::DatadogAgent collector{*validated, dd::default_clock,
                              std::make_shared<dd::CerrLogger>()};
@@ -608,9 +596,7 @@ void play_with_propagation(int argc, const char* const* argv) {
     service = "dd-trace-cpp-example-receiver";
   }
 
-  const auto http_client = std::make_shared<dd::Curl>();
   dd::TracerConfig config;
-  config.agent.http_client = http_client;
   config.defaults.service = service;
   const auto validated = dd::finalize_config(config);
   if (const auto* error = validated.if_error()) {
@@ -682,7 +668,7 @@ void play_with_propagation(int argc, const char* const* argv) {
 }
 
 void play_with_default_http_client() {
-  auto client = dd::default_http_client();
+  auto client = dd::default_http_client(std::make_shared<dd::CerrLogger>());
   std::cout << "default HTTP client address: "
             << static_cast<const void*>(client.get()) << '\n';
 }

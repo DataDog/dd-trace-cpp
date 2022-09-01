@@ -13,6 +13,7 @@ namespace datadog {
 namespace tracing {
 
 class EventScheduler;
+class Logger;
 
 struct DatadogAgentConfig {
   std::shared_ptr<HTTPClient> http_client;
@@ -25,7 +26,7 @@ struct DatadogAgentConfig {
 
 class FinalizedDatadogAgentConfig {
   friend Expected<FinalizedDatadogAgentConfig> finalize_config(
-      const DatadogAgentConfig& config);
+      const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger);
 
   FinalizedDatadogAgentConfig() = default;
 
@@ -37,7 +38,7 @@ class FinalizedDatadogAgentConfig {
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& config);
+    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger);
 
 }  // namespace tracing
 }  // namespace datadog

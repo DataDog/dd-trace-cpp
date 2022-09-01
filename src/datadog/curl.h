@@ -19,15 +19,14 @@
 #include "dict_reader.h"
 #include "dict_writer.h"
 #include "http_client.h"
-
-// TODO: Everywhere you see CHECK, I need to add error handling.
-#define CHECK
+#include "logger.h"
 
 namespace datadog {
 namespace tracing {
 
 class Curl : public HTTPClient {
   std::mutex mutex_;
+  std::shared_ptr<Logger> logger_;
   CURLM *multi_handle_;
   std::unordered_set<CURL *> request_handles_;
   std::list<CURL *> new_handles_;
@@ -73,6 +72,9 @@ class Curl : public HTTPClient {
   };
 
   void run();
+  CURLcode log_on_error(CURLcode result);
+  CURLMcode log_on_error(CURLMcode result);
+
   static std::size_t on_read_header(char *data, std::size_t, std::size_t length,
                                     void *user_data);
   static std::size_t on_read_body(char *data, std::size_t, std::size_t length,
@@ -82,7 +84,7 @@ class Curl : public HTTPClient {
   static std::string_view trim(std::string_view);
 
  public:
-  Curl();
+  explicit Curl(const std::shared_ptr<Logger> &logger);
   ~Curl();
 
   virtual Expected<void> post(const URL &url, HeadersSetter set_headers,
@@ -92,25 +94,63 @@ class Curl : public HTTPClient {
   virtual void drain(std::chrono::steady_clock::time_point deadline) override;
 };
 
-inline Curl::Curl()
-    : multi_handle_((curl_global_init(CURL_GLOBAL_ALL), curl_multi_init())),
-      shutting_down_(false),
-      num_active_handles_(0),
-      event_loop_([this]() { run(); }) {}
+inline Curl::Curl(const std::shared_ptr<Logger> &logger)
+    : logger_(logger), shutting_down_(false), num_active_handles_(0) {
+  curl_global_init(CURL_GLOBAL_ALL);
+  multi_handle_ = curl_multi_init();
+  if (multi_handle_ == nullptr) {
+    logger_->log_error(Error{
+        Error::CURL_HTTP_CLIENT_SETUP_FAILED,
+        "Unable to initialize a curl multi-handle for sending requests."});
+    return;
+  }
+
+  try {
+    event_loop_ = std::thread([this]() { run(); });
+  } catch (const std::system_error &error) {
+    logger_->log_error(
+        Error{Error::CURL_HTTP_CLIENT_SETUP_FAILED, error.what()});
+
+    // Usually the worker thread would do this, but since the thread failed to
+    // start, do it here.
+    (void)curl_multi_cleanup(multi_handle_);
+    curl_global_cleanup();
+
+    // Mark this object as not working.
+    multi_handle_ = nullptr;
+  }
+}
 
 inline Curl::~Curl() {
+  if (multi_handle_ == nullptr) {
+    // We're not running; nothing to shut down.
+    return;
+  }
+
   {
     std::lock_guard<std::mutex> lock(mutex_);
     shutting_down_ = true;
   }
-  CHECK curl_multi_wakeup(multi_handle_);
+  log_on_error(curl_multi_wakeup(multi_handle_));
   event_loop_.join();
+}
+
+inline void throw_on_error(CURLcode result) {
+  if (result != CURLE_OK) {
+    throw result;
+  }
 }
 
 inline Expected<void> Curl::post(const HTTPClient::URL &url,
                                  HeadersSetter set_headers, std::string body,
                                  ResponseHandler on_response,
-                                 ErrorHandler on_error) {
+                                 ErrorHandler on_error) try {
+  if (multi_handle_ == nullptr) {
+    return Error{Error::CURL_HTTP_CLIENT_NOT_RUNNING,
+                 "Unable to send request via libcurl because the HTTP client "
+                 "failed to start."};
+  }
+
   auto request = new Request();
 
   request->request_body = std::move(body);
@@ -118,39 +158,47 @@ inline Expected<void> Curl::post(const HTTPClient::URL &url,
   request->on_error = std::move(on_error);
 
   CURL *handle = curl_easy_init();
+  if (!handle) {
+    return Error{Error::CURL_REQUEST_SETUP_FAILED,
+                 "unable to initialize a curl handle for request sending"};
+  }
   // TODO: no
-  CHECK curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
+  throw_on_error(curl_easy_setopt(handle, CURLOPT_VERBOSE, 1));
   // end TODO
 
-  CHECK curl_easy_setopt(handle, CURLOPT_PRIVATE, request);
-  CHECK curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, request->error_buffer);
-  CHECK curl_easy_setopt(handle, CURLOPT_POST, 1);
-  CHECK curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE,
-                         request->request_body.size());
-  CHECK curl_easy_setopt(handle, CURLOPT_POSTFIELDS,
-                         request->request_body.data());
-  CHECK curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, &on_read_header);
-  CHECK curl_easy_setopt(handle, CURLOPT_HEADERDATA, request);
-  CHECK curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &on_read_body);
-  CHECK curl_easy_setopt(handle, CURLOPT_WRITEDATA, request);
+  throw_on_error(curl_easy_setopt(handle, CURLOPT_PRIVATE, request));
+  throw_on_error(
+      curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, request->error_buffer));
+  throw_on_error(curl_easy_setopt(handle, CURLOPT_POST, 1));
+  throw_on_error(curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE,
+                                  request->request_body.size()));
+  throw_on_error(curl_easy_setopt(handle, CURLOPT_POSTFIELDS,
+                                  request->request_body.data()));
+  throw_on_error(
+      curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, &on_read_header));
+  throw_on_error(curl_easy_setopt(handle, CURLOPT_HEADERDATA, request));
+  throw_on_error(
+      curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &on_read_body));
+  throw_on_error(curl_easy_setopt(handle, CURLOPT_WRITEDATA, request));
   if (url.scheme == "unix" || url.scheme == "http+unix" ||
       url.scheme == "https+unix") {
-    CHECK curl_easy_setopt(handle, CURLOPT_UNIX_SOCKET_PATH,
-                           url.authority.c_str());
+    throw_on_error(curl_easy_setopt(handle, CURLOPT_UNIX_SOCKET_PATH,
+                                    url.authority.c_str()));
     // The authority section of the URL is ignored when a unix domain socket is
     // to be used.
-    CHECK curl_easy_setopt(handle, CURLOPT_URL,
-                           ("http://localhost" + url.path).c_str());
+    throw_on_error(curl_easy_setopt(handle, CURLOPT_URL,
+                                    ("http://localhost" + url.path).c_str()));
   } else {
-    CHECK curl_easy_setopt(
+    throw_on_error(curl_easy_setopt(
         handle, CURLOPT_URL,
-        (url.scheme + "://" + url.authority + url.path).c_str());
+        (url.scheme + "://" + url.authority + url.path).c_str()));
   }
 
   HeaderWriter writer;
   set_headers(writer);
   request->request_headers = writer.release();
-  CHECK curl_easy_setopt(handle, CURLOPT_HTTPHEADER, request->request_headers);
+  throw_on_error(
+      curl_easy_setopt(handle, CURLOPT_HTTPHEADER, request->request_headers));
 
   std::list<CURL *> node;
   node.push_back(handle);
@@ -158,9 +206,11 @@ inline Expected<void> Curl::post(const HTTPClient::URL &url,
     std::lock_guard<std::mutex> lock(mutex_);
     new_handles_.splice(new_handles_.end(), node);
   }
-  CHECK curl_multi_wakeup(multi_handle_);
+  log_on_error(curl_multi_wakeup(multi_handle_));
 
   return std::nullopt;
+} catch (CURLcode error) {
+  return Error{Error::CURL_REQUEST_SETUP_FAILED, curl_easy_strerror(error)};
 }
 
 void Curl::drain(std::chrono::steady_clock::time_point deadline) {
@@ -227,13 +277,29 @@ inline std::size_t Curl::on_read_body(char *data, std::size_t,
   return length;
 }
 
+inline CURLcode Curl::log_on_error(CURLcode result) {
+  if (result != CURLE_OK) {
+    logger_->log_error(
+        Error{Error::CURL_HTTP_CLIENT_ERROR, curl_easy_strerror(result)});
+  }
+  return result;
+}
+
+inline CURLMcode Curl::log_on_error(CURLMcode result) {
+  if (result != CURLM_OK) {
+    logger_->log_error(
+        Error{Error::CURL_HTTP_CLIENT_ERROR, curl_multi_strerror(result)});
+  }
+  return result;
+}
+
 inline void Curl::run() {
   int num_messages_remaining;
   CURLMsg *message;
   std::unique_lock<std::mutex> lock(mutex_);
 
   for (;;) {
-    CHECK curl_multi_perform(multi_handle_, &num_active_handles_);
+    log_on_error(curl_multi_perform(multi_handle_, &num_active_handles_));
     if (num_active_handles_ == 0) {
       no_requests_.notify_all();
     }
@@ -246,7 +312,10 @@ inline void Curl::run() {
 
       auto *const request_handle = message->easy_handle;
       char *user_data;
-      CHECK curl_easy_getinfo(request_handle, CURLINFO_PRIVATE, &user_data);
+      if (log_on_error(curl_easy_getinfo(request_handle, CURLINFO_PRIVATE,
+                                         &user_data)) != CURLE_OK) {
+        continue;
+      }
       auto &request = *reinterpret_cast<Request *>(user_data);
 
       // `request` is done.  If we got a response, then call the response
@@ -262,14 +331,16 @@ inline void Curl::run() {
             Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
       } else {
         long status;
-        CHECK curl_easy_getinfo(request_handle, CURLINFO_RESPONSE_CODE,
-                                &status);
+        if (log_on_error(curl_easy_getinfo(
+                request_handle, CURLINFO_RESPONSE_CODE, &status)) != CURLE_OK) {
+          status = -1;
+        }
         HeaderReader reader(&request.response_headers_lower);
         request.on_response(static_cast<int>(status), reader,
                             std::move(request.response_body));
       }
 
-      CHECK curl_multi_remove_handle(multi_handle_, request_handle);
+      log_on_error(curl_multi_remove_handle(multi_handle_, request_handle));
       curl_easy_cleanup(request_handle);
       request_handles_.erase(request_handle);
       delete &request;
@@ -277,14 +348,14 @@ inline void Curl::run() {
 
     const int max_wait_milliseconds = 10 * 1000;
     lock.unlock();
-    CHECK curl_multi_poll(multi_handle_, nullptr, 0, max_wait_milliseconds,
-                          nullptr);
+    log_on_error(curl_multi_poll(multi_handle_, nullptr, 0,
+                                 max_wait_milliseconds, nullptr));
     lock.lock();
 
     // New requests might have been added while we were sleeping.
     for (; !new_handles_.empty(); new_handles_.pop_front()) {
       CURL *const handle = new_handles_.front();
-      CHECK curl_multi_add_handle(multi_handle_, handle);
+      log_on_error(curl_multi_add_handle(multi_handle_, handle));
       request_handles_.insert(handle);
     }
 
@@ -296,14 +367,16 @@ inline void Curl::run() {
   // We're shutting down.  Clean up any remaining request handles.
   for (const auto &handle : request_handles_) {
     char *user_data;
-    CHECK curl_easy_getinfo(handle, CURLINFO_PRIVATE, &user_data);
-    delete reinterpret_cast<Request *>(user_data);
+    if (log_on_error(curl_easy_getinfo(handle, CURLINFO_PRIVATE, &user_data)) ==
+        CURLE_OK) {
+      delete reinterpret_cast<Request *>(user_data);
+    }
 
-    CHECK curl_multi_remove_handle(multi_handle_, handle);
+    log_on_error(curl_multi_remove_handle(multi_handle_, handle));
   }
 
   request_handles_.clear();
-  CHECK curl_multi_cleanup(multi_handle_);
+  log_on_error(curl_multi_cleanup(multi_handle_));
   curl_global_cleanup();
 }
 
