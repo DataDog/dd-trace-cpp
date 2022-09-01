@@ -20,6 +20,7 @@ add_library(dd_trace_cpp-object OBJECT
     src/datadog/clock.cpp
     src/datadog/collector.cpp
     src/datadog/collector_response.cpp
+    src/datadog/curl.cpp
     src/datadog/datadog_agent_config.cpp
     src/datadog/datadog_agent.cpp
     src/datadog/default_http_client_curl.cpp

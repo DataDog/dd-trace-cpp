@@ -5,4 +5,4 @@ cd $(dirname "$0")/..
 find src/datadog -type f -name '*.cpp' | \
     sort | \
     sed 's/.*/    "\0",/'  | \
-    sed 's/.*default_http_client_curl.*/# \0 no libcurl/'
+    sed 's/.*curl.*/# \0 no libcurl/'
