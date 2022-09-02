@@ -69,19 +69,28 @@ Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
   request->on_error = std::move(on_error);
 
   CURL *handle = curl_easy_init();
+
+  class Guard {
+    Request *request_;
+    CURL *handle_;
+
+   public:
+    Guard(Request *request, CURL *handle)
+        : request_(request), handle_(handle) {}
+    ~Guard() {
+      delete request_;
+      curl_easy_cleanup(handle_);
+    }
+    void release() {
+      request_ = nullptr;
+      handle_ = nullptr;
+    }
+  } guard{request, handle};
+
   if (!handle) {
     return Error{Error::CURL_REQUEST_SETUP_FAILED,
                  "unable to initialize a curl handle for request sending"};
   }
-
-  class HandleGuard {
-    CURL *handle_;
-
-   public:
-    explicit HandleGuard(CURL *handle) : handle_(handle) {}
-    ~HandleGuard() { curl_easy_cleanup(handle_); }
-    void release() { handle_ = nullptr; }
-  } handle_guard{handle};
 
   // TODO: no
   throw_on_error(curl_easy_setopt(handle, CURLOPT_VERBOSE, 1));
@@ -126,7 +135,7 @@ Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
   {
     std::lock_guard<std::mutex> lock(mutex_);
     new_handles_.splice(new_handles_.end(), node);
-    handle_guard.release();
+    guard.release();
   }
   log_on_error(curl_multi_wakeup(multi_handle_));
 
