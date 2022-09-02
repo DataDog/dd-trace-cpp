@@ -66,6 +66,7 @@ cc_library(
     "src/datadog/http_client.h",
     "src/datadog/id_generator.h",
     "src/datadog/json.hpp",
+    "src/datadog/json_fwd.hpp",
     "src/datadog/limiter.h",
     "src/datadog/logger.h",
     "src/datadog/msgpack.h",
