@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <charconv>
 #include <iterator>
+#include <sstream>
 #include <string>
 
 #include "error.h"
@@ -65,33 +67,32 @@ Expected<int> parse_int(std::string_view input, int base) {
   return parse_integer<int>(input, base, "int");
 }
 
-Expected<double> parse_double(std::string_view input,
-                              std::chars_format format) {
-  // This is very similar to `parse_integer`, above.
+Expected<double> parse_double(std::string_view input) {
+  // This function uses a different technique from `parse_integer`, because
+  // some compilers with _partial_ support for C++17 do not implement the
+  // floating point portions of `std::from_chars`:
+  // <https://en.cppreference.com/w/cpp/compiler_support/17#C.2B.2B17_library_features>.
+  // As an alternative, we could use either of `std::stod` or `std::istream`.
+  // I choose `std::istream`.
   double value;
-  input = strip(input);
-  const auto status =
-      std::from_chars(input.begin(), input.end(), value, format);
-
-  if (status.ec == std::errc::invalid_argument) {
+  std::stringstream stream;
+  stream << strip(input);
+  stream >> value;
+  
+  if (!stream) {
     std::string message;
-    message += "Is not a valid number: \"";
+    message += "Is not a valid number, or is out of the range of double precision floating point: \"";
     message += input;
     message += '\"';
     return Error{Error::INVALID_DOUBLE, std::move(message)};
-  } else if (status.ptr != input.end()) {
+  } else if (!stream.eof()) {
     std::string message;
     message += "Number has trailing characters in: \"";
     message += input;
     message += '\"';
     return Error{Error::INVALID_DOUBLE, std::move(message)};
-  } else if (status.ec == std::errc::result_out_of_range) {
-    std::string message;
-    message +=
-        "Number is not within the range of double precision floating point:";
-    message += input;
-    return Error{Error::OUT_OF_RANGE_DOUBLE, std::move(message)};
   }
+
   return value;
 }
 
