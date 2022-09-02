@@ -12,6 +12,7 @@
 #include "datadog_agent.h"
 #include "environment.h"
 #include "null_collector.h"
+#include "parse_util.h"
 
 namespace datadog {
 namespace tracing {
@@ -34,28 +35,23 @@ bool falsy(std::string_view text) {
 std::vector<std::string_view> parse_list(std::string_view input) {
   using uchar = unsigned char;
 
+  input = strip(input);
   std::vector<std::string_view> items;
   if (input.empty()) {
     return items;
   }
 
-  const char *current = input.begin();
   const char *const end = input.end();
 
-  bool preceded_by_comma = false;
-  for (;;) {
+  const char *current = input.begin();
+  const char *begin_delim;
+  do {
     const char *begin_item =
         std::find_if(current, end, [](uchar ch) { return !std::isspace(ch); });
-    const char *begin_delim = std::find_if(begin_item, end, [](uchar ch) {
+    begin_delim = std::find_if(begin_item, end, [](uchar ch) {
       return std::isspace(ch) || ch == ',';
     });
 
-    if (begin_item == end) {
-      if (preceded_by_comma) {
-        items.emplace_back();
-      }
-      break;
-    }
     items.emplace_back(begin_item, std::size_t(begin_delim - begin_item));
 
     const char *end_delim = std::find_if(
@@ -63,13 +59,10 @@ std::vector<std::string_view> parse_list(std::string_view input) {
 
     if (end_delim != end && *end_delim == ',') {
       ++end_delim;
-      preceded_by_comma = true;
-    } else {
-      preceded_by_comma = false;
     }
 
     current = end_delim;
-  }
+  } while (begin_delim != end);
 
   return items;
 }

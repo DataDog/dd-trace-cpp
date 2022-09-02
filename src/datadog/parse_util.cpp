@@ -49,6 +49,10 @@ std::string_view strip(std::string_view input) {
       std::find_if(input.begin(), input.end(), not_whitespace);
   const char* const end =
       std::find_if(input.rbegin(), input.rend(), not_whitespace).base();
+
+  if (end < begin) {
+    return std::string_view{};
+  }
   return std::string_view{begin, std::size_t(end - begin)};
 }
 
