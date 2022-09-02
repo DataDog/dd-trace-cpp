@@ -62,30 +62,14 @@ Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
                  "failed to start."};
   }
 
-  auto request = new Request();
+  auto request = std::make_unique<Request>();
 
   request->request_body = std::move(body);
   request->on_response = std::move(on_response);
   request->on_error = std::move(on_error);
 
-  CURL *handle = curl_easy_init();
-
-  class Guard {
-    Request *request_;
-    CURL *handle_;
-
-   public:
-    Guard(Request *request, CURL *handle)
-        : request_(request), handle_(handle) {}
-    ~Guard() {
-      delete request_;
-      curl_easy_cleanup(handle_);
-    }
-    void release() {
-      request_ = nullptr;
-      handle_ = nullptr;
-    }
-  } guard{request, handle};
+  std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> handle{
+      curl_easy_init(), &curl_easy_cleanup};
 
   if (!handle) {
     return Error{Error::CURL_REQUEST_SETUP_FAILED,
@@ -93,49 +77,57 @@ Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
   }
 
   // TODO: no
-  throw_on_error(curl_easy_setopt(handle, CURLOPT_VERBOSE, 1));
+  throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_VERBOSE, 1));
   // end TODO
 
-  throw_on_error(curl_easy_setopt(handle, CURLOPT_PRIVATE, request));
   throw_on_error(
-      curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, request->error_buffer));
-  throw_on_error(curl_easy_setopt(handle, CURLOPT_POST, 1));
-  throw_on_error(curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE,
+      curl_easy_setopt(handle.get(), CURLOPT_PRIVATE, request.get()));
+  throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_ERRORBUFFER,
+                                  request->error_buffer));
+  throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_POST, 1));
+  throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_POSTFIELDSIZE,
                                   request->request_body.size()));
-  throw_on_error(curl_easy_setopt(handle, CURLOPT_POSTFIELDS,
+  throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_POSTFIELDS,
                                   request->request_body.data()));
   throw_on_error(
-      curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, &on_read_header));
-  throw_on_error(curl_easy_setopt(handle, CURLOPT_HEADERDATA, request));
+      curl_easy_setopt(handle.get(), CURLOPT_HEADERFUNCTION, &on_read_header));
   throw_on_error(
-      curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &on_read_body));
-  throw_on_error(curl_easy_setopt(handle, CURLOPT_WRITEDATA, request));
+      curl_easy_setopt(handle.get(), CURLOPT_HEADERDATA, request.get()));
+  throw_on_error(
+      curl_easy_setopt(handle.get(), CURLOPT_WRITEFUNCTION, &on_read_body));
+  throw_on_error(
+      curl_easy_setopt(handle.get(), CURLOPT_WRITEDATA, request.get()));
   if (url.scheme == "unix" || url.scheme == "http+unix" ||
       url.scheme == "https+unix") {
-    throw_on_error(curl_easy_setopt(handle, CURLOPT_UNIX_SOCKET_PATH,
+    throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_UNIX_SOCKET_PATH,
                                     url.authority.c_str()));
     // The authority section of the URL is ignored when a unix domain socket is
     // to be used.
-    throw_on_error(curl_easy_setopt(handle, CURLOPT_URL,
+    throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_URL,
                                     ("http://localhost" + url.path).c_str()));
   } else {
     throw_on_error(curl_easy_setopt(
-        handle, CURLOPT_URL,
+        handle.get(), CURLOPT_URL,
         (url.scheme + "://" + url.authority + url.path).c_str()));
   }
 
   HeaderWriter writer;
   set_headers(writer);
-  request->request_headers = writer.release();
-  throw_on_error(
-      curl_easy_setopt(handle, CURLOPT_HTTPHEADER, request->request_headers));
+  std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> headers{
+      writer.release(), &curl_slist_free_all};
+  request->request_headers = headers.get();
+  throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_HTTPHEADER,
+                                  request->request_headers));
 
   std::list<CURL *> node;
-  node.push_back(handle);
+  node.push_back(handle.get());
   {
     std::lock_guard<std::mutex> lock(mutex_);
     new_handles_.splice(new_handles_.end(), node);
-    guard.release();
+
+    headers.release();
+    handle.release();
+    request.release();
   }
   log_on_error(curl_multi_wakeup(multi_handle_));
 
