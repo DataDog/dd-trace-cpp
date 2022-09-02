@@ -13,7 +13,7 @@
 namespace datadog {
 namespace tracing {
 
-class CollectorResponse;
+struct CollectorResponse;
 struct SamplingDecision;
 struct SpanData;
 

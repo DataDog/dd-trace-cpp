@@ -12,7 +12,7 @@
 namespace datadog {
 namespace tracing {
 
-struct FinalizedDatadogAgentConfig;
+class FinalizedDatadogAgentConfig;
 class Logger;
 struct SpanData;
 class TraceSampler;

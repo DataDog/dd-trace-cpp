@@ -7,7 +7,7 @@
 namespace datadog {
 namespace tracing {
 
-class Error;
+struct Error;
 
 class Logger {
  public:

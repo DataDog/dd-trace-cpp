@@ -18,8 +18,8 @@ class Collector;
 class DictReader;
 class DictWriter;
 class Logger;
-class SpanData;
-class SpanDefaults;
+struct SpanData;
+struct SpanDefaults;
 class SpanSampler;
 class TraceSampler;
 

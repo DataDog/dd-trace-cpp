@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 
 project(dd-trace-cpp)
 
-set(CMAKE_BUILD_TYPE "RelWithDebInfo")
-# set(CMAKE_BUILD_TYPE "Debug")
+# set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+set(CMAKE_BUILD_TYPE "Debug")
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -81,3 +81,10 @@ target_include_directories(example PRIVATE src/)
 
 find_package(Threads REQUIRED)
 target_link_libraries(example ${CMAKE_BINARY_DIR}/lib/libcurl.a Threads::Threads)
+
+# TODO: Not ready for prime time.  AddressSanitizer fails with a "fatal error."
+# target_compile_options(example PRIVATE -fsanitize=address,undefined)
+# target_link_options(example PRIVATE -fsanitize=address,undefined)
+
+# TODO: A separate pass using thread sanitizer would be good, but it's
+#       incompatible with address sanitizer.

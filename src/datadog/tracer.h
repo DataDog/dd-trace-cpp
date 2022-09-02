@@ -13,7 +13,7 @@ namespace datadog {
 namespace tracing {
 
 class DictReader;
-class SpanConfig;
+struct SpanConfig;
 class TraceSampler;
 class SpanSampler;
 
