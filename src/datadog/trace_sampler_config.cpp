@@ -127,7 +127,8 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   auto sample_rate = config.sample_rate;
   if (auto sample_rate_env = lookup(environment::DD_TRACE_SAMPLE_RATE)) {
-    auto maybe_sample_rate = parse_double(*sample_rate_env);
+    auto maybe_sample_rate =
+        parse_double(*sample_rate_env, std::chars_format::fixed);
     if (auto *error = maybe_sample_rate.if_error()) {
       std::string prefix;
       prefix += "While parsing ";
@@ -155,7 +156,8 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   auto max_per_second = config.max_per_second;
   if (auto limit_env = lookup(environment::DD_TRACE_RATE_LIMIT)) {
-    auto maybe_max_per_second = parse_double(*limit_env);
+    auto maybe_max_per_second =
+        parse_double(*limit_env, std::chars_format::fixed);
     if (auto *error = maybe_max_per_second.if_error()) {
       std::string prefix;
       prefix += "While parsing ";

@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <charconv>
 #include <cstddef>
 #include <string>
 
@@ -62,12 +61,14 @@ Expected<int> parse_int(std::string_view input, int base) {
   return parse_integer<int>(input, base, "int");
 }
 
-Expected<double> parse_double(std::string_view input) {
+Expected<double> parse_double(std::string_view input,
+                              std::chars_format format) {
   // This is very similar to `parse_integer`, above.
   double value;
   input = strip(input);
-  const auto status = std::from_chars(input.begin(), input.end(), value,
-                                      std::chars_format::fixed);
+  const auto status =
+      std::from_chars(input.begin(), input.end(), value, format);
+
   if (status.ec == std::errc::invalid_argument) {
     std::string message;
     message += "Is not a valid number: \"";
