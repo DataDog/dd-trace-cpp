@@ -90,6 +90,7 @@ void TraceSegment::span_finished() {
   // On the other hand, there's nobody left to contend for the mutex, so it
   // doesn't make any difference.
   make_sampling_decision_if_null();
+  assert(sampling_decision_);
 
   // All of our spans are finished.  Run the span sampler, finalize the spans,
   // and then send the spans to the collector.
@@ -190,9 +191,14 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   assert(!injection_styles_.w3c);
   // end TODO
 
+  int sampling_priority;
+  std::string encoded_trace_tags;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     make_sampling_decision_if_null();
+    assert(sampling_decision_);
+    sampling_priority = sampling_decision_->priority;
+    encoded_trace_tags = encode_tags(trace_tags_);
   }
 
   // Origin and trace tag headers are always propagated.
@@ -200,7 +206,6 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   if (origin_) {
     writer.set("x-datadog-origin", *origin_);
   }
-  const std::string encoded_trace_tags = encode_tags(trace_tags_);
   if (encoded_trace_tags.size() > tags_header_max_size_) {
     std::string message;
     message +=
@@ -221,7 +226,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
     writer.set("x-datadog-trace-id", std::to_string(span.trace_id));
     writer.set("x-datadog-parent-id", std::to_string(span.span_id));
     writer.set("x-datadog-sampling-priority",
-               std::to_string(sampling_decision_->priority));
+               std::to_string(sampling_priority));
   }
 
   // TODO: other styles
