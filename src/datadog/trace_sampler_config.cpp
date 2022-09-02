@@ -4,6 +4,7 @@
 
 #include "environment.h"
 #include "json.hpp"
+#include "parse_util.h"
 
 namespace datadog {
 namespace tracing {
@@ -124,11 +125,24 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.push_back(std::move(finalized));
   }
 
+  auto sample_rate = config.sample_rate;
+  if (auto sample_rate_env = lookup(environment::DD_TRACE_SAMPLE_RATE)) {
+    auto maybe_sample_rate = parse_double(*sample_rate_env);
+    if (auto *error = maybe_sample_rate.if_error()) {
+      std::string prefix;
+      prefix += "While parsing ";
+      prefix += name(environment::DD_TRACE_SAMPLE_RATE);
+      prefix += ": ";
+      return error->with_prefix(prefix);
+    }
+    sample_rate = *maybe_sample_rate;
+  }
+
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
   // appended to the end of `rules`.  First, though, we have to make sure the
   // sample rate is valid.
-  if (config.sample_rate) {
-    auto maybe_rate = Rate::from(*config.sample_rate);
+  if (sample_rate) {
+    auto maybe_rate = Rate::from(*sample_rate);
     if (auto *error = maybe_rate.if_error()) {
       return error->with_prefix(
           "Unable to parse overall sample_rate for trace sampling: ");
@@ -139,7 +153,20 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.push_back(std::move(catch_all));
   }
 
-  if (config.max_per_second <= 0) {
+  auto max_per_second = config.max_per_second;
+  if (auto limit_env = lookup(environment::DD_TRACE_RATE_LIMIT)) {
+    auto maybe_max_per_second = parse_double(*limit_env);
+    if (auto *error = maybe_max_per_second.if_error()) {
+      std::string prefix;
+      prefix += "While parsing ";
+      prefix += name(environment::DD_TRACE_RATE_LIMIT);
+      prefix += ": ";
+      return error->with_prefix(prefix);
+    }
+    max_per_second = *maybe_max_per_second;
+  }
+
+  if (!(max_per_second > 0)) {
     std::string message;
     message +=
         "Trace sampling max_per_second must be greater than zero, but the "

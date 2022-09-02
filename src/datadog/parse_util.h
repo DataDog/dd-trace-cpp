@@ -61,5 +61,33 @@ inline Expected<int> parse_int(std::string_view input, int base) {
   return parse_integer<int>(input, base, "int");
 }
 
+inline Expected<double> parse_double(std::string_view input) {
+  // This is very similar to `parse_integer`, above.
+  double value;
+  input = strip(input);
+  const auto status = std::from_chars(input.begin(), input.end(), value,
+                                      std::chars_format::fixed);
+  if (status.ec == std::errc::invalid_argument) {
+    std::string message;
+    message += "Is not a valid number: \"";
+    message += input;
+    message += '\"';
+    return Error{Error::INVALID_DOUBLE, std::move(message)};
+  } else if (status.ptr != input.end()) {
+    std::string message;
+    message += "Number has trailing characters in: \"";
+    message += input;
+    message += '\"';
+    return Error{Error::INVALID_DOUBLE, std::move(message)};
+  } else if (status.ec == std::errc::result_out_of_range) {
+    std::string message;
+    message +=
+        "Number is not within the range of double precision floating point:";
+    message += input;
+    return Error{Error::OUT_OF_RANGE_DOUBLE, std::move(message)};
+  }
+  return value;
+}
+
 }  // namespace tracing
 }  // namespace datadog
