@@ -55,6 +55,7 @@ struct Error {
     CURL_HTTP_CLIENT_ERROR = 41,
     INVALID_DOUBLE = 42,
     OUT_OF_RANGE_DOUBLE = 43,
+    MISSING_TRACE_ID = 44,
   };
 
   Code code;

@@ -297,6 +297,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   //
   // - no trace ID and no parent ID
   //     - this means there's no span to extract
+  // - parent ID and no trace ID
+  //     - error
   // - trace ID and no parent ID
   //     - if origin is set, then we're extracting a root span
   //         - the idea is that "synthetics" might have started a trace without
@@ -309,9 +311,19 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     return Error{Error::NO_SPAN_TO_EXTRACT,
                  "There's trace ID or parent span ID to extract."};
   }
+  if (!trace_id) {
+    std::string message;
+    message +=
+        "There's no trace ID to extract, but there is a parent span ID: ";
+    message += std::to_string(*parent_id);
+    return Error{Error::MISSING_TRACE_ID, std::move(message)};
+  }
   if (!parent_id && !origin) {
-    return Error{Error::MISSING_PARENT_SPAN_ID,
-                 "There's no parent span ID to extract."};
+    std::string message;
+    message +=
+        "There's no parent span ID to extract, but there is a trace ID: ";
+    message += std::to_string(*trace_id);
+    return Error{Error::MISSING_PARENT_SPAN_ID, std::move(message)};
   }
 
   if (!parent_id) {
