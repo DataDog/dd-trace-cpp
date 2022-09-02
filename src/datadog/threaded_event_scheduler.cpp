@@ -13,7 +13,7 @@ ThreadedEventScheduler::EventConfig::EventConfig(
 bool ThreadedEventScheduler::GreaterThan::operator()(
     const ScheduledRun& left, const ScheduledRun& right) const {
   return left.when > right.when;
-};
+}
 
 ThreadedEventScheduler::ThreadedEventScheduler()
     : shutting_down_(false), dispatcher_([this]() { run(); }) {}
