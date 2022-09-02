@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "error.h"
+#include "parse_util.h"
 
 namespace datadog {
 namespace tracing {
@@ -27,11 +28,6 @@ namespace tracing {
 // https://docs.google.com/document/d/1zeO6LGnvxk5XweObHAwJbK3SfK23z7jQzp7ozWJTa2A/edit#heading=h.yp07yuixga36
 
 namespace {
-
-// Return a `string_view` over the specified range of characters `[begin, end)`.
-std::string_view range(const char* begin, const char* end) {
-  return std::string_view{begin, std::size_t(end - begin)};
-}
 
 // Insert into the specified `destination` a tag decoded from the specified
 // `entry`.  Return an `Error` if an error occurs.

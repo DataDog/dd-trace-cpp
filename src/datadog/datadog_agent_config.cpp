@@ -5,18 +5,11 @@
 
 #include "default_http_client.h"
 #include "environment.h"
+#include "parse_util.h"
 #include "threaded_event_scheduler.h"
 
 namespace datadog {
 namespace tracing {
-namespace {
-
-template <typename BeginIterator, typename EndIterator>
-std::string_view range(BeginIterator begin, EndIterator end) {
-  return std::string_view{begin, std::size_t(end - begin)};
-}
-
-}  // namespace
 
 Expected<HTTPClient::URL> DatadogAgentConfig::parse(std::string_view input) {
   const std::string_view separator = "://";
