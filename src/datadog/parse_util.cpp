@@ -1,7 +1,9 @@
 #include "parse_util.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
+#include <iterator>
 #include <string>
 
 #include "error.h"
@@ -48,11 +50,10 @@ std::string_view strip(std::string_view input) {
   const char* const begin =
       std::find_if(input.begin(), input.end(), not_whitespace);
   const char* const end =
-      std::find_if(input.rbegin(), input.rend(), not_whitespace).base();
+      std::find_if(input.rbegin(), std::make_reverse_iterator(begin), not_whitespace).base();
 
-  if (end < begin) {
-    return std::string_view{};
-  }
+  assert(begin <= end);
+
   return std::string_view{begin, std::size_t(end - begin)};
 }
 
