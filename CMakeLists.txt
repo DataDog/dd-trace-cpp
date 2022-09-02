@@ -13,7 +13,16 @@ else()
     add_compile_options(-Wall -Wextra -pedantic -Werror)
 endif()
 
-find_package(CURL)
+include (ExternalProject)
+ExternalProject_Add(curl
+  URL "https://github.com/curl/curl/releases/download/curl-7_85_0/curl-7.85.0.tar.gz"
+  URL_MD5 "4e9eb4f434e9be889e510f038754d3de"
+  BUILD_IN_SOURCE 1
+  SOURCE_DIR ${CMAKE_BINARY_DIR}/curl
+  CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/curl/configure --prefix=${CMAKE_BINARY_DIR} --disable-ftp --disable-ldap --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-smtp --disable-gopher --without-ssl --disable-crypto-auth --without-axtls --without-zlib --disable-rtsp --enable-shared=no --enable-static=yes --with-pic --without-brotli
+  BUILD_COMMAND make -j16
+  INSTALL_COMMAND make install
+)
 
 add_library(dd_trace_cpp-object OBJECT
     src/datadog/cerr_logger.cpp
@@ -62,5 +71,13 @@ add_library(dd_trace_cpp-object OBJECT
     src/datadog/version.cpp    
 )
 
-target_link_libraries(dd_trace_cpp-object ${CURL_LIBRARIES})
+add_dependencies(dd_trace_cpp-object curl)
+include_directories(${CMAKE_BINARY_DIR}/include)
 set_property(TARGET dd_trace_cpp-object PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+add_executable(example example/example.cpp $<TARGET_OBJECTS:dd_trace_cpp-object>)
+
+target_include_directories(example PRIVATE src/)
+
+find_package(Threads REQUIRED)
+target_link_libraries(example ${CMAKE_BINARY_DIR}/lib/libcurl.a Threads::Threads)

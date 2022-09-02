@@ -4,5 +4,8 @@ set -e
 
 cd "$(dirname "$0")"/..
 
-make -C example
-example/example "$@"
+mkdir -p .build
+cd .build
+cmake ..
+make -j $(nproc)
+.build/example "$@"
