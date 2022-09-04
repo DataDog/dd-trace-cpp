@@ -72,6 +72,7 @@ class Curl : public HTTPClient {
   };
 
   void run();
+  void handle_message(const CURLMsg&);
   CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
 

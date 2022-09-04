@@ -225,46 +225,11 @@ void Curl::run() {
       no_requests_.notify_all();
     }
 
+    // If a request is done or errored out, curl will enqueue a "message" for
+    // us to handle.  Handle any pending messages.
     while ((message =
                 curl_multi_info_read(multi_handle_, &num_messages_remaining))) {
-      if (message->msg != CURLMSG_DONE) {
-        continue;
-      }
-
-      auto *const request_handle = message->easy_handle;
-      char *user_data;
-      if (log_on_error(curl_easy_getinfo(request_handle, CURLINFO_PRIVATE,
-                                         &user_data)) != CURLE_OK) {
-        continue;
-      }
-      auto &request = *reinterpret_cast<Request *>(user_data);
-
-      // `request` is done.  If we got a response, then call the response
-      // handler.  If an error occurred, then call the error handler.
-      const auto result = message->data.result;
-      if (result != CURLE_OK) {
-        std::string error_message;
-        error_message += "Error sending request with libcurl (";
-        error_message += curl_easy_strerror(result);
-        error_message += "): ";
-        error_message += request.error_buffer;
-        request.on_error(
-            Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
-      } else {
-        long status;
-        if (log_on_error(curl_easy_getinfo(
-                request_handle, CURLINFO_RESPONSE_CODE, &status)) != CURLE_OK) {
-          status = -1;
-        }
-        HeaderReader reader(&request.response_headers_lower);
-        request.on_response(static_cast<int>(status), reader,
-                            std::move(request.response_body));
-      }
-
-      log_on_error(curl_multi_remove_handle(multi_handle_, request_handle));
-      curl_easy_cleanup(request_handle);
-      request_handles_.erase(request_handle);
-      delete &request;
+      handle_message(*message);
     }
 
     const int max_wait_milliseconds = 10 * 1000;
@@ -299,6 +264,47 @@ void Curl::run() {
   request_handles_.clear();
   log_on_error(curl_multi_cleanup(multi_handle_));
   curl_global_cleanup();
+}
+
+void Curl::handle_message(const CURLMsg& message) {
+  if (message.msg != CURLMSG_DONE) {
+    return;
+  }
+
+  auto *const request_handle = message.easy_handle;
+  char *user_data;
+  if (log_on_error(curl_easy_getinfo(request_handle, CURLINFO_PRIVATE,
+                                     &user_data)) != CURLE_OK) {
+    return;
+  }
+  auto &request = *reinterpret_cast<Request *>(user_data);
+
+  // `request` is done.  If we got a response, then call the response
+  // handler.  If an error occurred, then call the error handler.
+  const auto result = message.data.result;
+  if (result != CURLE_OK) {
+    std::string error_message;
+    error_message += "Error sending request with libcurl (";
+    error_message += curl_easy_strerror(result);
+    error_message += "): ";
+    error_message += request.error_buffer;
+    request.on_error(
+        Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
+  } else {
+    long status;
+    if (log_on_error(curl_easy_getinfo(
+            request_handle, CURLINFO_RESPONSE_CODE, &status)) != CURLE_OK) {
+      status = -1;
+    }
+    HeaderReader reader(&request.response_headers_lower);
+    request.on_response(static_cast<int>(status), reader,
+                        std::move(request.response_body));
+  }
+
+  log_on_error(curl_multi_remove_handle(multi_handle_, request_handle));
+  curl_easy_cleanup(request_handle);
+  request_handles_.erase(request_handle);
+  delete &request;
 }
 
 Curl::Request::~Request() { curl_slist_free_all(request_headers); }
