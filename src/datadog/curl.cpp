@@ -1,4 +1,5 @@
 #include "curl.h"
+#include "parse_util.h"
 
 namespace datadog {
 namespace tracing {
@@ -166,8 +167,8 @@ std::size_t Curl::on_read_header(char *data, std::size_t, std::size_t length,
     return length;
   }
 
-  const auto key = trim(std::string_view(begin, colon - begin));
-  const auto value = trim(std::string_view(colon + 1, end - (colon + 1)));
+  const auto key = strip(std::string_view(begin, colon - begin));
+  const auto value = strip(std::string_view(colon + 1, end - (colon + 1)));
 
   std::string key_lower;
   key_lower.reserve(key.size());
@@ -181,15 +182,6 @@ std::size_t Curl::on_read_header(char *data, std::size_t, std::size_t length,
 bool Curl::is_non_whitespace(unsigned char ch) { return !std::isspace(ch); }
 
 char Curl::to_lower(unsigned char ch) { return std::tolower(ch); }
-
-std::string_view Curl::trim(std::string_view source) {
-  const auto first_non_whitespace =
-      std::find_if(source.begin(), source.end(), &is_non_whitespace);
-  const auto after_last_non_whitespace =
-      std::find_if(source.rbegin(), source.rend(), &is_non_whitespace).base();
-  const auto trimmed_length = after_last_non_whitespace - first_non_whitespace;
-  return std::string_view(first_non_whitespace, trimmed_length);
-}
 
 std::size_t Curl::on_read_body(char *data, std::size_t, std::size_t length,
                                void *user_data) {
