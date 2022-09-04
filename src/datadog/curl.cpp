@@ -167,8 +167,8 @@ std::size_t Curl::on_read_header(char *data, std::size_t, std::size_t length,
     return length;
   }
 
-  const auto key = strip(std::string_view(begin, colon - begin));
-  const auto value = strip(std::string_view(colon + 1, end - (colon + 1)));
+  const auto key = strip(range(begin, colon));
+  const auto value = strip(range(colon + 1, end));
 
   std::string key_lower;
   key_lower.reserve(key.size());
