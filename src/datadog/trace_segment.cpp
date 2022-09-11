@@ -1,8 +1,11 @@
 #include "trace_segment.h"
 
 #include <cassert>
+#include <charconv>
+#include <limits>
 #include <optional>
 #include <string>
+#include <system_error>
 #include <unordered_map>
 #include <utility>
 
@@ -19,6 +22,20 @@
 
 namespace datadog {
 namespace tracing {
+namespace {
+
+template <typename Integer> std::string hex(Integer value) {
+  // 4 bits per hex digit char, and then +1 char for possible minus sign
+  char buffer[std::numeric_limits<Integer>::digits / 4 + 1];
+
+  const int base = 16;
+  auto result = std::to_chars(std::begin(buffer), std::end(buffer), value, base);
+  assert(result.ec == std::errc());
+
+  return std::string{std::begin(buffer), result.ptr};
+}
+
+}  // namespace
 
 TraceSegment::TraceSegment(
     const std::shared_ptr<Logger>& logger,
@@ -194,8 +211,6 @@ void TraceSegment::update_decision_maker_trace_tag() {
 
 void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   // TODO: I can assume this because of the current trace config validator.
-  assert(injection_styles_.datadog);
-  assert(!injection_styles_.b3);
   assert(!injection_styles_.w3c);
   // end TODO
 
@@ -237,7 +252,11 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
                std::to_string(sampling_priority));
   }
 
-  // TODO: other styles
+  if (injection_styles_.b3) {
+    writer.set("x-b3-traceid", hex(span.trace_id));
+    writer.set("x-b3-spanid", hex(span.span_id));
+    writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
+  }
 }
 
 }  // namespace tracing

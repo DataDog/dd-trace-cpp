@@ -119,7 +119,58 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
 };
 
 class B3ExtractionPolicy : public DatadogExtractionPolicy {
-  // TODO
+  Expected<std::optional<std::uint64_t>> id(const DictReader& headers,
+                                            std::string_view header,
+                                            std::string_view kind) {
+    auto found = headers.lookup(header);
+    if (!found) {
+      return std::nullopt;
+    }
+    auto result = parse_uint64(*found, 16);
+    if (auto* error = result.if_error()) {
+      std::string prefix;
+      prefix += "Could not extract B3-style ";
+      prefix += kind;
+      prefix += "ID from ";
+      prefix += header;
+      prefix += ": ";
+      prefix += *found;
+      prefix += ' ';
+      return error->with_prefix(prefix);
+    }
+    return *result;
+  }
+
+ public:
+  Expected<std::optional<std::uint64_t>> trace_id(
+      const DictReader& headers) override {
+    return id(headers, "x-b3-traceid", "trace");
+  }
+
+  Expected<std::optional<std::uint64_t>> parent_id(
+      const DictReader& headers) override {
+    return id(headers, "x-b3-spanid", "parent span");
+  }
+
+  Expected<std::optional<int>> sampling_priority(
+      const DictReader& headers) override {
+    const std::string_view header = "x-b3-sampled";
+    auto found = headers.lookup(header);
+    if (!found) {
+      return std::nullopt;
+    }
+    auto result = parse_int(*found, 10);
+    if (auto* error = result.if_error()) {
+      std::string prefix;
+      prefix += "Could not extract B3-style sampling priority from ";
+      prefix += header;
+      prefix += ": ";
+      prefix += *found;
+      prefix += ' ';
+      return error->with_prefix(prefix);
+    }
+    return *result;
+  }
 };
 
 class W3CExtractionPolicy : public DatadogExtractionPolicy {
@@ -231,7 +282,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader) {
 Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
   // TODO: I can assume this because of the current config validator.
-  assert(extraction_styles_.datadog && !extraction_styles_.b3 &&
+  assert((extraction_styles_.datadog || extraction_styles_.b3) &&
          !extraction_styles_.w3c);
   // end TODO
 
