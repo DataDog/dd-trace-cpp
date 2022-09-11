@@ -50,6 +50,7 @@ class Tracer {
 
   // Create a new trace and return the root span of the trace.  Optionally
   // specify a `config` indicating the attributes of the root span.
+  Span create_span();
   Span create_span(const SpanConfig& config);
 
   // Return a span whose parent and other context is parsed from the specified

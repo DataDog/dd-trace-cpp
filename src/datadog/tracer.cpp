@@ -257,6 +257,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 }
 
+Span Tracer::create_span() {
+  return create_span(SpanConfig{});
+}
+
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
