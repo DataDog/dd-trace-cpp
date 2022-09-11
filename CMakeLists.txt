@@ -2,16 +2,10 @@ cmake_minimum_required(VERSION 3.13)
 
 project(dd-trace-cpp)
 
+option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
+
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 # set(CMAKE_BUILD_TYPE "Debug")
-
-set(CMAKE_CXX_STANDARD 17)
-
-if (MSVC)
-    add_compile_options(/W4 /WX)
-else()
-    add_compile_options(-Wall -Wextra -pedantic -Werror)
-endif()
 
 include (ExternalProject)
 ExternalProject_Add(curl
@@ -24,11 +18,26 @@ ExternalProject_Add(curl
   INSTALL_COMMAND make install
 )
 
-# TODO: Not for production builds.
+set(CMAKE_CXX_STANDARD 17)
+
+if (MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -pedantic -Werror)
+    if(BUILD_COVERAGE)
+      add_compile_options(-g -O0 -fprofile-arcs -ftest-coverage)
+  endif()
+endif()
+
+# TODO: The sanitizers have been giving me "fatal errors."
 # add_compile_options(-fsanitize=address,undefined)
 # add_link_options(-fsanitize=address,undefined)
 # TODO: A separate pass using thread sanitizer would be good, but it's
 #       incompatible with address sanitizer.
+
+if(BUILD_COVERAGE)
+  set(COVERAGE_LIBRARIES gcov)
+endif()
 
 add_library(dd_trace_cpp-object OBJECT
     src/datadog/cerr_logger.cpp

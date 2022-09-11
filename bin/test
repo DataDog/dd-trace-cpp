@@ -6,6 +6,17 @@ cd "$(dirname "$0")"/..
 
 mkdir -p .build
 cd .build
-cmake ..
-make -j $(nproc)
+cmake .. -DBUILD_COVERAGE=1
+make -j $(nproc) VERBOSE=1
 ./test/tests "$@"
+
+echo 'Generating Code Coverage Report'
+echo '==============================='
+cd -
+mkdir -p .coverage
+# Compile the .gcdo files into an intermediate format.
+lcov --quiet --capture --directory .build --output-file .coverage/raw.info
+# Filter out system headers and test drivers.
+lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*"
+# Generate an HTML coverage report at ".coverage/report/index.html".
+genhtml --quiet .coverage/filtered.info --output-directory .coverage/report

@@ -4,7 +4,7 @@
 // necessary for tracing, and provides member functions for creating spans.
 // Each span created by `Tracer` is either the root of a new trace (see
 // `create_span`) or part of an existing trace whose information is extracted
-// from a provided key/value source.
+// from a provided key/value source (see `extract_span`).
 //
 // `Tracer` is instantiated with a `FinalizedTracerConfig`, which can be
 // obtained from a `TracerConfig` via the `finalize_config` function.  See

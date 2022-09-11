@@ -2,5 +2,5 @@
 
 cd "$(dirname "$0")"/..
 
-find src/ example/ -type f \( -name '*.h' -o -name '*.cpp' \) -print0 | \
+find src/ example/ test/ -type f \( -name '*.h' -o -name '*.cpp' \) -print0 | \
     xargs -0 clang-format-14 --style=file -i
