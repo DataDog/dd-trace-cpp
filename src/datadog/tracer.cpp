@@ -144,11 +144,7 @@ Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
                                      const DictReader& reader) {
   ExtractedData extracted_data;
 
-  auto& trace_id = extracted_data.trace_id;
-  auto& parent_id = extracted_data.parent_id;
-  auto& origin = extracted_data.origin;
-  auto& trace_tags = extracted_data.trace_tags;
-  auto& sampling_priority = extracted_data.sampling_priority;
+  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] = extracted_data;
 
   auto maybe_trace_id = extract.trace_id(reader);
   if (auto* error = maybe_trace_id.if_error()) {
@@ -286,11 +282,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     extracted_by = "W3C";
   }
 
-  auto& trace_id = extracted_data->trace_id;
-  auto& parent_id = extracted_data->parent_id;
-  auto& origin = extracted_data->origin;
-  auto& trace_tags = extracted_data->trace_tags;
-  auto& sampling_priority = extracted_data->sampling_priority;
+  assert(extracted_data);
+  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] = *extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:
