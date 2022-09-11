@@ -24,6 +24,12 @@ ExternalProject_Add(curl
   INSTALL_COMMAND make install
 )
 
+# TODO: Not for production builds.
+# add_compile_options(-fsanitize=address,undefined)
+# add_link_options(-fsanitize=address,undefined)
+# TODO: A separate pass using thread sanitizer would be good, but it's
+#       incompatible with address sanitizer.
+
 add_library(dd_trace_cpp-object OBJECT
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
@@ -71,20 +77,17 @@ add_library(dd_trace_cpp-object OBJECT
     src/datadog/version.cpp    
 )
 
+# Make the build libcurl visible to dd_trace_cpp-object and all other targets.
 add_dependencies(dd_trace_cpp-object curl)
 include_directories(${CMAKE_BINARY_DIR}/include)
+
 set_property(TARGET dd_trace_cpp-object PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-add_executable(example example/example.cpp $<TARGET_OBJECTS:dd_trace_cpp-object>)
-
-target_include_directories(example PRIVATE src/)
-
 find_package(Threads REQUIRED)
-target_link_libraries(example ${CMAKE_BINARY_DIR}/lib/libcurl.a Threads::Threads)
 
-# TODO: Not ready for prime time.  AddressSanitizer fails with a "fatal error."
-# target_compile_options(example PRIVATE -fsanitize=address,undefined)
-# target_link_options(example PRIVATE -fsanitize=address,undefined)
+# add_executable(example example/example.cpp $<TARGET_OBJECTS:dd_trace_cpp-object>)
+# add_dependencies(example dd_trace_cpp-object)
+# target_include_directories(example PRIVATE src/)
+# target_link_libraries(example ${CMAKE_BINARY_DIR}/lib/libcurl.a Threads::Threads)
 
-# TODO: A separate pass using thread sanitizer would be good, but it's
-#       incompatible with address sanitizer.
+add_subdirectory(test)
