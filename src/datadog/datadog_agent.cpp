@@ -166,6 +166,7 @@ DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
 DatadogAgent::~DatadogAgent() {
   const auto deadline = clock_().tick + std::chrono::seconds(2);
   cancel_scheduled_flush_();
+  flush();
   http_client_->drain(deadline);
 }
 

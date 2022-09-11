@@ -140,7 +140,7 @@ Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
 void Curl::drain(std::chrono::steady_clock::time_point deadline) {
   std::unique_lock<std::mutex> lock(mutex_);
   no_requests_.wait_until(lock, deadline,
-                          [this]() { return num_active_handles_ == 0; });
+                          [this]() { return num_active_handles_ == 0 && new_handles_.empty(); });
 }
 
 std::size_t Curl::on_read_header(char *data, std::size_t, std::size_t length,
