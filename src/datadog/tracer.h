@@ -1,5 +1,15 @@
 #pragma once
 
+// This component provides a class, `Tracer`, that instantiates the mechanisms
+// necessary for tracing, and provides member functions for creating spans.
+// Each span created by `Tracer` is either the root of a new trace (see
+// `create_span`) or part of an existing trace whose information is extracted
+// from a provided key/value source.
+//
+// `Tracer` is instantiated with a `FinalizedTracerConfig`, which can be
+// obtained from a `TracerConfig` via the `finalize_config` function.  See
+// `tracer_config.h`.
+
 #include <optional>
 
 #include "clock.h"
@@ -31,6 +41,9 @@ class Tracer {
   std::size_t tags_header_max_size_;
 
  public:
+  // Create a tracer configured using the specified `config`, and optionally:
+  // - using the specified `generator` to create trace IDs and span IDs
+  // - using the specified `clock` to get the current time.
   explicit Tracer(const FinalizedTracerConfig& config);
   Tracer(const FinalizedTracerConfig& config, const IDGenerator& generator,
          const Clock& clock);
