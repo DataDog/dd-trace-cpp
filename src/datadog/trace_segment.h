@@ -83,6 +83,7 @@ class TraceSegment {
 
  private:
   void make_sampling_decision_if_null();
+  void update_decision_maker_trace_tag();
 };
 
 template <typename Visitor>

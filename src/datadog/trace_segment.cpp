@@ -163,6 +163,7 @@ void TraceSegment::override_sampling_priority(int priority) {
 
   std::lock_guard<std::mutex> lock(mutex_);
   sampling_decision_ = decision;
+  update_decision_maker_trace_tag();
 }
 
 void TraceSegment::make_sampling_decision_if_null() {
@@ -175,7 +176,14 @@ void TraceSegment::make_sampling_decision_if_null() {
   const SpanData& local_root = *spans_.front();
   sampling_decision_ = trace_sampler_->decide(local_root);
 
-  // Update the decision maker trace tag.
+  update_decision_maker_trace_tag();
+}
+
+void TraceSegment::update_decision_maker_trace_tag() {
+  // Depending on the context, `mutex_` might need already to be locked.
+  
+  assert(sampling_decision_);
+
   if (sampling_decision_->priority <= 0) {
     trace_tags_.erase(tags::internal::decision_maker);
   } else {
