@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 
 namespace datadog {
 namespace tracing {
@@ -28,6 +29,8 @@ extern const std::string span_sampling_mechanism;
 extern const std::string span_sampling_rule_rate;
 extern const std::string span_sampling_limit;
 }  // namespace internal
+
+bool is_internal(std::string_view tag_name);
 
 }  // namespace tags
 }  // namespace tracing

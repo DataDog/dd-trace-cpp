@@ -35,6 +35,7 @@ class Span {
   ~Span();
 
   Span create_child(const SpanConfig& config) const;
+  Span create_child() const;
 
   std::uint64_t id() const;
   std::uint64_t trace_id() const;

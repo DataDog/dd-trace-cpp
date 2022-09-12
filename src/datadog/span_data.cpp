@@ -48,7 +48,9 @@ void SpanData::apply_config(const SpanDefaults& defaults,
     tags.insert_or_assign(tags::version, version);
   }
   for (const auto& [key, value] : config.tags) {
-    tags.insert_or_assign(key, value);
+    if (!tags::is_internal(key)) {
+      tags.insert_or_assign(key, value);
+    }
   }
 
   resource = config.resource.value_or(name);

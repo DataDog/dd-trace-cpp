@@ -1,8 +1,22 @@
 #include "tags.h"
 
+#include <algorithm>
+
 namespace datadog {
 namespace tracing {
 namespace tags {
+namespace {
+
+bool starts_with(std::string_view subject, std::string_view prefix) {
+  if (prefix.size() > subject.size()) {
+    return false;
+  }
+
+  return std::mismatch(subject.begin(), subject.end(), prefix.begin()).second ==
+         prefix.end();
+}
+
+}  // namespace
 
 const std::string environment = "env";
 const std::string service_name = "service.name";
@@ -28,6 +42,10 @@ const std::string span_sampling_rule_rate = "_dd.span_sampling.rule_rate";
 const std::string span_sampling_limit = "_dd.span_sampling.max_per_second";
 
 }  // namespace internal
+
+bool is_internal(std::string_view tag_name) {
+  return starts_with(tag_name, "_dd.");
+}
 
 }  // namespace tags
 }  // namespace tracing

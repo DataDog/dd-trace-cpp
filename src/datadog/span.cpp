@@ -1,34 +1,18 @@
 #include "span.h"
 
-#include <algorithm>
 #include <cassert>
 #include <optional>
 #include <string>
 #include <string_view>
 
 #include "dict_writer.h"
+#include "span_config.h"
 #include "span_data.h"
 #include "tags.h"
 #include "trace_segment.h"
 
 namespace datadog {
 namespace tracing {
-namespace {
-
-bool starts_with(std::string_view subject, std::string_view prefix) {
-  if (prefix.size() > subject.size()) {
-    return false;
-  }
-
-  return std::mismatch(subject.begin(), subject.end(), prefix.begin()).second ==
-         prefix.end();
-}
-
-bool is_internal_tag(std::string_view tag_name) {
-  return starts_with(tag_name, "_dd.");
-}
-
-}  // namespace
 
 Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
            const std::function<std::uint64_t()>& generate_span_id,
@@ -71,6 +55,10 @@ Span Span::create_child(const SpanConfig& config) const {
   return Span(span_data_ptr, trace_segment_, generate_span_id_, clock_);
 }
 
+Span Span::create_child() const {
+  return create_child(SpanConfig{});
+}
+
 void Span::inject(DictWriter& writer) const {
   trace_segment_->inject(writer, *data_);
 }
@@ -80,7 +68,7 @@ std::uint64_t Span::id() const { return data_->span_id; }
 std::uint64_t Span::trace_id() const { return data_->trace_id; }
 
 std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
-  if (is_internal_tag(name)) {
+  if (tags::is_internal(name)) {
     return std::nullopt;
   }
 
@@ -92,13 +80,13 @@ std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
 }
 
 void Span::set_tag(std::string_view name, std::string_view value) {
-  if (!is_internal_tag(name)) {
+  if (!tags::is_internal(name)) {
     data_->tags.insert_or_assign(std::string(name), std::string(value));
   }
 }
 
 void Span::remove_tag(std::string_view name) {
-  if (!is_internal_tag(name)) {
+  if (!tags::is_internal(name)) {
     data_->tags.erase(std::string(name));
   }
 }

@@ -1,4 +1,5 @@
-#include "catch.hpp"
+#include "test.h"
+#include "loggers.h"
 
 #include <datadog/span.h>
 #include <datadog/span_config.h>
@@ -10,6 +11,7 @@ using namespace datadog::tracing;
 TEST_CASE("smoke") {
     TracerConfig config;
     config.defaults.service = "testsvc";
+    config.logger = std::make_shared<NullLogger>();
     
     auto maybe_config = finalize_config(config);
     REQUIRE(maybe_config);
