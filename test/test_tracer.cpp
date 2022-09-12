@@ -66,6 +66,7 @@ TEST_CASE("tracer span defaults") {
             auto root = tracer.create_span();
             (void)root;
         }
+        REQUIRE(logger->error_count() == 0);
         
         // Get the finished span from the collector and verify that its
         // properties have the configured default values.
@@ -89,6 +90,8 @@ TEST_CASE("tracer span defaults") {
             auto root = tracer.create_span(overrides);
             (void)root;
         }
+        REQUIRE(logger->error_count() == 0);
+
         // Get the finished span from the collector and verify that its
         // properties have the overridden values.
         REQUIRE(collector->chunks.size() == 1);
@@ -111,6 +114,8 @@ TEST_CASE("tracer span defaults") {
             auto span = tracer.extract_span(reader);
             REQUIRE(span);
         }
+        REQUIRE(logger->error_count() == 0);
+
         // Get the finished span from the collector and verify that its
         // properties have the configured default values.
         REQUIRE(collector->chunks.size() == 1);
@@ -133,6 +138,8 @@ TEST_CASE("tracer span defaults") {
             auto span = tracer.extract_span(reader, overrides);
             REQUIRE(span);
         }
+        REQUIRE(logger->error_count() == 0);
+
         // Get the finished span from the collector and verify that its
         // properties have the configured default values.
         REQUIRE(collector->chunks.size() == 1);
@@ -156,6 +163,8 @@ TEST_CASE("tracer span defaults") {
             auto child = parent.create_child();
             (void)child;
         }
+        REQUIRE(logger->error_count() == 0);
+
         // Get the finished span from the collector and verify that its
         // properties have the configured default values.
         REQUIRE(collector->chunks.size() == 1);
@@ -181,6 +190,8 @@ TEST_CASE("tracer span defaults") {
             auto child = parent.create_child(overrides);
             (void)child;
         }
+        REQUIRE(logger->error_count() == 0);
+
         // Get the finished span from the collector and verify that its
         // properties have the configured default values.
         REQUIRE(collector->chunks.size() == 1);
