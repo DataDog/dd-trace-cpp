@@ -4,7 +4,14 @@ set -e
 
 cd "$(dirname "$0")"/..
 
-# TODO: error if there are unstaged changes
+# See <https://unix.stackexchange.com/a/155077>
+if output=$(git status --porcelain) && [ -z "$output" ]; then
+  : # Working directory clean
+else 
+  >&2 echo 'Commit or stash changes to the working tree before running this script.'
+  >&2 echo 'See `git status` for more info.'
+  exit 1
+fi
 
 bin/test # also generates a coverage report
 git switch gh-pages
