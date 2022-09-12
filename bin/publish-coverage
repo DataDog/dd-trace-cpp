@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -e
+
+cd "$(dirname "$0")"/..
+
+# TODO: error if there are unstaged changes
+
+bin/test # also generates a coverage report
+git switch gh-pages
+cp -r .coverage/report/* .
+git add -A
+git commit -m 'update testing code coverage report'
+git push
+git switch -
