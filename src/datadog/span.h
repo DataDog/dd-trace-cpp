@@ -8,6 +8,7 @@
 
 #include "clock.h"
 #include "error.h"
+#include "id_generator.h"
 
 namespace datadog {
 namespace tracing {
@@ -20,14 +21,13 @@ class TraceSegment;
 class Span {
   std::shared_ptr<TraceSegment> trace_segment_;
   SpanData* data_;
-  std::function<std::uint64_t()> generate_span_id_;
+  IDGenerator generate_span_id_;
   Clock clock_;
   std::optional<std::chrono::steady_clock::time_point> end_time_;
 
  public:
   Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
-       const std::function<std::uint64_t()>& generate_span_id,
-       const Clock& clock);
+       const IDGenerator& generate_span_id, const Clock& clock);
   Span(const Span&) = delete;
   Span(Span&&) = default;
   Span& operator=(Span&&) = default;

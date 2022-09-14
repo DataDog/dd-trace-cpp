@@ -26,7 +26,8 @@ class DefaultIDGenerator {
   std::uniform_int_distribution<std::int64_t> distribution_;
 
  public:
-  DefaultIDGenerator() : generator_(std::random_device{}()) {
+  DefaultIDGenerator() {
+    seed_with_random();
 // If a process links to this library and then calls `fork`, the `generator_` in
 // the parent and child processes will produce the exact same sequence of
 // values, which is bad.
@@ -55,9 +56,9 @@ void on_fork() { thread_local_generator.seed_with_random(); }
 
 }  // namespace
 
-const IDGenerator default_id_generator = {
-    []() { return thread_local_generator(); },
-    []() { return thread_local_generator(); }};
+const IDGenerator default_id_generator = []() {
+  return thread_local_generator();
+};
 
 }  // namespace tracing
 }  // namespace datadog

@@ -6,10 +6,7 @@
 namespace datadog {
 namespace tracing {
 
-struct IDGenerator {
-  std::function<std::uint64_t()> generate_trace_id;
-  std::function<std::uint64_t()> generate_span_id;
-};
+using IDGenerator = std::function<std::uint64_t()>;
 
 extern const IDGenerator default_id_generator;
 

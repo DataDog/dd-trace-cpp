@@ -675,10 +675,8 @@ void play_with_default_http_client() {
 
 void play_with_id_generator() {
   for (int i = 0; i < 10; ++i) {
-    std::cout << "Here's a trace ID: "
-              << dd::default_id_generator.generate_trace_id() << '\n';
-    std::cout << "Here's a span ID: "
-              << dd::default_id_generator.generate_span_id() << '\n';
+    std::cout << "Here's a trace ID: " << dd::default_id_generator() << '\n';
+    std::cout << "Here's a span ID: " << dd::default_id_generator() << '\n';
   }
 }
 
@@ -709,8 +707,8 @@ void play_with_trace_sampling() {
   dd::TraceSampler sampler{*finalized, dd::default_clock};
 
   dd::SpanData span = dd::SpanData{};
-  span.trace_id = dd::default_id_generator.generate_trace_id();
-  span.span_id = dd::default_id_generator.generate_span_id();
+  span.trace_id = dd::default_id_generator();
+  span.span_id = dd::default_id_generator();
   span.service = "foosvc";
 
   dd::SamplingDecision decision = sampler.decide(span);
@@ -750,8 +748,8 @@ void play_with_span_sampling() {
   dd::SpanSampler span_sampler{*finalized, dd::default_clock};
 
   dd::SpanData span{};
-  span.trace_id = dd::default_id_generator.generate_trace_id();
-  span.span_id = dd::default_id_generator.generate_span_id();
+  span.trace_id = dd::default_id_generator();
+  span.span_id = dd::default_id_generator();
   span.service = "crud.app";
   span.name = "mysql.query";
 

@@ -15,8 +15,7 @@ namespace datadog {
 namespace tracing {
 
 Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
-           const std::function<std::uint64_t()>& generate_span_id,
-           const Clock& clock)
+           const IDGenerator& generate_span_id, const Clock& clock)
     : trace_segment_(trace_segment),
       data_(data),
       generate_span_id_(generate_span_id),

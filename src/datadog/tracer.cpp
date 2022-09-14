@@ -245,7 +245,7 @@ Span Tracer::create_span() { return create_span(SpanConfig{}); }
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
-  span_data->span_id = generator_.generate_span_id();
+  span_data->span_id = generator_();
   span_data->trace_id = span_data->span_id;
   span_data->parent_id = 0;
 
@@ -256,7 +256,7 @@ Span Tracer::create_span(const SpanConfig& config) {
       tags_header_max_size_,
       std::unordered_map<std::string, std::string>{} /* trace_tags */,
       std::nullopt /* sampling_decision */, std::move(span_data));
-  Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
+  Span span{span_data_ptr, segment, generator_, clock_};
   return span;
 }
 
@@ -350,7 +350,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
-  span_data->span_id = generator_.generate_span_id();
+  span_data->span_id = generator_();
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
 
@@ -382,7 +382,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
       std::move(decoded_trace_tags), std::move(sampling_decision),
       std::move(span_data));
-  Span span{span_data_ptr, segment, generator_.generate_span_id, clock_};
+  Span span{span_data_ptr, segment, generator_, clock_};
   return span;
 }
 
