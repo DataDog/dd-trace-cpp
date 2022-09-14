@@ -68,7 +68,7 @@ std::vector<std::string_view> parse_list(std::string_view input) {
 }
 
 Expected<PropagationStyles> parse_propagation_styles(std::string_view input) {
-  PropagationStyles styles{false, false, false};
+  PropagationStyles styles{false, false};
 
   // Style names are separated by spaces, or a comma, or some combination.
   for (const std::string_view &item : parse_list(input)) {
@@ -78,15 +78,13 @@ Expected<PropagationStyles> parse_propagation_styles(std::string_view input) {
       styles.datadog = true;
     } else if (token == "b3") {
       styles.b3 = true;
-    } else if (token == "w3c") {
-      styles.w3c = true;
     } else {
       std::string message;
       message += "Unsupported propagation style \"";
       message += token;
       message += "\" in list \"";
       message += input;
-      message += "\".  The following styles are supported: Datadog, B3, W3C.";
+      message += "\".  The following styles are supported: Datadog, B3.";
       return Error{Error::UNKNOWN_PROPAGATION_STYLE, std::move(message)};
     }
   }
@@ -225,24 +223,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     result.injection_styles = *styles;
   }
 
-  // TODO: implement the other styles
-  const auto not_implemented = [](std::string_view style,
-                                  std::string_view operation) {
-    std::string message;
-    message += "The ";
-    message += style;
-    message += ' ';
-    message += operation;
-    message += " style is not yet supported. Only datadog is supported.";
-    return Error{Error::NOT_IMPLEMENTED, std::move(message)};
-  };
-
-  if (result.extraction_styles.w3c) {
-    return not_implemented("w3c", "extraction");
-  } else if (result.injection_styles.w3c) {
-    return not_implemented("w3c", "injection");
-  } else if (!result.extraction_styles.datadog &&
-             !result.extraction_styles.b3) {
+  if (!result.extraction_styles.datadog && !result.extraction_styles.b3) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
                  "At least one extraction style must be specified."};
   } else if (!result.injection_styles.datadog && !result.injection_styles.b3) {

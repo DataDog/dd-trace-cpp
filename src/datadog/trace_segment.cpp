@@ -212,10 +212,6 @@ void TraceSegment::update_decision_maker_trace_tag() {
 }
 
 void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
-  // TODO: I can assume this because of the current trace config validator.
-  assert(!injection_styles_.w3c);
-  // end TODO
-
   int sampling_priority;
   std::string encoded_trace_tags;
   {

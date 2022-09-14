@@ -159,10 +159,6 @@ class B3ExtractionPolicy : public DatadogExtractionPolicy {
   }
 };
 
-class W3CExtractionPolicy : public DatadogExtractionPolicy {
-  // TODO
-};
-
 struct ExtractedData {
   std::optional<std::uint64_t> trace_id;
   std::optional<std::uint64_t> parent_id;
@@ -270,10 +266,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader) {
 
 Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
-  // TODO: I can assume this because of the current config validator.
-  assert((extraction_styles_.datadog || extraction_styles_.b3) &&
-         !extraction_styles_.w3c);
-  // end TODO
+  assert(extraction_styles_.datadog || extraction_styles_.b3);
 
   std::optional<ExtractedData> extracted_data;
   const char* extracted_by;
@@ -303,23 +296,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     }
     extracted_data = *data;
     extracted_by = "B3";
-  }
-
-  if (extraction_styles_.w3c) {
-    W3CExtractionPolicy extract;
-    auto data = extract_data(extract, reader);
-    if (auto* error = data.if_error()) {
-      return std::move(*error);
-    }
-    if (extracted_data && *data != *extracted_data) {
-      std::string message;
-      message += "W3C extracted different data than did ";
-      message += extracted_by;
-      // TODO: diagnose difference
-      return Error{Error::INCONSISTENT_EXTRACTION_STYLES, std::move(message)};
-    }
-    extracted_data = *data;
-    extracted_by = "W3C";
   }
 
   assert(extracted_data);
