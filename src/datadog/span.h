@@ -40,6 +40,8 @@ class Span {
   std::uint64_t id() const;
   std::uint64_t trace_id() const;
   std::optional<std::uint64_t> parent_id() const;
+  TimePoint start_time() const;
+  bool error() const;
 
   std::optional<std::string_view> lookup_tag(std::string_view name) const;
   void set_tag(std::string_view name, std::string_view value);
@@ -49,8 +51,9 @@ class Span {
   void set_service_type(std::string_view);
   void set_operation_name(std::string_view);
   void set_resource_name(std::string_view);
-  void set_error(std::string_view);
   void set_error(bool);
+  void set_error_message(std::string_view);
+  void set_error_type(std::string_view);
   void set_end_time(std::chrono::steady_clock::time_point);
 
   void inject(DictWriter& writer) const;

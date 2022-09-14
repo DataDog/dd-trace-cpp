@@ -71,6 +71,10 @@ std::optional<std::uint64_t> Span::parent_id() const {
   return data_->parent_id;
 }
 
+TimePoint Span::start_time() const { return data_->start; }
+
+bool Span::error() const { return data_->error; }
+
 std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
   if (tags::is_internal(name)) {
     return std::nullopt;
@@ -107,16 +111,22 @@ void Span::set_resource_name(std::string_view resource) {
   data_->resource = resource;
 }
 
-void Span::set_error(std::string_view message) {
-  data_->error = true;
-  data_->tags.insert_or_assign("error.msg", std::string(message));
-}
-
 void Span::set_error(bool is_error) {
   data_->error = is_error;
   if (!is_error) {
     data_->tags.erase("error.msg");
+    data_->tags.erase("error.type");
   }
+}
+
+void Span::set_error_message(std::string_view message) {
+  data_->error = true;
+  data_->tags.insert_or_assign("error.msg", std::string(message));
+}
+
+void Span::set_error_type(std::string_view type) {
+  data_->error = true;
+  data_->tags.insert_or_assign("error.type", std::string(type));
 }
 
 void Span::set_operation_name(std::string_view value) { data_->name = value; }

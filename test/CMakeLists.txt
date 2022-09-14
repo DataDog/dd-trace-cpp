@@ -12,11 +12,13 @@ add_executable(tests
     # mocks and utilities
     collectors.cpp
     dict_readers.cpp
+    dict_writers.cpp
     loggers.cpp
     matchers.cpp
     
     # test cases
     test_smoke.cpp
+    test_span.cpp
     test_tracer.cpp
 )
 

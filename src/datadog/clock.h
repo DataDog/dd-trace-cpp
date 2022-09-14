@@ -19,6 +19,10 @@ inline Duration operator-(const TimePoint& after, const TimePoint& before) {
   return after.tick - before.tick;
 }
 
+inline TimePoint operator-(const TimePoint& origin, Duration offset) {
+  return {origin.wall - offset, origin.tick - offset};
+}
+
 using Clock = std::function<TimePoint()>;
 
 extern const Clock default_clock;
