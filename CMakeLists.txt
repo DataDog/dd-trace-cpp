@@ -61,6 +61,8 @@ add_library(dd_trace_cpp-object OBJECT
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
     src/datadog/msgpack.cpp
+    src/datadog/net_util.cpp
+    src/datadog/null_collector.cpp
     src/datadog/parse_util.cpp
     src/datadog/propagation_styles.cpp
     src/datadog/rate.cpp

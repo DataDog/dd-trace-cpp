@@ -78,9 +78,7 @@ Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
                  "unable to initialize a curl handle for request sending"};
   }
 
-  // TODO: no
-  throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_VERBOSE, 1));
-  // end TODO
+  // throw_on_error(curl_easy_setopt(handle.get(), CURLOPT_VERBOSE, 1));
 
   throw_on_error(
       curl_easy_setopt(handle.get(), CURLOPT_PRIVATE, request.get()));

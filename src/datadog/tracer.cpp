@@ -1,8 +1,12 @@
 #include "tracer.h"
 
+#include <algorithm>
+#include <cassert>
+
 #include "datadog_agent.h"
 #include "dict_reader.h"
 #include "logger.h"
+#include "net_util.h"
 #include "parse_util.h"
 #include "span.h"
 #include "span_config.h"
@@ -13,27 +17,9 @@
 #include "trace_sampler.h"
 #include "trace_segment.h"
 
-// for `::gethostname`
-#ifdef _MSC_VER
-#include <winsock.h>
-#else
-#include <unistd.h>
-#endif
-
-#include <algorithm>
-#include <cassert>
-
 namespace datadog {
 namespace tracing {
 namespace {
-
-std::optional<std::string> get_hostname() {
-  char buffer[256];
-  if (::gethostname(buffer, sizeof buffer)) {
-    return std::nullopt;
-  }
-  return buffer;
-}
 
 class ExtractionPolicy {
  public:
@@ -357,7 +343,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   if (!trace_id && !parent_id) {
     return Error{Error::NO_SPAN_TO_EXTRACT,
-                 "There's trace ID or parent span ID to extract."};
+                 "There's neither a trace ID nor a parent span ID to extract."};
   }
   if (!trace_id) {
     std::string message;
@@ -431,16 +417,10 @@ Expected<Span> Tracer::extract_or_create_span(const DictReader& reader) {
 Expected<Span> Tracer::extract_or_create_span(const DictReader& reader,
                                               const SpanConfig& config) {
   auto maybe_span = extract_span(reader, config);
-  if (auto* error = maybe_span.if_error()) {
-    // If the error is `NO_SPAN_TO_EXTRACT`, then fine, we'll create a span
-    // instead.
-    // If, however, there was some other error, then return the error.
-    if (error->code != Error::NO_SPAN_TO_EXTRACT) {
-      return maybe_span;
-    }
+  if (!maybe_span && maybe_span.error().code == Error::NO_SPAN_TO_EXTRACT) {
+    return create_span(config);
   }
-
-  return create_span(config);
+  return maybe_span;
 }
 
 }  // namespace tracing
