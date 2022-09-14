@@ -52,7 +52,9 @@ std::string_view strip(std::string_view input) {
   const char* const begin =
       std::find_if(input.begin(), input.end(), not_whitespace);
   const char* const end =
-      std::find_if(input.rbegin(), std::make_reverse_iterator(begin), not_whitespace).base();
+      std::find_if(input.rbegin(), std::make_reverse_iterator(begin),
+                   not_whitespace)
+          .base();
 
   assert(begin <= end);
 
@@ -78,10 +80,12 @@ Expected<double> parse_double(std::string_view input) {
   std::stringstream stream;
   stream << strip(input);
   stream >> value;
-  
+
   if (!stream) {
     std::string message;
-    message += "Is not a valid number, or is out of the range of double precision floating point: \"";
+    message +=
+        "Is not a valid number, or is out of the range of double precision "
+        "floating point: \"";
     message += input;
     message += '\"';
     return Error{Error::INVALID_DOUBLE, std::move(message)};

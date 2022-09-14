@@ -24,12 +24,14 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-template <typename Integer> std::string hex(Integer value) {
+template <typename Integer>
+std::string hex(Integer value) {
   // 4 bits per hex digit char, and then +1 char for possible minus sign
   char buffer[std::numeric_limits<Integer>::digits / 4 + 1];
 
   const int base = 16;
-  auto result = std::to_chars(std::begin(buffer), std::end(buffer), value, base);
+  auto result =
+      std::to_chars(std::begin(buffer), std::end(buffer), value, base);
   assert(result.ec == std::errc());
 
   return std::string{std::begin(buffer), result.ptr};
@@ -198,7 +200,7 @@ void TraceSegment::make_sampling_decision_if_null() {
 
 void TraceSegment::update_decision_maker_trace_tag() {
   // Depending on the context, `mutex_` might need already to be locked.
-  
+
   assert(sampling_decision_);
 
   if (sampling_decision_->priority <= 0) {

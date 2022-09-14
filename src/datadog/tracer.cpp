@@ -195,7 +195,8 @@ Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
                                      const DictReader& reader) {
   ExtractedData extracted_data;
 
-  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] = extracted_data;
+  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] =
+      extracted_data;
 
   auto maybe_trace_id = extract.trace_id(reader);
   if (auto* error = maybe_trace_id.if_error()) {
@@ -257,9 +258,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 }
 
-Span Tracer::create_span() {
-  return create_span(SpanConfig{});
-}
+Span Tracer::create_span() { return create_span(SpanConfig{}); }
 
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
@@ -338,7 +337,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   assert(extracted_data);
-  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] = *extracted_data;
+  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] =
+      *extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:

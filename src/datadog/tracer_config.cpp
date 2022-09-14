@@ -241,7 +241,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     return not_implemented("w3c", "extraction");
   } else if (result.injection_styles.w3c) {
     return not_implemented("w3c", "injection");
-  } else if (!result.extraction_styles.datadog && !result.extraction_styles.b3) {
+  } else if (!result.extraction_styles.datadog &&
+             !result.extraction_styles.b3) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
                  "At least one extraction style must be specified."};
   } else if (!result.injection_styles.datadog && !result.injection_styles.b3) {

@@ -39,6 +39,7 @@ class Span {
 
   std::uint64_t id() const;
   std::uint64_t trace_id() const;
+  std::optional<std::uint64_t> parent_id() const;
 
   std::optional<std::string_view> lookup_tag(std::string_view name) const;
   void set_tag(std::string_view name, std::string_view value);

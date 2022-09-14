@@ -1,4 +1,5 @@
 #include "curl.h"
+
 #include "parse_util.h"
 
 namespace datadog {
@@ -139,8 +140,9 @@ Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
 
 void Curl::drain(std::chrono::steady_clock::time_point deadline) {
   std::unique_lock<std::mutex> lock(mutex_);
-  no_requests_.wait_until(lock, deadline,
-                          [this]() { return num_active_handles_ == 0 && new_handles_.empty(); });
+  no_requests_.wait_until(lock, deadline, [this]() {
+    return num_active_handles_ == 0 && new_handles_.empty();
+  });
 }
 
 std::size_t Curl::on_read_header(char *data, std::size_t, std::size_t length,
@@ -258,7 +260,7 @@ void Curl::run() {
   curl_global_cleanup();
 }
 
-void Curl::handle_message(const CURLMsg& message) {
+void Curl::handle_message(const CURLMsg &message) {
   if (message.msg != CURLMSG_DONE) {
     return;
   }
@@ -284,8 +286,8 @@ void Curl::handle_message(const CURLMsg& message) {
         Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
   } else {
     long status;
-    if (log_on_error(curl_easy_getinfo(
-            request_handle, CURLINFO_RESPONSE_CODE, &status)) != CURLE_OK) {
+    if (log_on_error(curl_easy_getinfo(request_handle, CURLINFO_RESPONSE_CODE,
+                                       &status)) != CURLE_OK) {
       status = -1;
     }
     HeaderReader reader(&request.response_headers_lower);

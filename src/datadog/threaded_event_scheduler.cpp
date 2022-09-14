@@ -16,7 +16,9 @@ bool ThreadedEventScheduler::GreaterThan::operator()(
 }
 
 ThreadedEventScheduler::ThreadedEventScheduler()
-    : running_current_(false), shutting_down_(false), dispatcher_([this]() { run(); }) {}
+    : running_current_(false),
+      shutting_down_(false),
+      dispatcher_([this]() { run(); }) {}
 
 ThreadedEventScheduler::~ThreadedEventScheduler() {
   {

@@ -55,9 +55,7 @@ Span Span::create_child(const SpanConfig& config) const {
   return Span(span_data_ptr, trace_segment_, generate_span_id_, clock_);
 }
 
-Span Span::create_child() const {
-  return create_child(SpanConfig{});
-}
+Span Span::create_child() const { return create_child(SpanConfig{}); }
 
 void Span::inject(DictWriter& writer) const {
   trace_segment_->inject(writer, *data_);
@@ -66,6 +64,13 @@ void Span::inject(DictWriter& writer) const {
 std::uint64_t Span::id() const { return data_->span_id; }
 
 std::uint64_t Span::trace_id() const { return data_->trace_id; }
+
+std::optional<std::uint64_t> Span::parent_id() const {
+  if (data_->parent_id == 0) {
+    return std::nullopt;
+  }
+  return data_->parent_id;
+}
 
 std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
   if (tags::is_internal(name)) {

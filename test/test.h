@@ -4,14 +4,15 @@
 #define CATCH_CONFIG_CPP17_OPTIONAL
 #define CATCH_CONFIG_CPP17_BYTE
 
-#include "catch.hpp"
-
 #include <iosfwd>
 #include <string>
 #include <utility>
 
+#include "catch.hpp"
+
 namespace std {
 
-std::ostream& operator<<(std::ostream& stream, const std::pair<const std::string, std::string>& item);
+std::ostream& operator<<(std::ostream& stream,
+                         const std::pair<const std::string, std::string>& item);
 
-}  // namspace std
+}  // namespace std
