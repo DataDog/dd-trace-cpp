@@ -5,6 +5,7 @@
 #include <datadog/clock.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
+#include <datadog/tag_propagation.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 
@@ -17,6 +18,7 @@
 #include <string>
 
 #include "collectors.h"
+#include "dict_readers.h"
 #include "dict_writers.h"
 #include "loggers.h"
 #include "test.h"
@@ -376,18 +378,64 @@ TEST_CASE("injection") {
   auto generator = []() { return 42; };
   Tracer tracer{*finalized_config, generator, default_clock};
 
-  auto span = tracer.create_span();
-  const int priority = 3;  // 😱
-  span.trace_segment().override_sampling_priority(priority);
-  MockDictWriter writer;
-  span.inject(writer);
+  SECTION("trace ID, parent ID ,and sampling priority") {
+    auto span = tracer.create_span();
+    const int priority = 3;  // 😱
+    span.trace_segment().override_sampling_priority(priority);
+    MockDictWriter writer;
+    span.inject(writer);
 
-  const auto& headers = writer.items;
-  REQUIRE(headers.at("x-datadog-trace-id") == std::to_string(span.trace_id()));
-  REQUIRE(headers.at("x-datadog-parent-id") == std::to_string(span.id()));
-  REQUIRE(headers.at("x-datadog-sampling-priority") ==
-          std::to_string(priority));
-  REQUIRE(headers.at("x-b3-traceid") == hex(span.trace_id()));
-  REQUIRE(headers.at("x-b3-spanid") == hex(span.id()));
-  REQUIRE(headers.at("x-b3-sampled") == std::to_string(int(priority > 0)));
+    const auto& headers = writer.items;
+    REQUIRE(headers.at("x-datadog-trace-id") ==
+            std::to_string(span.trace_id()));
+    REQUIRE(headers.at("x-datadog-parent-id") == std::to_string(span.id()));
+    REQUIRE(headers.at("x-datadog-sampling-priority") ==
+            std::to_string(priority));
+    REQUIRE(headers.at("x-b3-traceid") == hex(span.trace_id()));
+    REQUIRE(headers.at("x-b3-spanid") == hex(span.id()));
+    REQUIRE(headers.at("x-b3-sampled") == std::to_string(int(priority > 0)));
+  }
+
+  SECTION("origin and trace tags") {
+    SECTION("empty trace tags") {
+      const std::unordered_map<std::string, std::string> headers{
+          {"x-datadog-trace-id", "123"},
+          {"x-datadog-sampling-priority", "0"},
+          {"x-datadog-origin", "Egypt"},
+          {"x-datadog-tags", ""}};
+      MockDictReader reader{headers};
+      auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+      MockDictWriter writer;
+      span->inject(writer);
+
+      REQUIRE(writer.items.at("x-datadog-origin") == "Egypt");
+      // empty trace tags → x-datadog-tags is not set
+      REQUIRE(writer.items.count("x-datadog-tags") == 0);
+    }
+
+    SECTION("lots of trace tags") {
+      const std::string trace_tags = "foo=bar,34=43,54-46=my-number";
+      const std::unordered_map<std::string, std::string> headers{
+          {"x-datadog-trace-id", "123"},
+          {"x-datadog-sampling-priority", "0"},
+          {"x-datadog-origin", "Egypt"},
+          {"x-datadog-tags", trace_tags}};
+      MockDictReader reader{headers};
+      auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+      MockDictWriter writer;
+      span->inject(writer);
+
+      REQUIRE(writer.items.at("x-datadog-origin") == "Egypt");
+      // Trace tags could get reordered (because we parse them into a hash
+      // table). So, compare the parsed versions.
+      REQUIRE(writer.items.count("x-datadog-tags") == 1);
+      const auto output = decode_tags(writer.items.at("x-datadog-tags"));
+      const auto input = decode_tags(trace_tags);
+      REQUIRE(output);
+      REQUIRE(input);
+      REQUIRE(*input == *output);
+    }
+  }
 }

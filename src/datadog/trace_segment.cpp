@@ -239,7 +239,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
     logger_->log_error(message);
     SpanData& local_root = *spans_.front();
     local_root.tags[tags::internal::propagation_error] = "inject_max_size";
-  } else {
+  } else if (!encoded_trace_tags.empty()) {
     writer.set("x-datadog-tags", encoded_trace_tags);
   }
 

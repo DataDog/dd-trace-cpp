@@ -568,6 +568,13 @@ TEST_CASE("span extraction") {
       REQUIRE(tracer.extract_span(reader));
     }
 
+    SECTION("extraction succeeds when x-datadog-tags is empty") {
+      const std::string header_value = "";
+      REQUIRE(decode_tags(header_value));
+      headers["x-datadog-tags"] = header_value;
+      REQUIRE(tracer.extract_span(reader));
+    }
+
     SECTION("extraction succeeds when x-datadog-tags is invalid") {
       const std::string header_value = "this is missing an equal sign";
       REQUIRE(!decode_tags(header_value));
