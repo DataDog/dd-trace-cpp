@@ -129,6 +129,11 @@ void Span::set_error_type(std::string_view type) {
   data_->tags.insert_or_assign("error.type", std::string(type));
 }
 
+void Span::set_error_stack(std::string_view type) {
+  data_->error = true;
+  data_->tags.insert_or_assign("error.stack", std::string(type));
+}
+
 void Span::set_operation_name(std::string_view value) { data_->name = value; }
 
 void Span::set_end_time(std::chrono::steady_clock::time_point end_time) {

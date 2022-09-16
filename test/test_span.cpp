@@ -229,33 +229,38 @@ TEST_CASE(".error() and .set_error*()") {
     bool expected_error;
     std::optional<std::string_view> expected_error_message;
     std::optional<std::string_view> expected_error_type;
+    std::optional<std::string_view> expected_error_stack;
   };
 
   auto test_case = GENERATE(values<TestCase>(
-      {{"No error → no error.", [](Span&) {}, false, std::nullopt,
+      {{"No error → no error.", [](Span&) {}, false, std::nullopt, std::nullopt,
         std::nullopt},
        {"set_error(true) → error", [](Span& span) { span.set_error(true); },
-        true, std::nullopt, std::nullopt},
+        true, std::nullopt, std::nullopt, std::nullopt},
        {"set_error_message → error and error message",
         [](Span& span) { span.set_error_message("oops!"); }, true, "oops!",
-        std::nullopt},
+        std::nullopt, std::nullopt},
        {"set_error_type → error and error type",
         [](Span& span) { span.set_error_type("errno"); }, true, std::nullopt,
-        "errno"},
-       {"set_error_message and set_error_type → error, error message, and "
-        "error type",
+        "errno", std::nullopt},
+       {"set_error_stack → error and error stack",
+        [](Span& span) { span.set_error_stack("this is C++, fool"); }, true,
+        std::nullopt, std::nullopt, "this is C++, fool"},
+       {"set all of them → error, error message, error type, and error stack",
         [](Span& span) {
           span.set_error_message("oops!");
           span.set_error_type("errno");
+          span.set_error_stack("this is C++, fool");
         },
-        true, "oops!", "errno"},
-       {"set_error(false) → no error and no error tags",
+        true, "oops!", "errno", "this is C++, fool"},
+       {"set_error(false) → no error, no error tags, and no error stack",
         [](Span& span) {
           span.set_error_message("this will go away");
           span.set_error_type("as will this");
+          span.set_error_stack("this too");
           span.set_error(false);
         },
-        false, std::nullopt, std::nullopt}}));
+        false, std::nullopt, std::nullopt, std::nullopt}}));
 
   TracerConfig config;
   config.defaults.service = "testsvc";

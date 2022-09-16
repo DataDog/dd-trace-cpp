@@ -23,6 +23,12 @@ inline TimePoint operator-(const TimePoint& origin, Duration offset) {
   return {origin.wall - offset, origin.tick - offset};
 }
 
+inline TimePoint& operator+=(TimePoint& self, Duration offset) {
+  self.wall += offset;
+  self.tick += offset;
+  return self;
+}
+
 using Clock = std::function<TimePoint()>;
 
 extern const Clock default_clock;
