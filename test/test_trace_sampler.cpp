@@ -161,8 +161,22 @@ TEST_CASE("priority sampling") {
   // sample rates are sent back to it by the collector (Datadog Agent).
   const std::size_t num_iterations = 10'000;
 
+  struct TestCase {
+    std::string name;
+    std::string service_key;
+    double sample_rate;
+    double expected_rate;
+  };
+
+  auto test_case = GENERATE(values<TestCase>(
+      {{"default rate", CollectorResponse::key_of_default_rate, 0.5, 0.5},
+       {"testsvc on dev", "service:testsvc,env:dev", 0.5, 0.5},
+       {"no match uses default of 100%", "service:unrelated,env:foo", 0.25,
+        1.0}}));
+
   TracerConfig config;
   config.defaults.service = "testsvc";
+  config.defaults.environment = "dev";
   // plenty of head room
   config.trace_sampler.max_per_second = 2 * num_iterations;
   const auto collector =
@@ -174,11 +188,8 @@ TEST_CASE("priority sampling") {
   REQUIRE(finalized);
   Tracer tracer{*finalized};
 
-  // Have the collector tell the sampler to default to 50% keep.
-  const double sample_rate = 0.5;
-  collector->response
-      .sample_rate_by_key[CollectorResponse::key_of_default_rate] =
-      assert_rate(sample_rate);
+  collector->response.sample_rate_by_key[test_case.service_key] =
+      assert_rate(test_case.sample_rate);
 
   for (std::size_t i = 0; i < num_iterations; ++i) {
     auto span = tracer.create_span();
@@ -189,5 +200,5 @@ TEST_CASE("priority sampling") {
 
   // Priority sampling uses sampling priority 1 ("auto keep").
   REQUIRE(collector->ratio_of(SamplingPriority::AUTO_KEEP) ==
-          Approx(sample_rate).margin(0.05));
+          Approx(test_case.expected_rate).margin(0.05));
 }
