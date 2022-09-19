@@ -8,16 +8,18 @@ mkdir -p .build
 cd .build
 cmake .. -DBUILD_COVERAGE=1
 find . -type f -name '*.gcda' -print0 | xargs -0 rm -f
-make -j $(nproc) VERBOSE=1
+make -j $(nproc) # VERBOSE=1
+
+echo 'Running tests...'
 ./test/tests "$@"
 
 printf 'Generating Code Coverage Report ... '
 cd ../
 mkdir -p .coverage
 # Compile the .gcdo files into an intermediate format.
-lcov --quiet --capture --directory .build --output-file .coverage/raw.info
+lcov --quiet --capture --directory .build --output-file .coverage/raw.info # -rc geninfo_json_module=JSON::XS
 # Filter out system headers and test drivers.
-lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*"
+lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
 # Generate an HTML coverage report at ".coverage/report/index.html".
 genhtml --quiet .coverage/filtered.info --output-directory .coverage/report
 

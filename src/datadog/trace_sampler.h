@@ -43,7 +43,7 @@
 // traces that originate with this tracer will be sent to Datadog.  The
 // remaining 90% will be sent to the Datadog Agent, but will not be sent to
 // Datadog's backend and will not be visible in the Datadog UI.
-// 
+//
 // The volume of traces kept on account of the global sample rate is limited by
 // the same setting as for trace sampling rules.  See the description of
 // `TraceSamplerConfig::max_per_second` and `DD_TRACE_RATE_LIMIT` at the end of
@@ -78,10 +78,10 @@
 // matches any span and is appended to any configured sampling rules.  This,
 // sampling rules override the global sample rate for matching root spans.
 //
-// The volume of traces kept by sampling rules (including the global sample rate) is limited
-// by a configurable number of traces-per-second.  The limit is configured via
-// `TraceSamplerConfig::max_per_second` or the `DD_TRACE_RATE_LIMIT` environment
-// variable.
+// The volume of traces kept by sampling rules (including the global sample
+// rate) is limited by a configurable number of traces-per-second.  The limit is
+// configured via `TraceSamplerConfig::max_per_second` or the
+// `DD_TRACE_RATE_LIMIT` environment variable.
 
 #include <mutex>
 #include <optional>

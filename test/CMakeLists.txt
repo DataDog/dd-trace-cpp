@@ -20,6 +20,7 @@ add_executable(tests
     test_smoke.cpp
     test_span.cpp
     test_tracer.cpp
+    test_trace_sampler.cpp
 )
 
 add_dependencies(tests dd_trace_cpp-object)
