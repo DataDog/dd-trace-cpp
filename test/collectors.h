@@ -19,9 +19,9 @@ struct MockCollector : public Collector {
   }
 
   SpanData& first_span() const {
-    REQUIRE(chunks.size() == 1);
+    REQUIRE(chunks.size() >= 1);
     const auto& chunk = chunks.front();
-    REQUIRE(chunk.size() == 1);
+    REQUIRE(chunk.size() >= 1);
     const auto& span_ptr = chunk.front();
     REQUIRE(span_ptr);
     return *span_ptr;
