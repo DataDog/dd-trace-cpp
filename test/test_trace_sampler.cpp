@@ -202,3 +202,5 @@ TEST_CASE("priority sampling") {
   REQUIRE(collector->ratio_of(SamplingPriority::AUTO_KEEP) ==
           Approx(test_case.expected_rate).margin(0.05));
 }
+
+// TODO: test sampling rules
