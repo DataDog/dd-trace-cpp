@@ -2,6 +2,13 @@
 
 set -e
 
+if [ "$1" = '--coverage' ]; then
+    coverage=1
+    shift
+else
+    coverage=0
+fi
+
 cd "$(dirname "$0")"/..
 
 mkdir -p .build
@@ -13,14 +20,16 @@ make -j $(nproc) # VERBOSE=1
 echo 'Running tests...'
 ./test/tests "$@"
 
-printf 'Generating Code Coverage Report ... '
-cd ../
-mkdir -p .coverage
-# Compile the .gcdo files into an intermediate format.
-lcov --quiet --capture --directory .build --output-file .coverage/raw.info # -rc geninfo_json_module=JSON::XS
-# Filter out system headers and test drivers.
-lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
-# Generate an HTML coverage report at ".coverage/report/index.html".
-genhtml --quiet .coverage/filtered.info --output-directory .coverage/report
+if [ "$coverage" -eq 1 ]; then
+    printf 'Generating Code Coverage Report ... '
+    cd ../
+    mkdir -p .coverage
+    # Compile the .gcdo files into an intermediate format.
+    lcov --quiet --capture --directory .build --output-file .coverage/raw.info # -rc geninfo_json_module=JSON::XS
+    # Filter out system headers and test drivers.
+    lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
+    # Generate an HTML coverage report at ".coverage/report/index.html".
+    genhtml --quiet .coverage/filtered.info --output-directory .coverage/report
 
-echo 'Done.'
+    echo 'Done.'
+fi
