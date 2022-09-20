@@ -12,10 +12,13 @@ add_executable(tests
     collectors.cpp
     dict_readers.cpp
     dict_writers.cpp
+    event_schedulers.cpp
+    http_clients.cpp
     loggers.cpp
     matchers.cpp
     
     # test cases
+    test_datadog_agent.cpp
     test_glob.cpp
     test_limiter.cpp
     test_smoke.cpp

@@ -1,5 +1,7 @@
 #pragma once
 
+// TODO: document
+
 #include <memory>
 #include <mutex>
 #include <vector>

@@ -249,9 +249,8 @@ void DatadogAgent::flush() {
   // request or retrieving the response.  It's invoked
   // asynchronously.
   auto on_error = [logger = logger_](Error error) {
-    logger->log_error([&](auto& stream) {
-      stream << "Error occurred during HTTP request: " << error;
-    });
+    logger->log_error(
+        error.with_prefix("Error occurred during HTTP request: "));
   };
 
   auto post_result = http_client_->post(
