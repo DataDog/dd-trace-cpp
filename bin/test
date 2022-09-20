@@ -29,6 +29,7 @@ echo 'Running tests...'
 if [ "$coverage_flags" != '' ]; then
     printf 'Generating Code Coverage Report ... '
     cd ../
+    rm -rf .coverage
     mkdir -p .coverage
     # Compile the .gcdo files into an intermediate format.
     lcov --quiet --capture --directory .build --output-file .coverage/raw.info # -rc geninfo_json_module=JSON::XS
