@@ -13,7 +13,7 @@ else
   exit 1
 fi
 
-bin/test # also generates a coverage report
+bin/test --coverage
 git switch gh-pages
 cp -r .coverage/report/* .
 git add -A
