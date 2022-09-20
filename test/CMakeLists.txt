@@ -17,6 +17,7 @@ add_executable(tests
     matchers.cpp
     
     # test cases
+    test_glob.cpp
     test_limiter.cpp
     test_smoke.cpp
     test_span.cpp
