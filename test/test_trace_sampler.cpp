@@ -203,4 +203,69 @@ TEST_CASE("priority sampling") {
           Approx(test_case.expected_rate).margin(0.05));
 }
 
-// TODO: test sampling rules
+TEST_CASE("sampling rules") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  const auto collector = std::make_shared<PriorityCountingCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  SECTION("no rule matches → priority sampling") {
+    TraceSamplerConfig::Rule rule;
+    rule.service = "foosvc";
+    config.trace_sampler.rules.push_back(rule);
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized};
+    {
+      auto span = tracer.create_span();
+      (void)span;
+    }
+
+    REQUIRE(collector->total_count() == 1);
+    REQUIRE(collector->count_of(SamplingPriority::AUTO_KEEP) +
+                collector->count_of(SamplingPriority::AUTO_DROP) ==
+            1);
+  }
+
+  SECTION("matches first rule") {
+    TraceSamplerConfig::Rule rule;
+    rule.service = "testsvc";
+    rule.sample_rate = 1.0;  // this is also the default
+    config.trace_sampler.rules.push_back(rule);
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized};
+    {
+      auto span = tracer.create_span();
+      (void)span;
+    }
+
+    REQUIRE(collector->total_count() == 1);
+    REQUIRE(collector->count_of(SamplingPriority::USER_KEEP) == 1);
+  }
+
+  SECTION("matches second rule") {
+    TraceSamplerConfig::Rule rule;
+    rule.service = "foosvc";
+    rule.sample_rate = 1.0;  // this is also the default
+    config.trace_sampler.rules.push_back(rule);
+
+    rule.service = "testsvc";
+    rule.sample_rate = 0.0;
+    config.trace_sampler.rules.push_back(rule);
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized};
+    {
+      auto span = tracer.create_span();
+      (void)span;
+    }
+
+    REQUIRE(collector->total_count() == 1);
+    REQUIRE(collector->count_of(SamplingPriority::USER_DROP) == 1);
+  }
+}
