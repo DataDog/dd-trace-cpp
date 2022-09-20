@@ -332,10 +332,10 @@ TEST_CASE("property setters") {
     REQUIRE(span.service_type == "wobble");
   }
 
-  SECTION("set_operation_name") {
+  SECTION("set_name") {
     {
       auto span = tracer.create_span();
-      span.set_operation_name("wobble");
+      span.set_name("wobble");
     }
     auto& span = collector->first_span();
     REQUIRE(span.name == "wobble");

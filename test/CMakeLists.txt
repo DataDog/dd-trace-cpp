@@ -1,4 +1,3 @@
-
 add_executable(tests
     # test driver
     main.cpp
@@ -21,6 +20,7 @@ add_executable(tests
     test_limiter.cpp
     test_smoke.cpp
     test_span.cpp
+    test_span_sampler.cpp
     test_tracer.cpp
     test_trace_sampler.cpp
 )

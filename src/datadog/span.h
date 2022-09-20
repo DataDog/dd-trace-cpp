@@ -121,7 +121,7 @@ class Span {
   void set_service_type(std::string_view);
   // Set the name of the operation that this span represents, e.g.
   // "handle.request", "execute.query", or "healthcheck".
-  void set_operation_name(std::string_view);
+  void set_name(std::string_view);
   // Set the name of the resource associated with the operation that this span
   // represents, e.g. "/api/v1/info" or "select count(*) from users".
   void set_resource_name(std::string_view);

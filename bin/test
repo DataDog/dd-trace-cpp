@@ -3,24 +3,30 @@
 set -e
 
 if [ "$1" = '--coverage' ]; then
-    coverage=1
+    coverage_flags=-DBUILD_COVERAGE=1
     shift
 else
-    coverage=0
+    coverage_flags=''
+fi
+
+if [ "$1" = '--verbose' ]; then
+    verbosity_flags='VERBOSE=1'
+else
+    verbosity_flags=''
 fi
 
 cd "$(dirname "$0")"/..
 
 mkdir -p .build
 cd .build
-cmake .. -DBUILD_COVERAGE=1
+cmake .. $coverage_flags
 find . -type f -name '*.gcda' -print0 | xargs -0 rm -f
-make -j $(nproc) # VERBOSE=1
+make -j $(nproc) $verbosity_flags
 
 echo 'Running tests...'
 ./test/tests "$@"
 
-if [ "$coverage" -eq 1 ]; then
+if [ "$coverage_flags" != '' ]; then
     printf 'Generating Code Coverage Report ... '
     cd ../
     mkdir -p .coverage
