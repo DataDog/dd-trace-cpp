@@ -49,4 +49,4 @@ Different instances of `Tracer` are independent of each other.  If an
 application wishes to reconfigure tracing at runtime, it can create another
 `Tracer` using the new configuration.
 
-[1]: https://datadog.github.io/dd-trace-cpp
+[1]: https://datadog.github.io/dd-trace-cpp/datadog
