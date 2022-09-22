@@ -24,6 +24,7 @@ add_executable(tests
     test_smoke.cpp
     test_span.cpp
     test_span_sampler.cpp
+    test_tracer_config.cpp
     test_tracer.cpp
     test_trace_sampler.cpp
 )

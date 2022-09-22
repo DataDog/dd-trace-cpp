@@ -23,7 +23,7 @@ struct NullLogger : public Logger {
 
 struct MockLogger : public Logger {
   struct Entry {
-    enum { ERROR, STARTUP } kind;
+    enum Kind { ERROR, STARTUP } kind;
     std::variant<std::string, Error> payload;
   };
 
@@ -71,10 +71,14 @@ struct MockLogger : public Logger {
     entries.push_back(Entry{Entry::ERROR, std::string(message)});
   }
 
-  int error_count() const {
+  int error_count() const { return count(Entry::ERROR); }
+
+  int startup_count() const { return count(Entry::STARTUP); }
+
+  int count(Entry::Kind kind) const {
     return std::count_if(
         entries.begin(), entries.end(),
-        [](const Entry& entry) { return entry.kind == Entry::ERROR; });
+        [kind](const Entry& entry) { return entry.kind == kind; });
   }
 
   const Error& first_error() const {
@@ -83,5 +87,13 @@ struct MockLogger : public Logger {
         entries.begin(), entries.end(),
         [](const Entry& entry) { return entry.kind == Entry::ERROR; });
     return std::get<Error>(found->payload);
+  }
+
+  const std::string& first_startup() const {
+    REQUIRE(startup_count() > 0);
+    auto found = std::find_if(
+        entries.begin(), entries.end(),
+        [](const Entry& entry) { return entry.kind == Entry::STARTUP; });
+    return std::get<std::string>(found->payload);
   }
 };

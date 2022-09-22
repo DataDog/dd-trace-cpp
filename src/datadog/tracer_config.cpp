@@ -160,16 +160,12 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
 
   result.log_on_startup = config.log_on_startup;
   if (auto startup_env = lookup(environment::DD_TRACE_STARTUP_LOGS)) {
-    if (falsy(*startup_env)) {
-      result.log_on_startup = false;
-    }
+    result.log_on_startup = !falsy(*startup_env);
   }
 
   bool report_traces = config.report_traces;
   if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
-    if (falsy(*enabled_env)) {
-      report_traces = false;
-    }
+    report_traces = !falsy(*enabled_env);
   }
 
   if (!report_traces) {
