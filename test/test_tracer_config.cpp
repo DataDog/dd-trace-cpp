@@ -1,4 +1,5 @@
 #include <datadog/id_generator.h>
+#include <datadog/propagation_styles.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
@@ -10,6 +11,7 @@
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -23,6 +25,27 @@
 #else
 #include <stdlib.h>  // setenv, unsetenv
 #endif
+
+namespace datadog {
+namespace tracing {
+
+std::ostream& operator<<(std::ostream& stream,
+                         const PropagationStyles& styles) {
+  stream << '{';
+  const char* separator = "";
+  if (styles.datadog) {
+    stream << "Datadog";
+    separator = ", ";
+  }
+  if (styles.b3) {
+    stream << separator << "B3";
+    separator = ", ";
+  }
+  return stream << '}';
+}
+
+}  // namespace tracing
+}  // namespace datadog
 
 using namespace datadog::tracing;
 
@@ -980,8 +1003,117 @@ TEST_CASE("TracerConfig::span_sampler") {
   }
 }
 
-/*
 TEST_CASE("TracerConfig propagation styles") {
-  // TODO
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+
+  SECTION("injection_styles") {
+    SECTION("defaults to just Datadog") {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->injection_styles.datadog);
+      REQUIRE(!finalized->injection_styles.b3);
+    }
+
+    SECTION("need at least one") {
+      config.injection_styles.datadog = false;
+      config.injection_styles.b3 = false;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == Error::MISSING_SPAN_INJECTION_STYLE);
+    }
+
+    SECTION("DD_PROPAGATION_STYLE_INJECT") {
+      SECTION("overrides injection_styles") {
+        const EnvGuard guard{"DD_PROPAGATION_STYLE_INJECT", "B3"};
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        REQUIRE(!finalized->injection_styles.datadog);
+        REQUIRE(finalized->injection_styles.b3);
+      }
+
+      SECTION("parsing") {
+        struct TestCase {
+          int line;
+          std::string env_value;
+          std::optional<Error::Code> expected_error;
+          PropagationStyles expected_styles = PropagationStyles{};
+        };
+
+        // clang-format off
+        auto test_case = GENERATE(values<TestCase>({
+          {__LINE__, "Datadog", x, {true, false}},
+          {__LINE__, "DaTaDoG", x, {true, false}},
+          {__LINE__, "B3", x, {false, true}},
+          {__LINE__, "b3", x, {false, true}},
+          {__LINE__, "Datadog B3", x, {true, true}},
+          {__LINE__, "B3 Datadog", x, {true, true}},
+          {__LINE__, "b3 datadog", x, {true, true}},
+          {__LINE__, "b3, datadog", x, {true, true}},
+          {__LINE__, "b3,datadog", x, {true, true}},
+          {__LINE__, "b3,             datadog", x, {true, true}},
+          {__LINE__, "b3,,datadog", Error::UNKNOWN_PROPAGATION_STYLE},
+          {__LINE__, "b3,datadog,w3c", Error::UNKNOWN_PROPAGATION_STYLE},
+          {__LINE__, "b3,datadog,datadog", x, {true, true}},
+          {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ", x, {false, true}},
+        }));
+        // clang-format on
+
+        CAPTURE(test_case.line);
+        CAPTURE(test_case.env_value);
+
+        const EnvGuard guard{"DD_PROPAGATION_STYLE_INJECT",
+                             test_case.env_value};
+        auto finalized = finalize_config(config);
+        if (test_case.expected_error) {
+          REQUIRE(!finalized);
+          REQUIRE(finalized.error().code == *test_case.expected_error);
+        } else {
+          REQUIRE(finalized);
+          REQUIRE(finalized->injection_styles.datadog ==
+                  test_case.expected_styles.datadog);
+          REQUIRE(finalized->injection_styles.b3 ==
+                  test_case.expected_styles.b3);
+        }
+      }
+    }
+  }
+
+  // This section is very much like "injection_styles", above.
+  SECTION("extraction_styles") {
+    SECTION("defaults to just Datadog") {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->extraction_styles.datadog);
+      REQUIRE(!finalized->extraction_styles.b3);
+    }
+
+    SECTION("need at least one") {
+      config.extraction_styles.datadog = false;
+      config.extraction_styles.b3 = false;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == Error::MISSING_SPAN_EXTRACTION_STYLE);
+    }
+
+    SECTION("DD_PROPAGATION_STYLE_EXTRACT") {
+      SECTION("overrides extraction_styles") {
+        const EnvGuard guard{"DD_PROPAGATION_STYLE_EXTRACT", "B3"};
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        REQUIRE(!finalized->extraction_styles.datadog);
+        REQUIRE(finalized->extraction_styles.b3);
+      }
+
+      // It's the same as for injection styles, so let's omit most of the
+      // section.  Keep only an example where parsing fails, so we cover the
+      // error handling code in `TracerConfig`.
+      SECTION("parsing failure") {
+        const EnvGuard guard{"DD_PROPAGATION_STYLE_EXTRACT", "b3,,datadog"};
+        auto finalized = finalize_config(config);
+        REQUIRE(!finalized);
+        REQUIRE(finalized.error().code == Error::UNKNOWN_PROPAGATION_STYLE);
+      }
+    }
+  }
 }
-*/
