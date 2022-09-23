@@ -78,7 +78,7 @@ Expected<double> parse_double(std::string_view input) {
   // I choose `std::istream`.
   double value;
   std::stringstream stream;
-  stream << strip(input);
+  stream << input;
   stream >> value;
 
   if (!stream) {

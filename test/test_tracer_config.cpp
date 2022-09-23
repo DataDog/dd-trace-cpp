@@ -2,7 +2,10 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <cmath>
 #include <cstdlib>
+#include <datadog/json.hpp>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -432,11 +435,222 @@ TEST_CASE("TracerConfig::agent") {
   }
 }
 
-/*
 TEST_CASE("TracerConfig::trace_sampler") {
-  // TODO
+  // TODO:
+  // ✅ default is no rules
+  //  ✅  one rule
+  //   ✅  sample_rate defaults to 1.0
+  //   ✅  sample_rate must be in range
+  // ✅   two rules
+  // ✅    global sample rate creates a catch-all rule
+  // ✅   DD_TRACE_SAMPLE_RATE overrides sample_rate
+  //   ✅   and can fail to parse or be out of range
+  // ✅    max_per_second must be > 0
+  // ✅    DD_TRACE_RATE_LIMIT overrides max_per_second
+  //    ✅    and can fail to parse or be out of range
+  // - DD_TRACE_SAMPLING_RULES overrides rules
+  //   - and can fail to parse in a bunch of ways
+
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+
+  SECTION("default is no rules") {
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_sampler.rules.size() == 0);
+  }
+
+  SECTION("one sampling rule") {
+    auto& rules = config.trace_sampler.rules;
+    rules.resize(rules.size() + 1);
+    TraceSamplerConfig::Rule& rule = rules.back();
+
+    SECTION("yields one sampling rule") {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->trace_sampler.rules.size() == 1);
+      // and the default sample_rate is 100%
+      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 1.0);
+    }
+
+    SECTION("has to have a valid sample_rate") {
+      auto rate = GENERATE(std::nan(""), -0.5, 1.3,
+                           std::numeric_limits<double>::infinity(),
+                           -std::numeric_limits<double>::infinity(), 42);
+      rule.sample_rate = rate;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == Error::RATE_OUT_OF_RANGE);
+    }
+  }
+
+  SECTION("two sampling rules") {
+    auto& rules = config.trace_sampler.rules;
+    rules.resize(rules.size() + 2);
+    rules[0].sample_rate = 0.5;
+    rules[1].sample_rate = 0.6;
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_sampler.rules.size() == 2);
+    REQUIRE(finalized->trace_sampler.rules[0].sample_rate == 0.5);
+    REQUIRE(finalized->trace_sampler.rules[1].sample_rate == 0.6);
+  }
+
+  SECTION("global sample_rate creates a catch-all rule") {
+    config.trace_sampler.sample_rate = 0.25;
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_sampler.rules.size() == 1);
+    const auto& rule = finalized->trace_sampler.rules.front();
+    REQUIRE(rule.sample_rate == 0.25);
+    REQUIRE(rule.service == "*");
+    REQUIRE(rule.name == "*");
+    REQUIRE(rule.resource == "*");
+    REQUIRE(rule.tags.empty());
+  }
+
+  SECTION("DD_TRACE_SAMPLE_RATE") {
+    SECTION("sets the global sample_rate") {
+      const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", "0.5"};
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->trace_sampler.rules.size() == 1);
+      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 0.5);
+    }
+
+    SECTION("overrides TraceSamplerConfig::sample_rate") {
+      config.trace_sampler.sample_rate = 0.25;
+      const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", "0.5"};
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->trace_sampler.rules.size() == 1);
+      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 0.5);
+    }
+
+    SECTION("has to have a valid value") {
+      struct TestCase {
+        std::string name;
+        std::string env_value;
+        Error::Code expected_error;
+      };
+
+      auto test_case = GENERATE(values<TestCase>({
+          {"empty", "", Error::INVALID_DOUBLE},
+          {"nonsense", "nonsense", Error::INVALID_DOUBLE},
+          {"trailing space", "0.23   ", Error::INVALID_DOUBLE},
+          {"out of range of double", "123e9999999999", Error::INVALID_DOUBLE},
+          {"NaN", "NaN", Error::INVALID_DOUBLE},
+          {"nan", "nan", Error::INVALID_DOUBLE},
+          {"inf", "inf", Error::INVALID_DOUBLE},
+          {"Inf", "Inf", Error::INVALID_DOUBLE},
+          {"below range", "-0.1", Error::RATE_OUT_OF_RANGE},
+          {"above range", "1.1", Error::RATE_OUT_OF_RANGE},
+      }));
+
+      CAPTURE(test_case.name);
+
+      const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", test_case.env_value};
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == test_case.expected_error);
+    }
+  }
+
+  SECTION("max_per_second") {
+    SECTION("defaults to 200") {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->trace_sampler.max_per_second == 200);
+    }
+
+    SECTION("must be >0 and a finite number") {
+      auto limit = GENERATE(0.0, -1.0, std::nan(""),
+                            std::numeric_limits<double>::infinity(),
+                            -std::numeric_limits<double>::infinity());
+
+      CAPTURE(limit);
+      CAPTURE(std::fpclassify(limit));
+
+      config.trace_sampler.max_per_second = limit;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == Error::MAX_PER_SECOND_OUT_OF_RANGE);
+    }
+  }
+
+  SECTION("DD_TRACE_RATE_LIMIT") {
+    SECTION("overrides SpanSamplerConfig::max_per_second") {
+      const EnvGuard guard{"DD_TRACE_RATE_LIMIT", "120"};
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->trace_sampler.max_per_second == 120);
+    }
+
+    SECTION("has to have a valid value") {
+      struct TestCase {
+        std::string name;
+        std::string env_value;
+        Error::Code expected_error;
+      };
+
+      auto test_case = GENERATE(values<TestCase>({
+          {"empty", "", Error::INVALID_DOUBLE},
+          {"nonsense", "nonsense", Error::INVALID_DOUBLE},
+          {"trailing space", "23   ", Error::INVALID_DOUBLE},
+          {"out of range of double", "123e9999999999", Error::INVALID_DOUBLE},
+          {"NaN", "NaN", Error::INVALID_DOUBLE},
+          {"nan", "nan", Error::INVALID_DOUBLE},
+          {"inf", "inf", Error::INVALID_DOUBLE},
+          {"Inf", "Inf", Error::INVALID_DOUBLE},
+          {"below range", "-0.1", Error::MAX_PER_SECOND_OUT_OF_RANGE},
+          {"zero (also below range)", "0", Error::MAX_PER_SECOND_OUT_OF_RANGE},
+      }));
+
+      CAPTURE(test_case.name);
+
+      const EnvGuard guard{"DD_TRACE_RATE_LIMIT", test_case.env_value};
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == test_case.expected_error);
+    }
+  }
+
+  SECTION("DD_TRACE_SAMPLING_RULES") {
+    const auto array = [](const auto&... args) {
+      return nlohmann::json::array({std::forward(args)...});
+    };
+    const auto object = [](const auto&... args) {
+      return nlohmann::json::object({std::forward(args)...});
+    };
+
+    SECTION("sets sampling rules") {
+      nlohmann::json rules_json = array(
+          object({"service", "poohbear"}, {"name", "get.honey"},
+                 {"sample_rate", 0}),
+          object({"tags", object({"error", "*"})}, {"max_per_second", 1000}));
+
+      const EnvGuard guard{"DD_TRACE_SAMPLING_RULES", rules_json.dump()};
+      auto finalized = finalize_config(config);
+      CAPTURE(finalized.error());
+      REQUIRE(finalized);
+
+      const auto& rules = finalized->trace_sampler.rules;
+      CAPTURE(rules_json);
+      CAPTURE(rules);
+      REQUIRE(rules.size() == 3);  // TODO
+      // TODO
+    }
+  }
 }
 
+/*
+Error::TRACE_SAMPLING_RULES_INVALID_JSON
+Error::TRACE_SAMPLING_RULES_WRONG_TYPE
+Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE
+Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY
+*/
+
+/*
 TEST_CASE("TracerConfig::span_sampler") {
   // TODO
 }

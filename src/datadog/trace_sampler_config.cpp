@@ -1,5 +1,6 @@
 #include "trace_sampler_config.h"
 
+#include <cmath>
 #include <unordered_set>
 
 #include "environment.h"
@@ -166,7 +167,10 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     max_per_second = *maybe_max_per_second;
   }
 
-  if (!(max_per_second > 0)) {
+  const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
+  if (!(max_per_second > 0) ||
+      std::find(std::begin(allowed_types), std::end(allowed_types),
+                std::fpclassify(max_per_second)) == std::end(allowed_types)) {
     std::string message;
     message +=
         "Trace sampling max_per_second must be greater than zero, but the "
@@ -174,7 +178,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     message += std::to_string(config.max_per_second);
     return Error{Error::MAX_PER_SECOND_OUT_OF_RANGE, std::move(message)};
   }
-  result.max_per_second = config.max_per_second;
+  result.max_per_second = max_per_second;
 
   return result;
 }
