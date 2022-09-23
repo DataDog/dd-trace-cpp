@@ -1,5 +1,6 @@
 #include "span_sampler_config.h"
 
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
@@ -46,7 +47,7 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(
   }
 
   const std::unordered_set<std::string_view> allowed_properties{
-      "service", "name", "resource", "tags", "sample_rate"};
+      "service", "name", "resource", "tags", "sample_rate", "max_per_second"};
 
   for (const auto &json_rule : json_rules) {
     auto matcher = SpanMatcher::from_json(json_rule);
@@ -217,7 +218,12 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
       return error->with_prefix(prefix);
     }
 
-    if (rule.max_per_second && !(*rule.max_per_second > 0)) {
+    const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
+    if (rule.max_per_second &&
+        (!(*rule.max_per_second > 0) ||
+         std::find(std::begin(allowed_types), std::end(allowed_types),
+                   std::fpclassify(*rule.max_per_second)) ==
+             std::end(allowed_types))) {
       std::string message;
       message += "Span sampling rule with pattern ";
       message += rule.to_json();

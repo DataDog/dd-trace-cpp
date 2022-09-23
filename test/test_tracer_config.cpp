@@ -1,12 +1,18 @@
+#include <datadog/id_generator.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <system_error>
 
 #include "collectors.h"
 #include "event_schedulers.h"
@@ -22,6 +28,8 @@ using namespace datadog::tracing;
 
 namespace {
 
+// For the lifetime of this object, set a specified environment variable.
+// Restore any previous value (or unset the value if it was unset) afterward.
 class EnvGuard {
   std::string name_;
   std::optional<std::string> former_value_;
@@ -64,6 +72,55 @@ class EnvGuard {
 // For brevity when we're tabulating a lot of test cases with parse
 // `std::optional<...>` data members.
 const auto x = std::nullopt;
+
+// Here's an attempt at a portable secure temporary file.
+// There's no standard solution, and it's generally hard on Windows.
+class SomewhatSecureTemporaryFile : public std::fstream {
+  std::filesystem::path path_;
+
+ public:
+  SomewhatSecureTemporaryFile() try {
+    namespace fs = std::filesystem;
+
+    // The goal is to create a file whose name is like
+    // "/tmp/342394898324/239489029034", where the directory under /tmp has
+    // permissions such that only the current user can read/write/cd it.
+    const auto tmp = fs::temp_directory_path();
+    const int max_attempts = 5;
+    for (int i = 0; i < max_attempts; ++i) {
+      const auto dir = tmp / std::to_string(default_id_generator());
+      std::error_code err;
+      if (!fs::create_directory(dir, err)) {
+        continue;
+      }
+      fs::permissions(dir, fs::perms(0700), fs::perm_options::replace, err);
+      if (err) {
+        continue;
+      }
+      const auto file = dir / std::to_string(default_id_generator());
+      if (fs::exists(file, err) || err) {
+        continue;
+      }
+      // We did it!
+      open(file, std::ios::in | std::ios::out | std::ios::app);
+      path_ = file;
+      return;
+    }
+    throw std::runtime_error("exhausted all attempts");
+  } catch (const std::exception& error) {
+    std::cerr << "Unable to create a temporary file: " << error.what() << '\n';
+    // `path_` is empty, and this `fstream` is not open.
+  }
+
+  ~SomewhatSecureTemporaryFile() {
+    if (path_ != std::filesystem::path{}) {
+      std::error_code ignored;
+      std::filesystem::remove_all(path_.parent_path(), ignored);
+    }
+  }
+
+  const std::filesystem::path& path() const { return path_; }
+};
 
 }  // namespace
 
@@ -435,21 +492,6 @@ TEST_CASE("TracerConfig::agent") {
 }
 
 TEST_CASE("TracerConfig::trace_sampler") {
-  // TODO:
-  // ✅ default is no rules
-  //  ✅  one rule
-  //   ✅  sample_rate defaults to 1.0
-  //   ✅  sample_rate must be in range
-  // ✅   two rules
-  // ✅    global sample rate creates a catch-all rule
-  // ✅   DD_TRACE_SAMPLE_RATE overrides sample_rate
-  //   ✅   and can fail to parse or be out of range
-  // ✅    max_per_second must be > 0
-  // ✅    DD_TRACE_RATE_LIMIT overrides max_per_second
-  //    ✅    and can fail to parse or be out of range
-  // - DD_TRACE_SAMPLING_RULES overrides rules
-  //   - and can fail to parse in a bunch of ways
-
   TracerConfig config;
   config.defaults.service = "testsvc";
 
@@ -633,18 +675,16 @@ TEST_CASE("TracerConfig::trace_sampler") {
       CAPTURE(rules_json);
       CAPTURE(rules);
       REQUIRE(rules.size() == 2);
-      const auto& rule0 = rules[0];
-      REQUIRE(rule0.service == "poohbear");
-      REQUIRE(rule0.name == "get.honey");
-      REQUIRE(rule0.sample_rate == 0);
-      REQUIRE(rule0.tags.size() == 0);
-      const auto& rule1 = rules[1];
-      REQUIRE(rule1.service == "*");
-      REQUIRE(rule1.name == "*");
-      REQUIRE(rule1.sample_rate == 1);
-      REQUIRE(rule1.tags.size() == 1);
-      REQUIRE(rule1.tags.at("error") == "*");
-      REQUIRE(rule1.resource == "/admin/*");
+      REQUIRE(rules[0].service == "poohbear");
+      REQUIRE(rules[0].name == "get.honey");
+      REQUIRE(rules[0].sample_rate == 0);
+      REQUIRE(rules[0].tags.size() == 0);
+      REQUIRE(rules[1].service == "*");
+      REQUIRE(rules[1].name == "*");
+      REQUIRE(rules[1].sample_rate == 1);
+      REQUIRE(rules[1].tags.size() == 1);
+      REQUIRE(rules[1].tags.at("error") == "*");
+      REQUIRE(rules[1].resource == "/admin/*");
     }
 
     SECTION("must be valid") {
@@ -692,8 +732,256 @@ TEST_CASE("TracerConfig::trace_sampler") {
   }
 }
 
-/*
 TEST_CASE("TracerConfig::span_sampler") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+
+  SECTION("default is no rules") {
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->span_sampler.rules.size() == 0);
+  }
+
+  SECTION("one sampling rule") {
+    auto& rules = config.span_sampler.rules;
+    rules.resize(rules.size() + 1);
+    SpanSamplerConfig::Rule& rule = rules.back();
+
+    SECTION("yields one sampling rule") {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->span_sampler.rules.size() == 1);
+      // the default sample_rate is 100%
+      REQUIRE(finalized->span_sampler.rules.front().sample_rate == 1.0);
+      // the default max_per_second is null (unlimited)
+      REQUIRE(!finalized->span_sampler.rules.front().max_per_second);
+    }
+
+    SECTION("has to have a valid sample_rate") {
+      auto rate = GENERATE(std::nan(""), -0.5, 1.3,
+                           std::numeric_limits<double>::infinity(),
+                           -std::numeric_limits<double>::infinity(), 42);
+      CAPTURE(rate);
+      rule.sample_rate = rate;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == Error::RATE_OUT_OF_RANGE);
+    }
+
+    SECTION("has to have a valid max_per_second (if not null)") {
+      auto limit =
+          GENERATE(0.0, -1.0, std::numeric_limits<double>::infinity(),
+                   -std::numeric_limits<double>::infinity(), std::nan(""));
+      CAPTURE(limit);
+      rule.max_per_second = limit;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == Error::MAX_PER_SECOND_OUT_OF_RANGE);
+    }
+  }
+
+  SECTION("two sampling rules") {
+    auto& rules = config.span_sampler.rules;
+    rules.resize(rules.size() + 2);
+    rules[0].sample_rate = 0.5;
+    rules[1].sample_rate = 0.6;
+    rules[1].max_per_second = 10;
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->span_sampler.rules.size() == 2);
+    REQUIRE(finalized->span_sampler.rules[0].sample_rate == 0.5);
+    REQUIRE(!finalized->span_sampler.rules[0].max_per_second);
+    REQUIRE(finalized->span_sampler.rules[1].sample_rate == 0.6);
+    REQUIRE(finalized->span_sampler.rules[1].max_per_second == 10);
+  }
+
+  SECTION("DD_SPAN_SAMPLING_RULES") {
+    SECTION(
+        "sets the span sampling rules, and overrides "
+        "TracerConfig::span_sampler.rules") {
+      SpanSamplerConfig::Rule config_rule;
+      config_rule.service = "foosvc";
+      config_rule.max_per_second = 9.2;
+      config.span_sampler.rules.push_back(config_rule);
+
+      auto rules_json = R"json([
+        {"name": "mysql2.query", "max_per_second": 100},
+        {"max_per_second": 10, "sample_rate": 0.1}
+      ])json";
+
+      const EnvGuard guard{"DD_SPAN_SAMPLING_RULES", rules_json};
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      const auto& rules = finalized->span_sampler.rules;
+      REQUIRE(rules.size() == 2);
+      REQUIRE(rules[0].service == "*");
+      REQUIRE(rules[0].name == "mysql2.query");
+      REQUIRE(rules[0].resource == "*");
+      REQUIRE(rules[0].sample_rate == 1.0);
+      REQUIRE(rules[0].max_per_second == 100);
+      REQUIRE(rules[1].service == "*");
+      REQUIRE(rules[1].name == "*");
+      REQUIRE(rules[1].resource == "*");
+      REQUIRE(rules[1].max_per_second == 10);
+      REQUIRE(rules[1].sample_rate == 0.1);
+    }
+
+    SECTION("must be valid") {
+      struct TestCase {
+        std::string name;
+        std::string json;
+        Error::Code expected_error;
+      };
+
+      auto test_case = GENERATE(values<TestCase>({
+          {"invalid JSON", "this is clearly not JSON",
+           Error::SPAN_SAMPLING_RULES_INVALID_JSON},
+          {"barely not JSON", "[true,]",
+           Error::SPAN_SAMPLING_RULES_INVALID_JSON},
+          {"must be array",
+           R"json({"service": "you forgot the square brackets"})json",
+           Error::SPAN_SAMPLING_RULES_WRONG_TYPE},
+          {"service must be a string", R"json([{"service": 123}])json",
+           Error::RULE_PROPERTY_WRONG_TYPE},
+          {"name must be a string", R"json([{"name": null}])json",
+           Error::RULE_PROPERTY_WRONG_TYPE},
+          {"resource must be a string", R"json([{"resource": false}])json",
+           Error::RULE_PROPERTY_WRONG_TYPE},
+          {"'tags' property must be an object",
+           R"json([{"tags": ["foo:bar"]}])json",
+           Error::RULE_PROPERTY_WRONG_TYPE},
+          {"tag values must be strings",
+           R"json([{"tags": {"foo": "two", "error": false}}])json",
+           Error::RULE_TAG_WRONG_TYPE},
+          {"each rule must be an object", R"json([["service", "wrong!"]])json",
+           Error::RULE_WRONG_TYPE},
+          {"sample_rate must be a number", R"json([{"sample_rate": true}])json",
+           Error::SPAN_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE},
+          {"max_per_second must be a number (or absent)",
+           R"json([{"max_per_second": false}])json",
+           Error::SPAN_SAMPLING_RULES_MAX_PER_SECOND_WRONG_TYPE},
+          {"no unknown properties", R"json([{"extension": "denied!"}])json",
+           Error::SPAN_SAMPLING_RULES_UNKNOWN_PROPERTY},
+      }));
+
+      CAPTURE(test_case.name);
+
+      const EnvGuard guard{"DD_SPAN_SAMPLING_RULES", test_case.json};
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == test_case.expected_error);
+    }
+
+    SECTION("DD_SPAN_SAMPLING_RULES_FILE") {
+      SECTION("successful usage") {
+        const auto logger = std::make_shared<MockLogger>();
+        config.logger = logger;
+
+        // This rule will be overridden.
+        SpanSamplerConfig::Rule config_rule;
+        config_rule.service = "foosvc";
+        config_rule.max_per_second = 9.2;
+        config.span_sampler.rules.push_back(config_rule);
+
+        auto rules_file_json = R"json([
+        {"name": "mysql2.query"},
+        {"resource": "/admin*"},
+        {"max_per_second": 10, "sample_rate": 0.1}
+      ])json";
+
+        SomewhatSecureTemporaryFile file;
+        REQUIRE(file.is_open());
+        file << rules_file_json;
+        file.close();
+        const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE",
+                             file.path().string()};
+
+        SECTION("overrides SpanSamplerConfig::rules") {
+          auto finalized = finalize_config(config);
+          REQUIRE(finalized);
+          const auto& rules = finalized->span_sampler.rules;
+          REQUIRE(rules.size() == 3);
+          REQUIRE(rules[0].name == "mysql2.query");
+          REQUIRE(rules[1].resource == "/admin*");
+          REQUIRE(rules[2].max_per_second == 10);
+          REQUIRE(rules[2].sample_rate == 0.1);
+        }
+
+        SECTION("doesn't override DD_SPAN_SAMPLING_RULES, but logs an error") {
+          auto rules_json = R"json([
+            {"name": "mysql2.query", "max_per_second": 100},
+            {"max_per_second": 10, "sample_rate": 0.1}
+          ])json";
+
+          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES", rules_json};
+          auto finalized = finalize_config(config);
+          REQUIRE(finalized);
+          const auto& rules = finalized->span_sampler.rules;
+          REQUIRE(rules.size() == 2);
+          REQUIRE(rules[0].name == "mysql2.query");
+          REQUIRE(rules[0].max_per_second == 100);
+          REQUIRE(rules[1].max_per_second == 10);
+          REQUIRE(rules[1].sample_rate == 0.1);
+
+          REQUIRE(logger->error_count() == 1);
+        }
+      }
+
+      SECTION("failed usage") {
+        SECTION("unable to open") {
+          std::filesystem::path defunct;
+          {
+            SomewhatSecureTemporaryFile file;
+            REQUIRE(file.is_open());
+            defunct = file.path();
+          }
+          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE", defunct.string()};
+          auto finalized = finalize_config(config);
+          REQUIRE(!finalized);
+          REQUIRE(finalized.error().code == Error::SPAN_SAMPLING_RULES_FILE_IO);
+        }
+
+        SECTION("unable to read") {
+          SomewhatSecureTemporaryFile file;
+          REQUIRE(file.is_open());
+          file << "[]";
+          file.close();
+          // We can't read it anymore. This doesn't actually cover the call to
+          // `::read` (i.e. `std::filebuf::[...]`) failing, but getting that to
+          // fail after the file has already been opened for reading is too
+          // tricky.
+          std::filesystem::permissions(file.path(),
+                                       std::filesystem::perms(0200));
+          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE",
+                               file.path().string()};
+          auto finalized = finalize_config(config);
+          REQUIRE(!finalized);
+          REQUIRE(finalized.error().code == Error::SPAN_SAMPLING_RULES_FILE_IO);
+        }
+
+        SECTION("unable to parse") {
+          SomewhatSecureTemporaryFile file;
+          REQUIRE(file.is_open());
+          // We could do any of the failures tested in the "must be valid"
+          // section, since it's the same parser. Instead, just to cover the
+          // code path specific to DD_SPAN_SAMPLING_RULES_FILE, pick any error,
+          // e.g. invalid JSON.
+          file << "this is clearly not JSON";
+          file.close();
+          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE",
+                               file.path().string()};
+          auto finalized = finalize_config(config);
+          REQUIRE(!finalized);
+          REQUIRE(finalized.error().code ==
+                  Error::SPAN_SAMPLING_RULES_INVALID_JSON);
+        }
+      }
+    }
+  }
+}
+
+/*
+TEST_CASE("TracerConfig propagation styles") {
   // TODO
 }
 */
