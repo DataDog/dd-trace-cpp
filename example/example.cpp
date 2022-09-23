@@ -46,11 +46,9 @@ void play_with_id_generator();
 void play_with_default_http_client();
 void play_with_propagation(int argc, const char* const* argv);
 void play_with_inject();
-void play_with_extract();
 void play_with_agent();
 void play_with_parse_url();
 void play_with_span_tags();
-void play_with_create_span();
 void play_with_config();
 void play_with_cpp20_syntax();
 void play_with_msgpack();
@@ -89,9 +87,6 @@ int main(int argc, char* argv[]) {
     } else if (example == "inject") {
       play_with_inject();
       std::cout << "\nDone playing with inject.\n";
-    } else if (example == "extract") {
-      play_with_extract();
-      std::cout << "\nDone playing with extract.\n";
     } else if (example == "agent") {
       play_with_agent();
       std::cout << "\nDone playing with agent.\n";
@@ -101,9 +96,6 @@ int main(int argc, char* argv[]) {
     } else if (example == "span_tags") {
       play_with_span_tags();
       std::cout << "\nDone playing with span tags.\n";
-    } else if (example == "create_span") {
-      play_with_create_span();
-      std::cout << "\nDone playing with create_span.\n";
     } else if (example == "config") {
       play_with_config();
       std::cout << "\nDone playing with config.\n";
@@ -302,26 +294,6 @@ void play_with_config() {
   // (void) config;
 }
 
-void play_with_create_span() {
-  dd::TracerConfig config;
-  config.defaults.service = "hello";
-
-  auto maybe_config = dd::finalize_config(config);
-  if (const auto* const error = maybe_config.if_error()) {
-    std::cout << "Bad config: " << error->message << '\n';
-    return;
-  }
-
-  dd::Tracer tracer{*maybe_config};
-  dd::Span span = tracer.create_span(dd::SpanConfig{});
-
-  dd::Span child = span.create_child(dd::SpanConfig{});
-  child.trace_segment().visit_spans(
-      [](const std::vector<std::unique_ptr<dd::SpanData>>& spans) {
-        std::cout << "There are " << spans.size() << " spans in the trace.\n";
-      });
-}
-
 void play_with_span_tags() {
   dd::TracerConfig config;
   config.defaults.service = "hello";
@@ -479,56 +451,6 @@ class LowerCaseMapReader : public dd::DictReader {
     }
   }
 };
-
-void play_with_extract() {
-  dd::TracerConfig config;
-  config.defaults.service = "hello";
-  config.collector = std::make_shared<NoOpCollector>();
-
-  auto maybe_config = dd::finalize_config(config);
-  if (const auto* const error = maybe_config.if_error()) {
-    std::cout << "Bad config: " << error->message << '\n';
-    return;
-  }
-  dd::Tracer tracer{*maybe_config};
-
-  const std::unordered_map<std::string, std::string> headers{
-      {"x-datadog-trace-id", "123"},
-      {"x-datadog-parent-id", "456"},
-      {"x-datadog-sampling-priority", "0"},
-      {"x-frobnostication-index", "-1"}};
-
-  auto maybe_span = tracer.extract_span(LowerCaseMapReader{headers});
-  if (auto* error = maybe_span.if_error()) {
-    std::cout << *error << '\n';
-    return;
-  }
-  auto& span = *maybe_span;
-  std::cout << "sampling_decision: ";
-  if (const auto& decision = span.trace_segment().sampling_decision()) {
-    decision->to_json(std::cout);
-  }
-  std::cout << "\norigin: " << span.trace_segment().origin().value_or("");
-  std::cout << "\nspans:\n";
-  span.trace_segment().visit_spans([](const auto& spans) {
-    for (const auto& span_data_ptr : spans) {
-      const auto& span_data = *span_data_ptr;
-      std::cout << "-------------------\n"
-                << "trace_id: " << span_data.trace_id << '\n'
-                << "span_id: " << span_data.span_id << '\n'
-                << "parent_id: " << span_data.parent_id << '\n'
-                << "tags:";
-      for (const auto& [key, value] : span_data.tags) {
-        std::cout << ' ' << key << ':' << value;
-      }
-      std::cout << '\n';
-      std::cout << "environment: " << span_data.environment().value_or("")
-                << '\n'
-                << "service: " << span_data.service << '\n'
-                << "version: " << span_data.version().value_or("") << '\n';
-    }
-  });
-}
 
 class HeaderStreamWriter : public dd::DictWriter {
   std::ostream* stream_;

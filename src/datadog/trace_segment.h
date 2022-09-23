@@ -1,5 +1,31 @@
 #pragma once
 
+// This component provides a class, `TraceSegment`, that represents a portion of
+// a trace that is passing through this process.
+//
+// `TraceSegment` is not instantiated directly.  It is an implementation detail
+// of this library.
+//
+// A trace might begin in this process, or it might have been propagated in from
+// outside (see `Tracer::extract_span`).  A trace might remain in this process,
+// or it might be propagated outward (see `Span::inject`) one or more times.
+//
+// A trace might pass through this process twice or more.  Consider an RPC
+// server that receives a request, in handling that request makes a request to a
+// different service, and in the course of the other service handling its
+// request, the original service is called again.  Both "passes" through this
+// process are part of the same trace, but each pass is a different _trace
+// segment_.
+//
+// `TraceSegment` stores context and configuration shared among all spans within
+// the trace segment, and additionally owns the spans' data.  When `Tracer`
+// creates or extracts a span, it also creates a new `TraceSegment`.  When a
+// child `Span` is created from a `Span`, the child and the parent share the
+// same `TraceSegment`.
+//
+// When all of the `Span`s associated with `TraceSegment` have been destroyed,
+// the `TraceSegment` submits their them in a payload to a `Collector`.
+
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -64,33 +90,34 @@ class TraceSegment {
 
   Logger& logger() const;
 
-  // This is for trace propagation.
-  void inject(DictWriter&, const SpanData&);
+  // Inject trace context for the specified `span` into the specified `writer`.
+  // This function is the implementation of `Span::inject`.
+  void inject(DictWriter& writer, const SpanData& span);
 
   // These are for sampling delegation, not for trace propagation.
   // TODO
   Expected<void> extract(const DictReader& reader);
   void inject(DictWriter& writer) const;
 
+  // Take ownership of the specified `span`.
   void register_span(std::unique_ptr<SpanData> span);
+  // Increment the number of finished spans.  If that number is equal to the
+  // number of registered spans, send all of the spans to the `Collector`.
   void span_finished();
 
+  // Set the sampling decision to be a local, manual decision with the specified
+  // sampling `priority`.  Overwrite any previous sampling decision.
   void override_sampling_priority(int priority);
 
-  // TODO: This might be nice for testing.
-  template <typename Visitor>
-  void visit_spans(Visitor&& visitor) const;
-
  private:
+  // If `sampling_decision_` is not null, use `trace_sampler_` to make a
+  // sampling decision and assign it to `sampling_decision_`.
   void make_sampling_decision_if_null();
+  // Set or remove the `tags::internal::decision_maker` trace tag in
+  // `trace_tags_` according to either information extracted from trace context
+  // or from a local sampling decision.
   void update_decision_maker_trace_tag();
 };
-
-template <typename Visitor>
-void TraceSegment::visit_spans(Visitor&& visitor) const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  visitor(spans_);
-}
 
 }  // namespace tracing
 }  // namespace datadog
