@@ -61,7 +61,6 @@ struct Error {
   Code code;
   std::string message;
 
-  std::string to_string() const;
   Error with_prefix(std::string_view) const;
 };
 
