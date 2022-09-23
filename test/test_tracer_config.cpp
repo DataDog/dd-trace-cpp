@@ -1,3 +1,4 @@
+#include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -6,6 +7,7 @@
 #include <string>
 
 #include "collectors.h"
+#include "event_schedulers.h"
 #include "loggers.h"
 #include "test.h"
 #ifdef _MSC_VER
@@ -56,6 +58,10 @@ class EnvGuard {
 #endif
   }
 };
+
+// For brevity when we're tabulating a lot of test cases with parse
+// `std::optional<...>` data members.
+const auto x = std::nullopt;
 
 }  // namespace
 
@@ -149,7 +155,7 @@ TEST_CASE("TracerConfig::defaults") {
   }
 }
 
-TEST_CASE("log_on_startup") {
+TEST_CASE("TracerConfig::log_on_startup") {
   TracerConfig config;
   config.defaults.service = "testsvc";
   const auto logger = std::make_shared<MockLogger>();
@@ -210,7 +216,7 @@ TEST_CASE("log_on_startup") {
   }
 }
 
-TEST_CASE("report_traces") {
+TEST_CASE("TracerConfig::report_traces") {
   TracerConfig config;
   config.defaults.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
@@ -279,4 +285,159 @@ TEST_CASE("report_traces") {
   }
 }
 
-// TODO: samplers and propagation styles
+TEST_CASE("TracerConfig::agent") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+
+  SECTION("event_scheduler") {
+    SECTION("default") {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      const auto* const agent =
+          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+      REQUIRE(agent);
+      REQUIRE(
+          dynamic_cast<ThreadedEventScheduler*>(agent->event_scheduler.get()));
+    }
+
+    SECTION("custom") {
+      auto scheduler = std::make_shared<MockEventScheduler>();
+      config.agent.event_scheduler = scheduler;
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      const auto* const agent =
+          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+      REQUIRE(agent);
+      REQUIRE(agent->event_scheduler == scheduler);
+    }
+  }
+
+  SECTION("flush interval") {
+    SECTION("cannot be zero") {
+      config.agent.flush_interval_milliseconds = 0;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code ==
+              Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL);
+    }
+
+    SECTION("cannot be negative") {
+      config.agent.flush_interval_milliseconds = -1337;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code ==
+              Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL);
+    }
+  }
+
+  SECTION("url") {
+    SECTION("parsing") {
+      struct TestCase {
+        std::string url;
+        std::optional<Error::Code> expected_error;
+        std::string expected_scheme = "";
+        std::string expected_authority = "";
+        std::string expected_path = "";
+      };
+
+      auto test_case = GENERATE(values<TestCase>({
+          {"http://dd-agent:8126", std::nullopt, "http", "dd-agent:8126", ""},
+          {"http://dd-agent:8126/", std::nullopt, "http", "dd-agent:8126", "/"},
+          {"https://dd-agent:8126/", std::nullopt, "https", "dd-agent:8126",
+           "/"},
+          {"unix:///var/run/datadog/trace-agent.sock", std::nullopt, "unix",
+           "/var/run/datadog/trace-agent.sock"},
+          {"unix://var/run/datadog/trace-agent.sock",
+           Error::URL_UNIX_DOMAIN_SOCKET_PATH_NOT_ABSOLUTE},
+          {"http+unix:///run/datadog/trace-agent.sock", std::nullopt,
+           "http+unix", "/run/datadog/trace-agent.sock"},
+          {"https+unix:///run/datadog/trace-agent.sock", std::nullopt,
+           "https+unix", "/run/datadog/trace-agent.sock"},
+          {"tcp://localhost:8126", Error::URL_UNSUPPORTED_SCHEME},
+          {"/var/run/datadog/trace-agent.sock", Error::URL_MISSING_SEPARATOR},
+      }));
+
+      CAPTURE(test_case.url);
+      config.agent.url = test_case.url;
+      auto finalized = finalize_config(config);
+      if (test_case.expected_error) {
+        REQUIRE(!finalized);
+        REQUIRE(finalized.error().code == *test_case.expected_error);
+      } else {
+        REQUIRE(finalized);
+        const auto* const agent =
+            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+        REQUIRE(agent);
+        REQUIRE(agent->url.scheme == test_case.expected_scheme);
+        REQUIRE(agent->url.authority == test_case.expected_authority);
+        REQUIRE(agent->url.path == test_case.expected_path);
+      }
+    }
+
+    SECTION("environment variables override") {
+      struct TestCase {
+        std::string name;
+        std::optional<std::string> env_host;
+        std::optional<std::string> env_port;
+        std::optional<std::string> env_url;
+        std::string expected_scheme;
+        std::string expected_authority;
+      };
+
+      auto test_case = GENERATE(values<TestCase>({
+          {"override host with default port", "dd-agent", x, x, "http",
+           "dd-agent:8126"},
+          {"override port and host", "dd-agent", "8080", x, "http",
+           "dd-agent:8080"},
+          {"override port with default host", x, "8080", x, "http",
+           "localhost:8080"},
+          // A bogus port number will cause an error in the TCPClient, not
+          // during configuration.  For the purposes of configuration, any
+          // value is accepted.
+          {"we don't parse port", x, "bogus", x, "http", "localhost:bogus"},
+          {"even empty is ok", x, "", x, "http", "localhost:"},
+          {"URL", x, x, "http://dd-agent:8080", "http", "dd-agent:8080"},
+          {"URL overrides scheme", x, x, "https://dd-agent:8080", "https",
+           "dd-agent:8080"},
+          {"URL overrides host", "localhost", x, "http://dd-agent:8080", "http",
+           "dd-agent:8080"},
+          {"URL overrides port", x, "8126", "http://dd-agent:8080", "http",
+           "dd-agent:8080"},
+          {"URL overrides port and host", "localhost", "8126",
+           "http://dd-agent:8080", "http", "dd-agent:8080"},
+      }));
+
+      CAPTURE(test_case.name);
+      std::optional<EnvGuard> host_guard;
+      if (test_case.env_host) {
+        host_guard.emplace("DD_AGENT_HOST", *test_case.env_host);
+      }
+      std::optional<EnvGuard> port_guard;
+      if (test_case.env_port) {
+        port_guard.emplace("DD_TRACE_AGENT_PORT", *test_case.env_port);
+      }
+      std::optional<EnvGuard> url_guard;
+      if (test_case.env_url) {
+        url_guard.emplace("DD_TRACE_AGENT_URL", *test_case.env_url);
+      }
+
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      const auto* const agent =
+          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+      REQUIRE(agent);
+      REQUIRE(agent->url.scheme == test_case.expected_scheme);
+      REQUIRE(agent->url.authority == test_case.expected_authority);
+    }
+  }
+}
+
+/*
+TEST_CASE("TracerConfig::trace_sampler") {
+  // TODO
+}
+
+TEST_CASE("TracerConfig::span_sampler") {
+  // TODO
+}
+*/

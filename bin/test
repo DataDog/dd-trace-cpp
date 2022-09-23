@@ -11,8 +11,18 @@ fi
 
 if [ "$1" = '--verbose' ]; then
     verbosity_flags='VERBOSE=1'
+    shift
 else
     verbosity_flags=''
+fi
+
+if [ "$1" = '--show-coverage' ]; then
+    # implies --coverage
+    coverage_flags=-DBUILD_COVERAGE=1
+    show_coverage=1
+    shift
+else
+    show_coverage=0
 fi
 
 cd "$(dirname "$0")"/..
@@ -39,4 +49,13 @@ if [ "$coverage_flags" != '' ]; then
     genhtml --quiet .coverage/filtered.info --output-directory .coverage/report
 
     echo 'Done.'
+fi
+
+if [ "$show_coverage" -eq 1 ]; then
+    index='.coverage/report/index.html'
+    case "$(uname -s)" in
+      Darwin) open "$index" ;;
+      Windows*|CYGWIN*) explorer "$index" ;;
+      *) xdg-open "$index" ;;
+    esac
 fi
