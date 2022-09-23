@@ -1,6 +1,7 @@
 #include "trace_sampler_config.h"
 
 #include <cmath>
+#include <ostream>
 #include <unordered_set>
 
 #include "environment.h"
@@ -181,6 +182,16 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   result.max_per_second = max_per_second;
 
   return result;
+}
+
+std::ostream &operator<<(std::ostream &stream,
+                         const FinalizedTraceSamplerConfig::Rule &rule) {
+  nlohmann::json object;
+  object["service"] = rule.service;
+  object["name"] = rule.name;
+  object["resource"] = rule.resource;
+  object["sample_rate"] = double(rule.sample_rate);
+  return stream << object.dump();
 }
 
 }  // namespace tracing

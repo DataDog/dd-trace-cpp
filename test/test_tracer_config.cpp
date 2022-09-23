@@ -4,7 +4,6 @@
 
 #include <cmath>
 #include <cstdlib>
-#include <datadog/json.hpp>
 #include <limits>
 #include <optional>
 #include <string>
@@ -616,39 +615,82 @@ TEST_CASE("TracerConfig::trace_sampler") {
   }
 
   SECTION("DD_TRACE_SAMPLING_RULES") {
-    const auto array = [](const auto&... args) {
-      return nlohmann::json::array({std::forward(args)...});
-    };
-    const auto object = [](const auto&... args) {
-      return nlohmann::json::object({std::forward(args)...});
-    };
+    SECTION("sets sampling rules and overrides TraceSampler::rules") {
+      TraceSamplerConfig::Rule config_rule;
+      config_rule.service = "whatever";
+      config.trace_sampler.rules.push_back(config_rule);
 
-    SECTION("sets sampling rules") {
-      nlohmann::json rules_json = array(
-          object({"service", "poohbear"}, {"name", "get.honey"},
-                 {"sample_rate", 0}),
-          object({"tags", object({"error", "*"})}, {"max_per_second", 1000}));
+      auto rules_json = R"json([
+        {"service": "poohbear", "name": "get.honey", "sample_rate": 0},
+        {"tags": {"error": "*"}, "resource": "/admin/*"}
+      ])json";
 
-      const EnvGuard guard{"DD_TRACE_SAMPLING_RULES", rules_json.dump()};
+      const EnvGuard guard{"DD_TRACE_SAMPLING_RULES", rules_json};
       auto finalized = finalize_config(config);
-      CAPTURE(finalized.error());
       REQUIRE(finalized);
 
       const auto& rules = finalized->trace_sampler.rules;
       CAPTURE(rules_json);
       CAPTURE(rules);
-      REQUIRE(rules.size() == 3);  // TODO
-      // TODO
+      REQUIRE(rules.size() == 2);
+      const auto& rule0 = rules[0];
+      REQUIRE(rule0.service == "poohbear");
+      REQUIRE(rule0.name == "get.honey");
+      REQUIRE(rule0.sample_rate == 0);
+      REQUIRE(rule0.tags.size() == 0);
+      const auto& rule1 = rules[1];
+      REQUIRE(rule1.service == "*");
+      REQUIRE(rule1.name == "*");
+      REQUIRE(rule1.sample_rate == 1);
+      REQUIRE(rule1.tags.size() == 1);
+      REQUIRE(rule1.tags.at("error") == "*");
+      REQUIRE(rule1.resource == "/admin/*");
+    }
+
+    SECTION("must be valid") {
+      struct TestCase {
+        std::string name;
+        std::string json;
+        Error::Code expected_error;
+      };
+
+      auto test_case = GENERATE(values<TestCase>({
+          {"invalid JSON", "this is clearly not JSON",
+           Error::TRACE_SAMPLING_RULES_INVALID_JSON},
+          {"barely not JSON", "[true,]",
+           Error::TRACE_SAMPLING_RULES_INVALID_JSON},
+          {"must be array",
+           R"json({"service": "you forgot the square brackets"})json",
+           Error::TRACE_SAMPLING_RULES_WRONG_TYPE},
+          {"service must be a string", R"json([{"service": 123}])json",
+           Error::RULE_PROPERTY_WRONG_TYPE},
+          {"name must be a string", R"json([{"name": null}])json",
+           Error::RULE_PROPERTY_WRONG_TYPE},
+          {"resource must be a string", R"json([{"resource": false}])json",
+           Error::RULE_PROPERTY_WRONG_TYPE},
+          {"'tags' property must be an object",
+           R"json([{"tags": ["foo:bar"]}])json",
+           Error::RULE_PROPERTY_WRONG_TYPE},
+          {"tag values must be strings",
+           R"json([{"tags": {"foo": "two", "error": false}}])json",
+           Error::RULE_TAG_WRONG_TYPE},
+          {"each rule must be an object", R"json([["service", "wrong!"]])json",
+           Error::RULE_WRONG_TYPE},
+          {"sample_rate must be a number", R"json([{"sample_rate": true}])json",
+           Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE},
+          {"no unknown properties", R"json([{"extension": "denied!"}])json",
+           Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY},
+      }));
+
+      CAPTURE(test_case.name);
+
+      const EnvGuard guard{"DD_TRACE_SAMPLING_RULES", test_case.json};
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code == test_case.expected_error);
     }
   }
 }
-
-/*
-Error::TRACE_SAMPLING_RULES_INVALID_JSON
-Error::TRACE_SAMPLING_RULES_WRONG_TYPE
-Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE
-Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY
-*/
 
 /*
 TEST_CASE("TracerConfig::span_sampler") {

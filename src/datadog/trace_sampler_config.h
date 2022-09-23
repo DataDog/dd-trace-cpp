@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iosfwd>
 #include <optional>
 #include <vector>
 
@@ -41,6 +42,9 @@ class FinalizedTraceSamplerConfig {
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
     const TraceSamplerConfig& config);
+
+std::ostream& operator<<(std::ostream&,
+                         const FinalizedTraceSamplerConfig::Rule&);
 
 }  // namespace tracing
 }  // namespace datadog
