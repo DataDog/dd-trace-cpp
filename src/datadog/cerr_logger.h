@@ -15,6 +15,7 @@ class CerrLogger : public Logger {
  public:
   void log_error(const LogFunc&) override;
   void log_startup(const LogFunc&) override;
+  using Logger::log_error;  // expose the non-virtual overloads
 
  private:
   void log(const LogFunc&);

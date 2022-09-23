@@ -18,6 +18,7 @@ add_executable(tests
     matchers.cpp
     
     # test cases
+    test_cerr_logger.cpp
     test_datadog_agent.cpp
     test_glob.cpp
     test_limiter.cpp
