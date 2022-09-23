@@ -109,3 +109,12 @@ struct PriorityCountingCollectorWithResponse
     return {};
   }
 };
+
+struct FailureCollector : public Collector {
+  Error failure{Error::OTHER, "send(...) failed because I told it to."};
+
+  Expected<void> send(std::vector<std::unique_ptr<SpanData>>&&,
+                      const std::shared_ptr<TraceSampler>&) override {
+    return failure;
+  }
+};
