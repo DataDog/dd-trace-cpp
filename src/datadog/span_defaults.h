@@ -15,5 +15,7 @@ struct SpanDefaults {
   std::unordered_map<std::string, std::string> tags;
 };
 
+bool operator==(const SpanDefaults&, const SpanDefaults&);
+
 }  // namespace tracing
 }  // namespace datadog
