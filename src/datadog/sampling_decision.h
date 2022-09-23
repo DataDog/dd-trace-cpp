@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iosfwd>
 #include <optional>
 
 #include "rate.h"
@@ -18,8 +17,6 @@ struct SamplingDecision {
   std::optional<Rate> limiter_effective_rate;
   std::optional<double> limiter_max_per_second;
   Origin origin;
-
-  void to_json(std::ostream&) const;
 };
 
 }  // namespace tracing

@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <functional>
-#include <iosfwd>
 #include <optional>
 
 #include "error.h"
@@ -39,8 +38,6 @@ class HTTPClient {
 
   virtual ~HTTPClient() = default;
 };
-
-std::ostream& operator<<(std::ostream&, const HTTPClient::URL&);
 
 }  // namespace tracing
 }  // namespace datadog
