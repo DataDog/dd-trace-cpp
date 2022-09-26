@@ -22,5 +22,7 @@ Expected<int> parse_int(std::string_view input, int base);
 
 Expected<double> parse_double(std::string_view input);
 
+bool starts_with(std::string_view subject, std::string_view prefix);
+
 }  // namespace tracing
 }  // namespace datadog

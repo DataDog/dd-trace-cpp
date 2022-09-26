@@ -372,7 +372,11 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       logger_->log_error(*error);
       span_data->tags[tags::internal::propagation_error] = "decoding_error";
     } else {
-      decoded_trace_tags = std::move(*maybe_trace_tags);
+      for (const auto& [key, value] : *maybe_trace_tags) {
+        if (starts_with(key, "_dd.p.")) {
+          decoded_trace_tags.insert_or_assign(key, value);
+        }
+      }
     }
   }
 

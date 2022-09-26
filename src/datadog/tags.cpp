@@ -1,22 +1,9 @@
 #include "tags.h"
-
-#include <algorithm>
+#include "parse_util.h"
 
 namespace datadog {
 namespace tracing {
 namespace tags {
-namespace {
-
-bool starts_with(std::string_view subject, std::string_view prefix) {
-  if (prefix.size() > subject.size()) {
-    return false;
-  }
-
-  return std::mismatch(subject.begin(), subject.end(), prefix.begin()).second ==
-         prefix.end();
-}
-
-}  // namespace
 
 const std::string environment = "env";
 const std::string service_name = "service.name";

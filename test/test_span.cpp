@@ -21,6 +21,7 @@
 #include "dict_readers.h"
 #include "dict_writers.h"
 #include "loggers.h"
+#include "matchers.h"
 #include "test.h"
 
 using namespace datadog::tracing;
@@ -420,7 +421,7 @@ TEST_CASE("injection") {
     }
 
     SECTION("lots of trace tags") {
-      const std::string trace_tags = "foo=bar,34=43,54-46=my-number";
+      const std::string trace_tags = "foo=bar,34=43,54-46=my-number,_dd.p.not_excluded=foo";
       const std::unordered_map<std::string, std::string> headers{
           {"x-datadog-trace-id", "123"},
           {"x-datadog-sampling-priority", "0"},
@@ -440,7 +441,9 @@ TEST_CASE("injection") {
       const auto input = decode_tags(trace_tags);
       REQUIRE(output);
       REQUIRE(input);
-      REQUIRE(*input == *output);
+      // Trace tags that don't begin with "_dd.p." are excluded from the parsed
+      // trace tags, so check only that the output is a subset of the input.
+      REQUIRE_THAT(*input, ContainsSubset(*output));
     }
   }
 }

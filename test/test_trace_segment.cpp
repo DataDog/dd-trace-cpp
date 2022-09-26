@@ -21,7 +21,7 @@ using namespace datadog::tracing;
 // ✅ `Collector::send` failure logs the error
 // - finalization:
 //   - root span:
-//     - sampling priority
+//     ✅ sampling priority
 //     ✅ "inject_max_size" propagation error if we tried to inject oversized
 //       x-datadog-tags
 //     - hostname if you got it
@@ -178,6 +178,7 @@ TEST_CASE("TraceSegment finalization of spans") {
       std::string trace_tags_value = "foo=bar";
       for (int i = 0; i < 10'000; ++i) {
         trace_tags_value += ',';
+        trace_tags_value += "_dd.p.";
         trace_tags_value += std::to_string(i);
         trace_tags_value += '=';
         trace_tags_value += std::to_string(2 * i);
