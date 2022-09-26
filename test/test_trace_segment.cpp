@@ -203,6 +203,62 @@ TEST_CASE("TraceSegment finalization of spans") {
                   tags::internal::propagation_error) == "inject_max_size");
     }
 
-    // TODO
+    SECTION("sampling priority") {
+      TracerConfig config;
+      config.defaults.service = "testsvc";
+      const auto collector = std::make_shared<MockCollector>();
+      config.collector = collector;
+      config.logger = std::make_shared<NullLogger>();
+
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      Tracer tracer{*finalized};
+
+      SECTION("create trace -> priority in root span") {
+        {
+          auto root = tracer.create_span();
+          (void)root;
+        }
+        REQUIRE(collector->span_count() == 1);
+        const auto& span = collector->first_span();
+        REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) == 1);
+        // The value depends on the trace ID, so we won't check it here.
+      }
+
+      SECTION("extracted sampling priority -> local root sampling priority same as extracted") {
+        auto sampling_priority = GENERATE(-1, 0, 1, 2);
+        const std::unordered_map<std::string, std::string> headers{
+          {"x-datadog-trace-id", "123"},
+          {"x-datadog-parent-id", "456"},
+          {"x-datadog-sampling-priority", std::to_string(sampling_priority)},
+        };
+        MockDictReader reader{headers};
+        {
+          auto span = tracer.extract_span(reader);
+        }
+        REQUIRE(collector->span_count() == 1);
+        REQUIRE(collector->first_span().numeric_tags.at(tags::internal::sampling_priority) == sampling_priority);
+      }
+      
+      SECTION("override sampling priority  -> local root sampling priority same as override") {
+        auto sampling_priority = GENERATE(-1, 0, 1, 2);
+        {
+          auto root = tracer.create_span();
+          root.trace_segment().override_sampling_priority(sampling_priority);
+        }
+        REQUIRE(collector->span_count() == 1);
+        REQUIRE(collector->first_span().numeric_tags.at(tags::internal::sampling_priority) == sampling_priority);
+      }
+
+      SECTION("inject span -> injected priority is the same as that sent to agent in local root span") {
+        MockDictWriter writer;
+        {
+          auto root = tracer.create_span();
+          root.inject(writer);
+        }
+        REQUIRE(collector->span_count() == 1);
+        REQUIRE(std::to_string(int(collector->first_span().numeric_tags.at(tags::internal::sampling_priority))) == writer.items.at("x-datadog-sampling-priority"));
+      }
+    }
   }
 }

@@ -35,6 +35,10 @@ struct MockCollector : public Collector {
     REQUIRE(span_ptr);
     return *span_ptr;
   }
+
+  std::size_t span_count() const {
+    return std::accumulate(chunks.begin(), chunks.end(), 0, [](std::size_t total, const auto& chunk) { return total + chunk.size(); });
+  }
 };
 
 struct PriorityCountingCollector : public Collector {
