@@ -146,7 +146,8 @@ void TraceSegment::span_finished() {
     local_root.tags[tags::internal::hostname] = *hostname_;
   }
   if (decision.origin == SamplingDecision::Origin::LOCAL) {
-    if (decision.mechanism == int(SamplingMechanism::AGENT_RATE)) {
+    if (decision.mechanism == int(SamplingMechanism::AGENT_RATE) ||
+        decision.mechanism == int(SamplingMechanism::DEFAULT)) {
       local_root.numeric_tags[tags::internal::agent_sample_rate] =
           *decision.configured_rate;
     } else if (decision.mechanism == int(SamplingMechanism::RULE)) {

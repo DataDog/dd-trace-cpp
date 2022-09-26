@@ -37,7 +37,22 @@ struct MockCollector : public Collector {
   }
 
   std::size_t span_count() const {
-    return std::accumulate(chunks.begin(), chunks.end(), 0, [](std::size_t total, const auto& chunk) { return total + chunk.size(); });
+    return std::accumulate(chunks.begin(), chunks.end(), 0,
+                           [](std::size_t total, const auto& chunk) {
+                             return total + chunk.size();
+                           });
+  }
+};
+
+struct MockCollectorWithResponse : public MockCollector {
+  CollectorResponse response;
+
+  Expected<void> send(
+      std::vector<std::unique_ptr<SpanData>>&& spans,
+      const std::shared_ptr<TraceSampler>& response_handler) override {
+    MockCollector::send(std::move(spans), response_handler);
+    response_handler->handle_collector_response(response);
+    return {};
   }
 };
 

@@ -1,4 +1,5 @@
 #include "tags.h"
+
 #include "parse_util.h"
 
 namespace datadog {

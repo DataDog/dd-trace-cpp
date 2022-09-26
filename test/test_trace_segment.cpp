@@ -1,3 +1,5 @@
+#include <datadog/net_util.h>
+#include <datadog/rate.h>
 #include <datadog/tags.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
@@ -7,6 +9,7 @@
 #include "dict_readers.h"
 #include "dict_writers.h"
 #include "loggers.h"
+#include "matchers.h"
 #include "test.h"
 
 using namespace datadog::tracing;
@@ -20,19 +23,17 @@ using namespace datadog::tracing;
 //    ✅ logger
 // ✅ `Collector::send` failure logs the error
 // - finalization:
-//   - root span:
-//     ✅ sampling priority
-//     ✅ "inject_max_size" propagation error if we tried to inject oversized
-//       x-datadog-tags
-//     - hostname if you got it
-//     - anything in X-Datadog-Tags
-//       - _dd.p.dm in particular (but only if sampling priority > 0)
-//     - if agent made sampling decision, agent rate
-//     - if rule/sample_Rate made sampling decision, rule rate
-//     - if rule limiter was consulted in sampling decision, limiter effective
-//     rate
 // - all spans:
 //     - origin if you got it
+
+namespace {
+
+Rate assert_rate(double rate) {
+  // If `rate` is not valid, `std::variant` will throw an exception.
+  return *Rate::from(rate);
+}
+
+}  // namespace
 
 TEST_CASE("TraceSegment accessors") {
   TracerConfig config;
@@ -205,12 +206,6 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
 
     SECTION("sampling priority") {
-      TracerConfig config;
-      config.defaults.service = "testsvc";
-      const auto collector = std::make_shared<MockCollector>();
-      config.collector = collector;
-      config.logger = std::make_shared<NullLogger>();
-
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
       Tracer tracer{*finalized};
@@ -222,44 +217,176 @@ TEST_CASE("TraceSegment finalization of spans") {
         }
         REQUIRE(collector->span_count() == 1);
         const auto& span = collector->first_span();
-        REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) == 1);
+        REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) ==
+                1);
         // The value depends on the trace ID, so we won't check it here.
       }
 
-      SECTION("extracted sampling priority -> local root sampling priority same as extracted") {
+      SECTION(
+          "extracted sampling priority -> local root sampling priority same as "
+          "extracted") {
         auto sampling_priority = GENERATE(-1, 0, 1, 2);
         const std::unordered_map<std::string, std::string> headers{
-          {"x-datadog-trace-id", "123"},
-          {"x-datadog-parent-id", "456"},
-          {"x-datadog-sampling-priority", std::to_string(sampling_priority)},
+            {"x-datadog-trace-id", "123"},
+            {"x-datadog-parent-id", "456"},
+            {"x-datadog-sampling-priority", std::to_string(sampling_priority)},
         };
         MockDictReader reader{headers};
-        {
-          auto span = tracer.extract_span(reader);
-        }
+        { auto span = tracer.extract_span(reader); }
         REQUIRE(collector->span_count() == 1);
-        REQUIRE(collector->first_span().numeric_tags.at(tags::internal::sampling_priority) == sampling_priority);
+        REQUIRE(collector->first_span().numeric_tags.at(
+                    tags::internal::sampling_priority) == sampling_priority);
       }
-      
-      SECTION("override sampling priority  -> local root sampling priority same as override") {
+
+      SECTION(
+          "override sampling priority  -> local root sampling priority same as "
+          "override") {
         auto sampling_priority = GENERATE(-1, 0, 1, 2);
         {
           auto root = tracer.create_span();
           root.trace_segment().override_sampling_priority(sampling_priority);
         }
         REQUIRE(collector->span_count() == 1);
-        REQUIRE(collector->first_span().numeric_tags.at(tags::internal::sampling_priority) == sampling_priority);
+        REQUIRE(collector->first_span().numeric_tags.at(
+                    tags::internal::sampling_priority) == sampling_priority);
       }
 
-      SECTION("inject span -> injected priority is the same as that sent to agent in local root span") {
+      SECTION(
+          "inject span -> injected priority is the same as that sent to agent "
+          "in local root span") {
         MockDictWriter writer;
         {
           auto root = tracer.create_span();
           root.inject(writer);
         }
         REQUIRE(collector->span_count() == 1);
-        REQUIRE(std::to_string(int(collector->first_span().numeric_tags.at(tags::internal::sampling_priority))) == writer.items.at("x-datadog-sampling-priority"));
+        REQUIRE(std::to_string(int(collector->first_span().numeric_tags.at(
+                    tags::internal::sampling_priority))) ==
+                writer.items.at("x-datadog-sampling-priority"));
       }
     }
-  }
-}
+
+    SECTION("hostname") {
+      config.report_hostname = true;
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      Tracer tracer{*finalized};
+      {
+        auto root = tracer.create_span();
+        (void)root;
+      }
+      REQUIRE(collector->span_count() == 1);
+      REQUIRE(collector->first_span().tags.at(tags::internal::hostname) ==
+              get_hostname());
+    }
+
+    SECTION("x-datadog-tags") {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      Tracer tracer{*finalized};
+
+      const std::unordered_map<std::string, std::string> headers{
+          {"x-datadog-trace-id", "123"},
+          {"x-datadog-parent-id", "456"},
+          {"x-datadog-tags", "_dd.p.one=1,_dd.p.two=2,three=3"},
+      };
+      MockDictReader reader{headers};
+      {
+        auto span = tracer.extract_span(reader);
+        (void)span;
+      }
+
+      const std::unordered_map<std::string, std::string> filtered{
+          {"_dd.p.one", "1"}, {"_dd.p.two", "2"}};
+
+      REQUIRE(collector->span_count() == 1);
+      const auto& span = collector->first_span();
+      // "three" will be discarded, but not the other two.
+      REQUIRE(span.tags.count("three") == 0);
+      REQUIRE_THAT(span.tags, ContainsSubset(filtered));
+      // "_dd.p.dm" will be added, because we made a sampling decision.
+      REQUIRE(span.tags.count("_dd.p.dm") == 1);
+    }
+
+    SECTION("rate tags") {
+      SECTION("default mechanism (100%) -> agent psr tag on first trace") {
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        Tracer tracer{*finalized};
+        {
+          auto span = tracer.create_span();
+          (void)span;
+        }
+        REQUIRE(collector->span_count() == 1);
+        const auto& span = collector->first_span();
+        REQUIRE(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
+      }
+
+      SECTION(
+          "agent catch-all response @100% -> agent psr tag on second trace") {
+        const auto collector = std::make_shared<MockCollectorWithResponse>();
+        collector->response
+            .sample_rate_by_key[CollectorResponse::key_of_default_rate] =
+            assert_rate(1.0);
+        config.collector = collector;
+
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        Tracer tracer{*finalized};
+        // First trace doesn't have a collector-specified sample rate.
+        {
+          auto span = tracer.create_span();
+          (void)span;
+        }
+        REQUIRE(collector->span_count() == 1);
+
+        collector->chunks.clear();
+        // Second trace will use the rate from `collector->response`.
+        {
+          auto span = tracer.create_span();
+          (void)span;
+        }
+        REQUIRE(collector->span_count() == 1);
+        const auto& span = collector->first_span();
+        REQUIRE(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
+      }
+
+      SECTION("rules (implicit and explicit)") {
+        // When sample rate is 100%, the sampler will consult the limiter.
+        // When sample rate is 0%, it won't.  We test both cases.
+        auto sample_rate = GENERATE(0.0, 1.0);
+
+        SECTION("global sample rate") {
+          config.trace_sampler.sample_rate = sample_rate;
+        }
+
+        SECTION("sampling rule") {
+          TraceSamplerConfig::Rule rule;
+          rule.service = "testsvc";
+          rule.sample_rate = sample_rate;
+          config.trace_sampler.rules.push_back(rule);
+        }
+
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        Tracer tracer{*finalized};
+        {
+          auto span = tracer.create_span();
+          (void)span;
+        }
+        REQUIRE(collector->span_count() == 1);
+        const auto& span = collector->first_span();
+        REQUIRE(span.numeric_tags.at(tags::internal::rule_sample_rate) ==
+                sample_rate);
+        if (sample_rate == 1.0) {
+          REQUIRE(span.numeric_tags.at(
+                      tags::internal::rule_limiter_sample_rate) == 1.0);
+        } else {
+          REQUIRE(sample_rate == 0.0);
+          REQUIRE(span.numeric_tags.count(
+                      tags::internal::rule_limiter_sample_rate) == 0);
+        }
+      }
+    }
+  }  // root span
+}  // span finalizers

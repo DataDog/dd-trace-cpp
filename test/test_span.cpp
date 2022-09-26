@@ -421,7 +421,8 @@ TEST_CASE("injection") {
     }
 
     SECTION("lots of trace tags") {
-      const std::string trace_tags = "foo=bar,34=43,54-46=my-number,_dd.p.not_excluded=foo";
+      const std::string trace_tags =
+          "foo=bar,34=43,54-46=my-number,_dd.p.not_excluded=foo";
       const std::unordered_map<std::string, std::string> headers{
           {"x-datadog-trace-id", "123"},
           {"x-datadog-sampling-priority", "0"},
