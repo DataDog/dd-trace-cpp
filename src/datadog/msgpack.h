@@ -20,8 +20,6 @@ void push_number_big_endian(std::string& buffer, Integer integer);
 template <typename Range>
 void push(std::string& buffer, const Range& range);
 
-void pack_nil(std::string& buffer);
-
 void pack_negative(std::string& buffer, std::int64_t value);
 
 void pack_nonnegative(std::string& buffer, std::uint64_t value);
@@ -30,8 +28,6 @@ template <typename Integer>
 void pack_integer(std::string& buffer, Integer value);
 
 void pack_double(std::string& buffer, double value);
-
-void pack_bool(std::string& buffer, bool value);
 
 void pack_str(std::string& buffer, const char* cstr);
 
@@ -52,9 +48,6 @@ enum pack_type : std::uint8_t {
   FIX_ARRAY = 0x90,
 
   FIX_STR = 0xA0,
-
-  FALSE = 0xC2,
-  TRUE = 0xC3,
 
   DOUBLE = 0xCB,
   UINT8 = 0xCC,
@@ -190,14 +183,6 @@ inline void pack_double(std::string& buffer, double value) {
 #endif
 
   push_number_big_endian(buffer, memory.as_integer);
-}
-
-inline void pack_bool(std::string& buffer, bool value) {
-  if (value) {
-    buffer.push_back(static_cast<char>(pack_type::TRUE));
-  } else {
-    buffer.push_back(static_cast<char>(pack_type::FALSE));
-  }
 }
 
 inline void pack_str(std::string& buffer, const char* cstr) {
