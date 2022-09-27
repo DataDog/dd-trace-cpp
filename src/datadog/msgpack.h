@@ -38,9 +38,6 @@ void pack_str(std::string& buffer, const char* cstr);
 template <typename Range>
 void pack_str(std::string& buffer, const Range& range);
 
-template <typename Range>
-void pack_bin(std::string& buffer, const Range& range);
-
 void pack_array(std::string& buffer, size_t size);
 
 void pack_map(std::string& buffer, size_t size);
@@ -56,19 +53,9 @@ enum pack_type : std::uint8_t {
 
   FIX_STR = 0xA0,
 
-  NIL = 0xC0,
   FALSE = 0xC2,
   TRUE = 0xC3,
 
-  BIN8 = 0xC4,
-  BIN16 = 0xC5,
-  BIN32 = 0xC6,
-
-  EXT8 = 0xC7,
-  EXT16 = 0xC8,
-  EXT32 = 0xC9,
-
-  FLOAT = 0xCA,
   DOUBLE = 0xCB,
   UINT8 = 0xCC,
   UINT16 = 0xCD,
@@ -133,10 +120,6 @@ void push_number_big_endian(std::string& buffer, Integer integer) {
 template <typename Range>
 void push(std::string& buffer, const Range& range) {
   buffer.insert(buffer.end(), std::begin(range), std::end(range));
-}
-
-inline void pack_nil(std::string& buffer) {
-  buffer.push_back(static_cast<char>(pack_type::NIL));
 }
 
 inline void pack_negative(std::string& buffer, std::int64_t value) {
@@ -244,28 +227,6 @@ void pack_str(std::string& buffer, const Range& range) {
   } else {
     throw std::out_of_range(make_overflow_message(
         "string", size, std::numeric_limits<std::uint32_t>::max()));
-  }
-}
-
-template <typename Range>
-void pack_bin(std::string& buffer, const Range& range) {
-  auto size =
-      static_cast<size_t>(std::distance(std::begin(range), std::end(range)));
-  if (size <= std::numeric_limits<std::uint8_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::BIN8));
-    buffer.push_back(static_cast<char>(static_cast<std::uint8_t>(size)));
-    push(buffer, range);
-  } else if (size <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::BIN16));
-    push_number_big_endian(buffer, static_cast<std::uint16_t>(size));
-    push(buffer, range);
-  } else if (size <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::BIN32));
-    push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
-    push(buffer, range);
-  } else {
-    throw std::out_of_range(make_overflow_message(
-        "binary", size, std::numeric_limits<std::uint32_t>::max()));
   }
 }
 
