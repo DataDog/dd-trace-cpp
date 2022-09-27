@@ -101,7 +101,7 @@ inline std::string make_overflow_message(std::string_view type,
   message += " of size ";
   message += std::to_string(actual);
   message += ", which exceeds the protocol maximum of ";
-  message += max;
+  message += std::to_string(max);
   message += '.';
   return message;
 }
