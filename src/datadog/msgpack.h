@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -41,35 +42,31 @@ void pack_map(std::string& buffer, size_t size);
 std::string make_overflow_message(std::string_view type, std::size_t actual,
                                   std::size_t max);
 
-// `pack_type` enumerates the type prefix bytes used by this encoder.
-enum pack_type : std::uint8_t {
-  FIX_MAP = 0x80,
-
-  FIX_ARRAY = 0x90,
-
-  FIX_STR = 0xA0,
-
-  DOUBLE = 0xCB,
-  UINT8 = 0xCC,
-  UINT16 = 0xCD,
-  UINT32 = 0xCE,
-  UINT64 = 0xCF,
-  INT8 = 0xD0,
-  INT16 = 0xD1,
-  INT32 = 0xD2,
-  INT64 = 0xD3,
-
-  STR8 = 0xD9,
-  STR16 = 0xDA,
-  STR32 = 0xDB,
-
-  ARRAY16 = 0xDC,
-  ARRAY32 = 0xDD,
-  MAP16 = 0xDE,
-  MAP32 = 0xDF,
-
-  NEGATIVE_FIXNUM = 0xE0,
-};
+// MessagePack values are prefixed by a byte naming their type, but there are
+// multiple flavors in order to compactly encode the length of the value where
+// applicable.
+namespace types {
+constexpr auto FIX_MAP = std::byte(0x80);
+constexpr auto FIX_ARRAY = std::byte(0x90);
+constexpr auto FIX_STR = std::byte(0xA0);
+constexpr auto DOUBLE = std::byte(0xCB);
+constexpr auto UINT8 = std::byte(0xCC);
+constexpr auto UINT16 = std::byte(0xCD);
+constexpr auto UINT32 = std::byte(0xCE);
+constexpr auto UINT64 = std::byte(0xCF);
+constexpr auto INT8 = std::byte(0xD0);
+constexpr auto INT16 = std::byte(0xD1);
+constexpr auto INT32 = std::byte(0xD2);
+constexpr auto INT64 = std::byte(0xD3);
+constexpr auto STR8 = std::byte(0xD9);
+constexpr auto STR16 = std::byte(0xDA);
+constexpr auto STR32 = std::byte(0xDB);
+constexpr auto ARRAY16 = std::byte(0xDC);
+constexpr auto ARRAY32 = std::byte(0xDD);
+constexpr auto MAP16 = std::byte(0xDE);
+constexpr auto MAP32 = std::byte(0xDF);
+constexpr auto NEGATIVE_FIXNUM = std::byte(0xE0);
+}  // namespace types
 
 // Here are the inline definitions of all of the functions declared above.
 
@@ -117,37 +114,37 @@ void push(std::string& buffer, const Range& range) {
 
 inline void pack_negative(std::string& buffer, std::int64_t value) {
   if (value >= -32) {
-    buffer.push_back(pack_type::NEGATIVE_FIXNUM |
-                     static_cast<std::uint8_t>((value + 32)));
+    buffer.push_back(
+        static_cast<char>(types::NEGATIVE_FIXNUM | std::byte((value + 32))));
   } else if (value >= std::numeric_limits<std::int8_t>::min()) {
-    buffer.push_back(static_cast<char>(pack_type::INT8));
+    buffer.push_back(static_cast<char>(types::INT8));
     buffer.push_back(static_cast<char>(value));
   } else if (value >= std::numeric_limits<std::int16_t>::min()) {
-    buffer.push_back(static_cast<char>(pack_type::INT16));
+    buffer.push_back(static_cast<char>(types::INT16));
     push_number_big_endian(buffer, static_cast<std::int16_t>(value));
   } else if (value >= std::numeric_limits<std::int32_t>::min()) {
-    buffer.push_back(static_cast<char>(pack_type::INT32));
+    buffer.push_back(static_cast<char>(types::INT32));
     push_number_big_endian(buffer, static_cast<std::int32_t>(value));
   } else if (value >= std::numeric_limits<std::int64_t>::min()) {
-    buffer.push_back(static_cast<char>(pack_type::INT64));
+    buffer.push_back(static_cast<char>(types::INT64));
     push_number_big_endian(buffer, static_cast<std::int64_t>(value));
   }
 }
 
 inline void pack_nonnegative(std::string& buffer, std::uint64_t value) {
   if (value <= 0x7F) {
-    buffer.push_back(static_cast<char>(static_cast<std::uint8_t>(value)));
+    buffer.push_back(static_cast<char>(std::byte(value)));
   } else if (value <= std::numeric_limits<std::uint8_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::UINT8));
-    buffer.push_back(static_cast<char>(static_cast<std::uint8_t>(value)));
+    buffer.push_back(static_cast<char>(types::UINT8));
+    buffer.push_back(static_cast<char>(std::byte(value)));
   } else if (value <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::UINT16));
+    buffer.push_back(static_cast<char>(types::UINT16));
     push_number_big_endian(buffer, static_cast<std::uint16_t>(value));
   } else if (value <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::UINT32));
+    buffer.push_back(static_cast<char>(types::UINT32));
     push_number_big_endian(buffer, static_cast<std::uint32_t>(value));
   } else if (value <= std::numeric_limits<std::uint64_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::UINT64));
+    buffer.push_back(static_cast<char>(types::UINT64));
     push_number_big_endian(buffer, static_cast<std::uint64_t>(value));
   }
 }
@@ -162,7 +159,7 @@ void pack_integer(std::string& buffer, Integer value) {
 }
 
 inline void pack_double(std::string& buffer, double value) {
-  buffer.push_back(static_cast<char>(pack_type::DOUBLE));
+  buffer.push_back(static_cast<char>(types::DOUBLE));
 
   // The following is lifted from the "msgpack-c" project.
   // See "pack_double" in
@@ -194,19 +191,18 @@ void pack_str(std::string& buffer, const Range& range) {
   auto size =
       static_cast<size_t>(std::distance(std::begin(range), std::end(range)));
   if (size < 32) {
-    buffer.push_back(static_cast<char>(pack_type::FIX_STR |
-                                       static_cast<std::uint8_t>(size)));
+    buffer.push_back(static_cast<char>(types::FIX_STR | std::byte(size)));
     push(buffer, range);
   } else if (size <= std::numeric_limits<std::uint8_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::STR8));
-    buffer.push_back(static_cast<char>(static_cast<std::uint8_t>(size)));
+    buffer.push_back(static_cast<char>(types::STR8));
+    buffer.push_back(static_cast<char>(std::byte(size)));
     push(buffer, range);
   } else if (size <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::STR16));
+    buffer.push_back(static_cast<char>(types::STR16));
     push_number_big_endian(buffer, static_cast<std::uint16_t>(size));
     push(buffer, range);
   } else if (size <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::STR32));
+    buffer.push_back(static_cast<char>(types::STR32));
     push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
     push(buffer, range);
   } else {
@@ -217,13 +213,12 @@ void pack_str(std::string& buffer, const Range& range) {
 
 inline void pack_array(std::string& buffer, size_t size) {
   if (size <= 15) {
-    buffer.push_back(static_cast<char>(pack_type::FIX_ARRAY |
-                                       static_cast<std::uint8_t>(size)));
+    buffer.push_back(static_cast<char>(types::FIX_ARRAY | std::byte(size)));
   } else if (size <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::ARRAY16));
+    buffer.push_back(static_cast<char>(types::ARRAY16));
     push_number_big_endian(buffer, static_cast<std::uint16_t>(size));
   } else if (size <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::ARRAY32));
+    buffer.push_back(static_cast<char>(types::ARRAY32));
     push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
   } else {
     throw std::out_of_range(make_overflow_message(
@@ -233,13 +228,12 @@ inline void pack_array(std::string& buffer, size_t size) {
 
 inline void pack_map(std::string& buffer, size_t size) {
   if (size <= 15) {
-    buffer.push_back(static_cast<char>(pack_type::FIX_MAP |
-                                       static_cast<std::uint8_t>(size)));
+    buffer.push_back(static_cast<char>(types::FIX_MAP | std::byte(size)));
   } else if (size <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::MAP16));
+    buffer.push_back(static_cast<char>(types::MAP16));
     push_number_big_endian(buffer, static_cast<std::uint16_t>(size));
   } else if (size <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(pack_type::MAP32));
+    buffer.push_back(static_cast<char>(types::MAP32));
     push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
   } else {
     throw std::out_of_range(make_overflow_message(
