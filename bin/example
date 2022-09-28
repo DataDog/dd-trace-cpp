@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = '--verbose' ]; then
+    verbosity_flags='VERBOSE=1'
+    shift
+else
+    verbosity_flags=''
+fi
+
+if [ "$1" = '--build-only' ]; then
+    build_only=1
+else
+    build_only=0
+fi
+
+cd "$(dirname "$0")"/..
+
+mkdir -p .build
+cd .build
+cmake .. $coverage_flags -DBUILD_EXAMPLE=1
+make -j $(nproc) $verbosity_flags
+
+if [ "$build_only" -eq 1 ]; then
+    exit
+fi
+
+echo 'Running example...'
+./example/example"$@"

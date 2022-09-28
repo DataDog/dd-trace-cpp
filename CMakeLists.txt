@@ -91,11 +91,10 @@ add_library(dd_trace_cpp
 
 add_dependencies(dd_trace_cpp curl)
 
-# Make the build libcurl visible to dd_trace_cpp.
-target_include_directories(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/include)
+# Make the build libcurl visible to dd_trace_cpp and its dependents.
+target_include_directories(dd_trace_cpp PUBLIC ${CMAKE_BINARY_DIR}/include)
 
 # This library's public headers are just its source headers.
-# target_include_directories(dd_trace_cpp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(dd_trace_cpp INTERFACE src/)
 
 # Any dependent target that's linking this library will also need curl and threads.
@@ -104,4 +103,8 @@ target_link_libraries(dd_trace_cpp INTERFACE ${CMAKE_BINARY_DIR}/lib/libcurl.a T
 
 if(BUILD_TESTING)
   add_subdirectory(test)
+endif()
+
+if(BUILD_EXAMPLE)
+  add_subdirectory(example)
 endif()
