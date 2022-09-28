@@ -5,9 +5,6 @@ add_executable(tests
     # wrapper around Catch2
     test.cpp
 
-    # library under test
-    $<TARGET_OBJECTS:dd_trace_cpp-object>
-   
     # mocks and utilities
     collectors.cpp
     dict_readers.cpp
@@ -31,10 +28,7 @@ add_executable(tests
     test_trace_sampler.cpp
 )
 
-add_dependencies(tests dd_trace_cpp-object)
-target_link_libraries(tests ${CMAKE_BINARY_DIR}/lib/libcurl.a ${COVERAGE_LIBRARIES} Threads::Threads)
+target_link_libraries(tests dd_trace_cpp ${COVERAGE_LIBRARIES})
 if(BUILD_COVERAGE)
     target_link_options(tests PRIVATE -fprofile-arcs -ftest-coverage)
 endif()
-
-target_include_directories(tests PRIVATE ../src/)

@@ -25,13 +25,24 @@ else
     show_coverage=0
 fi
 
+if [ "$1" = '--build-only' ]; then
+    build_only=1
+else
+    build_only=0
+fi
+
 cd "$(dirname "$0")"/..
 
 mkdir -p .build
 cd .build
-cmake .. $coverage_flags
+cmake .. $coverage_flags -DBUILD_TESTING=1
+# Clean up any code coverage artifacts.
 find . -type f -name '*.gcda' -print0 | xargs -0 rm -f
 make -j $(nproc) $verbosity_flags
+
+if [ "$build_only" -eq 1 ]; then
+    exit
+fi
 
 echo 'Running tests...'
 ./test/tests "$@"
