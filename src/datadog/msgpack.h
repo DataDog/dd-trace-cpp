@@ -42,30 +42,14 @@ void pack_map(std::string& buffer, size_t size);
 std::string make_overflow_message(std::string_view type, std::size_t actual,
                                   std::size_t max);
 
-// MessagePack values are prefixed by a byte naming their type, but there are
-// multiple flavors in order to compactly encode the length of the value where
-// applicable.
+// MessagePack values are prefixed by a byte naming their type.
 namespace types {
-constexpr auto FIX_MAP = std::byte(0x80);
-constexpr auto FIX_ARRAY = std::byte(0x90);
-constexpr auto FIX_STR = std::byte(0xA0);
 constexpr auto DOUBLE = std::byte(0xCB);
-constexpr auto UINT8 = std::byte(0xCC);
-constexpr auto UINT16 = std::byte(0xCD);
-constexpr auto UINT32 = std::byte(0xCE);
 constexpr auto UINT64 = std::byte(0xCF);
-constexpr auto INT8 = std::byte(0xD0);
-constexpr auto INT16 = std::byte(0xD1);
-constexpr auto INT32 = std::byte(0xD2);
 constexpr auto INT64 = std::byte(0xD3);
-constexpr auto STR8 = std::byte(0xD9);
-constexpr auto STR16 = std::byte(0xDA);
 constexpr auto STR32 = std::byte(0xDB);
-constexpr auto ARRAY16 = std::byte(0xDC);
 constexpr auto ARRAY32 = std::byte(0xDD);
-constexpr auto MAP16 = std::byte(0xDE);
 constexpr auto MAP32 = std::byte(0xDF);
-constexpr auto NEGATIVE_FIXNUM = std::byte(0xE0);
 }  // namespace types
 
 // Here are the inline definitions of all of the functions declared above.
@@ -113,40 +97,13 @@ void push(std::string& buffer, const Range& range) {
 }
 
 inline void pack_negative(std::string& buffer, std::int64_t value) {
-  if (value >= -32) {
-    buffer.push_back(
-        static_cast<char>(types::NEGATIVE_FIXNUM | std::byte((value + 32))));
-  } else if (value >= std::numeric_limits<std::int8_t>::min()) {
-    buffer.push_back(static_cast<char>(types::INT8));
-    buffer.push_back(static_cast<char>(value));
-  } else if (value >= std::numeric_limits<std::int16_t>::min()) {
-    buffer.push_back(static_cast<char>(types::INT16));
-    push_number_big_endian(buffer, static_cast<std::int16_t>(value));
-  } else if (value >= std::numeric_limits<std::int32_t>::min()) {
-    buffer.push_back(static_cast<char>(types::INT32));
-    push_number_big_endian(buffer, static_cast<std::int32_t>(value));
-  } else if (value >= std::numeric_limits<std::int64_t>::min()) {
-    buffer.push_back(static_cast<char>(types::INT64));
-    push_number_big_endian(buffer, static_cast<std::int64_t>(value));
-  }
+  buffer.push_back(static_cast<char>(types::INT64));
+  push_number_big_endian(buffer, static_cast<std::int64_t>(value));
 }
 
 inline void pack_nonnegative(std::string& buffer, std::uint64_t value) {
-  if (value <= 0x7F) {
-    buffer.push_back(static_cast<char>(std::byte(value)));
-  } else if (value <= std::numeric_limits<std::uint8_t>::max()) {
-    buffer.push_back(static_cast<char>(types::UINT8));
-    buffer.push_back(static_cast<char>(std::byte(value)));
-  } else if (value <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(types::UINT16));
-    push_number_big_endian(buffer, static_cast<std::uint16_t>(value));
-  } else if (value <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(types::UINT32));
-    push_number_big_endian(buffer, static_cast<std::uint32_t>(value));
-  } else if (value <= std::numeric_limits<std::uint64_t>::max()) {
-    buffer.push_back(static_cast<char>(types::UINT64));
-    push_number_big_endian(buffer, static_cast<std::uint64_t>(value));
-  }
+  buffer.push_back(static_cast<char>(types::UINT64));
+  push_number_big_endian(buffer, static_cast<std::uint64_t>(value));
 }
 
 template <typename Integer>
@@ -190,55 +147,31 @@ template <typename Range>
 void pack_str(std::string& buffer, const Range& range) {
   auto size =
       static_cast<size_t>(std::distance(std::begin(range), std::end(range)));
-  if (size < 32) {
-    buffer.push_back(static_cast<char>(types::FIX_STR | std::byte(size)));
-    push(buffer, range);
-  } else if (size <= std::numeric_limits<std::uint8_t>::max()) {
-    buffer.push_back(static_cast<char>(types::STR8));
-    buffer.push_back(static_cast<char>(std::byte(size)));
-    push(buffer, range);
-  } else if (size <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(types::STR16));
-    push_number_big_endian(buffer, static_cast<std::uint16_t>(size));
-    push(buffer, range);
-  } else if (size <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(types::STR32));
-    push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
-    push(buffer, range);
-  } else {
+  if (size > std::numeric_limits<std::uint32_t>::max()) {
     throw std::out_of_range(make_overflow_message(
         "string", size, std::numeric_limits<std::uint32_t>::max()));
   }
+  buffer.push_back(static_cast<char>(types::STR32));
+  push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
+  push(buffer, range);
 }
 
 inline void pack_array(std::string& buffer, size_t size) {
-  if (size <= 15) {
-    buffer.push_back(static_cast<char>(types::FIX_ARRAY | std::byte(size)));
-  } else if (size <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(types::ARRAY16));
-    push_number_big_endian(buffer, static_cast<std::uint16_t>(size));
-  } else if (size <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(types::ARRAY32));
-    push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
-  } else {
+  if (size > std::numeric_limits<std::uint32_t>::max()) {
     throw std::out_of_range(make_overflow_message(
         "array", size, std::numeric_limits<std::uint32_t>::max()));
   }
+  buffer.push_back(static_cast<char>(types::ARRAY32));
+  push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
 }
 
 inline void pack_map(std::string& buffer, size_t size) {
-  if (size <= 15) {
-    buffer.push_back(static_cast<char>(types::FIX_MAP | std::byte(size)));
-  } else if (size <= std::numeric_limits<std::uint16_t>::max()) {
-    buffer.push_back(static_cast<char>(types::MAP16));
-    push_number_big_endian(buffer, static_cast<std::uint16_t>(size));
-  } else if (size <= std::numeric_limits<std::uint32_t>::max()) {
-    buffer.push_back(static_cast<char>(types::MAP32));
-    push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
-  } else {
+  if (size > std::numeric_limits<std::uint32_t>::max()) {
     throw std::out_of_range(make_overflow_message(
         "map", size, std::numeric_limits<std::uint32_t>::max()));
   }
+  buffer.push_back(static_cast<char>(types::MAP32));
+  push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
 }
 
 }  // namespace msgpack
