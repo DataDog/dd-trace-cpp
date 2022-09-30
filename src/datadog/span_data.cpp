@@ -1,5 +1,6 @@
 #include "span_data.h"
 
+#include <cstddef>
 #include <exception>
 #include <string_view>
 
@@ -65,7 +66,7 @@ void SpanData::apply_config(const SpanDefaults& defaults,
 Expected<void> msgpack_encode(std::string& destination,
                               const SpanData& span) try {
   // Be sure to update `num_fields` when adding fields.
-  const int num_fields = 12;
+  const std::size_t num_fields = 12;
   msgpack::pack_map(destination, num_fields);
 
   msgpack::pack_string(destination, "service");
@@ -102,18 +103,16 @@ Expected<void> msgpack_encode(std::string& destination,
   msgpack::pack_integer(destination, std::int32_t(span.error));
 
   msgpack::pack_string(destination, "meta");
-  msgpack::pack_map(destination, span.tags.size());
-  for (const auto& [key, value] : span.tags) {
-    msgpack::pack_string(destination, key);
-    msgpack::pack_string(destination, value);
-  }
+  msgpack::pack_map(destination, span.tags,
+                    [](std::string& destination, const auto& value) {
+                      msgpack::pack_string(destination, value);
+                    });
 
   msgpack::pack_string(destination, "metrics");
-  msgpack::pack_map(destination, span.numeric_tags.size());
-  for (const auto& [key, value] : span.numeric_tags) {
-    msgpack::pack_string(destination, key);
-    msgpack::pack_double(destination, value);
-  }
+  msgpack::pack_map(destination, span.numeric_tags,
+                    [](std::string& destination, const auto& value) {
+                      msgpack::pack_double(destination, value);
+                    });
 
   msgpack::pack_string(destination, "type");
   msgpack::pack_string(destination, span.service_type);
