@@ -23,8 +23,12 @@ namespace datadog {
 namespace tracing {
 namespace msgpack {
 
-void pack_negative(std::string& buffer, std::int64_t value);
-void pack_nonnegative(std::string& buffer, std::uint64_t value);
+void pack_integer(std::string& buffer, std::int64_t value);
+void pack_integer(std::string& buffer, std::uint64_t value);
+
+inline void pack_integer(std::string& buffer, std::int32_t value) {
+  pack_integer(buffer, std::int64_t(value));
+}
 
 void pack_double(std::string& buffer, double value);
 void pack_string(std::string& buffer, std::string_view value);
@@ -69,15 +73,6 @@ template <typename Key, typename PackValue, typename... Rest>
 void pack_map_suffix(std::string& buffer, Key&& key, PackValue&& pack_value,
                      Rest&&... rest);
 void pack_map_suffix(std::string& buffer);
-
-template <typename Integer>
-void pack_integer(std::string& buffer, Integer value) {
-  if (value < 0) {
-    return pack_negative(buffer, value);
-  } else {
-    return pack_nonnegative(buffer, value);
-  }
-}
 
 template <typename Iterable, typename PackValue>
 Expected<void> pack_array(std::string& buffer, Iterable&& values,

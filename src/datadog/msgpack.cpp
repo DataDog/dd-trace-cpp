@@ -58,12 +58,12 @@ void push_number_big_endian(std::string& buffer, Integer integer) {
 
 }  // namespace
 
-void pack_negative(std::string& buffer, std::int64_t value) {
+void pack_integer(std::string& buffer, std::int64_t value) {
   buffer.push_back(static_cast<char>(types::INT64));
   push_number_big_endian(buffer, static_cast<std::int64_t>(value));
 }
 
-void pack_nonnegative(std::string& buffer, std::uint64_t value) {
+void pack_integer(std::string& buffer, std::uint64_t value) {
   buffer.push_back(static_cast<char>(types::UINT64));
   push_number_big_endian(buffer, static_cast<std::uint64_t>(value));
 }
