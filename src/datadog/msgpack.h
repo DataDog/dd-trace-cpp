@@ -30,10 +30,10 @@ void pack_integer(std::string& buffer, Integer value);
 
 void pack_double(std::string& buffer, double value);
 
-void pack_str(std::string& buffer, const char* cstr);
+void pack_string(std::string& buffer, const char* cstr);
 
 template <typename Range>
-void pack_str(std::string& buffer, const Range& range);
+void pack_string(std::string& buffer, const Range& range);
 
 void pack_array(std::string& buffer, size_t size);
 
@@ -139,17 +139,17 @@ inline void pack_double(std::string& buffer, double value) {
   push_number_big_endian(buffer, memory.as_integer);
 }
 
-inline void pack_str(std::string& buffer, const char* cstr) {
-  return pack_str(buffer, std::string_view(cstr));
+inline void pack_string(std::string& buffer, const char* cstr) {
+  return pack_string(buffer, std::string_view(cstr));
 }
 
 template <typename Range>
-void pack_str(std::string& buffer, const Range& range) {
+void pack_string(std::string& buffer, const Range& range) {
   auto size =
       static_cast<size_t>(std::distance(std::begin(range), std::end(range)));
-  if (size > std::numeric_limits<std::uint32_t>::max()) {
-    throw std::out_of_range(make_overflow_message(
-        "string", size, std::numeric_limits<std::uint32_t>::max()));
+  const auto max = std::numeric_limits<std::uint32_t>::max();
+  if (size > max) {
+    throw std::out_of_range(make_overflow_message("string", size, max));
   }
   buffer.push_back(static_cast<char>(types::STR32));
   push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
@@ -157,18 +157,18 @@ void pack_str(std::string& buffer, const Range& range) {
 }
 
 inline void pack_array(std::string& buffer, size_t size) {
-  if (size > std::numeric_limits<std::uint32_t>::max()) {
-    throw std::out_of_range(make_overflow_message(
-        "array", size, std::numeric_limits<std::uint32_t>::max()));
+  const auto max = std::numeric_limits<std::uint32_t>::max();
+  if (size > max) {
+    throw std::out_of_range(make_overflow_message("array", size, max));
   }
   buffer.push_back(static_cast<char>(types::ARRAY32));
   push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
 }
 
 inline void pack_map(std::string& buffer, size_t size) {
-  if (size > std::numeric_limits<std::uint32_t>::max()) {
-    throw std::out_of_range(make_overflow_message(
-        "map", size, std::numeric_limits<std::uint32_t>::max()));
+  const auto max = std::numeric_limits<std::uint32_t>::max();
+  if (size > max) {
+    throw std::out_of_range(make_overflow_message("map", size, max));
   }
   buffer.push_back(static_cast<char>(types::MAP32));
   push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
