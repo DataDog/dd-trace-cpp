@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <chrono>
-#include <exception>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -31,25 +30,21 @@ HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
 
 Expected<void> msgpack_encode(
     std::string& destination,
-    const std::vector<std::unique_ptr<SpanData>>& spans) try {
+    const std::vector<std::unique_ptr<SpanData>>& spans) {
   return msgpack::pack_array(destination, spans,
                              [](auto& destination, const auto& span_ptr) {
                                assert(span_ptr);
                                return msgpack_encode(destination, *span_ptr);
                              });
-} catch (const std::exception& error) {
-  return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }
 
 Expected<void> msgpack_encode(
     std::string& destination,
-    const std::vector<DatadogAgent::TraceChunk>& trace_chunks) try {
+    const std::vector<DatadogAgent::TraceChunk>& trace_chunks) {
   return msgpack::pack_array(destination, trace_chunks,
                              [](auto& destination, const auto& chunk) {
                                return msgpack_encode(destination, chunk.spans);
                              });
-} catch (const std::exception& error) {
-  return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }
 
 std::variant<CollectorResponse, std::string> parse_agent_traces_response(

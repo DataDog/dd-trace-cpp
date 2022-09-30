@@ -1,7 +1,6 @@
 #include "span_data.h"
 
 #include <cstddef>
-#include <exception>
 #include <string_view>
 
 #include "error.h"
@@ -63,8 +62,7 @@ void SpanData::apply_config(const SpanDefaults& defaults,
   }
 }
 
-Expected<void> msgpack_encode(std::string& destination,
-                              const SpanData& span) try {
+Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
   // clang-format off
   msgpack::pack_map(
       destination,
@@ -125,8 +123,6 @@ Expected<void> msgpack_encode(std::string& destination,
   // clang-format on
 
   return std::nullopt;
-} catch (const std::exception& error) {
-  return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }
 
 }  // namespace tracing
