@@ -1,5 +1,16 @@
 #pragma once
 
+// This component provides encoding routines for [MessagePack][1].
+//
+// Each function is in `namespace msgpack` and appends a specified value to a
+// `std::string`.  For example, `msgpack::pack_integer(destination, -42)`
+// MessagePack encodes the number `-42` and appends the result to `destination`.
+//
+// Only encoding is provided, and only for the types required by `SpanData` and
+// `DatadogAgent`.
+//
+// [1]: https://msgpack.org/index.html
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -19,14 +30,37 @@ void pack_double(std::string& buffer, double value);
 void pack_string(std::string& buffer, std::string_view value);
 
 void pack_array(std::string& buffer, std::size_t size);
+
+// Append to the specified `buffer` a MessagePack encoded array having the
+// specified `values`, where for each element of `values` the specified
+// `pack_value` function appends the value.  `pack_value` is invoked with two
+// arguments: the first is a reference to `buffer`, and the second is a
+// reference to the current value.  `pack_value` returns an `Expected<void>`.
+// If the return value is an error, then iteration is halted and the error is
+// returned.  Otherwise the non-error value is returned.
 template <typename Iterable, typename PackValue>
 Expected<void> pack_array(std::string& buffer, Iterable&& values,
                           PackValue&& pack_value);
 
 void pack_map(std::string& buffer, std::size_t size);
+
+// Append to the specified `buffer` a MessagePack encoded map consisting of the
+// specified `pairs`, where the first element of each pair is the name of the
+// map element, and the second element of each pair is some value that is
+// MessagePack encoded by the specified `pack_value` function. `pack_value` is
+// invoked with two arguments: the first is a reference to `buffer`, and the
+// second is a reference to the current value.
 template <typename PairIterable, typename PackValue>
 void pack_map(std::string& buffer, const PairIterable& pairs,
               PackValue&& pack_value);
+
+// Append to the specified `buffer` a MessagePack encoded map consisting of the
+// specified key value pairs.  After the `buffer` argument, `pack_map` accepts
+// an even number of arguments.  First in each pair of arguments is `key`, the
+// key name of the corresponding map item.  Second in each pair of arguments is
+// `pack_value`, a function that encodes the corresponding value.  `pack_value`
+// is invoked with two arguments: the first is a reference to `buffer`, and the
+// second is a reference to the current value.
 template <typename Key, typename PackValue, typename... Rest>
 void pack_map(std::string& buffer, Key&& key, PackValue&& pack_value,
               Rest&&... rest);
