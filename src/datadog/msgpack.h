@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace datadog {
 namespace tracing {
@@ -17,9 +18,16 @@ void pack_string(std::string& buffer, std::string_view value);
 
 void pack_array(std::string& buffer, std::size_t size);
 void pack_map(std::string& buffer, std::size_t size);
+template <typename PairIterable, typename PackValue>
+void pack_map(std::string& buffer, const PairIterable& pairs,
+              PackValue&& pack_value);
+template <typename Key, typename PackValue, typename... Rest>
+void pack_map(std::string& buffer, Key&& key, PackValue&& pack_value,
+              Rest&&... rest);
 
-template <typename Entry, typename... Entries>
-void pack_map_suffix(std::string& buffer, Entry&& entry, Entries&&... entries);
+template <typename Key, typename PackValue, typename... Rest>
+void pack_map_suffix(std::string& buffer, Key&& key, PackValue&& pack_value,
+                     Rest&&... rest);
 void pack_map_suffix(std::string& buffer);
 
 template <typename Integer>
@@ -41,22 +49,26 @@ void pack_map(std::string& buffer, const PairIterable& pairs,
   }
 }
 
-template <typename Entry, typename... Entries>
-void pack_map(std::string& buffer, Entry&& entry, Entries&&... entries) {
-  pack_map(buffer, 1 + sizeof...(entries));
-  pack_map_suffix(buffer, std::forward<Entry>(entry),
-                  std::forward<Entries>(entries)...);
+template <typename Key, typename PackValue, typename... Rest>
+void pack_map(std::string& buffer, Key&& key, PackValue&& pack_value,
+              Rest&&... rest) {
+  pack_map(buffer, 1 + sizeof...(rest));
+  pack_map_suffix(buffer, std::forward<Key>(key),
+                  std::forward<PackValue>(pack_value),
+                  std::forward<Rest>(rest)...);
 }
 
-template <typename Entry, typename... Entries>
-void pack_map_suffix(std::string& buffer, Entry&& entry, Entries&&... entries) {
-  auto&& [key, pack_value] = entry;
+template <typename Key, typename PackValue, typename... Rest>
+void pack_map_suffix(std::string& buffer, Key&& key, PackValue&& pack_value,
+                     Rest&&... rest) {
   pack_string(buffer, key);
   pack_value(buffer);
-  pack_map_suffix(buffer, std::forward<Entries>(entries)...);
+  pack_map_suffix(buffer, std::forward<Rest>(rest)...);
 }
 
-inline void pack_map_suffix(std::string&) {}
+inline void pack_map_suffix(std::string&) {
+  // base case does nothing
+}
 
 }  // namespace msgpack
 }  // namespace tracing

@@ -18,7 +18,6 @@ constexpr auto MAP32 = std::byte(0xDF);
 constexpr auto STR32 = std::byte(0xDB);
 constexpr auto UINT64 = std::byte(0xCF);
 }  // namespace types
-}  // namespace
 
 std::string make_overflow_message(std::string_view type, std::size_t actual,
                                   std::size_t max) {
@@ -56,6 +55,8 @@ void push_number_big_endian(std::string& buffer, Integer integer) {
 
   buffer.append(buf, sizeof buf);
 }
+
+}  // namespace
 
 void pack_negative(std::string& buffer, std::int64_t value) {
   buffer.push_back(static_cast<char>(types::INT64));

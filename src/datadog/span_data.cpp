@@ -65,59 +65,58 @@ void SpanData::apply_config(const SpanDefaults& defaults,
 
 Expected<void> msgpack_encode(std::string& destination,
                               const SpanData& span) try {
-  // Be sure to update `num_fields` when adding fields.
-  const std::size_t num_fields = 12;
-  msgpack::pack_map(destination, num_fields);
-
-  msgpack::pack_string(destination, "service");
-  msgpack::pack_string(destination, span.service);
-
-  msgpack::pack_string(destination, "name");
-  msgpack::pack_string(destination, span.name);
-
-  msgpack::pack_string(destination, "resource");
-  msgpack::pack_string(destination, span.resource);
-
-  msgpack::pack_string(destination, "trace_id");
-  msgpack::pack_integer(destination, span.trace_id);
-
-  msgpack::pack_string(destination, "span_id");
-  msgpack::pack_integer(destination, span.span_id);
-
-  msgpack::pack_string(destination, "parent_id");
-  msgpack::pack_integer(destination, span.parent_id);
-
-  msgpack::pack_string(destination, "start");
-  msgpack::pack_integer(destination,
-                        std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            span.start.wall.time_since_epoch())
-                            .count());
-
-  msgpack::pack_string(destination, "duration");
-  msgpack::pack_integer(
+  // clang-format off
+  msgpack::pack_map(
       destination,
-      std::chrono::duration_cast<std::chrono::nanoseconds>(span.duration)
-          .count());
+      "service", [&](auto& destination) {
+         msgpack::pack_string(destination, span.service);
+       },
+      "name", [&](auto& destination) {
+         msgpack::pack_string(destination, span.name);
+       },
+      "resource", [&](auto& destination) {
+         msgpack::pack_string(destination, span.resource);
+       },
+      "trace_id", [&](auto& destination) {
+         msgpack::pack_integer(destination, span.trace_id);
+       },
+      "span_id", [&](auto& destination) {
+         msgpack::pack_integer(destination, span.span_id);
+       },
+      "parent_id", [&](auto& destination) {
+         msgpack::pack_integer(destination, span.parent_id);
+       },
+      "start", [&](auto& destination) {
+         msgpack::pack_integer(
+             destination, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                              span.start.wall.time_since_epoch())
+                              .count());
+       },
+      "duration", [&](auto& destination) {
+         msgpack::pack_integer(
+             destination,
+             std::chrono::duration_cast<std::chrono::nanoseconds>(span.duration)
+                 .count());
+       },
+      "error", [&](auto& destination) {
+         msgpack::pack_integer(destination, std::int32_t(span.error));
+       },
+      "meta", [&](auto& destination) {
+         msgpack::pack_map(destination, span.tags,
+                           [](std::string& destination, const auto& value) {
+                             msgpack::pack_string(destination, value);
+                           });
+       }, "metrics",
+       [&](auto& destination) {
+         msgpack::pack_map(destination, span.numeric_tags,
+                           [](std::string& destination, const auto& value) {
+                             msgpack::pack_double(destination, value);
+                           });
+       }, "type", [&](auto& destination) {
+         msgpack::pack_string(destination, span.service_type);
+       });
+  // clang-format on
 
-  msgpack::pack_string(destination, "error");
-  msgpack::pack_integer(destination, std::int32_t(span.error));
-
-  msgpack::pack_string(destination, "meta");
-  msgpack::pack_map(destination, span.tags,
-                    [](std::string& destination, const auto& value) {
-                      msgpack::pack_string(destination, value);
-                    });
-
-  msgpack::pack_string(destination, "metrics");
-  msgpack::pack_map(destination, span.numeric_tags,
-                    [](std::string& destination, const auto& value) {
-                      msgpack::pack_double(destination, value);
-                    });
-
-  msgpack::pack_string(destination, "type");
-  msgpack::pack_string(destination, span.service_type);
-
-  // Be sure to update `num_fields` when adding fields.
   return std::nullopt;
 } catch (const std::exception& error) {
   return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
