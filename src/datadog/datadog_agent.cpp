@@ -32,17 +32,11 @@ HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
 Expected<void> msgpack_encode(
     std::string& destination,
     const std::vector<std::unique_ptr<SpanData>>& spans) try {
-  msgpack::pack_array(destination, spans.size());
-
-  for (const auto& span_ptr : spans) {
-    assert(span_ptr);
-    auto result = msgpack_encode(destination, *span_ptr);
-    if (auto* error = result.if_error()) {
-      return std::move(*error);
-    }
-  }
-
-  return std::nullopt;
+  return msgpack::pack_array(destination, spans,
+                             [](auto& destination, const auto& span_ptr) {
+                               assert(span_ptr);
+                               return msgpack_encode(destination, *span_ptr);
+                             });
 } catch (const std::exception& error) {
   return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }
@@ -50,16 +44,10 @@ Expected<void> msgpack_encode(
 Expected<void> msgpack_encode(
     std::string& destination,
     const std::vector<DatadogAgent::TraceChunk>& trace_chunks) try {
-  msgpack::pack_array(destination, trace_chunks.size());
-
-  for (const auto& chunk : trace_chunks) {
-    auto result = msgpack_encode(destination, chunk.spans);
-    if (auto* error = result.if_error()) {
-      return std::move(*error);
-    }
-  }
-
-  return std::nullopt;
+  return msgpack::pack_array(destination, trace_chunks,
+                             [](auto& destination, const auto& chunk) {
+                               return msgpack_encode(destination, chunk.spans);
+                             });
 } catch (const std::exception& error) {
   return Error{Error::MESSAGEPACK_ENCODE_FAILURE, error.what()};
 }

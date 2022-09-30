@@ -6,6 +6,8 @@
 #include <string_view>
 #include <utility>
 
+#include "expected.h"
+
 namespace datadog {
 namespace tracing {
 namespace msgpack {
@@ -17,6 +19,10 @@ void pack_double(std::string& buffer, double value);
 void pack_string(std::string& buffer, std::string_view value);
 
 void pack_array(std::string& buffer, std::size_t size);
+template <typename Iterable, typename PackValue>
+Expected<void> pack_array(std::string& buffer, Iterable&& values,
+                          PackValue&& pack_value);
+
 void pack_map(std::string& buffer, std::size_t size);
 template <typename PairIterable, typename PackValue>
 void pack_map(std::string& buffer, const PairIterable& pairs,
@@ -37,6 +43,20 @@ void pack_integer(std::string& buffer, Integer value) {
   } else {
     return pack_nonnegative(buffer, value);
   }
+}
+
+template <typename Iterable, typename PackValue>
+Expected<void> pack_array(std::string& buffer, Iterable&& values,
+                          PackValue&& pack_value) {
+  Expected<void> result;
+  pack_array(buffer, std::size(values));
+  for (const auto& value : values) {
+    result = pack_value(buffer, value);
+    if (!result) {
+      break;
+    }
+  }
+  return result;
 }
 
 template <typename PairIterable, typename PackValue>
