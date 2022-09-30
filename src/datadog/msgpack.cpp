@@ -2,8 +2,9 @@
 
 #include <cassert>
 #include <limits>
-#include <stdexcept>
 #include <type_traits>
+
+#include "error.h"
 
 namespace datadog {
 namespace tracing {
@@ -92,33 +93,39 @@ void pack_double(std::string& buffer, double value) {
   push_number_big_endian(buffer, memory.as_integer);
 }
 
-void pack_string(std::string& buffer, std::string_view value) {
+Expected<void> pack_string(std::string& buffer, std::string_view value) {
   const auto size = value.size();
   const auto max = std::numeric_limits<std::uint32_t>::max();
   if (size > max) {
-    throw std::out_of_range(make_overflow_message("string", size, max));
+    return Error{Error::MESSAGEPACK_ENCODE_FAILURE,
+                 make_overflow_message("string", size, max)};
   }
   buffer.push_back(static_cast<char>(types::STR32));
   push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
   buffer.append(value.begin(), value.end());
+  return {};
 }
 
-void pack_array(std::string& buffer, size_t size) {
+Expected<void> pack_array(std::string& buffer, size_t size) {
   const auto max = std::numeric_limits<std::uint32_t>::max();
   if (size > max) {
-    throw std::out_of_range(make_overflow_message("array", size, max));
+    return Error{Error::MESSAGEPACK_ENCODE_FAILURE,
+                 make_overflow_message("array", size, max)};
   }
   buffer.push_back(static_cast<char>(types::ARRAY32));
   push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
+  return {};
 }
 
-void pack_map(std::string& buffer, size_t size) {
+Expected<void> pack_map(std::string& buffer, size_t size) {
   const auto max = std::numeric_limits<std::uint32_t>::max();
   if (size > max) {
-    throw std::out_of_range(make_overflow_message("map", size, max));
+    return Error{Error::MESSAGEPACK_ENCODE_FAILURE,
+                 make_overflow_message("map", size, max)};
   }
   buffer.push_back(static_cast<char>(types::MAP32));
   push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
+  return {};
 }
 
 }  // namespace msgpack

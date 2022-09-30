@@ -69,51 +69,58 @@ Expected<void> msgpack_encode(std::string& destination,
   msgpack::pack_map(
       destination,
       "service", [&](auto& destination) {
-         msgpack::pack_string(destination, span.service);
+         return msgpack::pack_string(destination, span.service);
        },
       "name", [&](auto& destination) {
-         msgpack::pack_string(destination, span.name);
+         return msgpack::pack_string(destination, span.name);
        },
       "resource", [&](auto& destination) {
-         msgpack::pack_string(destination, span.resource);
+         return msgpack::pack_string(destination, span.resource);
        },
       "trace_id", [&](auto& destination) {
          msgpack::pack_integer(destination, span.trace_id);
+         return Expected<void>{};
        },
       "span_id", [&](auto& destination) {
          msgpack::pack_integer(destination, span.span_id);
+         return Expected<void>{};
        },
       "parent_id", [&](auto& destination) {
          msgpack::pack_integer(destination, span.parent_id);
+         return Expected<void>{};
        },
       "start", [&](auto& destination) {
          msgpack::pack_integer(
              destination, std::chrono::duration_cast<std::chrono::nanoseconds>(
                               span.start.wall.time_since_epoch())
                               .count());
+         return Expected<void>{};
        },
       "duration", [&](auto& destination) {
          msgpack::pack_integer(
              destination,
              std::chrono::duration_cast<std::chrono::nanoseconds>(span.duration)
                  .count());
+        return Expected<void>{};
        },
       "error", [&](auto& destination) {
          msgpack::pack_integer(destination, std::int32_t(span.error));
+         return Expected<void>{};
        },
       "meta", [&](auto& destination) {
-         msgpack::pack_map(destination, span.tags,
+         return msgpack::pack_map(destination, span.tags,
                            [](std::string& destination, const auto& value) {
-                             msgpack::pack_string(destination, value);
+                             return msgpack::pack_string(destination, value);
                            });
        }, "metrics",
        [&](auto& destination) {
-         msgpack::pack_map(destination, span.numeric_tags,
+         return msgpack::pack_map(destination, span.numeric_tags,
                            [](std::string& destination, const auto& value) {
                              msgpack::pack_double(destination, value);
+                             return Expected<void>{};
                            });
        }, "type", [&](auto& destination) {
-         msgpack::pack_string(destination, span.service_type);
+         return msgpack::pack_string(destination, span.service_type);
        });
   // clang-format on
 
