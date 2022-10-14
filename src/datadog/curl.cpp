@@ -1,9 +1,105 @@
 #include "curl.h"
 
+#include <curl/curl.h>
+
+#include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <condition_variable>
+#include <cstddef>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string_view>
+#include <thread>
+#include <unordered_map>
+#include <unordered_set>
+
+#include "dict_reader.h"
+#include "dict_writer.h"
+#include "http_client.h"
+#include "logger.h"
 #include "parse_util.h"
 
 namespace datadog {
 namespace tracing {
+
+using ErrorHandler = HTTPClient::ErrorHandler;
+using HeadersSetter = HTTPClient::HeadersSetter;
+using ResponseHandler = HTTPClient::ResponseHandler;
+using URL = HTTPClient::URL;
+
+class CurlImpl {
+  std::mutex mutex_;
+  std::shared_ptr<Logger> logger_;
+  CURLM *multi_handle_;
+  std::unordered_set<CURL *> request_handles_;
+  std::list<CURL *> new_handles_;
+  bool shutting_down_;
+  int num_active_handles_;
+  std::condition_variable no_requests_;
+  std::thread event_loop_;
+
+  struct Request {
+    curl_slist *request_headers = nullptr;
+    std::string request_body;
+    ResponseHandler on_response;
+    ErrorHandler on_error;
+    char error_buffer[CURL_ERROR_SIZE] = "";
+    std::unordered_map<std::string, std::string> response_headers_lower;
+    std::string response_body;
+
+    ~Request();
+  };
+
+  class HeaderWriter : public DictWriter {
+    curl_slist *list_ = nullptr;
+    std::string buffer_;
+
+   public:
+    ~HeaderWriter();
+    curl_slist *release();
+    void set(std::string_view key, std::string_view value) override;
+  };
+
+  class HeaderReader : public DictReader {
+    std::unordered_map<std::string, std::string> *response_headers_lower_;
+    mutable std::string buffer_;
+
+   public:
+    explicit HeaderReader(
+        std::unordered_map<std::string, std::string> *response_headers_lower);
+    std::optional<std::string_view> lookup(std::string_view key) const override;
+    void visit(
+        const std::function<void(std::string_view key, std::string_view value)>
+            &visitor) const override;
+  };
+
+  void run();
+  void handle_message(const CURLMsg &);
+  CURLcode log_on_error(CURLcode result);
+  CURLMcode log_on_error(CURLMcode result);
+
+  static std::size_t on_read_header(char *data, std::size_t, std::size_t length,
+                                    void *user_data);
+  static std::size_t on_read_body(char *data, std::size_t, std::size_t length,
+                                  void *user_data);
+  static bool is_non_whitespace(unsigned char);
+  static char to_lower(unsigned char);
+  static std::string_view trim(std::string_view);
+
+ public:
+  explicit CurlImpl(const std::shared_ptr<Logger> &logger);
+  ~CurlImpl();
+
+  Expected<void> post(const URL &url, HeadersSetter set_headers,
+                      std::string body, ResponseHandler on_response,
+                      ErrorHandler on_error);
+
+  void drain(std::chrono::steady_clock::time_point deadline);
+};
+
 namespace {
 
 void throw_on_error(CURLcode result) {
@@ -15,6 +111,21 @@ void throw_on_error(CURLcode result) {
 }  // namespace
 
 Curl::Curl(const std::shared_ptr<Logger> &logger)
+    : impl_(new CurlImpl{logger}) {}
+
+Curl::~Curl() { delete impl_; }
+
+Expected<void> Curl::post(const URL &url, HeadersSetter set_headers,
+                          std::string body, ResponseHandler on_response,
+                          ErrorHandler on_error) {
+  return impl_->post(url, set_headers, body, on_response, on_error);
+}
+
+void Curl::drain(std::chrono::steady_clock::time_point deadline) {
+  impl_->drain(deadline);
+}
+
+CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger)
     : logger_(logger), shutting_down_(false), num_active_handles_(0) {
   curl_global_init(CURL_GLOBAL_ALL);
   multi_handle_ = curl_multi_init();
@@ -41,7 +152,7 @@ Curl::Curl(const std::shared_ptr<Logger> &logger)
   }
 }
 
-Curl::~Curl() {
+CurlImpl::~CurlImpl() {
   if (multi_handle_ == nullptr) {
     // We're not running; nothing to shut down.
     return;
@@ -55,9 +166,10 @@ Curl::~Curl() {
   event_loop_.join();
 }
 
-Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
-                          std::string body, ResponseHandler on_response,
-                          ErrorHandler on_error) try {
+Expected<void> CurlImpl::post(const HTTPClient::URL &url,
+                              HeadersSetter set_headers, std::string body,
+                              ResponseHandler on_response,
+                              ErrorHandler on_error) try {
   if (multi_handle_ == nullptr) {
     return Error{Error::CURL_HTTP_CLIENT_NOT_RUNNING,
                  "Unable to send request via libcurl because the HTTP client "
@@ -136,15 +248,15 @@ Expected<void> Curl::post(const HTTPClient::URL &url, HeadersSetter set_headers,
   return Error{Error::CURL_REQUEST_SETUP_FAILED, curl_easy_strerror(error)};
 }
 
-void Curl::drain(std::chrono::steady_clock::time_point deadline) {
+void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
   std::unique_lock<std::mutex> lock(mutex_);
   no_requests_.wait_until(lock, deadline, [this]() {
     return num_active_handles_ == 0 && new_handles_.empty();
   });
 }
 
-std::size_t Curl::on_read_header(char *data, std::size_t, std::size_t length,
-                                 void *user_data) {
+std::size_t CurlImpl::on_read_header(char *data, std::size_t,
+                                     std::size_t length, void *user_data) {
   const auto request = static_cast<Request *>(user_data);
   // The idea is:
   //
@@ -179,18 +291,18 @@ std::size_t Curl::on_read_header(char *data, std::size_t, std::size_t length,
   return length;
 }
 
-bool Curl::is_non_whitespace(unsigned char ch) { return !std::isspace(ch); }
+bool CurlImpl::is_non_whitespace(unsigned char ch) { return !std::isspace(ch); }
 
-char Curl::to_lower(unsigned char ch) { return std::tolower(ch); }
+char CurlImpl::to_lower(unsigned char ch) { return std::tolower(ch); }
 
-std::size_t Curl::on_read_body(char *data, std::size_t, std::size_t length,
-                               void *user_data) {
+std::size_t CurlImpl::on_read_body(char *data, std::size_t, std::size_t length,
+                                   void *user_data) {
   const auto request = static_cast<Request *>(user_data);
   request->response_body.append(data, length);
   return length;
 }
 
-CURLcode Curl::log_on_error(CURLcode result) {
+CURLcode CurlImpl::log_on_error(CURLcode result) {
   if (result != CURLE_OK) {
     logger_->log_error(
         Error{Error::CURL_HTTP_CLIENT_ERROR, curl_easy_strerror(result)});
@@ -198,7 +310,7 @@ CURLcode Curl::log_on_error(CURLcode result) {
   return result;
 }
 
-CURLMcode Curl::log_on_error(CURLMcode result) {
+CURLMcode CurlImpl::log_on_error(CURLMcode result) {
   if (result != CURLM_OK) {
     logger_->log_error(
         Error{Error::CURL_HTTP_CLIENT_ERROR, curl_multi_strerror(result)});
@@ -206,7 +318,7 @@ CURLMcode Curl::log_on_error(CURLMcode result) {
   return result;
 }
 
-void Curl::run() {
+void CurlImpl::run() {
   int num_messages_remaining;
   CURLMsg *message;
   std::unique_lock<std::mutex> lock(mutex_);
@@ -258,7 +370,7 @@ void Curl::run() {
   curl_global_cleanup();
 }
 
-void Curl::handle_message(const CURLMsg &message) {
+void CurlImpl::handle_message(const CURLMsg &message) {
   if (message.msg != CURLMSG_DONE) {
     return;
   }
@@ -299,17 +411,17 @@ void Curl::handle_message(const CURLMsg &message) {
   delete &request;
 }
 
-Curl::Request::~Request() { curl_slist_free_all(request_headers); }
+CurlImpl::Request::~Request() { curl_slist_free_all(request_headers); }
 
-Curl::HeaderWriter::~HeaderWriter() { curl_slist_free_all(list_); }
+CurlImpl::HeaderWriter::~HeaderWriter() { curl_slist_free_all(list_); }
 
-curl_slist *Curl::HeaderWriter::release() {
+curl_slist *CurlImpl::HeaderWriter::release() {
   auto list = list_;
   list_ = nullptr;
   return list;
 }
 
-void Curl::HeaderWriter::set(std::string_view key, std::string_view value) {
+void CurlImpl::HeaderWriter::set(std::string_view key, std::string_view value) {
   buffer_.clear();
   buffer_ += key;
   buffer_ += ": ";
@@ -318,11 +430,11 @@ void Curl::HeaderWriter::set(std::string_view key, std::string_view value) {
   list_ = curl_slist_append(list_, buffer_.c_str());
 }
 
-Curl::HeaderReader::HeaderReader(
+CurlImpl::HeaderReader::HeaderReader(
     std::unordered_map<std::string, std::string> *response_headers_lower)
     : response_headers_lower_(response_headers_lower) {}
 
-std::optional<std::string_view> Curl::HeaderReader::lookup(
+std::optional<std::string_view> CurlImpl::HeaderReader::lookup(
     std::string_view key) const {
   buffer_.clear();
   std::transform(key.begin(), key.end(), std::back_inserter(buffer_),
@@ -335,7 +447,7 @@ std::optional<std::string_view> Curl::HeaderReader::lookup(
   return found->second;
 }
 
-void Curl::HeaderReader::visit(
+void CurlImpl::HeaderReader::visit(
     const std::function<void(std::string_view key, std::string_view value)>
         &visitor) const {
   for (const auto &[key, value] : *response_headers_lower_) {

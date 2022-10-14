@@ -121,7 +121,9 @@ template <typename Key, typename PackValue, typename... Rest>
 Expected<void> pack_map(std::string& buffer, Key&& key, PackValue&& pack_value,
                         Rest&&... rest) {
   Expected<void> result;
-  static_assert(sizeof...(rest) % 2 == 0, "pack_map must receive an even number of arguments after the first.");
+  static_assert(
+      sizeof...(rest) % 2 == 0,
+      "pack_map must receive an even number of arguments after the first.");
   result = pack_map(buffer, 1 + sizeof...(rest) / 2);
   if (!result) {
     return result;
