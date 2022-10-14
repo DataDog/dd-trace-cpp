@@ -5,6 +5,11 @@ project(dd-trace-cpp)
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
 
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+include(ProcessorCount)
+ProcessorCount(NUM_PROCESSORS)
+set(MAKE_JOB_COUNT ${NUM_PROCESSORS} CACHE STRING "Number of jobs to use when building libcurl")
 
 include (ExternalProject)
 ExternalProject_Add(curl
@@ -13,7 +18,7 @@ ExternalProject_Add(curl
   BUILD_IN_SOURCE 1
   SOURCE_DIR ${CMAKE_BINARY_DIR}/curl
   CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/curl/configure --prefix=${CMAKE_BINARY_DIR} --disable-ftp --disable-ldap --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-smtp --disable-gopher --without-ssl --disable-crypto-auth --without-axtls --without-zlib --disable-rtsp --enable-shared=no --enable-static=yes --with-pic --without-brotli
-  BUILD_COMMAND make -j16
+  BUILD_COMMAND make -j${MAKE_JOB_COUNT}
   INSTALL_COMMAND make install
 )
 
@@ -40,7 +45,7 @@ if(BUILD_COVERAGE)
   set(COVERAGE_LIBRARIES gcov)
 endif()
 
-add_library(dd_trace_cpp
+add_library(dd_trace_cpp SHARED
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
     src/datadog/collector.cpp
@@ -92,14 +97,14 @@ add_library(dd_trace_cpp
 add_dependencies(dd_trace_cpp curl)
 
 # Make the build libcurl visible to dd_trace_cpp and its dependents.
-target_include_directories(dd_trace_cpp PUBLIC ${CMAKE_BINARY_DIR}/include)
+target_include_directories(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/include)
 
 # This library's public headers are just its source headers.
 target_include_directories(dd_trace_cpp INTERFACE src/)
 
 # Any dependent target that's linking this library will also need curl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp INTERFACE ${CMAKE_BINARY_DIR}/lib/libcurl.a Threads::Threads)
+target_link_libraries(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads)
 
 if(BUILD_TESTING)
   add_subdirectory(test)
