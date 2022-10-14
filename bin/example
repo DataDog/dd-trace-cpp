@@ -26,12 +26,15 @@ if [ "$build_only" -eq 1 ]; then
     exit
 fi
 
+trap 'docker compose --project-directory ../example down' INT
+
 echo 'Running example...'
 if [ "$DD_API_KEY" = '' ]; then
     >&2 echo "The DD_API_KEY environment variable must be set to a Datadog API key."
     exit 1
 fi
 docker compose --project-directory ../example up --detach --remove-orphans
-sleep 3
+# docker compose --project-directory ../example logs --follow &
 ./example/example"$@"
 docker compose --project-directory ../example down
+# wait
