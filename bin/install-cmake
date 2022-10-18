@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# Install a recent binary release of cmake.
+# Kitware produces a self-installing tarball.
+
+set -x
+set -e
+
+if [ "$(uname)" != Linux ]; then
+    >&2 echo "This installer requires Linux, but instead you're running $(uname)."
+    exit 1
+fi
+
+if ! >/dev/null command -v wget; then
+    >&2 echo 'This installer requires wget.'
+    exit 2
+fi
+
+ARCHITECTURE=$(uname -m)
+VERSION=3.24.2
+INSTALLER=cmake-${VERSION}-linux-${ARCHITECTURE}.sh
+URL=https://github.com/Kitware/CMake/releases/download/v${VERSION}/${INSTALLER}
+
+maybe_sudo() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+cd /tmp
+wget "${URL}"
+chmod +x "${INSTALLER}"
+maybe_sudo ./"${INSTALLER}" --skip-license --prefix=/usr/local --exclude-subdir
+rm "${INSTALLER}"
