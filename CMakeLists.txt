@@ -1,8 +1,9 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.24)
 
 project(dd-trace-cpp)
 
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
+option(BUILD_EXAMPLE "Build the example program (example/)" OFF)
 
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -16,6 +17,7 @@ ExternalProject_Add(curl
   URL "https://github.com/curl/curl/releases/download/curl-7_85_0/curl-7.85.0.tar.gz"
   URL_MD5 "4e9eb4f434e9be889e510f038754d3de"
   BUILD_IN_SOURCE 1
+  DOWNLOAD_EXTRACT_TIMESTAMP 0
   SOURCE_DIR ${CMAKE_BINARY_DIR}/curl
   CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/curl/configure --prefix=${CMAKE_BINARY_DIR} --disable-ftp --disable-ldap --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-smtp --disable-gopher --without-ssl --disable-crypto-auth --without-axtls --without-zlib --disable-rtsp --enable-shared=no --enable-static=yes --with-pic --without-brotli
   BUILD_COMMAND make -j${MAKE_JOB_COUNT}
@@ -45,7 +47,8 @@ if(BUILD_COVERAGE)
   set(COVERAGE_LIBRARIES gcov)
 endif()
 
-add_library(dd_trace_cpp SHARED
+add_library(dd_trace_cpp SHARED)
+target_sources(dd_trace_cpp PRIVATE
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
     src/datadog/collector.cpp
@@ -94,17 +97,74 @@ add_library(dd_trace_cpp SHARED
     src/datadog/version.cpp    
 )
 
+# This library's public headers are just its source headers.
+target_sources(dd_trace_cpp PUBLIC
+  FILE_SET public_headers
+  TYPE HEADERS
+  BASE_DIRS src/
+  FILES
+  src/datadog/cerr_logger.h
+  src/datadog/clock.h
+  src/datadog/collector.h
+  src/datadog/collector_response.h
+  # src/datadog/curl.h except for curl.h
+  src/datadog/datadog_agent_config.h
+  src/datadog/datadog_agent.h
+  src/datadog/default_http_client.h
+  src/datadog/dict_reader.h
+  src/datadog/dict_writer.h
+  src/datadog/environment.h
+  src/datadog/error.h
+  src/datadog/event_scheduler.h
+  src/datadog/expected.h
+  src/datadog/glob.h
+  src/datadog/http_client.h
+  src/datadog/id_generator.h
+  src/datadog/json_fwd.hpp
+  src/datadog/json.hpp
+  src/datadog/limiter.h
+  src/datadog/logger.h
+  src/datadog/msgpack.h
+  src/datadog/net_util.h
+  src/datadog/null_collector.h
+  src/datadog/parse_util.h
+  src/datadog/propagation_styles.h
+  src/datadog/rate.h
+  src/datadog/sampling_decision.h
+  src/datadog/sampling_mechanism.h
+  src/datadog/sampling_priority.h
+  src/datadog/sampling_util.h
+  src/datadog/span_config.h
+  src/datadog/span_data.h
+  src/datadog/span_defaults.h
+  src/datadog/span.h
+  src/datadog/span_matcher.h
+  src/datadog/span_sampler_config.h
+  src/datadog/span_sampler.h
+  src/datadog/tag_propagation.h
+  src/datadog/tags.h
+  src/datadog/threaded_event_scheduler.h
+  src/datadog/tracer_config.h
+  src/datadog/tracer.h
+  src/datadog/trace_sampler_config.h
+  src/datadog/trace_sampler.h
+  src/datadog/trace_segment.h
+  src/datadog/version.h
+)
+
 add_dependencies(dd_trace_cpp curl)
 
-# Make the build libcurl visible to dd_trace_cpp and its dependents.
+# Make the build libcurl visible to dd_trace_cpp, but not to its dependents.
 target_include_directories(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/include)
 
-# This library's public headers are just its source headers.
-target_include_directories(dd_trace_cpp INTERFACE src/)
-
-# Any dependent target that's linking this library will also need curl and threads.
+# Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
 target_link_libraries(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads)
+
+# When installing, install the library and its public headers.
+
+install(TARGETS dd_trace_cpp
+  FILE_SET public_headers)
 
 if(BUILD_TESTING)
   add_subdirectory(test)
