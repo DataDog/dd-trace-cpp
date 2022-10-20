@@ -3,9 +3,6 @@
 # Install a recent binary release of cmake.
 # Kitware produces a self-installing tarball.
 
-set -x
-set -e
-
 if [ "$(uname)" != Linux ]; then
     >&2 echo "This installer requires Linux, but instead you're running $(uname)."
     exit 1
@@ -30,7 +27,10 @@ maybe_sudo() {
 }
 
 cd /tmp
-wget "${URL}"
+if ! wget "${URL}"; then
+    >&2 echo "wget failed to download \"${URL}\"."
+    exit 3
+fi
 chmod +x "${INSTALLER}"
 maybe_sudo ./"${INSTALLER}" --skip-license --prefix=/usr/local --exclude-subdir
 rm "${INSTALLER}"
