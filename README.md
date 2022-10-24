@@ -1,52 +1,47 @@
-Check out the latest [testing code coverage report][1].
+Build
+-----
+### `cmake && make && make install` Style Build
+Build this library from source using [CMake][1]. Installation places a shared
+library and public headers into the appropriate system directories
+(`/usr/local/[...]`), or to a specified installation prefix.
 
-Logical Component Relationships
--------------------------------
-- Vertices are components.
-- Edges are ownership relationships between components.  Each edge is labeled
-  by the kind of "smart pointer" that could implement that kind of
-  relationship.
-- Components containing a padlock are protected by a mutex.
+A recent version of CMake is required (3.24), which might not be in your
+system's package manager. [bin/install-cmake](bin/install-cmake) is an installer
+for a recent CMake.
 
-![diagram](ownership.svg)
+Here is how to install dd-trace-cpp into `.install/` within the source
+repository.
+```shell
+$ git clone 'https://github.com/datadog/dd-trace-cpp'
+$ cd dd-trace-cpp
+$ bin/install-cmake
+$ mkdir .install
+$ mkdir .build
+$ cd .build
+$ cmake -DCMAKE_INSTALL_PREFIX=../.install ..
+$ make -j $(nproc)
+$ make install
+$ find ../.install -type d
+```
 
-Code Component Relationships
-----------------------------
-![another diagram](includes.svg)
+To instead install into `/usr/local/`, omit the `.install` directory and the
+`-DCMAKE_INSTALL_PREFIX=../.install` option.
 
-Example Usage
--------------
-TODO
+Then, when building an executable that uses `dd-trace-cpp`, specify the path to
+the installed headers using an appropriate `-I` option.  If the library was
+installed into the default system directories, then the `-I` option is not
+needed.
+```shell
+$ c++ -I/path/to/dd-trace-cpp/.install/include -c -o my_app.o my_app.cpp
+```
 
-Objects
--------
-- _Span_ has a beginning, end, and tags.  It is associated with a _TraceSegment_.
-- _TraceSegment_ is part of a trace.  It makes sampling decisions, detects when
-  it is finished, and sends itself to the _Collector_.
-- _Collector_ receives trace segments.  It provides a callback to deliver
-  sampler modifications, if applicable.
-- _Tracer_ is responsible for creating trace segments. It contains the
-  instances of, and configuration for, the _Collector_, _TraceSampler_, and
-  _SpanSampler_.  A tracer is created from a _TracerConfig_.
-- _TraceSampler_ is used by trace segments to decide when to keep or drop
-  themselves.
-- _SpanSampler_ is used by trace segments to decide which spans to keep when
-  the segment is dropped.
-- _TracerConfig_ contains all of the information needed to configure the collector,
-  trace sampler, and span sampler, as well as defaults for span properties.
+When linking an executable that uses `dd-trace-cpp`, specify linkage to the
+built library using the `-ldd_trace_cpp` option and an appropriate `-L` option.
+If the library was installed into the default system directories, then the `-L`
+options is not needed. The `-ldd_trace_cpp` option is always needed.
+```shell
+$ c++ -o my_app my_app.o -L/path/to/dd-trace-cpp/.install/lib -ldd_trace_cpp
+```
+<!-- TODO: Do those commands need -pthread as well? -->
 
-Intended usage is:
-
-1. Create a `TracerConfig`.
-2. Use the `TracerConfig` to create a `Tracer`.
-3. Use the `Tracer` to create and/or extract local root `Span`s.
-4. Use `Span` to create children and/or inject context.
-5. Use a `Span`'s `TraceSegment` to perform trace-wide operations.
-6. When all `Span`s in ` TraceSegment` are finished, the segment is sent to the
-   `Collector`.
-
-Different instances of `Tracer` are independent of each other.  If an
-application wishes to reconfigure tracing at runtime, it can create another
-`Tracer` using the new configuration.
-
-[1]: https://datadog.github.io/dd-trace-cpp/datadog
+[1]: https://cmake.org/
