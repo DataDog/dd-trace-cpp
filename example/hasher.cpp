@@ -10,7 +10,6 @@
 // canonical format.  Produce a trace whose structure reflects the directory
 // structure.
 
-#include <datadog/curl.h>
 #include <datadog/span_config.h>
 #include <datadog/tags.h>
 #include <datadog/tracer.h>

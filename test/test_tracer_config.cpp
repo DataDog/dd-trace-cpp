@@ -964,24 +964,6 @@ TEST_CASE("TracerConfig::span_sampler") {
           REQUIRE(finalized.error().code == Error::SPAN_SAMPLING_RULES_FILE_IO);
         }
 
-        SECTION("unable to read") {
-          SomewhatSecureTemporaryFile file;
-          REQUIRE(file.is_open());
-          file << "[]";
-          file.close();
-          // We can't read it anymore. This doesn't actually cover the call to
-          // `::read` (i.e. `std::filebuf::[...]`) failing, but getting that to
-          // fail after the file has already been opened for reading is too
-          // tricky.
-          std::filesystem::permissions(file.path(),
-                                       std::filesystem::perms(0200));
-          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE",
-                               file.path().string()};
-          auto finalized = finalize_config(config);
-          REQUIRE(!finalized);
-          REQUIRE(finalized.error().code == Error::SPAN_SAMPLING_RULES_FILE_IO);
-        }
-
         SECTION("unable to parse") {
           SomewhatSecureTemporaryFile file;
           REQUIRE(file.is_open());
