@@ -1,3 +1,43 @@
+Datadog C++ Tracing Library
+===========================
+```c++
+#include <datadog/tracer.h>
+#include <datadog/tracer_config.h>
+
+#include <chrono>
+#include <iostream>
+#include <thread>
+
+int main() {
+    namespace dd = datadog::tracing;
+
+    dd::TracerConfig config;
+    config.service = "my-service";
+
+    const auto validated_config = dd::finalize_config(config);
+    if (!validated_config) {
+        std::cerr << validated_config.error() << '\n';
+        return 1;
+    }
+
+    dd::Tracer tracer{*validated_config};
+    dd::SpanConfig options;
+    
+    options.name = "parent";
+    dd::Span parent = tracer.create_span(options);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    options.name = "child";
+    dd::Span child = parent.create_child(options);
+    child.set_tag("foo", "bar");
+
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+}
+```
+
+See the [documentation of the library's public API](TODO).
+
 Build
 -----
 ### `cmake && make && make install` Style Build
@@ -11,7 +51,7 @@ for a recent CMake.
 
 Here is how to install dd-trace-cpp into `.install/` within the source
 repository.
-```shell
+```console
 $ git clone 'https://github.com/datadog/dd-trace-cpp'
 $ cd dd-trace-cpp
 $ bin/install-cmake
@@ -31,7 +71,7 @@ Then, when building an executable that uses `dd-trace-cpp`, specify the path to
 the installed headers using an appropriate `-I` option.  If the library was
 installed into the default system directories, then the `-I` option is not
 needed.
-```shell
+```console
 $ c++ -I/path/to/dd-trace-cpp/.install/include -c -o my_app.o my_app.cpp
 ```
 
@@ -39,9 +79,28 @@ When linking an executable that uses `dd-trace-cpp`, specify linkage to the
 built library using the `-ldd_trace_cpp` option and an appropriate `-L` option.
 If the library was installed into the default system directories, then the `-L`
 options is not needed. The `-ldd_trace_cpp` option is always needed.
-```shell
+```console
 $ c++ -o my_app my_app.o -L/path/to/dd-trace-cpp/.install/lib -ldd_trace_cpp
 ```
 <!-- TODO: Do those commands need -pthread as well? -->
+
+Test
+----
+Pass `-DBUILD_TESTING=1` to `cmake` to include the unit tests in the build.
+
+The resulting unit test executable is `test/tests` within the build directory.
+```console
+$ mkdir .build
+$ cd .build
+$ cmake -DBUILD_TESTING=1 ..
+$ make -j $(nproc)
+$ ./test/tests
+```
+
+Alternatively, [bin/test](bin/test) is provided for convenience.
+
+Contributing
+------------
+TODO: pull requests, issues, bin/format
 
 [1]: https://cmake.org/
