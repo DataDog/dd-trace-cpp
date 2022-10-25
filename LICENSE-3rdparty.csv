@@ -1,0 +1,3 @@
+Component,Origin,License,Copyright
+vendored,nlohmann/json,MIT,Copyright (c) 2013-2022 Niels Lohmann <http://nlohmann.me>
+vendored,Catch2,Boost,Copyright (c) 2022 Two Blue Cubes Ltd. All rights reserved.
