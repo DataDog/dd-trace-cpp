@@ -82,7 +82,6 @@ options is not needed. The `-ldd_trace_cpp` option is always needed.
 ```console
 $ c++ -o my_app my_app.o -L/path/to/dd-trace-cpp/.install/lib -ldd_trace_cpp
 ```
-<!-- TODO: Do those commands need -pthread as well? -->
 
 Test
 ----
@@ -101,6 +100,6 @@ Alternatively, [bin/test](bin/test) is provided for convenience.
 
 Contributing
 ------------
-TODO: pull requests, issues, bin/format
+See the [contributing guidelines](CONTRIBUTING.md).
 
 [1]: https://cmake.org/
