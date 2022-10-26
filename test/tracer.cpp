@@ -16,10 +16,10 @@
 #include <iosfwd>
 #include <optional>
 
+#include "matchers.h"
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
 #include "mocks/loggers.h"
-#include "matchers.h"
 #include "test.h"
 
 namespace datadog {

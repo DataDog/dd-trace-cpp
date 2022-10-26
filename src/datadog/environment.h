@@ -23,32 +23,30 @@ namespace environment {
 
 // To enforce correspondence between `enum Variable` and `variable_names`, the
 // preprocessor is used so that the DD_* symbols are listed exactly once.
-#define LIST_ENVIRONMENT_VARIABLES(MACRO) \
-  MACRO(DD_AGENT_HOST) \
-  MACRO(DD_ENV) \
-  MACRO(DD_PROPAGATION_STYLE_EXTRACT) \
-  MACRO(DD_PROPAGATION_STYLE_INJECT) \
-  MACRO(DD_SERVICE) \
-  MACRO(DD_SPAN_SAMPLING_RULES) \
-  MACRO(DD_SPAN_SAMPLING_RULES_FILE) \
-  MACRO(DD_TAGS) \
-  MACRO(DD_TRACE_AGENT_PORT) \
-  MACRO(DD_TRACE_AGENT_URL) \
-  MACRO(DD_TRACE_DEBUG) \
-  MACRO(DD_TRACE_ENABLED) \
-  MACRO(DD_TRACE_RATE_LIMIT) \
-  MACRO(DD_TRACE_REPORT_HOSTNAME) \
-  MACRO(DD_TRACE_SAMPLE_RATE) \
-  MACRO(DD_TRACE_SAMPLING_RULES) \
-  MACRO(DD_TRACE_STARTUP_LOGS) \
+#define LIST_ENVIRONMENT_VARIABLES(MACRO)     \
+  MACRO(DD_AGENT_HOST)                        \
+  MACRO(DD_ENV)                               \
+  MACRO(DD_PROPAGATION_STYLE_EXTRACT)         \
+  MACRO(DD_PROPAGATION_STYLE_INJECT)          \
+  MACRO(DD_SERVICE)                           \
+  MACRO(DD_SPAN_SAMPLING_RULES)               \
+  MACRO(DD_SPAN_SAMPLING_RULES_FILE)          \
+  MACRO(DD_TAGS)                              \
+  MACRO(DD_TRACE_AGENT_PORT)                  \
+  MACRO(DD_TRACE_AGENT_URL)                   \
+  MACRO(DD_TRACE_DEBUG)                       \
+  MACRO(DD_TRACE_ENABLED)                     \
+  MACRO(DD_TRACE_RATE_LIMIT)                  \
+  MACRO(DD_TRACE_REPORT_HOSTNAME)             \
+  MACRO(DD_TRACE_SAMPLE_RATE)                 \
+  MACRO(DD_TRACE_SAMPLING_RULES)              \
+  MACRO(DD_TRACE_STARTUP_LOGS)                \
   MACRO(DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH) \
   MACRO(DD_VERSION)
 
 #define WITH_COMMA(ARG) ARG,
 
-enum Variable {
-  LIST_ENVIRONMENT_VARIABLES(WITH_COMMA)
-};
+enum Variable { LIST_ENVIRONMENT_VARIABLES(WITH_COMMA) };
 
 // Quoting a macro arguments requires this two-step.
 #define QUOTED_IMPL(ARG) #ARG
@@ -57,8 +55,7 @@ enum Variable {
 #define QUOTED_WITH_COMMA(ARG) WITH_COMMA(QUOTED(ARG))
 
 inline const char *const variable_names[] = {
-  LIST_ENVIRONMENT_VARIABLES(QUOTED_WITH_COMMA)
-};
+    LIST_ENVIRONMENT_VARIABLES(QUOTED_WITH_COMMA)};
 
 #undef QUOTED_WITH_COMMA
 #undef QUOTED

@@ -19,7 +19,7 @@ class DictReader {
   // is no value at `key`.
   virtual std::optional<std::string_view> lookup(
       std::string_view key) const = 0;
-  
+
   // Invoke the specified `visitor` once for each key/value pair in this object.
   virtual void visit(
       const std::function<void(std::string_view key, std::string_view value)>&
