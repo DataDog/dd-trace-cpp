@@ -98,8 +98,11 @@ $ ./test/tests
 
 Alternatively, [bin/test](bin/test) is provided for convenience.
 
+The most recent code coverage report is available [here][2].
+
 Contributing
 ------------
 See the [contributing guidelines](CONTRIBUTING.md).
 
 [1]: https://cmake.org/
+[2]: https://datadog.github.io/dd-trace-cpp/datadog
