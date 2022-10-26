@@ -1,5 +1,42 @@
 #pragma once
 
+// This component provides a class template, `Expected<T>`, that is either an
+// instance of `T` or an instance of `Error`.  `Expected<void>` is either
+// `std::nullopt` or an instance of `Error`.
+//
+// `Expected` is inspired by, but incompatible with, C++23's `std::expected`.
+//
+// Example Usage
+// -------------
+// The following excerpt demonstrates the intended usage of `Expected<T>`:
+//
+//     Expected<int> parse_integer(std::string_view name);
+//
+//
+//     int main() {
+//       auto maybe_int = parse_integer("the answer");
+//       // using the `if_error` method
+//       if (auto *error = maybe_int.if_error()) {
+//         std::cerr << "parse_integer returned error: " << *error << '\n';
+//         return int(error->code);
+//       }
+//
+//       assert(*maybe_int == 42);
+//
+//       maybe_int = parse_integer("one hundred twenty-three");
+//       // use the `error` method.
+//       if (!maybe_int) {
+//         std::cerr << "parse_integer returned error: " << maybe_int.error() <<
+//         '\n'; return int(maybe_int.error().code);
+//       }
+//
+//       assert(maybe_int == 123);
+//     }
+//
+// `Expected<void>` is like `Expected<T>`, except that if the value is not an
+// error then it cannot be "dereferenced" with `operator*`, i.e. it is analogous
+// to `std::optional<Error>` (and is implemented as such).
+
 #include <optional>
 #include <variant>
 
@@ -25,27 +62,35 @@ class Expected {
   template <typename Other>
   Expected& operator=(Other&&);
 
+  // Return whether this object holds a `Value` (as opposed to an `Error`).
   bool has_value() const noexcept;
   explicit operator bool() const noexcept;
 
+  // Return a reference to the `Value` held by this object.  If this object is
+  // an `Error`, throw a `std::bad_variant_access`.
   Value& value() &;
   const Value& value() const&;
   Value&& value() &&;
   const Value&& value() const&&;
-
   Value& operator*() &;
   const Value& operator*() const&;
   Value&& operator*() &&;
   const Value&& operator*() const&&;
 
+  // Return a pointer to the `Value` held by this object.  If this object is an
+  // `Error`, throw a `std::bad_variant_access`.
   Value* operator->();
   const Value* operator->() const;
 
+  // Return a reference to the `Error` held by this object.  If this object is
+  // not an `Error`, throw a `std::bad_variant_access`.
   Error& error() &;
   const Error& error() const&;
   Error&& error() &&;
   const Error&& error() const&&;
 
+  // Return a pointer to the `Error` value held by this object, or return
+  // `nullptr` if this object is not an `Error`.
   Error* if_error() &;
   const Error* if_error() const&;
   // Don't use `if_error` on an rvalue (temporary).
