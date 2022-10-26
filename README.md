@@ -49,6 +49,8 @@ A recent version of CMake is required (3.24), which might not be in your
 system's package manager. [bin/install-cmake](bin/install-cmake) is an installer
 for a recent CMake.
 
+dd-trace-cpp requires a C++17 compiler.
+
 Here is how to install dd-trace-cpp into `.install/` within the source
 repository.
 ```console
