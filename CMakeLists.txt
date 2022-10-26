@@ -9,6 +9,10 @@ option(BUILD_EXAMPLE "Build the example program (example/)" OFF)
 
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(ProcessorCount)
 ProcessorCount(NUM_PROCESSORS)
@@ -25,8 +29,6 @@ ExternalProject_Add(curl
   BUILD_COMMAND make -j${MAKE_JOB_COUNT}
   INSTALL_COMMAND make install
 )
-
-set(CMAKE_CXX_STANDARD 17)
 
 if (MSVC)
     add_compile_options(/W4 /WX)
