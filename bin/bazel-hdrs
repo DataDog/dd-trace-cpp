@@ -1,8 +1,0 @@
-#!/bin/sh
-
-cd $(dirname "$0")/..
-
-find src/datadog -type f -name '*.h*' | \
-    sort | \
-    sed 's/.*/    "\0",/' | \
-    sed 's/.*\<curl\.h\>.*/# \0 no libcurl/'
