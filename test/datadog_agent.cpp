@@ -5,9 +5,9 @@
 
 #include <iostream>
 
-#include "event_schedulers.h"
-#include "http_clients.h"
-#include "loggers.h"
+#include "mocks/event_schedulers.h"
+#include "mocks/http_clients.h"
+#include "mocks/loggers.h"
 #include "test.h"
 
 using namespace datadog::tracing;

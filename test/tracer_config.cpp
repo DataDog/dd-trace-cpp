@@ -16,9 +16,9 @@
 #include <string>
 #include <system_error>
 
-#include "collectors.h"
-#include "event_schedulers.h"
-#include "loggers.h"
+#include "mocks/collectors.h"
+#include "mocks/event_schedulers.h"
+#include "mocks/loggers.h"
 #include "test.h"
 #ifdef _MSC_VER
 #include <winbase.h>  // SetEnvironmentVariable

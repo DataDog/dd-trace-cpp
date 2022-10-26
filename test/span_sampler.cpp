@@ -10,8 +10,8 @@
 #include <unordered_map>
 #include <utility>
 
-#include "collectors.h"
-#include "loggers.h"
+#include "mocks/collectors.h"
+#include "mocks/loggers.h"
 #include "test.h"
 
 using namespace datadog::tracing;

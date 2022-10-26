@@ -5,27 +5,29 @@ add_executable(tests
     # wrapper around Catch2
     test.cpp
 
-    # mocks and utilities
-    collectors.cpp
-    dict_readers.cpp
-    dict_writers.cpp
-    event_schedulers.cpp
-    http_clients.cpp
-    loggers.cpp
+    # mocks
+    mocks/collectors.cpp
+    mocks/dict_readers.cpp
+    mocks/dict_writers.cpp
+    mocks/event_schedulers.cpp
+    mocks/http_clients.cpp
+    mocks/loggers.cpp
+    
+    # utilities
     matchers.cpp
     
     # test cases
-    test_cerr_logger.cpp
-    test_datadog_agent.cpp
-    test_glob.cpp
-    test_limiter.cpp
-    test_smoke.cpp
-    test_span.cpp
-    test_span_sampler.cpp
-    test_trace_segment.cpp
-    test_tracer_config.cpp
-    test_tracer.cpp
-    test_trace_sampler.cpp
+    cerr_logger.cpp
+    datadog_agent.cpp
+    glob.cpp
+    limiter.cpp
+    smoke.cpp
+    span.cpp
+    span_sampler.cpp
+    trace_segment.cpp
+    tracer_config.cpp
+    tracer.cpp
+    trace_sampler.cpp
 )
 
 target_link_libraries(tests dd_trace_cpp ${COVERAGE_LIBRARIES})

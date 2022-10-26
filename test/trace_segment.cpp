@@ -5,10 +5,10 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
-#include "collectors.h"
-#include "dict_readers.h"
-#include "dict_writers.h"
-#include "loggers.h"
+#include "mocks/collectors.h"
+#include "mocks/dict_readers.h"
+#include "mocks/dict_writers.h"
+#include "mocks/loggers.h"
 #include "matchers.h"
 #include "test.h"
 

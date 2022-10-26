@@ -10,7 +10,7 @@
 #include <variant>
 #include <vector>
 
-#include "test.h"
+#include "../test.h"
 
 using namespace datadog::tracing;
 

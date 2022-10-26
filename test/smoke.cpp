@@ -3,7 +3,7 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
-#include "loggers.h"
+#include "mocks/loggers.h"
 #include "test.h"
 
 using namespace datadog::tracing;
