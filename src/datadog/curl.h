@@ -1,5 +1,14 @@
 #pragma once
 
+// This component provides a `class`, `Curl`, that implements the `HTTPClient`
+// interface in terms of [libcurl][1].  `class Curl` manages a thread that is
+// used as the event loop for libcurl.
+//
+// If this library was built in a mode that does not include libcurl, then this
+// file and its implementation, `curl.cpp`, will not be included.
+//
+// [1]: https://curl.se/libcurl/
+
 #include <chrono>
 #include <memory>
 #include <string>
