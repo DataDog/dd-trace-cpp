@@ -48,7 +48,7 @@ namespace environment {
 
 enum Variable { LIST_ENVIRONMENT_VARIABLES(WITH_COMMA) };
 
-// Quoting a macro arguments requires this two-step.
+// Quoting a macro argument requires this two-step.
 #define QUOTED_IMPL(ARG) #ARG
 #define QUOTED(ARG) QUOTED_IMPL(ARG)
 
