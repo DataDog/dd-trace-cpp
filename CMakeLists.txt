@@ -163,7 +163,7 @@ target_include_directories(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/include)
 
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads)
+target_link_libraries(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
 
 # When installing, install the library and its public headers.
 
