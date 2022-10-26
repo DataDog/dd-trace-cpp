@@ -36,8 +36,6 @@ int main() {
 }
 ```
 
-See the [documentation of the library's public API](TODO).
-
 Build
 -----
 ### `cmake && make && make install` Style Build
