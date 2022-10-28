@@ -1,5 +1,16 @@
 #pragma once
 
+// This component defines an enumeration of "sampling priority" values.
+//
+// Sampling priority is a hybrid between a sampling decision ("keep" versus
+// "drop") and a sampling reason ("user-specified rule").  Values less than or
+// equal to zero indicate a decision to "drop," while positive values indicate
+// a decision to "keep."
+//
+// The "priority" in the term "sampling priority" is a misnomer, since the
+// value does not denote any relationship among the different kinds of sampling
+// decisions.
+
 #include "sampling_mechanism.h"
 
 namespace datadog {
