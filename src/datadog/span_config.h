@@ -1,5 +1,18 @@
 #pragma once
 
+// This component provides a `struct`, `SpanConfig`, used to specify span
+// properties when a span is created. The following member functions accept a
+// `SpanConfig` argument:
+//
+// - `Tracer::create_span`
+// - `Tracer::extract_span`
+// - `Span::create_child`
+//
+// `SpanConfig` contains much of the same information as `SpanDefaults`, but the
+// two types have different purposes. `SpanDefaults` are the properties used
+// when no corresponding property is specified in a `SpanConfig` argument.
+// See `SpanData::apply_config`.
+
 #include <optional>
 #include <string>
 #include <unordered_map>
