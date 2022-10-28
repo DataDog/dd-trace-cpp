@@ -1,5 +1,12 @@
 #pragma once
 
+// This component provides a `struct`, `SpanSamplerConfig`, used to configure
+// `SpanSampler`. `SpanSampler` accepts a `FinalizedSpanSamplerConfig`, which
+// must be obtained from a call to `finalize_config`.
+//
+// `SpanSamplerConfig` is specified as the `span_sampler` property of
+// `TracerConfig`.
+
 #include <optional>
 #include <vector>
 
@@ -21,6 +28,9 @@ struct SpanSamplerConfig {
     Rule() = default;
   };
 
+  // Can be overriden by the `DD_TRACE_SAMPLING_RULES` environment variable.
+  // Also, the `DD_TRACE_SAMPLE_RATE` environment variable, if present, causes a
+  // corresponding `Rule` to be appended to `rules`. 
   std::vector<Rule> rules;
 };
 
