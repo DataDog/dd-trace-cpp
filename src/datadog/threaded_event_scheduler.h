@@ -1,5 +1,10 @@
 #pragma once
 
+// This component provides a `class`, `ThreadedEventScheduler`, that implements
+// the `EventScheduler` interface in terms of a dedicated event dispatching
+// thread. It is the default implementation used if
+// `DatadogAgent::event_scheduler` is not specified.
+
 #include <chrono>
 #include <condition_variable>
 #include <functional>
@@ -46,8 +51,6 @@ class ThreadedEventScheduler : public EventScheduler {
   void run();
 
  public:
-  // TODO: Didn't figure out what kind of dependency injection is appropriate
-  // for a thread that interacts with a condition variable.
   ThreadedEventScheduler();
   ~ThreadedEventScheduler();
 
