@@ -1,5 +1,7 @@
 #pragma once
 
+// This component provides networking-related miscellanea.
+
 #include <optional>
 #include <string>
 
