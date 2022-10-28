@@ -1,5 +1,13 @@
 #pragma once
 
+// This component provides a `class`, `Rate`, that is a `double` whose value is
+// between zero and one, inclusive.
+//
+// `Rate` objects are obtained by calling the static member function
+// `Rate::from` with a `double` argument. A default-constructed `Rate` has the
+// zero value. The static member functions `Rate::one` and `Rate::zero` are
+// provided for convenience.
+
 #include <variant>
 
 #include "expected.h"
