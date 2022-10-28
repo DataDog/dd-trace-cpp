@@ -17,6 +17,8 @@
 #include <optional>
 #include <string_view>
 
+#include "json_fwd.hpp"
+
 namespace datadog {
 namespace tracing {
 namespace environment {
@@ -54,7 +56,7 @@ enum Variable { LIST_ENVIRONMENT_VARIABLES(WITH_COMMA) };
 
 #define QUOTED_WITH_COMMA(ARG) WITH_COMMA(QUOTED(ARG))
 
-inline const char *const variable_names[] = {
+inline const char* const variable_names[] = {
     LIST_ENVIRONMENT_VARIABLES(QUOTED_WITH_COMMA)};
 
 #undef QUOTED_WITH_COMMA
@@ -69,6 +71,8 @@ std::string_view name(Variable variable);
 // Return the value of the specified environment `variable`, or return
 // `std::nullptr` if that variable is not set in the environment.
 std::optional<std::string_view> lookup(Variable variable);
+
+void environment_to_json(nlohmann::json& destination);
 
 }  // namespace environment
 }  // namespace tracing

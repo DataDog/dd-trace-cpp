@@ -15,6 +15,8 @@ class NullCollector : public Collector {
                       const std::shared_ptr<TraceSampler>&) override {
     return {};
   }
+
+  void config_json(nlohmann::json& destination) const override;
 };
 
 }  // namespace tracing

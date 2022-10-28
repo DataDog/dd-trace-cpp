@@ -14,10 +14,6 @@ Code Component Relationships
 ----------------------------
 ![another diagram](includes.svg)
 
-Example Usage
--------------
-TODO
-
 Objects
 -------
 - _Span_ has a beginning, end, and tags.  It is associated with a _TraceSegment_.

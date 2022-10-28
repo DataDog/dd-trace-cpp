@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "expected.h"
+#include "json_fwd.hpp"
 #include "rate.h"
 #include "span_matcher.h"
 
@@ -30,7 +31,7 @@ struct SpanSamplerConfig {
 
   // Can be overriden by the `DD_TRACE_SAMPLING_RULES` environment variable.
   // Also, the `DD_TRACE_SAMPLE_RATE` environment variable, if present, causes a
-  // corresponding `Rule` to be appended to `rules`. 
+  // corresponding `Rule` to be appended to `rules`.
   std::vector<Rule> rules;
 };
 
@@ -52,6 +53,9 @@ class FinalizedSpanSamplerConfig {
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
                                                      Logger&);
+
+void to_json(nlohmann::json& destination,
+             const FinalizedSpanSamplerConfig::Rule&);
 
 }  // namespace tracing
 }  // namespace datadog

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "expected.h"
+#include "json_fwd.hpp"
 #include "rate.h"
 #include "span_matcher.h"
 
@@ -52,6 +53,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
 std::ostream& operator<<(std::ostream&,
                          const FinalizedTraceSamplerConfig::Rule&);
+
+void to_json(nlohmann::json& destination,
+             const FinalizedTraceSamplerConfig::Rule&);
 
 }  // namespace tracing
 }  // namespace datadog

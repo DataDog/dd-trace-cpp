@@ -95,7 +95,7 @@ class TraceSegment {
   void inject(DictWriter& writer, const SpanData& span);
 
   // These are for sampling delegation, not for trace propagation.
-  // TODO
+  // TODO: Sampling delegation is not yet implemented.
   Expected<void> extract(const DictReader& reader);
   void inject(DictWriter& writer) const;
 

@@ -22,6 +22,7 @@
 #include <mutex>
 
 #include "clock.h"
+#include "json_fwd.hpp"
 #include "limiter.h"
 #include "sampling_decision.h"
 #include "span_sampler_config.h"
@@ -58,6 +59,8 @@ class SpanSampler {
   // Return a pointer to the first `Rule` that the specified span matches, or
   // return null if there is no match.
   Rule* match(const SpanData&);
+
+  void config_json(nlohmann::json& destination) const;
 };
 
 }  // namespace tracing

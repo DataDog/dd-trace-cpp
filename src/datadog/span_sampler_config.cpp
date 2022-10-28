@@ -244,5 +244,19 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   return result;
 }
 
+void to_json(nlohmann::json &destination,
+             const FinalizedSpanSamplerConfig::Rule &rule) {
+  destination = nlohmann::json::object({
+      {"service", rule.service},
+      {"name", rule.name},
+      {"resource", rule.resource},
+      {"sample_rate", double(rule.sample_rate)},
+  });
+
+  if (rule.max_per_second) {
+    destination["max_per_second"] = *rule.max_per_second;
+  }
+}
+
 }  // namespace tracing
 }  // namespace datadog

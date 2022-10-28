@@ -27,8 +27,8 @@ std::string_view strip(std::string_view input);
 Expected<std::uint64_t> parse_uint64(std::string_view input, int base);
 Expected<int> parse_int(std::string_view input, int base);
 
-// Return a floating point number parsed from the specified `input`, or return an
-// `Error` if not such number can be parsed. It is an error unless all of
+// Return a floating point number parsed from the specified `input`, or return
+// an `Error` if not such number can be parsed. It is an error unless all of
 // `input` is consumed by the parse. Leading and trailing whitespace are not
 // ignored.
 Expected<double> parse_double(std::string_view input);
