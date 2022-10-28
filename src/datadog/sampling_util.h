@@ -1,5 +1,8 @@
 #pragma once
 
+// This component provides sampling-related miscellanea.  It's used by both
+// `TraceSampler` and `SpanSampler`.
+
 #include <cstdint>
 #include <limits>
 
