@@ -184,13 +184,20 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   return result;
 }
 
+void to_json(nlohmann::json &destination,
+             const FinalizedTraceSamplerConfig::Rule &rule) {
+  destination = nlohmann::json::object({
+      {"service", rule.service},
+      {"name", rule.name},
+      {"resource", rule.resource},
+      {"sample_rate", double(rule.sample_rate)},
+  });
+}
+
 std::ostream &operator<<(std::ostream &stream,
                          const FinalizedTraceSamplerConfig::Rule &rule) {
   nlohmann::json object;
-  object["service"] = rule.service;
-  object["name"] = rule.name;
-  object["resource"] = rule.resource;
-  object["sample_rate"] = double(rule.sample_rate);
+  to_json(object, rule);
   return stream << object.dump();
 }
 

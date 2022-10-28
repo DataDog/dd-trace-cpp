@@ -1,5 +1,6 @@
 #include "span_sampler.h"
 
+#include "json.hpp"
 #include "sampling_mechanism.h"
 #include "sampling_priority.h"
 #include "sampling_util.h"
@@ -63,6 +64,18 @@ SpanSampler::Rule* SpanSampler::match(const SpanData& span) {
     return &*found;
   }
   return nullptr;
+}
+
+void SpanSampler::config_json(nlohmann::json& destination) const {
+  std::vector<nlohmann::json> rules;
+  for (const auto& rule : rules_) {
+    rules.emplace_back();
+    to_json(rules.back(), rule);
+  }
+
+  destination = nlohmann::json::object({
+      {"rules", rules},
+  });
 }
 
 }  // namespace tracing

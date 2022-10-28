@@ -2,6 +2,8 @@
 
 #include <cstdlib>
 
+#include "json.hpp"
+
 namespace datadog {
 namespace tracing {
 namespace environment {
@@ -15,6 +17,15 @@ std::optional<std::string_view> lookup(Variable variable) {
     return std::nullopt;
   }
   return std::string_view{value};
+}
+
+void to_json(nlohmann::json &destination) {
+  destination = nlohmann::json::object({});
+  for (const char *name : variable_names) {
+    if (const char *value = std::getenv(name)) {
+      destination[name] = value;
+    }
+  }
 }
 
 }  // namespace environment

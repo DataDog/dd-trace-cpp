@@ -5,6 +5,8 @@
 // has one `PropagationStyles` for extraction and another for injection. See
 // `tracer_config.h`.
 
+#include "json_fwd.hpp"
+
 namespace datadog {
 namespace tracing {
 
@@ -12,6 +14,8 @@ struct PropagationStyles {
   bool datadog = true;
   bool b3 = false;
 };
+
+void to_json(nlohmann::json& destination, const PropagationStyles&);
 
 }  // namespace tracing
 }  // namespace datadog

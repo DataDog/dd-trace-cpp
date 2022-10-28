@@ -5,7 +5,7 @@
 //
 // Errors, when they occur, are typically returned as `Error` values (often as
 // part of an `Expected` value). However, in "async" contexts where there is
-// nowhere to return a value, the logger is used instead. 
+// nowhere to return a value, the logger is used instead.
 //
 // `Logger`'s pure virtual member functions accept a callback function that is
 // either invoked immediately or not invoked at all, depending on the

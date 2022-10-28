@@ -14,18 +14,6 @@
 
 using namespace datadog::tracing;
 
-// TODO:
-// - accessors
-//    ✅ hostname
-//    ✅ defaults
-//    ✅ origin
-//    ✅ sampling_decision
-//    ✅ logger
-// ✅ `Collector::send` failure logs the error
-// - finalization:
-// - all spans:
-//     - origin if you got it
-
 namespace {
 
 Rate assert_rate(double rate) {

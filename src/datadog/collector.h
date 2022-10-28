@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "expected.h"
+#include "json_fwd.hpp"
 
 namespace datadog {
 namespace tracing {
@@ -31,6 +32,16 @@ class Collector {
   virtual Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) = 0;
+
+  // Assign to the specified `destination` a JSON representation of this
+  // object's configuration. The JSON representation is an object with
+  // the following properties:
+  //
+  // - "type" is the unmangled, unqualified name of the most-derived class, e.g.
+  //   "DatadogAgent".
+  // - "config" is an object containing this object's configuration. "config"
+  //   may be omitted if the derived class has no configuration.
+  virtual void config_json(nlohmann::json& destination) const = 0;
 
   virtual ~Collector() {}
 };

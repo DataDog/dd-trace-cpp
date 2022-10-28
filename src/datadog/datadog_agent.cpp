@@ -3,6 +3,7 @@
 #include <cassert>
 #include <chrono>
 #include <string>
+#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -142,7 +143,8 @@ DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
       http_client_(config.http_client),
       event_scheduler_(config.event_scheduler),
       cancel_scheduled_flush_(event_scheduler_->schedule_recurring_event(
-          config.flush_interval, [this]() { flush(); })) {
+          config.flush_interval, [this]() { flush(); })),
+      flush_interval_(config.flush_interval) {
   assert(logger_);
 }
 
@@ -160,6 +162,25 @@ Expected<void> DatadogAgent::send(
   incoming_trace_chunks_.push_back(
       TraceChunk{std::move(spans), response_handler});
   return std::nullopt;
+}
+
+void DatadogAgent::config_json(nlohmann::json& destination) const {
+  const auto& url = traces_endpoint_;  // brevity
+  const auto flush_interval_milliseconds =
+      std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_)
+          .count();
+
+  // clang-format off
+  destination = nlohmann::json::object({
+    {"type", "DatadogAgent"},
+    {"config", nlohmann::json::object({
+      {"url", (url.scheme + "://" + url.authority + url.path)},
+      {"flush_interval_milliseconds", flush_interval_milliseconds},
+      {"http_client_typeid", typeid(*http_client_).name()},
+      {"event_scheduler_typeid", typeid(*event_scheduler_).name()},
+    })},
+  });
+  // clang-format on
 }
 
 void DatadogAgent::flush() {

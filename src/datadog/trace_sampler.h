@@ -89,6 +89,7 @@
 #include <unordered_map>
 
 #include "clock.h"
+#include "json_fwd.hpp"
 #include "limiter.h"
 #include "rate.h"
 #include "trace_sampler_config.h"
@@ -119,6 +120,8 @@ class TraceSampler {
   // Update this sampler's Agent-provided sample rates using the specified
   // collector response.
   void handle_collector_response(const CollectorResponse&);
+
+  void config_json(nlohmann::json& destination) const;
 };
 
 }  // namespace tracing

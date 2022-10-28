@@ -42,6 +42,7 @@ class DatadogAgent : public Collector {
   std::shared_ptr<HTTPClient> http_client_;
   std::shared_ptr<EventScheduler> event_scheduler_;
   EventScheduler::Cancel cancel_scheduled_flush_;
+  std::chrono::steady_clock::duration flush_interval_;
 
   void flush();
 
@@ -50,9 +51,11 @@ class DatadogAgent : public Collector {
                const std::shared_ptr<Logger>&);
   ~DatadogAgent();
 
-  virtual Expected<void> send(
+  Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) override;
+
+  void config_json(nlohmann::json& destination) const override;
 };
 
 }  // namespace tracing

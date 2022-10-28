@@ -6,6 +6,7 @@
 #include <limits>
 
 #include "collector_response.h"
+#include "json.hpp"
 #include "sampling_decision.h"
 #include "sampling_priority.h"
 #include "sampling_util.h"
@@ -94,6 +95,19 @@ void TraceSampler::handle_collector_response(
   }
 
   collector_sample_rates_ = response.sample_rate_by_key;
+}
+
+void TraceSampler::config_json(nlohmann::json& destination) const {
+  std::vector<nlohmann::json> rules;
+  for (const auto& rule : rules_) {
+    rules.emplace_back();
+    to_json(rules.back(), rule);
+  }
+
+  destination = nlohmann::json::object({
+      {"rules", rules},
+      {"max_per_second", limiter_max_per_second_},
+  });
 }
 
 }  // namespace tracing
