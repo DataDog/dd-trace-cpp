@@ -1,5 +1,8 @@
 #pragma once
 
+// This component provides symbols for all span tag names that have special
+// meaning.
+
 #include <string>
 #include <string_view>
 
@@ -30,6 +33,8 @@ extern const std::string span_sampling_rule_rate;
 extern const std::string span_sampling_limit;
 }  // namespace internal
 
+// Return whether the specified `tag_name` is reserved for use internal to this
+// library.
 bool is_internal(std::string_view tag_name);
 
 }  // namespace tags
