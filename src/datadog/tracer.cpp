@@ -5,6 +5,7 @@
 
 #include "datadog_agent.h"
 #include "dict_reader.h"
+#include "environment.h"
 #include "json.hpp"
 #include "logger.h"
 #include "net_util.h"
@@ -217,7 +218,7 @@ void log_startup_message(Logger& logger, std::string_view tracer_version,
                          const std::optional<std::string>& hostname,
                          std::size_t tags_header_max_size) {
   nlohmann::json collector_json, defaults_json, trace_sampler_json,
-      span_sampler_json, injection_json, extraction_json;
+      span_sampler_json, injection_json, extraction_json, environment_variables;
 
   collector.config_json(collector_json);
   to_json(defaults_json, defaults);
@@ -225,6 +226,7 @@ void log_startup_message(Logger& logger, std::string_view tracer_version,
   span_sampler.config_json(span_sampler_json);
   to_json(injection_json, injection_styles);
   to_json(extraction_json, extraction_styles);
+  environment::to_json(environment_variables);
 
   // clang-format off
   auto config = nlohmann::json::object({
@@ -236,6 +238,7 @@ void log_startup_message(Logger& logger, std::string_view tracer_version,
     {"injection_styles", injection_json},
     {"extraction_styles", extraction_json},
     {"tags_header_size", tags_header_max_size},
+    {"environment_variables", environment_variables},
   });
   // clang-format on
 

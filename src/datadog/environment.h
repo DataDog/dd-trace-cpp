@@ -72,7 +72,7 @@ std::string_view name(Variable variable);
 // `std::nullptr` if that variable is not set in the environment.
 std::optional<std::string_view> lookup(Variable variable);
 
-void environment_to_json(nlohmann::json& destination);
+void to_json(nlohmann::json& destination);
 
 }  // namespace environment
 }  // namespace tracing
