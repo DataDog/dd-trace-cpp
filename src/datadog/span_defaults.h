@@ -1,5 +1,9 @@
 #pragma once
 
+// This component provides a `struct`, `SpanDefaults`, used to fill out `Span`
+// properties that are not otherwise specified in a `SpanConfig`.
+// `SpanDefaults` are specified as the `defaults` property of `TracerConfig`.
+
 #include <string>
 #include <unordered_map>
 
