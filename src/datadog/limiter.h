@@ -1,5 +1,13 @@
 #pragma once
 
+// This component provides a `class`, `Limiter`, that is an implementation of
+// the [token bucket][1] rate limiter.
+//
+// `Limiter` is used by the `TraceSampler` and the `SpanSampler` to enforce
+// their respective `max_per_second` configuration parameters.
+//
+// [1]: https://en.wikipedia.org/wiki/Token_bucket
+
 #include <vector>
 
 #include "clock.h"
