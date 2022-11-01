@@ -37,8 +37,8 @@ class Collector {
   // object's configuration. The JSON representation is an object with
   // the following properties:
   //
-  // - "type" is the unmangled, unqualified name of the most-derived class, e.g.
-  //   "DatadogAgent".
+  // - "type" is the unmangled, qualified name of the most-derived class, e.g.
+  //   "datadog::tracing::DatadogAgent".
   // - "config" is an object containing this object's configuration. "config"
   //   may be omitted if the derived class has no configuration.
   virtual void config_json(nlohmann::json& destination) const = 0;

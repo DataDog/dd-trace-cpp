@@ -2,6 +2,8 @@
 
 #include <thread>
 
+#include "json.hpp"
+
 namespace datadog {
 namespace tracing {
 
@@ -54,6 +56,11 @@ EventScheduler::Cancel ThreadedEventScheduler::schedule_recurring_event(
     });
     config.reset();
   };
+}
+
+void ThreadedEventScheduler::config_json(nlohmann::json& destination) const {
+  destination = nlohmann::json::object(
+      {{"type", "datadog::tracing::ThreadedEventScheduler"}});
 }
 
 void ThreadedEventScheduler::run() {

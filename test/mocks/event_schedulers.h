@@ -3,6 +3,7 @@
 #include <datadog/event_scheduler.h>
 
 #include <chrono>
+#include <datadog/json.hpp>
 #include <functional>
 #include <optional>
 
@@ -18,5 +19,9 @@ struct MockEventScheduler : public EventScheduler {
     event_callback = callback;
     recurrence_interval = interval;
     return [this]() { cancelled = true; };
+  }
+
+  void config_json(nlohmann::json& destination) const override {
+    destination = nlohmann::json::object({{"type", "MockEventScheduler"}});
   }
 };

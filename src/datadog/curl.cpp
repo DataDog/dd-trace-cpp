@@ -19,6 +19,7 @@
 #include "dict_reader.h"
 #include "dict_writer.h"
 #include "http_client.h"
+#include "json.hpp"
 #include "logger.h"
 #include "parse_util.h"
 
@@ -123,6 +124,10 @@ Expected<void> Curl::post(const URL &url, HeadersSetter set_headers,
 
 void Curl::drain(std::chrono::steady_clock::time_point deadline) {
   impl_->drain(deadline);
+}
+
+void Curl::config_json(nlohmann::json &destination) const {
+  destination = nlohmann::json::object({{"type", "datadog::tracing::Curl"}});
 }
 
 CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger)

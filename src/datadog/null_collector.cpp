@@ -8,7 +8,7 @@ namespace tracing {
 void NullCollector::config_json(nlohmann::json& destination) const {
   // clang-format off
     destination = nlohmann::json::object({
-        {"type", "NullCollector"},
+        {"type", "datadog::tracing::NullCollector"},
         {"config", nlohmann::json::object({})},
     });
   // clang-format on

@@ -14,6 +14,7 @@
 #include <string>
 
 #include "http_client.h"
+#include "json_fwd.hpp"
 
 namespace datadog {
 namespace tracing {
@@ -35,6 +36,8 @@ class Curl : public HTTPClient {
                       ErrorHandler on_error) override;
 
   void drain(std::chrono::steady_clock::time_point deadline) override;
+
+  void config_json(nlohmann::json& destination) const override;
 };
 
 }  // namespace tracing

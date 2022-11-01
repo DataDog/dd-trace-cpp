@@ -3,6 +3,7 @@
 #include <datadog/error.h>
 #include <datadog/http_client.h>
 
+#include <datadog/json.hpp>
 #include <mutex>
 #include <optional>
 #include <sstream>
@@ -58,5 +59,9 @@ struct MockHTTPClient : public HTTPClient {
       MockDictReader reader{response_headers};
       on_response_(response_status, reader, response_body.str());
     }
+  }
+
+  void config_json(nlohmann::json& destination) const override {
+    destination = nlohmann::json::object({{"type", "MockHTTPClient"}});
   }
 };
