@@ -66,14 +66,13 @@ SpanSampler::Rule* SpanSampler::match(const SpanData& span) {
   return nullptr;
 }
 
-void SpanSampler::config_json(nlohmann::json& destination) const {
+nlohmann::json SpanSampler::config_json() const {
   std::vector<nlohmann::json> rules;
   for (const auto& rule : rules_) {
-    rules.emplace_back();
-    to_json(rules.back(), rule);
+    rules.push_back(to_json(rule));
   }
 
-  destination = nlohmann::json::object({
+  return nlohmann::json::object({
       {"rules", rules},
   });
 }

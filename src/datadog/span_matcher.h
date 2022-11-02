@@ -29,7 +29,7 @@ struct SpanMatcher {
   std::unordered_map<std::string, std::string> tags;
 
   bool match(const SpanData&) const;
-  std::string to_json() const;
+  nlohmann::json to_json() const;
 
   static Expected<SpanMatcher> from_json(const nlohmann::json&);
 };

@@ -19,13 +19,13 @@ bool is_match(std::string_view pattern, std::string_view subject) {
 
 }  // namespace
 
-std::string SpanMatcher::to_json() const {
-  nlohmann::json object;
-  object["service"] = service;
-  object["name"] = name;
-  object["resource"] = resource;
-  object["tags"] = tags;
-  return object.dump();
+nlohmann::json SpanMatcher::to_json() const {
+  return nlohmann::json::object({
+      {"service", service},
+      {"name", name},
+      {"resource", resource},
+      {"tags", tags},
+  });
 }
 
 bool SpanMatcher::match(const SpanData& span) const {

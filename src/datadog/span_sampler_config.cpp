@@ -213,7 +213,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
       prefix +=
           "Unable to parse sample_rate in span sampling rule with span "
           "pattern ";
-      prefix += rule.to_json();
+      prefix += rule.to_json().dump();
       prefix += ": ";
       return error->with_prefix(prefix);
     }
@@ -226,7 +226,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
              std::end(allowed_types))) {
       std::string message;
       message += "Span sampling rule with pattern ";
-      message += rule.to_json();
+      message += rule.to_json().dump();
       message +=
           " should have a max_per_second value greater than zero, but the "
           "following value was given: ";
@@ -244,9 +244,8 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   return result;
 }
 
-void to_json(nlohmann::json &destination,
-             const FinalizedSpanSamplerConfig::Rule &rule) {
-  destination = nlohmann::json::object({
+nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule &rule) {
+  auto result = nlohmann::json::object({
       {"service", rule.service},
       {"name", rule.name},
       {"resource", rule.resource},
@@ -254,8 +253,10 @@ void to_json(nlohmann::json &destination,
   });
 
   if (rule.max_per_second) {
-    destination["max_per_second"] = *rule.max_per_second;
+    result["max_per_second"] = *rule.max_per_second;
   }
+
+  return result;
 }
 
 }  // namespace tracing

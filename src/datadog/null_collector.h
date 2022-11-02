@@ -16,7 +16,7 @@ class NullCollector : public Collector {
     return {};
   }
 
-  void config_json(nlohmann::json& destination) const override;
+  nlohmann::json config_json() const override;
 };
 
 }  // namespace tracing

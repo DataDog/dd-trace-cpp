@@ -37,7 +37,7 @@ class Curl : public HTTPClient {
 
   void drain(std::chrono::steady_clock::time_point deadline) override;
 
-  void config_json(nlohmann::json& destination) const override;
+  nlohmann::json config_json() const override;
 };
 
 }  // namespace tracing

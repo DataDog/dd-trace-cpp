@@ -54,8 +54,7 @@ class FinalizedSpanSamplerConfig {
 Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
                                                      Logger&);
 
-void to_json(nlohmann::json& destination,
-             const FinalizedSpanSamplerConfig::Rule&);
+nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule&);
 
 }  // namespace tracing
 }  // namespace datadog

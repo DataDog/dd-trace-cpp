@@ -126,8 +126,8 @@ void Curl::drain(std::chrono::steady_clock::time_point deadline) {
   impl_->drain(deadline);
 }
 
-void Curl::config_json(nlohmann::json &destination) const {
-  destination = nlohmann::json::object({{"type", "datadog::tracing::Curl"}});
+nlohmann::json Curl::config_json() const {
+  return nlohmann::json::object({{"type", "datadog::tracing::Curl"}});
 }
 
 CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger)

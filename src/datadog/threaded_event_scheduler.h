@@ -57,7 +57,7 @@ class ThreadedEventScheduler : public EventScheduler {
   Cancel schedule_recurring_event(std::chrono::steady_clock::duration interval,
                                   std::function<void()> callback) override;
 
-  void config_json(nlohmann::json& destination) const override;
+  nlohmann::json config_json() const override;
 };
 
 }  // namespace tracing

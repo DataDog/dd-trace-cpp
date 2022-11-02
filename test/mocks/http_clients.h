@@ -61,7 +61,7 @@ struct MockHTTPClient : public HTTPClient {
     }
   }
 
-  void config_json(nlohmann::json& destination) const override {
-    destination = nlohmann::json::object({{"type", "MockHTTPClient"}});
+  nlohmann::json config_json() const override {
+    return nlohmann::json::object({{"type", "MockHTTPClient"}});
   }
 };
