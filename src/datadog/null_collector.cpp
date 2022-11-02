@@ -5,10 +5,10 @@
 namespace datadog {
 namespace tracing {
 
-void NullCollector::config_json(nlohmann::json& destination) const {
+nlohmann::json NullCollector::config_json() const {
   // clang-format off
-    destination = nlohmann::json::object({
-        {"type", "NullCollector"},
+    return nlohmann::json::object({
+        {"type", "datadog::tracing::NullCollector"},
         {"config", nlohmann::json::object({})},
     });
   // clang-format on

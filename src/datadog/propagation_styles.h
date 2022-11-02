@@ -15,7 +15,7 @@ struct PropagationStyles {
   bool b3 = false;
 };
 
-void to_json(nlohmann::json& destination, const PropagationStyles&);
+nlohmann::json to_json(const PropagationStyles&);
 
 }  // namespace tracing
 }  // namespace datadog

@@ -164,20 +164,20 @@ Expected<void> DatadogAgent::send(
   return std::nullopt;
 }
 
-void DatadogAgent::config_json(nlohmann::json& destination) const {
+nlohmann::json DatadogAgent::config_json() const {
   const auto& url = traces_endpoint_;  // brevity
   const auto flush_interval_milliseconds =
       std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_)
           .count();
 
   // clang-format off
-  destination = nlohmann::json::object({
-    {"type", "DatadogAgent"},
+  return nlohmann::json::object({
+    {"type", "datadog::tracing::DatadogAgent"},
     {"config", nlohmann::json::object({
       {"url", (url.scheme + "://" + url.authority + url.path)},
       {"flush_interval_milliseconds", flush_interval_milliseconds},
-      {"http_client_typeid", typeid(*http_client_).name()},
-      {"event_scheduler_typeid", typeid(*event_scheduler_).name()},
+      {"http_client", http_client_->config_json()},
+      {"event_scheduler", event_scheduler_->config_json()},
     })},
   });
   // clang-format on

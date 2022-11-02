@@ -19,13 +19,16 @@ std::optional<std::string_view> lookup(Variable variable) {
   return std::string_view{value};
 }
 
-void to_json(nlohmann::json &destination) {
-  destination = nlohmann::json::object({});
+nlohmann::json to_json() {
+  auto result = nlohmann::json::object({});
+
   for (const char *name : variable_names) {
     if (const char *value = std::getenv(name)) {
-      destination[name] = value;
+      result[name] = value;
     }
   }
+
+  return result;
 }
 
 }  // namespace environment

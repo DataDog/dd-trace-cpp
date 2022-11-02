@@ -7,7 +7,6 @@
 // `TraceSamplerConfig` is specified as the `trace_sampler` property of
 // `TracerConfig`.
 
-#include <iosfwd>
 #include <optional>
 #include <vector>
 
@@ -51,11 +50,7 @@ class FinalizedTraceSamplerConfig {
 Expected<FinalizedTraceSamplerConfig> finalize_config(
     const TraceSamplerConfig& config);
 
-std::ostream& operator<<(std::ostream&,
-                         const FinalizedTraceSamplerConfig::Rule&);
-
-void to_json(nlohmann::json& destination,
-             const FinalizedTraceSamplerConfig::Rule&);
+nlohmann::json to_json(const FinalizedTraceSamplerConfig::Rule&);
 
 }  // namespace tracing
 }  // namespace datadog

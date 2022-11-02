@@ -217,28 +217,17 @@ void log_startup_message(Logger& logger, std::string_view tracer_version,
                          const PropagationStyles& extraction_styles,
                          const std::optional<std::string>& hostname,
                          std::size_t tags_header_max_size) {
-  nlohmann::json collector_json, defaults_json, trace_sampler_json,
-      span_sampler_json, injection_json, extraction_json, environment_variables;
-
-  collector.config_json(collector_json);
-  to_json(defaults_json, defaults);
-  trace_sampler.config_json(trace_sampler_json);
-  span_sampler.config_json(span_sampler_json);
-  to_json(injection_json, injection_styles);
-  to_json(extraction_json, extraction_styles);
-  environment::to_json(environment_variables);
-
   // clang-format off
   auto config = nlohmann::json::object({
     {"version", tracer_version},
-    {"defaults", defaults_json},
-    {"collector", collector_json},
-    {"trace_sampler", trace_sampler_json},
-    {"span_sampler", span_sampler_json},
-    {"injection_styles", injection_json},
-    {"extraction_styles", extraction_json},
+    {"defaults", to_json(defaults)},
+    {"collector", collector.config_json()},
+    {"trace_sampler", trace_sampler.config_json()},
+    {"span_sampler", span_sampler.config_json()},
+    {"injection_styles", to_json(injection_styles)},
+    {"extraction_styles", to_json(extraction_styles)},
     {"tags_header_size", tags_header_max_size},
-    {"environment_variables", environment_variables},
+    {"environment_variables", environment::to_json()},
   });
   // clang-format on
 

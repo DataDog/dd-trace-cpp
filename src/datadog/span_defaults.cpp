@@ -12,10 +12,10 @@ bool operator==(const SpanDefaults& left, const SpanDefaults& right) {
 #undef EQ
 }
 
-void to_json(nlohmann::json& destination, const SpanDefaults& defaults) {
-  destination = nlohmann::json::object({});
+nlohmann::json to_json(const SpanDefaults& defaults) {
+  auto result = nlohmann::json::object({});
 #define TO_JSON(FIELD) \
-  if (!defaults.FIELD.empty()) destination[#FIELD] = defaults.FIELD
+  if (!defaults.FIELD.empty()) result[#FIELD] = defaults.FIELD
   TO_JSON(service);
   TO_JSON(service_type);
   TO_JSON(environment);
@@ -23,6 +23,7 @@ void to_json(nlohmann::json& destination, const SpanDefaults& defaults) {
   TO_JSON(name);
   TO_JSON(tags);
 #undef TO_JSON
+  return result;
 }
 
 }  // namespace tracing

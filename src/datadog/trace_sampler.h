@@ -121,7 +121,7 @@ class TraceSampler {
   // collector response.
   void handle_collector_response(const CollectorResponse&);
 
-  void config_json(nlohmann::json& destination) const;
+  nlohmann::json config_json() const;
 };
 
 }  // namespace tracing

@@ -21,7 +21,7 @@ struct SpanDefaults {
   std::unordered_map<std::string, std::string> tags;
 };
 
-void to_json(nlohmann::json& destination, const SpanDefaults&);
+nlohmann::json to_json(const SpanDefaults&);
 
 bool operator==(const SpanDefaults&, const SpanDefaults&);
 

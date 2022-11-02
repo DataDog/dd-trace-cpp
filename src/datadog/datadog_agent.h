@@ -55,7 +55,7 @@ class DatadogAgent : public Collector {
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) override;
 
-  void config_json(nlohmann::json& destination) const override;
+  nlohmann::json config_json() const override;
 };
 
 }  // namespace tracing

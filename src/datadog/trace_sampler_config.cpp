@@ -1,7 +1,6 @@
 #include "trace_sampler_config.h"
 
 #include <cmath>
-#include <ostream>
 #include <unordered_set>
 
 #include "environment.h"
@@ -116,7 +115,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       prefix +=
           "Unable to parse sample_rate in trace sampling rule with root span "
           "pattern ";
-      prefix += rule.to_json();
+      prefix += rule.to_json().dump();
       prefix += ": ";
       return error->with_prefix(prefix);
     }
@@ -184,21 +183,13 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   return result;
 }
 
-void to_json(nlohmann::json &destination,
-             const FinalizedTraceSamplerConfig::Rule &rule) {
-  destination = nlohmann::json::object({
+nlohmann::json to_json(const FinalizedTraceSamplerConfig::Rule &rule) {
+  return nlohmann::json::object({
       {"service", rule.service},
       {"name", rule.name},
       {"resource", rule.resource},
       {"sample_rate", double(rule.sample_rate)},
   });
-}
-
-std::ostream &operator<<(std::ostream &stream,
-                         const FinalizedTraceSamplerConfig::Rule &rule) {
-  nlohmann::json object;
-  to_json(object, rule);
-  return stream << object.dump();
 }
 
 }  // namespace tracing

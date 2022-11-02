@@ -60,7 +60,7 @@ class SpanSampler {
   // return null if there is no match.
   Rule* match(const SpanData&);
 
-  void config_json(nlohmann::json& destination) const;
+  nlohmann::json config_json() const;
 };
 
 }  // namespace tracing

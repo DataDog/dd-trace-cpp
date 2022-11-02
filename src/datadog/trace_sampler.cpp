@@ -97,14 +97,13 @@ void TraceSampler::handle_collector_response(
   collector_sample_rates_ = response.sample_rate_by_key;
 }
 
-void TraceSampler::config_json(nlohmann::json& destination) const {
+nlohmann::json TraceSampler::config_json() const {
   std::vector<nlohmann::json> rules;
   for (const auto& rule : rules_) {
-    rules.emplace_back();
-    to_json(rules.back(), rule);
+    rules.push_back(to_json(rule));
   }
 
-  destination = nlohmann::json::object({
+  return nlohmann::json::object({
       {"rules", rules},
       {"max_per_second", limiter_max_per_second_},
   });

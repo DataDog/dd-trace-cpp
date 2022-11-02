@@ -8,7 +8,7 @@
 namespace datadog {
 namespace tracing {
 
-void to_json(nlohmann::json& destination, const PropagationStyles& styles) {
+nlohmann::json to_json(const PropagationStyles& styles) {
   std::vector<std::string> selected_names;
   if (styles.datadog) {
     selected_names.emplace_back("datadog");
@@ -16,7 +16,7 @@ void to_json(nlohmann::json& destination, const PropagationStyles& styles) {
   if (styles.b3) {
     selected_names.emplace_back("B3");
   }
-  destination = selected_names;
+  return selected_names;
 }
 
 }  // namespace tracing
