@@ -208,7 +208,7 @@ Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
   return extracted_data;
 }
 
-void log_startup_message(Logger& logger, std::string_view tracer_version,
+void log_startup_message(Logger& logger, std::string_view tracer_version_string,
                          const Collector& collector,
                          const SpanDefaults& defaults,
                          const TraceSampler& trace_sampler,
@@ -219,7 +219,7 @@ void log_startup_message(Logger& logger, std::string_view tracer_version,
                          std::size_t tags_header_max_size) {
   // clang-format off
   auto config = nlohmann::json::object({
-    {"version", tracer_version},
+    {"version", tracer_version_string},
     {"defaults", to_json(defaults)},
     {"collector", collector.config_json()},
     {"trace_sampler", trace_sampler.config_json()},
@@ -270,9 +270,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 
   if (config.log_on_startup) {
-    log_startup_message(*logger_, tracer_version, *collector_, *defaults_,
-                        *trace_sampler_, *span_sampler_, injection_styles_,
-                        extraction_styles_, hostname_, tags_header_max_size_);
+    log_startup_message(*logger_, tracer_version_string, *collector_,
+                        *defaults_, *trace_sampler_, *span_sampler_,
+                        injection_styles_, extraction_styles_, hostname_,
+                        tags_header_max_size_);
   }
 }
 
