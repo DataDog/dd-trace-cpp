@@ -7,7 +7,9 @@ project(dd-trace-cpp)
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
 option(BUILD_EXAMPLE "Build the example program (example/)" OFF)
 
-set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -29,6 +31,13 @@ ExternalProject_Add(curl
   BUILD_COMMAND make -j${MAKE_JOB_COUNT}
   INSTALL_COMMAND make install
 )
+
+add_library(libcurl INTERFACE IMPORTED GLOBAL)
+target_include_directories(libcurl INTERFACE ${CMAKE_BINARY_DIR}/include)
+
+execute_process(COMMAND ${CMAKE_BINARY_DIR}/bin/curl-config --static-libs
+  OUTPUT_VARIABLE CURL_LINK_OPTS OUTPUT_STRIP_TRAILING_WHITESPACE)
+target_link_options(libcurl INTERFACE "SHELL:${CURL_LINK_OPTS}")
 
 if (MSVC)
     add_compile_options(/W4 /WX)
@@ -163,12 +172,15 @@ target_include_directories(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/include)
 
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
+target_link_libraries(dd_trace_cpp PRIVATE libcurl Threads::Threads ${COVERAGE_LIBRARIES})
 
 # When installing, install the library and its public headers.
 
 install(TARGETS dd_trace_cpp
+  EXPORT dd_trace_cpp-config
   FILE_SET public_headers)
+install(EXPORT dd_trace_cpp-config
+  DESTINATION share/cmake/dd_trace_cpp)
 
 if(BUILD_TESTING)
   add_subdirectory(test)

@@ -26,6 +26,7 @@ namespace datadog {
 namespace tracing {
 
 using Duration = std::chrono::steady_clock::duration;
+using SystemDuration = std::chrono::system_clock::duration;
 
 struct TimePoint {
   std::chrono::system_clock::time_point wall =
@@ -39,11 +40,11 @@ inline Duration operator-(const TimePoint& after, const TimePoint& before) {
 }
 
 inline TimePoint operator-(const TimePoint& origin, Duration offset) {
-  return {origin.wall - offset, origin.tick - offset};
+  return {origin.wall - std::chrono::duration_cast<SystemDuration>(offset), origin.tick - offset};
 }
 
 inline TimePoint& operator+=(TimePoint& self, Duration offset) {
-  self.wall += offset;
+  self.wall += std::chrono::duration_cast<SystemDuration>(offset);
   self.tick += offset;
   return self;
 }
