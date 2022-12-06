@@ -4,7 +4,7 @@
 # Abseil's absl::string_view and absl::optional instead.
 #
 # In the context of an Envoy build, the Abseil libraries point to whatever
-# versions Envoy uses, inlcuding some source patches.
+# versions Envoy uses, including some source patches.
 #
 # To test this library's Bazel build independent of Envoy, we need to specify
 # versions of the Abseil libraries, including Envoy's patches. That is what this
