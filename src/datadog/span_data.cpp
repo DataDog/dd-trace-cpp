@@ -89,16 +89,16 @@ Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
        },
       "start", [&](auto& destination) {
          msgpack::pack_integer(
-             destination, std::chrono::duration_cast<std::chrono::nanoseconds>(
+             destination, std::uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
                               span.start.wall.time_since_epoch())
-                              .count());
+                              .count()));
          return Expected<void>{};
        },
       "duration", [&](auto& destination) {
          msgpack::pack_integer(
              destination,
-             std::chrono::duration_cast<std::chrono::nanoseconds>(span.duration)
-                 .count());
+             std::uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(span.duration)
+                 .count()));
         return Expected<void>{};
        },
       "error", [&](auto& destination) {
