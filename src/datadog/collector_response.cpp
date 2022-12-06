@@ -6,9 +6,9 @@ namespace tracing {
 std::string CollectorResponse::key(StringView service, StringView environment) {
   std::string result;
   result += "service:";
-  result += service;
+  append(result, service);
   result += ",env:";
-  result += environment;
+  append(result, environment);
   return result;
 }
 

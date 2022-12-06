@@ -39,9 +39,11 @@ namespace tracing {
 #ifdef DD_USE_ABSEIL_FOR_ENVOY
 template <typename Value>
 using Optional = absl::optional<Value>;
+inline constexpr auto nullopt = absl::nullopt;
 #else
 template <typename Value>
 using Optional = std::optional<Value>;
+inline constexpr auto nullopt = std::nullopt;
 #endif  // defined DD_USE_ABSEIL_FOR_ENVOY
 
 }  // namespace tracing

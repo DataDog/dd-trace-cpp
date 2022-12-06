@@ -247,7 +247,7 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   }
   log_on_error(curl_multi_wakeup(multi_handle_));
 
-  return std::nullopt;
+  return nullopt;
 } catch (CURLcode error) {
   return Error{Error::CURL_REQUEST_SETUP_FAILED, curl_easy_strerror(error)};
 }
@@ -445,7 +445,7 @@ Optional<StringView> CurlImpl::HeaderReader::lookup(StringView key) const {
 
   const auto found = response_headers_lower_->find(buffer_);
   if (found == response_headers_lower_->end()) {
-    return std::nullopt;
+    return nullopt;
   }
   return found->second;
 }

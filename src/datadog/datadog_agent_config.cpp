@@ -18,7 +18,7 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
   if (after_scheme == input.end()) {
     std::string message;
     message += "Datadog Agent URL is missing the \"://\" separator: \"";
-    message += input;
+    append(message, input);
     message += '\"';
     return Error{Error::URL_MISSING_SEPARATOR, std::move(message)};
   }
@@ -31,13 +31,13 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
   if (found == std::end(supported)) {
     std::string message;
     message += "Unsupported URI scheme \"";
-    message += scheme;
+    append(message, scheme);
     message += "\" in Datadog Agent URL \"";
-    message += input;
+    append(message, input);
     message += "\". The following are supported:";
     for (const auto& supported_scheme : supported) {
       message += ' ';
-      message += supported_scheme;
+      append(message, supported_scheme);
     }
     return Error{Error::URL_UNSUPPORTED_SCHEME, std::move(message)};
   }
@@ -59,9 +59,9 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
           "Unix domain socket paths for Datadog Agent must be absolute, i.e. "
           "must begin with a "
           "\"/\". The path \"";
-      message += authority_and_path;
+      append(message, authority_and_path);
       message += "\" is not absolute. Error occurred for URL: \"";
-      message += input;
+      append(message, input);
       message += '\"';
       return Error{Error::URL_UNIX_DOMAIN_SOCKET_PATH_NOT_ABSOLUTE,
                    std::move(message)};
@@ -119,13 +119,13 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   std::string configured_url = config.url;
   if (auto url_env = lookup(environment::DD_TRACE_AGENT_URL)) {
-    configured_url = *url_env;
+    assign(configured_url, *url_env);
   } else if (env_host || env_port) {
     configured_url.clear();
     configured_url += "http://";
-    configured_url += env_host.value_or("localhost");
+    append(configured_url, env_host.value_or("localhost"));
     configured_url += ':';
-    configured_url += env_port.value_or("8126");
+    append(configured_url, env_port.value_or("8126"));
   }
 
   auto url = config.parse(configured_url);

@@ -25,6 +25,8 @@
 // This file defines `datadog::tracing::StringView`, a type that is an alias
 // for either `std::string_view` or `absl::string_view`.
 
+#include <string>
+
 #ifdef DD_USE_ABSEIL_FOR_ENVOY
 // Abseil examples, including usage in Envoy, include Abseil headers in quoted
 // style instead of angle bracket style, per Bazel's default build behavior.
@@ -41,6 +43,20 @@ using StringView = absl::string_view;
 #else
 using StringView = std::string_view;
 #endif  // defined DD_USE_ABSEIL_FOR_ENVOY
+
+// When `StringView` is not the same as `std::string_view`,
+// `operator+=(string&, StringView)` isn't defined.  To work around this, use
+// `append` everywhere.
+inline void append(std::string& destination, StringView text) {
+  destination.append(text.data(), text.size());
+}
+
+// When `StringView` is not the same as `std::string_view`,
+// `operator=(string&, StringView)` isn't defined.  To work around this, use
+// `assign` everywhere.
+inline void assign(std::string& destination, StringView text) {
+  destination.assign(text.data(), text.size());
+}
 
 }  // namespace tracing
 }  // namespace datadog

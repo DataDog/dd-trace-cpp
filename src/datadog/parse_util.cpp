@@ -22,21 +22,21 @@ Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
   if (status.ec == std::errc::invalid_argument) {
     std::string message;
     message += "Is not a valid integer: \"";
-    message += input;
+    append(message, input);
     message += '\"';
     return Error{Error::INVALID_INTEGER, std::move(message)};
   } else if (status.ptr != input.end()) {
     std::string message;
     message += "Integer has trailing characters in: \"";
-    message += input;
+    append(message, input);
     message += '\"';
     return Error{Error::INVALID_INTEGER, std::move(message)};
   } else if (status.ec == std::errc::result_out_of_range) {
     std::string message;
     message += "Integer is not within the range of ";
-    message += kind;
+    append(message, kind);
     message += ": ";
-    message += input;
+    append(message, input);
     return Error{Error::OUT_OF_RANGE_INTEGER, std::move(message)};
   }
   return value;
@@ -85,13 +85,13 @@ Expected<double> parse_double(StringView input) {
     message +=
         "Is not a valid number, or is out of the range of double precision "
         "floating point: \"";
-    message += input;
+    append(message, input);
     message += '\"';
     return Error{Error::INVALID_DOUBLE, std::move(message)};
   } else if (!stream.eof()) {
     std::string message;
     message += "Number has trailing characters in: \"";
-    message += input;
+    append(message, input);
     message += '\"';
     return Error{Error::INVALID_DOUBLE, std::move(message)};
   }

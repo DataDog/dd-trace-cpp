@@ -83,7 +83,7 @@ Expected<PropagationStyles> parse_propagation_styles(StringView input) {
       message += "Unsupported propagation style \"";
       message += token;
       message += "\" in list \"";
-      message += input;
+      append(message, input);
       message += "\".  The following styles are supported: Datadog, B3.";
       return Error{Error::UNKNOWN_PROPAGATION_STYLE, std::move(message)};
     }
@@ -102,11 +102,11 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
     if (separator == token.end()) {
       std::string message;
       message += "Unable to parse a key/value from the tag text \"";
-      message += token;
+      append(message, token);
       message +=
           "\" because it does not contain the separator character \":\".  "
           "Error occurred in list of tags \"";
-      message += input;
+      append(message, input);
       message += "\".";
       return Error{Error::TAG_MISSING_SEPARATOR, std::move(message)};
     }
@@ -127,17 +127,17 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   result.defaults = config.defaults;
 
   if (auto service_env = lookup(environment::DD_SERVICE)) {
-    result.defaults.service = *service_env;
+    assign(result.defaults.service, *service_env);
   }
   if (result.defaults.service.empty()) {
     return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
   }
 
   if (auto environment_env = lookup(environment::DD_ENV)) {
-    result.defaults.environment = *environment_env;
+    assign(result.defaults.environment, *environment_env);
   }
   if (auto version_env = lookup(environment::DD_VERSION)) {
-    result.defaults.version = *version_env;
+    assign(result.defaults.version, *version_env);
   }
 
   if (auto tags_env = lookup(environment::DD_TAGS)) {
@@ -145,7 +145,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     if (auto *error = tags.if_error()) {
       std::string prefix;
       prefix += "Unable to parse ";
-      prefix += name(environment::DD_TAGS);
+      append(prefix, name(environment::DD_TAGS));
       prefix += " environment variable: ";
       return error->with_prefix(prefix);
     }
@@ -199,7 +199,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     if (auto *error = styles.if_error()) {
       std::string prefix;
       prefix += "Unable to parse ";
-      prefix += name(environment::DD_PROPAGATION_STYLE_EXTRACT);
+      append(prefix, name(environment::DD_PROPAGATION_STYLE_EXTRACT));
       prefix += " environment variable: ";
       return error->with_prefix(prefix);
     }
@@ -212,7 +212,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     if (auto *error = styles.if_error()) {
       std::string prefix;
       prefix += "Unable to parse ";
-      prefix += name(environment::DD_PROPAGATION_STYLE_INJECT);
+      append(prefix, name(environment::DD_PROPAGATION_STYLE_INJECT));
       prefix += " environment variable: ";
       return error->with_prefix(prefix);
     }

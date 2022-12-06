@@ -4,10 +4,11 @@
 # Abseil's absl::string_view and absl::optional instead.
 #
 # In the context of an Envoy build, the Abseil libraries point to whatever
-# versions Envoy uses.
+# versions Envoy uses, including some source patches.
 #
 # To test this library's Bazel build independent of Envoy, we need to specify
-# versions of the Abseil libraries. That is what this file is for.
+# versions of the Abseil libraries, including Envoy's patches. That is what this
+# file is for.
 
 # These rules are based on <https://abseil.io/docs/cpp/quickstart>,
 # accessed December 6, 2022.
@@ -18,6 +19,8 @@ http_archive(
   urls = ["https://github.com/abseil/abseil-cpp/archive/98eb410c93ad059f9bba1bf43f5bb916fc92a5ea.zip"],
   sha256 = "aabf6c57e3834f8dc3873a927f37eaf69975d4b28117fc7427dfb1c661542a87",
   strip_prefix = "abseil-cpp-98eb410c93ad059f9bba1bf43f5bb916fc92a5ea",
+  patches = ["//:abseil.patch"],
+  patch_args = ["-p1"],
 )
 
 http_archive(

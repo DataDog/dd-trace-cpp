@@ -25,7 +25,7 @@ const StringView traces_api_path = "/v0.4/traces";
 
 HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
   auto traces_url = agent_url;
-  traces_url.path += traces_api_path;
+  append(traces_url.path, traces_api_path);
   return traces_url;
 }
 
@@ -59,10 +59,10 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
         "Parsing the Datadog Agent's response to traces we sent it failed.  "
         "The response is expected to be a JSON object, but instead it's a JSON "
         "value with type \"";
-    message += type;
+    append(message, type);
     message += '\"';
     message += "\nError occurred for response body (begins on next line):\n";
-    message += body;
+    append(message, body);
     return message;
   }
 
@@ -78,14 +78,14 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
     message +=
         "Parsing the Datadog Agent's response to traces we sent it failed.  "
         "The \"";
-    message += sample_rates_property;
+    append(message, sample_rates_property);
     message +=
         "\" property of the response is expected to be a JSON object, but "
         "instead it's a JSON value with type \"";
-    message += type;
+    append(message, type);
     message += '\"';
     message += "\nError occurred for response body (begins on next line):\n";
-    message += body;
+    append(message, body);
     return message;
   }
 
@@ -99,10 +99,10 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
           "for the key \"";
       message += key;
       message += "\". Rate should be a number, but it's a \"";
-      message += type;
+      append(message, type);
       message += "\" instead.";
       message += "\nError occurred for response body (begins on next line):\n";
-      message += body;
+      append(message, body);
       return message;
     }
     auto maybe_rate = Rate::from(value);
@@ -115,7 +115,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
       message += "\": ";
       message += error->message;
       message += "\nError occurred for response body (begins on next line):\n";
-      message += body;
+      append(message, body);
       return message;
     }
     sample_rates.emplace(key, *maybe_rate);
@@ -128,7 +128,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
       "JSON error: ";
   message += error.what();
   message += "\nError occurred for response body (begins on next line):\n";
-  message += body;
+  append(message, body);
   return message;
 }
 
@@ -161,7 +161,7 @@ Expected<void> DatadogAgent::send(
   std::lock_guard<std::mutex> lock(mutex_);
   incoming_trace_chunks_.push_back(
       TraceChunk{std::move(spans), response_handler});
-  return std::nullopt;
+  return nullopt;
 }
 
 nlohmann::json DatadogAgent::config_json() const {

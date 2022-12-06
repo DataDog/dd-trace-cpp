@@ -14,7 +14,7 @@ Optional<StringView> lookup(Variable variable) {
   const char *name = variable_names[variable];
   const char *value = std::getenv(name);
   if (!value) {
-    return std::nullopt;
+    return nullopt;
   }
   return StringView{value};
 }

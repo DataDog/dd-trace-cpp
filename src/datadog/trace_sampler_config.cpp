@@ -26,9 +26,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     } catch (const nlohmann::json::parse_error &error) {
       std::string message;
       message += "Unable to parse JSON from ";
-      message += name(environment::DD_TRACE_SAMPLING_RULES);
+      append(message, name(environment::DD_TRACE_SAMPLING_RULES));
       message += " value ";
-      message += *rules_env;
+      append(message, *rules_env);
       message += ": ";
       message += error.what();
       return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
@@ -39,15 +39,15 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     if (type != "array") {
       std::string message;
       message += "Trace sampling rules must be an array, but ";
-      message += name(environment::DD_TRACE_SAMPLING_RULES);
+      append(message, name(environment::DD_TRACE_SAMPLING_RULES));
       message += " has JSON type \"";
       message += type;
       message += "\": ";
-      message += *rules_env;
+      append(message, *rules_env);
       return Error{Error::TRACE_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
     }
 
-    const std::unordered_set<StringView> allowed_properties{
+    const std::unordered_set<std::string> allowed_properties{
         "service", "name", "resource", "tags", "sample_rate"};
 
     for (const auto &json_rule : json_rules) {
@@ -55,9 +55,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       if (auto *error = matcher.if_error()) {
         std::string prefix;
         prefix += "Unable to create a rule from ";
-        prefix += name(environment::DD_TRACE_SAMPLING_RULES);
+        append(prefix, name(environment::DD_TRACE_SAMPLING_RULES));
         prefix += " value ";
-        prefix += *rules_env;
+        append(prefix, *rules_env);
         prefix += ": ";
         return error->with_prefix(prefix);
       }
@@ -70,9 +70,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
         if (type != "number") {
           std::string message;
           message += "Unable to parse a rule from ";
-          message += name(environment::DD_TRACE_SAMPLING_RULES);
+          append(message, name(environment::DD_TRACE_SAMPLING_RULES));
           message += " value ";
-          message += *rules_env;
+          append(message, *rules_env);
           message += ".  The \"sample_rate\" property of the rule ";
           message += json_rule.dump();
           message += " is not a number, but instead has type \"";
@@ -97,9 +97,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
         message += " in trace sampling rule ";
         message += json_rule.dump();
         message += ".  Error occurred while parsing ";
-        message += name(environment::DD_TRACE_SAMPLING_RULES);
+        append(message, name(environment::DD_TRACE_SAMPLING_RULES));
         message += ": ";
-        message += *rules_env;
+        append(message, *rules_env);
         return Error{Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY,
                      std::move(message)};
       }
@@ -132,7 +132,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     if (auto *error = maybe_sample_rate.if_error()) {
       std::string prefix;
       prefix += "While parsing ";
-      prefix += name(environment::DD_TRACE_SAMPLE_RATE);
+      append(prefix, name(environment::DD_TRACE_SAMPLE_RATE));
       prefix += ": ";
       return error->with_prefix(prefix);
     }
@@ -160,7 +160,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     if (auto *error = maybe_max_per_second.if_error()) {
       std::string prefix;
       prefix += "While parsing ";
-      prefix += name(environment::DD_TRACE_RATE_LIMIT);
+      append(prefix, name(environment::DD_TRACE_RATE_LIMIT));
       prefix += ": ";
       return error->with_prefix(prefix);
     }

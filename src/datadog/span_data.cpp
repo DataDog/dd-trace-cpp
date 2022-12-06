@@ -20,7 +20,7 @@ Optional<StringView> lookup(
   if (found != map.end()) {
     return found->second;
   }
-  return std::nullopt;
+  return nullopt;
 }
 
 }  // namespace
@@ -122,7 +122,7 @@ Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
        });
   // clang-format on
 
-  return std::nullopt;
+  return nullopt;
 }
 
 }  // namespace tracing

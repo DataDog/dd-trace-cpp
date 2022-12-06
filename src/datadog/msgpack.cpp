@@ -24,7 +24,7 @@ std::string make_overflow_message(StringView type, std::size_t actual,
                                   std::size_t max) {
   std::string message;
   message += "Cannot msgpack encode ";
-  message += type;
+  append(message, type);
   message += " of size ";
   message += std::to_string(actual);
   message += ", which exceeds the protocol maximum of ";

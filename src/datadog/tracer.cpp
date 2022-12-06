@@ -41,17 +41,17 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
                                        StringView header, StringView kind) {
     auto found = headers.lookup(header);
     if (!found) {
-      return std::nullopt;
+      return nullopt;
     }
     auto result = parse_uint64(*found, 10);
     if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Could not extract Datadog-style ";
-      prefix += kind;
+      append(prefix, kind);
       prefix += "ID from ";
-      prefix += header;
+      append(prefix, header);
       prefix += ": ";
-      prefix += *found;
+      append(prefix, *found);
       prefix += ' ';
       return error->with_prefix(prefix);
     }
@@ -74,15 +74,15 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
     const StringView header = "x-datadog-sampling-priority";
     auto found = headers.lookup(header);
     if (!found) {
-      return std::nullopt;
+      return nullopt;
     }
     auto result = parse_int(*found, 10);
     if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Could not extract Datadog-style sampling priority from ";
-      prefix += header;
+      append(prefix, header);
       prefix += ": ";
-      prefix += *found;
+      append(prefix, *found);
       prefix += ' ';
       return error->with_prefix(prefix);
     }
@@ -94,7 +94,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
     if (found) {
       return std::string(*found);
     }
-    return std::nullopt;
+    return nullopt;
   }
 
   Optional<std::string> trace_tags(const DictReader& headers) override {
@@ -102,7 +102,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
     if (found) {
       return std::string(*found);
     }
-    return std::nullopt;
+    return nullopt;
   }
 };
 
@@ -111,17 +111,17 @@ class B3ExtractionPolicy : public DatadogExtractionPolicy {
                                        StringView header, StringView kind) {
     auto found = headers.lookup(header);
     if (!found) {
-      return std::nullopt;
+      return nullopt;
     }
     auto result = parse_uint64(*found, 16);
     if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Could not extract B3-style ";
-      prefix += kind;
+      append(prefix, kind);
       prefix += "ID from ";
-      prefix += header;
+      append(prefix, header);
       prefix += ": ";
-      prefix += *found;
+      append(prefix, *found);
       prefix += ' ';
       return error->with_prefix(prefix);
     }
@@ -144,15 +144,15 @@ class B3ExtractionPolicy : public DatadogExtractionPolicy {
     const StringView header = "x-b3-sampled";
     auto found = headers.lookup(header);
     if (!found) {
-      return std::nullopt;
+      return nullopt;
     }
     auto result = parse_int(*found, 10);
     if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Could not extract B3-style sampling priority from ";
-      prefix += header;
+      append(prefix, header);
       prefix += ": ";
-      prefix += *found;
+      append(prefix, *found);
       prefix += ' ';
       return error->with_prefix(prefix);
     }
@@ -255,7 +255,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
-      hostname_(config.report_hostname ? get_hostname() : std::nullopt),
+      hostname_(config.report_hostname ? get_hostname() : nullopt),
       tags_header_max_size_(config.tags_header_size) {
   if (auto* collector =
           std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
@@ -287,10 +287,9 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
-      injection_styles_, hostname_, std::nullopt /* origin */,
-      tags_header_max_size_,
+      injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
       std::unordered_map<std::string, std::string>{} /* trace_tags */,
-      std::nullopt /* sampling_decision */, std::move(span_data));
+      nullopt /* sampling_decision */, std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;
 }

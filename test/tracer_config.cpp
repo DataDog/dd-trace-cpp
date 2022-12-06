@@ -94,7 +94,7 @@ class EnvGuard {
 
 // For brevity when we're tabulating a lot of test cases with parse
 // `Optional<...>` data members.
-const auto x = std::nullopt;
+const auto x = nullopt;
 
 // Here's an attempt at a portable secure temporary file.
 // There's no standard solution, and it's generally hard on Windows.
@@ -198,25 +198,22 @@ TEST_CASE("TracerConfig::defaults") {
     };
 
     auto test_case = GENERATE(values<TestCase>({
-        {"empty", "", {}, std::nullopt},
+        {"empty", "", {}, nullopt},
         {"missing colon", "foo", {}, Error::TAG_MISSING_SEPARATOR},
         {"trailing comma",
          "foo:bar, baz:123,",
          {},
          Error::TAG_MISSING_SEPARATOR},
-        {"overwrite value", "foo:baz", {{"foo", "baz"}}, std::nullopt},
+        {"overwrite value", "foo:baz", {{"foo", "baz"}}, nullopt},
         {"additional values",
          "baz:123, bam:three",
          {{"baz", "123"}, {"bam", "three"}},
-         std::nullopt},
+         nullopt},
         {"commas optional",
          "baz:123 bam:three",
          {{"baz", "123"}, {"bam", "three"}},
-         std::nullopt},
-        {"last one wins",
-         "baz:123 baz:three",
-         {{"baz", "three"}},
-         std::nullopt},
+         nullopt},
+        {"last one wins", "baz:123 baz:three", {{"baz", "three"}}, nullopt},
     }));
 
     // This will be overriden by the DD_TAGS environment variable.
@@ -423,18 +420,17 @@ TEST_CASE("TracerConfig::agent") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"http://dd-agent:8126", std::nullopt, "http", "dd-agent:8126", ""},
-          {"http://dd-agent:8126/", std::nullopt, "http", "dd-agent:8126", "/"},
-          {"https://dd-agent:8126/", std::nullopt, "https", "dd-agent:8126",
-           "/"},
-          {"unix:///var/run/datadog/trace-agent.sock", std::nullopt, "unix",
+          {"http://dd-agent:8126", nullopt, "http", "dd-agent:8126", ""},
+          {"http://dd-agent:8126/", nullopt, "http", "dd-agent:8126", "/"},
+          {"https://dd-agent:8126/", nullopt, "https", "dd-agent:8126", "/"},
+          {"unix:///var/run/datadog/trace-agent.sock", nullopt, "unix",
            "/var/run/datadog/trace-agent.sock"},
           {"unix://var/run/datadog/trace-agent.sock",
            Error::URL_UNIX_DOMAIN_SOCKET_PATH_NOT_ABSOLUTE},
-          {"http+unix:///run/datadog/trace-agent.sock", std::nullopt,
-           "http+unix", "/run/datadog/trace-agent.sock"},
-          {"https+unix:///run/datadog/trace-agent.sock", std::nullopt,
-           "https+unix", "/run/datadog/trace-agent.sock"},
+          {"http+unix:///run/datadog/trace-agent.sock", nullopt, "http+unix",
+           "/run/datadog/trace-agent.sock"},
+          {"https+unix:///run/datadog/trace-agent.sock", nullopt, "https+unix",
+           "/run/datadog/trace-agent.sock"},
           {"tcp://localhost:8126", Error::URL_UNSUPPORTED_SCHEME},
           {"/var/run/datadog/trace-agent.sock", Error::URL_MISSING_SEPARATOR},
       }));

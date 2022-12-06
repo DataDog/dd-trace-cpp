@@ -16,7 +16,7 @@ class DictReader {
  public:
   virtual ~DictReader() {}
 
-  // Return the value at the specified `key`, or return `std::nullopt` if there
+  // Return the value at the specified `key`, or return `nullopt` if there
   // is no value at `key`.
   virtual Optional<StringView> lookup(StringView key) const = 0;
 
