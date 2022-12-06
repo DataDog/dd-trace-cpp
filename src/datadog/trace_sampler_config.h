@@ -7,11 +7,11 @@
 // `TraceSamplerConfig` is specified as the `trace_sampler` property of
 // `TracerConfig`.
 
-#include <optional>
 #include <vector>
 
 #include "expected.h"
 #include "json_fwd.hpp"
+#include "optional.h"
 #include "rate.h"
 #include "span_matcher.h"
 
@@ -26,7 +26,7 @@ struct TraceSamplerConfig {
     Rule() = default;
   };
 
-  std::optional<double> sample_rate;
+  Optional<double> sample_rate;
   std::vector<Rule> rules;
   double max_per_second = 200;
 };

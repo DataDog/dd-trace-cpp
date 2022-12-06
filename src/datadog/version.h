@@ -2,7 +2,7 @@
 
 // This component provides the release version of this library.
 
-#include <string_view>
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

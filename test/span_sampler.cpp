@@ -1,10 +1,10 @@
+#include <datadog/optional.h>
 #include <datadog/span_data.h>
 #include <datadog/span_sampler.h>
 #include <datadog/tags.h>
 #include <datadog/tracer.h>
 
 #include <cstddef>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -18,7 +18,7 @@ using namespace datadog::tracing;
 
 namespace std {
 
-std::ostream& operator<<(std::ostream& stream, std::optional<double> value) {
+std::ostream& operator<<(std::ostream& stream, Optional<double> value) {
   if (value) {
     return stream << *value;
   }
@@ -46,9 +46,9 @@ std::ostream& operator<<(
 namespace {
 
 struct SpanSamplingTags {
-  std::optional<double> mechanism;
-  std::optional<double> rule_rate;
-  std::optional<double> max_per_second;
+  Optional<double> mechanism;
+  Optional<double> rule_rate;
+  Optional<double> max_per_second;
 };
 
 SpanSamplingTags span_sampling_tags(const SpanData& span) {
@@ -70,19 +70,19 @@ SpanSamplingTags span_sampling_tags(const SpanData& span) {
   return result;
 }
 
-SpanSamplerConfig::Rule by_service(std::string_view service) {
+SpanSamplerConfig::Rule by_service(StringView service) {
   SpanSamplerConfig::Rule rule;
   rule.service = service;
   return rule;
 }
 
-SpanSamplerConfig::Rule by_name(std::string_view name) {
+SpanSamplerConfig::Rule by_name(StringView name) {
   SpanSamplerConfig::Rule rule;
   rule.name = name;
   return rule;
 }
 
-SpanSamplerConfig::Rule by_resource(std::string_view resource) {
+SpanSamplerConfig::Rule by_resource(StringView resource) {
   SpanSamplerConfig::Rule rule;
   rule.resource = resource;
   return rule;
@@ -96,7 +96,7 @@ SpanSamplerConfig::Rule by_tags(
 }
 
 SpanSamplerConfig::Rule by_name_and_tags(
-    std::string_view name, std::unordered_map<std::string, std::string> tags) {
+    StringView name, std::unordered_map<std::string, std::string> tags) {
   SpanSamplerConfig::Rule rule;
   rule.name = name;
   rule.tags = std::move(tags);
@@ -292,7 +292,7 @@ TEST_CASE("span rule limiter") {
   struct TestCase {
     std::string name;
     std::size_t num_spans;
-    std::optional<double> max_per_second;
+    Optional<double> max_per_second;
     std::size_t expected_count;
   };
 

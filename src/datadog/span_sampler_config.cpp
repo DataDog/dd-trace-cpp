@@ -16,8 +16,8 @@ namespace {
 
 // `env_var` is the name of the environment variable from which `rules_raw` was
 // obtained.  It's used for error messages.
-Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(
-    std::string_view rules_raw, std::string_view env_var) {
+Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
+                                                           StringView env_var) {
   std::vector<SpanSamplerConfig::Rule> rules;
   nlohmann::json json_rules;
 
@@ -46,7 +46,7 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(
     return Error{Error::SPAN_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
   }
 
-  const std::unordered_set<std::string_view> allowed_properties{
+  const std::unordered_set<StringView> allowed_properties{
       "service", "name", "resource", "tags", "sample_rate", "max_per_second"};
 
   for (const auto &json_rule : json_rules) {

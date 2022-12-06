@@ -3,8 +3,7 @@
 namespace datadog {
 namespace tracing {
 
-std::string CollectorResponse::key(std::string_view service,
-                                   std::string_view environment) {
+std::string CollectorResponse::key(StringView service, StringView environment) {
   std::string result;
   result += "service:";
   result += service;

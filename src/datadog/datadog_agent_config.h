@@ -14,11 +14,11 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <variant>
 
 #include "expected.h"
 #include "http_client.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -50,7 +50,7 @@ struct DatadogAgentConfig {
   // How often, in milliseconds, to send batches of traces to the Datadog Agent.
   int flush_interval_milliseconds = 2000;
 
-  static Expected<HTTPClient::URL> parse(std::string_view);
+  static Expected<HTTPClient::URL> parse(StringView);
 };
 
 class FinalizedDatadogAgentConfig {

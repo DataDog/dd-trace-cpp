@@ -4,6 +4,7 @@
 #include <datadog/error.h>
 #include <datadog/net_util.h>
 #include <datadog/null_collector.h>
+#include <datadog/optional.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
@@ -14,7 +15,6 @@
 #include <datadog/tracer_config.h>
 
 #include <iosfwd>
-#include <optional>
 
 #include "matchers.h"
 #include "mocks/collectors.h"
@@ -26,7 +26,7 @@ namespace datadog {
 namespace tracing {
 
 std::ostream& operator<<(std::ostream& stream,
-                         const std::optional<Error::Code>& code) {
+                         const Optional<Error::Code>& code) {
   if (code) {
     return stream << "Error::Code(" << int(*code) << ")";
   }
@@ -263,7 +263,7 @@ TEST_CASE("span extraction") {
       bool extract_b3;
       std::unordered_map<std::string, std::string> headers;
       // Null means "don't expect an error."
-      std::optional<Error::Code> expected_error;
+      Optional<Error::Code> expected_error;
     };
 
     auto test_case = GENERATE(values<TestCase>({
@@ -453,8 +453,8 @@ TEST_CASE("span extraction") {
       bool extract_b3;
       std::unordered_map<std::string, std::string> headers;
       std::uint64_t expected_trace_id;
-      std::optional<std::uint64_t> expected_parent_id;
-      std::optional<int> expected_sampling_priority;
+      Optional<std::uint64_t> expected_parent_id;
+      Optional<int> expected_sampling_priority;
     };
 
     auto test_case = GENERATE(values<TestCase>({

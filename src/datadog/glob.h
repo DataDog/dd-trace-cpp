@@ -11,7 +11,7 @@
 // The patterns are here called "glob patterns," though they are different from
 // the patterns used in Unix shells.
 
-#include <string_view>
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -19,7 +19,7 @@ namespace tracing {
 // Return whether the specified `subject` matches the specified glob `pattern`,
 // i.e.  whether `subject` is a member of the set of strings represented by the
 // glob `pattern`.
-bool glob_match(std::string_view pattern, std::string_view subject);
+bool glob_match(StringView pattern, StringView subject);
 
 }  // namespace tracing
 }  // namespace datadog

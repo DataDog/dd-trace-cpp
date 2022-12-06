@@ -10,7 +10,7 @@
 // -------------
 // The following excerpt demonstrates the intended usage of `Expected<T>`:
 //
-//     Expected<int> parse_integer(std::string_view name);
+//     Expected<int> parse_integer(StringView name);
 //
 //
 //     int main() {
@@ -35,12 +35,12 @@
 //
 // `Expected<void>` is like `Expected<T>`, except that if the value is not an
 // error then it cannot be "dereferenced" with `operator*`, i.e. it is analogous
-// to `std::optional<Error>` (and is implemented as such).
+// to `Optional<Error>` (and is implemented as such).
 
-#include <optional>
 #include <variant>
 
 #include "error.h"
+#include "optional.h"
 
 namespace datadog {
 namespace tracing {
@@ -189,7 +189,7 @@ const Error* Expected<Value>::if_error() const& {
 
 template <>
 class Expected<void> {
-  std::optional<Error> data_;
+  Optional<Error> data_;
 
  public:
   Expected() = default;

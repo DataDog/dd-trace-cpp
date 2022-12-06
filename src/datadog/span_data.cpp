@@ -1,19 +1,19 @@
 #include "span_data.h"
 
 #include <cstddef>
-#include <string_view>
 
 #include "error.h"
 #include "msgpack.h"
 #include "span_config.h"
 #include "span_defaults.h"
+#include "string_view.h"
 #include "tags.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
 
-std::optional<std::string_view> lookup(
+Optional<StringView> lookup(
     const std::string& key,
     const std::unordered_map<std::string, std::string>& map) {
   const auto found = map.find(key);
@@ -25,11 +25,11 @@ std::optional<std::string_view> lookup(
 
 }  // namespace
 
-std::optional<std::string_view> SpanData::environment() const {
+Optional<StringView> SpanData::environment() const {
   return lookup(tags::environment, tags);
 }
 
-std::optional<std::string_view> SpanData::version() const {
+Optional<StringView> SpanData::version() const {
   return lookup(tags::version, tags);
 }
 

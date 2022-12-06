@@ -7,11 +7,11 @@
 // `SpanSamplerConfig` is specified as the `span_sampler` property of
 // `TracerConfig`.
 
-#include <optional>
 #include <vector>
 
 #include "expected.h"
 #include "json_fwd.hpp"
+#include "optional.h"
 #include "rate.h"
 #include "span_matcher.h"
 
@@ -23,7 +23,7 @@ class Logger;
 struct SpanSamplerConfig {
   struct Rule : public SpanMatcher {
     double sample_rate = 1.0;
-    std::optional<double> max_per_second;
+    Optional<double> max_per_second;
 
     Rule(const SpanMatcher&);
     Rule() = default;
@@ -45,7 +45,7 @@ class FinalizedSpanSamplerConfig {
  public:
   struct Rule : public SpanMatcher {
     Rate sample_rate;
-    std::optional<double> max_per_second;
+    Optional<double> max_per_second;
   };
 
   std::vector<Rule> rules;

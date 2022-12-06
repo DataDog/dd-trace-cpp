@@ -14,10 +14,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <utility>
 
 #include "expected.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -29,7 +29,7 @@ void pack_integer(std::string& buffer, std::int32_t value);
 
 void pack_double(std::string& buffer, double value);
 
-Expected<void> pack_string(std::string& buffer, std::string_view value);
+Expected<void> pack_string(std::string& buffer, StringView value);
 
 Expected<void> pack_array(std::string& buffer, std::size_t size);
 

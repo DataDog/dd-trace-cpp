@@ -1,4 +1,5 @@
 #include <datadog/id_generator.h>
+#include <datadog/optional.h>
 #include <datadog/propagation_styles.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
@@ -10,7 +11,6 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
-#include <optional>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -55,7 +55,7 @@ namespace {
 // Restore any previous value (or unset the value if it was unset) afterward.
 class EnvGuard {
   std::string name_;
-  std::optional<std::string> former_value_;
+  Optional<std::string> former_value_;
 
  public:
   EnvGuard(std::string name, std::string value) : name_(std::move(name)) {
@@ -93,7 +93,7 @@ class EnvGuard {
 };
 
 // For brevity when we're tabulating a lot of test cases with parse
-// `std::optional<...>` data members.
+// `Optional<...>` data members.
 const auto x = std::nullopt;
 
 // Here's an attempt at a portable secure temporary file.
@@ -194,7 +194,7 @@ TEST_CASE("TracerConfig::defaults") {
       std::string name;
       std::string dd_tags;
       std::unordered_map<std::string, std::string> expected_tags;
-      std::optional<Error::Code> expected_error;
+      Optional<Error::Code> expected_error;
     };
 
     auto test_case = GENERATE(values<TestCase>({
@@ -416,7 +416,7 @@ TEST_CASE("TracerConfig::agent") {
     SECTION("parsing") {
       struct TestCase {
         std::string url;
-        std::optional<Error::Code> expected_error;
+        Optional<Error::Code> expected_error;
         std::string expected_scheme = "";
         std::string expected_authority = "";
         std::string expected_path = "";
@@ -459,9 +459,9 @@ TEST_CASE("TracerConfig::agent") {
     SECTION("environment variables override") {
       struct TestCase {
         std::string name;
-        std::optional<std::string> env_host;
-        std::optional<std::string> env_port;
-        std::optional<std::string> env_url;
+        Optional<std::string> env_host;
+        Optional<std::string> env_port;
+        Optional<std::string> env_url;
         std::string expected_scheme;
         std::string expected_authority;
       };
@@ -490,15 +490,15 @@ TEST_CASE("TracerConfig::agent") {
       }));
 
       CAPTURE(test_case.name);
-      std::optional<EnvGuard> host_guard;
+      Optional<EnvGuard> host_guard;
       if (test_case.env_host) {
         host_guard.emplace("DD_AGENT_HOST", *test_case.env_host);
       }
-      std::optional<EnvGuard> port_guard;
+      Optional<EnvGuard> port_guard;
       if (test_case.env_port) {
         port_guard.emplace("DD_TRACE_AGENT_PORT", *test_case.env_port);
       }
-      std::optional<EnvGuard> url_guard;
+      Optional<EnvGuard> url_guard;
       if (test_case.env_url) {
         url_guard.emplace("DD_TRACE_AGENT_URL", *test_case.env_url);
       }
@@ -1018,7 +1018,7 @@ TEST_CASE("TracerConfig propagation styles") {
         struct TestCase {
           int line;
           std::string env_value;
-          std::optional<Error::Code> expected_error;
+          Optional<Error::Code> expected_error;
           PropagationStyles expected_styles = PropagationStyles{};
         };
 

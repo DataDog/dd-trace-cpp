@@ -26,20 +26,19 @@ namespace {
 
 class ExtractionPolicy {
  public:
-  virtual Expected<std::optional<std::uint64_t>> trace_id(
+  virtual Expected<Optional<std::uint64_t>> trace_id(
       const DictReader& headers) = 0;
-  virtual Expected<std::optional<std::uint64_t>> parent_id(
+  virtual Expected<Optional<std::uint64_t>> parent_id(
       const DictReader& headers) = 0;
-  virtual Expected<std::optional<int>> sampling_priority(
+  virtual Expected<Optional<int>> sampling_priority(
       const DictReader& headers) = 0;
-  virtual std::optional<std::string> origin(const DictReader& headers) = 0;
-  virtual std::optional<std::string> trace_tags(const DictReader&) = 0;
+  virtual Optional<std::string> origin(const DictReader& headers) = 0;
+  virtual Optional<std::string> trace_tags(const DictReader&) = 0;
 };
 
 class DatadogExtractionPolicy : public ExtractionPolicy {
-  Expected<std::optional<std::uint64_t>> id(const DictReader& headers,
-                                            std::string_view header,
-                                            std::string_view kind) {
+  Expected<Optional<std::uint64_t>> id(const DictReader& headers,
+                                       StringView header, StringView kind) {
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -60,19 +59,19 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
   }
 
  public:
-  Expected<std::optional<std::uint64_t>> trace_id(
+  Expected<Optional<std::uint64_t>> trace_id(
       const DictReader& headers) override {
     return id(headers, "x-datadog-trace-id", "trace");
   }
 
-  Expected<std::optional<std::uint64_t>> parent_id(
+  Expected<Optional<std::uint64_t>> parent_id(
       const DictReader& headers) override {
     return id(headers, "x-datadog-parent-id", "parent span");
   }
 
-  Expected<std::optional<int>> sampling_priority(
+  Expected<Optional<int>> sampling_priority(
       const DictReader& headers) override {
-    const std::string_view header = "x-datadog-sampling-priority";
+    const StringView header = "x-datadog-sampling-priority";
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -90,7 +89,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
     return *result;
   }
 
-  std::optional<std::string> origin(const DictReader& headers) override {
+  Optional<std::string> origin(const DictReader& headers) override {
     auto found = headers.lookup("x-datadog-origin");
     if (found) {
       return std::string(*found);
@@ -98,7 +97,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
     return std::nullopt;
   }
 
-  std::optional<std::string> trace_tags(const DictReader& headers) override {
+  Optional<std::string> trace_tags(const DictReader& headers) override {
     auto found = headers.lookup("x-datadog-tags");
     if (found) {
       return std::string(*found);
@@ -108,9 +107,8 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
 };
 
 class B3ExtractionPolicy : public DatadogExtractionPolicy {
-  Expected<std::optional<std::uint64_t>> id(const DictReader& headers,
-                                            std::string_view header,
-                                            std::string_view kind) {
+  Expected<Optional<std::uint64_t>> id(const DictReader& headers,
+                                       StringView header, StringView kind) {
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -131,19 +129,19 @@ class B3ExtractionPolicy : public DatadogExtractionPolicy {
   }
 
  public:
-  Expected<std::optional<std::uint64_t>> trace_id(
+  Expected<Optional<std::uint64_t>> trace_id(
       const DictReader& headers) override {
     return id(headers, "x-b3-traceid", "trace");
   }
 
-  Expected<std::optional<std::uint64_t>> parent_id(
+  Expected<Optional<std::uint64_t>> parent_id(
       const DictReader& headers) override {
     return id(headers, "x-b3-spanid", "parent span");
   }
 
-  Expected<std::optional<int>> sampling_priority(
+  Expected<Optional<int>> sampling_priority(
       const DictReader& headers) override {
-    const std::string_view header = "x-b3-sampled";
+    const StringView header = "x-b3-sampled";
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -163,11 +161,11 @@ class B3ExtractionPolicy : public DatadogExtractionPolicy {
 };
 
 struct ExtractedData {
-  std::optional<std::uint64_t> trace_id;
-  std::optional<std::uint64_t> parent_id;
-  std::optional<std::string> origin;
-  std::optional<std::string> trace_tags;
-  std::optional<int> sampling_priority;
+  Optional<std::uint64_t> trace_id;
+  Optional<std::uint64_t> parent_id;
+  Optional<std::string> origin;
+  Optional<std::string> trace_tags;
+  Optional<int> sampling_priority;
 };
 
 bool operator!=(const ExtractedData& left, const ExtractedData& right) {
@@ -208,14 +206,14 @@ Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
   return extracted_data;
 }
 
-void log_startup_message(Logger& logger, std::string_view tracer_version_string,
+void log_startup_message(Logger& logger, StringView tracer_version_string,
                          const Collector& collector,
                          const SpanDefaults& defaults,
                          const TraceSampler& trace_sampler,
                          const SpanSampler& span_sampler,
                          const PropagationStyles& injection_styles,
                          const PropagationStyles& extraction_styles,
-                         const std::optional<std::string>& hostname,
+                         const Optional<std::string>& hostname,
                          std::size_t tags_header_max_size) {
   // clang-format off
   auto config = nlohmann::json::object({
@@ -305,7 +303,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
   assert(extraction_styles_.datadog || extraction_styles_.b3);
 
-  std::optional<ExtractedData> extracted_data;
+  Optional<ExtractedData> extracted_data;
   const char* extracted_by;
 
   if (extraction_styles_.datadog) {
@@ -391,7 +389,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
 
-  std::optional<SamplingDecision> sampling_decision;
+  Optional<SamplingDecision> sampling_decision;
   if (sampling_priority) {
     SamplingDecision decision;
     decision.priority = *sampling_priority;

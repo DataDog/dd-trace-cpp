@@ -8,7 +8,7 @@
 // permitted to result from repeated invocations of `DictWriter::set` with the
 // same key.
 
-#include <string_view>
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -20,7 +20,7 @@ class DictWriter {
   // Associate the specified `value` with the specified `key`.  An
   // implementation may, but is not required to, overwrite any previous value at
   // `key`.
-  virtual void set(std::string_view key, std::string_view value) = 0;
+  virtual void set(StringView key, StringView value) = 0;
 };
 
 }  // namespace tracing

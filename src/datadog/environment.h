@@ -14,10 +14,9 @@
 //
 // `lookup` retrieves the value of `Variable` in the environment.
 
-#include <optional>
-#include <string_view>
-
 #include "json_fwd.hpp"
+#include "optional.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -66,11 +65,11 @@ inline const char* const variable_names[] = {
 #undef LIST_ENVIRONMENT_VARIABLES
 
 // Return the name of the specified environment `variable`.
-std::string_view name(Variable variable);
+StringView name(Variable variable);
 
 // Return the value of the specified environment `variable`, or return
 // `std::nullptr` if that variable is not set in the environment.
-std::optional<std::string_view> lookup(Variable variable);
+Optional<StringView> lookup(Variable variable);
 
 nlohmann::json to_json();
 

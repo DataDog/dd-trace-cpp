@@ -11,8 +11,8 @@
 namespace datadog {
 namespace tracing {
 
-Expected<HTTPClient::URL> DatadogAgentConfig::parse(std::string_view input) {
-  const std::string_view separator = "://";
+Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
+  const StringView separator = "://";
   const auto after_scheme = std::search(input.begin(), input.end(),
                                         separator.begin(), separator.end());
   if (after_scheme == input.end()) {
@@ -23,9 +23,9 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(std::string_view input) {
     return Error{Error::URL_MISSING_SEPARATOR, std::move(message)};
   }
 
-  const std::string_view scheme = range(input.begin(), after_scheme);
-  const std::string_view supported[] = {"http", "https", "unix", "http+unix",
-                                        "https+unix"};
+  const StringView scheme = range(input.begin(), after_scheme);
+  const StringView supported[] = {"http", "https", "unix", "http+unix",
+                                  "https+unix"};
   const auto found =
       std::find(std::begin(supported), std::end(supported), scheme);
   if (found == std::end(supported)) {
@@ -42,7 +42,7 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(std::string_view input) {
     return Error{Error::URL_UNSUPPORTED_SCHEME, std::move(message)};
   }
 
-  const std::string_view authority_and_path =
+  const StringView authority_and_path =
       range(after_scheme + separator.size(), input.end());
   // If the scheme is for unix domain sockets, then there's no way to
   // distinguish the path-to-socket from the path-to-resource.  Some

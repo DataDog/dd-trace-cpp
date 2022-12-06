@@ -20,7 +20,7 @@ constexpr auto STR32 = std::byte(0xDB);
 constexpr auto UINT64 = std::byte(0xCF);
 }  // namespace types
 
-std::string make_overflow_message(std::string_view type, std::size_t actual,
+std::string make_overflow_message(StringView type, std::size_t actual,
                                   std::size_t max) {
   std::string message;
   message += "Cannot msgpack encode ";
@@ -93,7 +93,7 @@ void pack_double(std::string& buffer, double value) {
   push_number_big_endian(buffer, memory.as_integer);
 }
 
-Expected<void> pack_string(std::string& buffer, std::string_view value) {
+Expected<void> pack_string(std::string& buffer, StringView value) {
   const auto size = value.size();
   const auto max = std::numeric_limits<std::uint32_t>::max();
   if (size > max) {

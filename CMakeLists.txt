@@ -76,6 +76,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/msgpack.cpp
     src/datadog/net_util.cpp
     src/datadog/null_collector.cpp
+    src/datadog/optional.cpp
     src/datadog/parse_util.cpp
     src/datadog/propagation_styles.cpp
     src/datadog/rate.cpp
@@ -90,6 +91,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/span_matcher.cpp
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp
+    src/datadog/string_view.cpp
     src/datadog/tag_propagation.cpp
     src/datadog/tags.cpp
     src/datadog/threaded_event_scheduler.cpp
@@ -131,6 +133,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/msgpack.h
   src/datadog/net_util.h
   src/datadog/null_collector.h
+  src/datadog/optional.h
   src/datadog/parse_util.h
   src/datadog/propagation_styles.h
   src/datadog/rate.h
@@ -145,6 +148,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/span_matcher.h
   src/datadog/span_sampler_config.h
   src/datadog/span_sampler.h
+  src/datadog/string_view.h
   src/datadog/tag_propagation.h
   src/datadog/tags.h
   src/datadog/threaded_event_scheduler.h

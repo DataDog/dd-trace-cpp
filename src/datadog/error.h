@@ -12,7 +12,8 @@
 
 #include <iosfwd>
 #include <string>
-#include <string_view>
+
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -71,7 +72,7 @@ struct Error {
   Code code;
   std::string message;
 
-  Error with_prefix(std::string_view) const;
+  Error with_prefix(StringView) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Error&);

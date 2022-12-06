@@ -2,10 +2,10 @@
 
 #include <datadog/error.h>
 #include <datadog/http_client.h>
+#include <datadog/optional.h>
 
 #include <datadog/json.hpp>
 #include <mutex>
-#include <optional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -29,11 +29,11 @@ using namespace datadog::tracing;
 // If `response_error` is not null, then it will be delivered instead of the
 // `response_body`.
 struct MockHTTPClient : public HTTPClient {
-  std::optional<Error> post_error;
+  Optional<Error> post_error;
   std::ostringstream response_body;
   int response_status = -1;
   std::unordered_map<std::string, std::string> response_headers;
-  std::optional<Error> response_error;
+  Optional<Error> response_error;
   MockDictWriter request_headers;
   std::mutex mutex_;
   ResponseHandler on_response_;
