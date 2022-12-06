@@ -10,7 +10,7 @@
 // -------------
 // The following excerpt demonstrates the intended usage of `Expected<T>`:
 //
-//     Expected<int> parse_integer(std::string_view name);
+//     Expected<int> parse_integer(StringView name);
 //
 //
 //     int main() {

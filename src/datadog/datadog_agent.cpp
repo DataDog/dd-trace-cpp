@@ -21,7 +21,7 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-const std::string_view traces_api_path = "/v0.4/traces";
+const StringView traces_api_path = "/v0.4/traces";
 
 HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
   auto traces_url = agent_url;
@@ -49,10 +49,10 @@ Expected<void> msgpack_encode(
 }
 
 std::variant<CollectorResponse, std::string> parse_agent_traces_response(
-    std::string_view body) try {
+    StringView body) try {
   nlohmann::json response = nlohmann::json::parse(body);
 
-  std::string_view type = response.type_name();
+  StringView type = response.type_name();
   if (type != "object") {
     std::string message;
     message +=
@@ -66,7 +66,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
     return message;
   }
 
-  const std::string_view sample_rates_property = "rate_by_service";
+  const StringView sample_rates_property = "rate_by_service";
   const auto found = response.find(sample_rates_property);
   if (found == response.end()) {
     return CollectorResponse{};

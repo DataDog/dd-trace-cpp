@@ -44,7 +44,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
-#include <string_view>
+#include "string_view.h"
 
 #include "clock.h"
 #include "error.h"
@@ -107,36 +107,36 @@ class Span {
 
   // Return the value of the tag having the specified `name`, or return null if
   // there is no such tag.
-  std::optional<std::string_view> lookup_tag(std::string_view name) const;
+  std::optional<StringView> lookup_tag(StringView name) const;
   // Overwrite the tag having the specified `name` so that it has the specified
   // `value`, or create a new tag.
-  void set_tag(std::string_view name, std::string_view value);
+  void set_tag(StringView name, StringView value);
   // Delete the tag having the specified `name` if it exists.
-  void remove_tag(std::string_view name);
+  void remove_tag(StringView name);
 
   // Set the name of the service associated with this span, e.g.
   // "ingress-nginx-useast1".
-  void set_service_name(std::string_view);
+  void set_service_name(StringView);
   // Set the type of the service associated with this span, e.g. "web".
-  void set_service_type(std::string_view);
+  void set_service_type(StringView);
   // Set the name of the operation that this span represents, e.g.
   // "handle.request", "execute.query", or "healthcheck".
-  void set_name(std::string_view);
+  void set_name(StringView);
   // Set the name of the resource associated with the operation that this span
   // represents, e.g. "/api/v1/info" or "select count(*) from users".
-  void set_resource_name(std::string_view);
+  void set_resource_name(StringView);
   // Set whether an error occurred during the extent of this span.  If `false`,
   // then error-related tags will be removed from this span as well.
   void set_error(bool);
   // Associate a message with the error that occurred during the extent of this
   // span.  This also has the effect of calling `set_error(true)`.
-  void set_error_message(std::string_view);
+  void set_error_message(StringView);
   // Associate an error type with the error that occurred during the extent of
   // this span.  This also has the effect of calling `set_error(true)`.
-  void set_error_type(std::string_view);
+  void set_error_type(StringView);
   // Associate a call stack with the error that occurred during the extent of
   // this span.  This also has the effect of calling `set_error(true)`.
-  void set_error_stack(std::string_view);
+  void set_error_stack(StringView);
   // Set end time of this span.  Doing so will override the default behavior of
   // using the current time in the destructor.
   void set_end_time(std::chrono::steady_clock::time_point);

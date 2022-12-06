@@ -11,7 +11,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
-#include <string_view>
+#include "string_view.h"
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
@@ -61,7 +61,7 @@ class CurlImpl {
    public:
     ~HeaderWriter();
     curl_slist *release();
-    void set(std::string_view key, std::string_view value) override;
+    void set(StringView key, StringView value) override;
   };
 
   class HeaderReader : public DictReader {
@@ -71,9 +71,9 @@ class CurlImpl {
    public:
     explicit HeaderReader(
         std::unordered_map<std::string, std::string> *response_headers_lower);
-    std::optional<std::string_view> lookup(std::string_view key) const override;
+    std::optional<StringView> lookup(StringView key) const override;
     void visit(
-        const std::function<void(std::string_view key, std::string_view value)>
+        const std::function<void(StringView key, StringView value)>
             &visitor) const override;
   };
 
@@ -88,7 +88,7 @@ class CurlImpl {
                                   void *user_data);
   static bool is_non_whitespace(unsigned char);
   static char to_lower(unsigned char);
-  static std::string_view trim(std::string_view);
+  static StringView trim(StringView);
 
  public:
   explicit CurlImpl(const std::shared_ptr<Logger> &logger);
@@ -426,7 +426,7 @@ curl_slist *CurlImpl::HeaderWriter::release() {
   return list;
 }
 
-void CurlImpl::HeaderWriter::set(std::string_view key, std::string_view value) {
+void CurlImpl::HeaderWriter::set(StringView key, StringView value) {
   buffer_.clear();
   buffer_ += key;
   buffer_ += ": ";
@@ -439,8 +439,8 @@ CurlImpl::HeaderReader::HeaderReader(
     std::unordered_map<std::string, std::string> *response_headers_lower)
     : response_headers_lower_(response_headers_lower) {}
 
-std::optional<std::string_view> CurlImpl::HeaderReader::lookup(
-    std::string_view key) const {
+std::optional<StringView> CurlImpl::HeaderReader::lookup(
+    StringView key) const {
   buffer_.clear();
   std::transform(key.begin(), key.end(), std::back_inserter(buffer_),
                  &to_lower);
@@ -453,7 +453,7 @@ std::optional<std::string_view> CurlImpl::HeaderReader::lookup(
 }
 
 void CurlImpl::HeaderReader::visit(
-    const std::function<void(std::string_view key, std::string_view value)>
+    const std::function<void(StringView key, StringView value)>
         &visitor) const {
   for (const auto &[key, value] : *response_headers_lower_) {
     visitor(key, value);

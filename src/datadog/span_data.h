@@ -7,7 +7,7 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
+#include "string_view.h"
 #include <unordered_map>
 
 #include "clock.h"
@@ -33,8 +33,8 @@ struct SpanData {
   std::unordered_map<std::string, std::string> tags;
   std::unordered_map<std::string, double> numeric_tags;
 
-  std::optional<std::string_view> environment() const;
-  std::optional<std::string_view> version() const;
+  std::optional<StringView> environment() const;
+  std::optional<StringView> version() const;
 
   // Modify the properties of this object to honor the specified `config` and
   // `defaults`.  The properties of `config`, if set, override the properties of

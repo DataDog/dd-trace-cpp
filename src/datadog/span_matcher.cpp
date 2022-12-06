@@ -12,7 +12,7 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-bool is_match(std::string_view pattern, std::string_view subject) {
+bool is_match(StringView pattern, StringView subject) {
   // Since "*" is the default pattern, optimize for that case.
   return pattern == "*" || glob_match(pattern, subject);
 }
@@ -52,8 +52,8 @@ Expected<SpanMatcher> SpanMatcher::from_json(const nlohmann::json& json) {
   }
 
   const auto check_property_type =
-      [&](std::string_view property, const nlohmann::json& value,
-          std::string_view expected_type) -> std::optional<Error> {
+      [&](StringView property, const nlohmann::json& value,
+          StringView expected_type) -> std::optional<Error> {
     type = value.type_name();
     if (type == expected_type) {
       return std::nullopt;

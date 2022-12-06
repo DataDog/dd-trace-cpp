@@ -3,7 +3,7 @@
 #include <cassert>
 #include <optional>
 #include <string>
-#include <string_view>
+#include "string_view.h"
 
 #include "dict_writer.h"
 #include "span_config.h"
@@ -75,7 +75,7 @@ TimePoint Span::start_time() const { return data_->start; }
 
 bool Span::error() const { return data_->error; }
 
-std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
+std::optional<StringView> Span::lookup_tag(StringView name) const {
   if (tags::is_internal(name)) {
     return std::nullopt;
   }
@@ -87,27 +87,27 @@ std::optional<std::string_view> Span::lookup_tag(std::string_view name) const {
   return found->second;
 }
 
-void Span::set_tag(std::string_view name, std::string_view value) {
+void Span::set_tag(StringView name, StringView value) {
   if (!tags::is_internal(name)) {
     data_->tags.insert_or_assign(std::string(name), std::string(value));
   }
 }
 
-void Span::remove_tag(std::string_view name) {
+void Span::remove_tag(StringView name) {
   if (!tags::is_internal(name)) {
     data_->tags.erase(std::string(name));
   }
 }
 
-void Span::set_service_name(std::string_view service) {
+void Span::set_service_name(StringView service) {
   data_->service = service;
 }
 
-void Span::set_service_type(std::string_view type) {
+void Span::set_service_type(StringView type) {
   data_->service_type = type;
 }
 
-void Span::set_resource_name(std::string_view resource) {
+void Span::set_resource_name(StringView resource) {
   data_->resource = resource;
 }
 
@@ -119,22 +119,22 @@ void Span::set_error(bool is_error) {
   }
 }
 
-void Span::set_error_message(std::string_view message) {
+void Span::set_error_message(StringView message) {
   data_->error = true;
   data_->tags.insert_or_assign("error.msg", std::string(message));
 }
 
-void Span::set_error_type(std::string_view type) {
+void Span::set_error_type(StringView type) {
   data_->error = true;
   data_->tags.insert_or_assign("error.type", std::string(type));
 }
 
-void Span::set_error_stack(std::string_view type) {
+void Span::set_error_stack(StringView type) {
   data_->error = true;
   data_->tags.insert_or_assign("error.stack", std::string(type));
 }
 
-void Span::set_name(std::string_view value) { data_->name = value; }
+void Span::set_name(StringView value) { data_->name = value; }
 
 void Span::set_end_time(std::chrono::steady_clock::time_point end_time) {
   end_time_ = end_time;

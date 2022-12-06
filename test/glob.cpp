@@ -3,7 +3,7 @@
 
 #include <datadog/glob.h>
 
-#include <string_view>
+#include <datadog/string_view.h>
 
 #include "test.h"
 
@@ -11,8 +11,8 @@ using namespace datadog::tracing;
 
 TEST_CASE("glob") {
   struct TestCase {
-    std::string_view pattern;
-    std::string_view subject;
+    StringView pattern;
+    StringView subject;
     bool expected;
   };
 

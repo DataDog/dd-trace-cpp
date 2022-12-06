@@ -5,7 +5,7 @@
 namespace datadog {
 namespace tracing {
 
-bool glob_match(std::string_view pattern, std::string_view subject) {
+bool glob_match(StringView pattern, StringView subject) {
   // This is a backtracking implementation of the glob matching algorithm.
   // The glob pattern language supports `*` and `?`, but no escape sequences.
   //

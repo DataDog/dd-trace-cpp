@@ -38,8 +38,8 @@ class ExtractionPolicy {
 
 class DatadogExtractionPolicy : public ExtractionPolicy {
   Expected<std::optional<std::uint64_t>> id(const DictReader& headers,
-                                            std::string_view header,
-                                            std::string_view kind) {
+                                            StringView header,
+                                            StringView kind) {
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -72,7 +72,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
 
   Expected<std::optional<int>> sampling_priority(
       const DictReader& headers) override {
-    const std::string_view header = "x-datadog-sampling-priority";
+    const StringView header = "x-datadog-sampling-priority";
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -109,8 +109,8 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
 
 class B3ExtractionPolicy : public DatadogExtractionPolicy {
   Expected<std::optional<std::uint64_t>> id(const DictReader& headers,
-                                            std::string_view header,
-                                            std::string_view kind) {
+                                            StringView header,
+                                            StringView kind) {
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -143,7 +143,7 @@ class B3ExtractionPolicy : public DatadogExtractionPolicy {
 
   Expected<std::optional<int>> sampling_priority(
       const DictReader& headers) override {
-    const std::string_view header = "x-b3-sampled";
+    const StringView header = "x-b3-sampled";
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -208,7 +208,7 @@ Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
   return extracted_data;
 }
 
-void log_startup_message(Logger& logger, std::string_view tracer_version_string,
+void log_startup_message(Logger& logger, StringView tracer_version_string,
                          const Collector& collector,
                          const SpanDefaults& defaults,
                          const TraceSampler& trace_sampler,

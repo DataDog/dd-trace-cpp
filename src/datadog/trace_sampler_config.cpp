@@ -47,7 +47,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       return Error{Error::TRACE_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
     }
 
-    const std::unordered_set<std::string_view> allowed_properties{
+    const std::unordered_set<StringView> allowed_properties{
         "service", "name", "resource", "tags", "sample_rate"};
 
     for (const auto &json_rule : json_rules) {

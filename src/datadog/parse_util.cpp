@@ -15,8 +15,8 @@ namespace tracing {
 namespace {
 
 template <typename Integer>
-Expected<Integer> parse_integer(std::string_view input, int base,
-                                std::string_view kind) {
+Expected<Integer> parse_integer(StringView input, int base,
+                                StringView kind) {
   Integer value;
   input = strip(input);
   const auto status = std::from_chars(input.begin(), input.end(), value, base);
@@ -45,7 +45,7 @@ Expected<Integer> parse_integer(std::string_view input, int base,
 
 }  // namespace
 
-std::string_view strip(std::string_view input) {
+StringView strip(StringView input) {
   const auto not_whitespace = [](unsigned char ch) {
     return !std::isspace(ch);
   };
@@ -58,18 +58,18 @@ std::string_view strip(std::string_view input) {
 
   assert(begin <= end);
 
-  return std::string_view{begin, std::size_t(end - begin)};
+  return StringView{begin, std::size_t(end - begin)};
 }
 
-Expected<std::uint64_t> parse_uint64(std::string_view input, int base) {
+Expected<std::uint64_t> parse_uint64(StringView input, int base) {
   return parse_integer<std::uint64_t>(input, base, "64-bit unsigned");
 }
 
-Expected<int> parse_int(std::string_view input, int base) {
+Expected<int> parse_int(StringView input, int base) {
   return parse_integer<int>(input, base, "int");
 }
 
-Expected<double> parse_double(std::string_view input) {
+Expected<double> parse_double(StringView input) {
   // This function uses a different technique from `parse_integer`, because
   // some compilers with _partial_ support for C++17 do not implement the
   // floating point portions of `std::from_chars`:
@@ -100,7 +100,7 @@ Expected<double> parse_double(std::string_view input) {
   return value;
 }
 
-bool starts_with(std::string_view subject, std::string_view prefix) {
+bool starts_with(StringView subject, StringView prefix) {
   if (prefix.size() > subject.size()) {
     return false;
   }

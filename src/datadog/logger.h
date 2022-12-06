@@ -32,7 +32,7 @@
 //       return;
 //     }
 //
-// The other overload accepts a `std::string_view`:
+// The other overload accepts a `StringView`:
 //
 //     if (!success) {
 //       logger.log_error("Something went wrong with the frobnication.");
@@ -41,7 +41,7 @@
 
 #include <functional>
 #include <ostream>
-#include <string_view>
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -58,7 +58,7 @@ class Logger {
   virtual void log_startup(const LogFunc&) = 0;
 
   virtual void log_error(const Error&);
-  virtual void log_error(std::string_view);
+  virtual void log_error(StringView);
 };
 
 }  // namespace tracing

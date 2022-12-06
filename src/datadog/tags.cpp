@@ -31,7 +31,7 @@ const std::string span_sampling_limit = "_dd.span_sampling.max_per_second";
 
 }  // namespace internal
 
-bool is_internal(std::string_view tag_name) {
+bool is_internal(StringView tag_name) {
   return starts_with(tag_name, "_dd.");
 }
 

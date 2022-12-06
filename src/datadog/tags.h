@@ -4,7 +4,7 @@
 // meaning.
 
 #include <string>
-#include <string_view>
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -35,7 +35,7 @@ extern const std::string span_sampling_limit;
 
 // Return whether the specified `tag_name` is reserved for use internal to this
 // library.
-bool is_internal(std::string_view tag_name);
+bool is_internal(StringView tag_name);
 
 }  // namespace tags
 }  // namespace tracing

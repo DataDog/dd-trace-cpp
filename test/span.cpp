@@ -228,9 +228,9 @@ TEST_CASE(".error() and .set_error*()") {
     std::string name;
     std::function<void(Span&)> mutate;
     bool expected_error;
-    std::optional<std::string_view> expected_error_message;
-    std::optional<std::string_view> expected_error_type;
-    std::optional<std::string_view> expected_error_stack;
+    std::optional<StringView> expected_error_message;
+    std::optional<StringView> expected_error_type;
+    std::optional<StringView> expected_error_stack;
   };
 
   auto test_case = GENERATE(values<TestCase>(

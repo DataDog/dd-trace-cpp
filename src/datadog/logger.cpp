@@ -9,7 +9,7 @@ void Logger::log_error(const Error& error) {
   log_error([&](auto& stream) { stream << error; });
 }
 
-void Logger::log_error(std::string_view message) {
+void Logger::log_error(StringView message) {
   log_error([&](auto& stream) { stream << message; });
 }
 

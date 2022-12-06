@@ -18,7 +18,7 @@ struct NullLogger : public Logger {
   void log_error(const LogFunc&) override {}
   void log_startup(const LogFunc&) override {}
   void log_error(const Error&) override {}
-  void log_error(std::string_view) override {}
+  void log_error(StringView) override {}
 };
 
 struct MockLogger : public Logger {
@@ -64,7 +64,7 @@ struct MockLogger : public Logger {
     entries.push_back(Entry{Entry::ERROR, error});
   }
 
-  void log_error(std::string_view message) override {
+  void log_error(StringView message) override {
     if (echo) {
       *echo << message << '\n';
     }

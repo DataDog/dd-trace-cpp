@@ -4,7 +4,7 @@
 #include <cctype>
 #include <cstddef>
 #include <string>
-#include <string_view>
+#include "string_view.h"
 #include <unordered_map>
 #include <vector>
 
@@ -23,7 +23,7 @@ void to_lower(std::string &text) {
                  [](unsigned char ch) { return std::tolower(ch); });
 }
 
-bool falsy(std::string_view text) {
+bool falsy(StringView text) {
   auto lower = std::string{text};
   to_lower(lower);
   return lower == "0" || lower == "false" || lower == "no";
@@ -32,11 +32,11 @@ bool falsy(std::string_view text) {
 // List items are separated by an optional comma (",") and any amount of
 // whitespace.
 // Leading and trailing whitespace is ignored.
-std::vector<std::string_view> parse_list(std::string_view input) {
+std::vector<StringView> parse_list(StringView input) {
   using uchar = unsigned char;
 
   input = strip(input);
-  std::vector<std::string_view> items;
+  std::vector<StringView> items;
   if (input.empty()) {
     return items;
   }
@@ -67,11 +67,11 @@ std::vector<std::string_view> parse_list(std::string_view input) {
   return items;
 }
 
-Expected<PropagationStyles> parse_propagation_styles(std::string_view input) {
+Expected<PropagationStyles> parse_propagation_styles(StringView input) {
   PropagationStyles styles{false, false};
 
   // Style names are separated by spaces, or a comma, or some combination.
-  for (const std::string_view &item : parse_list(input)) {
+  for (const StringView &item : parse_list(input)) {
     auto token = std::string(item);
     to_lower(token);
     if (token == "datadog") {
@@ -93,11 +93,11 @@ Expected<PropagationStyles> parse_propagation_styles(std::string_view input) {
 }
 
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
-    std::string_view input) {
+    StringView input) {
   std::unordered_map<std::string, std::string> tags;
 
   // Within a tag, the key and value are separated by a colon (":").
-  for (const std::string_view &token : parse_list(input)) {
+  for (const StringView &token : parse_list(input)) {
     const auto separator = std::find(token.begin(), token.end(), ':');
     if (separator == token.end()) {
       std::string message;

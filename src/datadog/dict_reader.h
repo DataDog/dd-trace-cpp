@@ -6,7 +6,7 @@
 
 #include <functional>
 #include <optional>
-#include <string_view>
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -17,12 +17,12 @@ class DictReader {
 
   // Return the value at the specified `key`, or return `std::nullopt` if there
   // is no value at `key`.
-  virtual std::optional<std::string_view> lookup(
-      std::string_view key) const = 0;
+  virtual std::optional<StringView> lookup(
+      StringView key) const = 0;
 
   // Invoke the specified `visitor` once for each key/value pair in this object.
   virtual void visit(
-      const std::function<void(std::string_view key, std::string_view value)>&
+      const std::function<void(StringView key, StringView value)>&
           visitor) const = 0;
 };
 
