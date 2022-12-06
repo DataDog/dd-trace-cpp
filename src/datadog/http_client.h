@@ -10,11 +10,11 @@
 
 #include <chrono>
 #include <functional>
-#include "optional.h"
 
 #include "error.h"
 #include "expected.h"
 #include "json_fwd.hpp"
+#include "optional.h"
 
 namespace datadog {
 namespace tracing {

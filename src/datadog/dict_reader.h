@@ -5,8 +5,8 @@
 // context from externalized formats: HTTP headers, gRPC metadata, etc.
 
 #include <functional>
-#include "optional.h"
 
+#include "optional.h"
 #include "string_view.h"
 
 namespace datadog {

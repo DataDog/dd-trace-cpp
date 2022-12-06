@@ -11,11 +11,11 @@
 // `response_handler` parameter to `Collector::send`.
 
 #include <memory>
-#include "optional.h"
 #include <vector>
 
 #include "expected.h"
 #include "json_fwd.hpp"
+#include "optional.h"
 
 namespace datadog {
 namespace tracing {

@@ -2,8 +2,9 @@
 
 // This component provides networking-related miscellanea.
 
-#include "optional.h"
 #include <string>
+
+#include "optional.h"
 
 namespace datadog {
 namespace tracing {

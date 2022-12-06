@@ -29,11 +29,11 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
-#include "optional.h"
 #include <unordered_map>
 #include <vector>
 
 #include "expected.h"
+#include "optional.h"
 #include "propagation_styles.h"
 #include "sampling_decision.h"
 
@@ -77,8 +77,7 @@ class TraceSegment {
                const std::shared_ptr<const SpanDefaults>& defaults,
                const PropagationStyles& injection_styles,
                const Optional<std::string>& hostname,
-               Optional<std::string> origin,
-               std::size_t tags_header_max_size,
+               Optional<std::string> origin, std::size_t tags_header_max_size,
                std::unordered_map<std::string, std::string> trace_tags,
                Optional<SamplingDecision> sampling_decision,
                std::unique_ptr<SpanData> local_root);

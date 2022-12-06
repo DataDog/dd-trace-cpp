@@ -13,12 +13,12 @@
 // when no corresponding property is specified in a `SpanConfig` argument.
 // See `SpanData::apply_config`.
 
-#include "optional.h"
 #include <string>
 #include <unordered_map>
 #include <variant>
 
 #include "clock.h"
+#include "optional.h"
 
 namespace datadog {
 namespace tracing {

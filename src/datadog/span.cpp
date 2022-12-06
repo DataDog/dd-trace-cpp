@@ -1,10 +1,10 @@
 #include "span.h"
 
 #include <cassert>
-#include "optional.h"
 #include <string>
 
 #include "dict_writer.h"
+#include "optional.h"
 #include "span_config.h"
 #include "span_data.h"
 #include "string_view.h"

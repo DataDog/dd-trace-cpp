@@ -5,7 +5,6 @@
 // contains supporting information about the reason for the decision.
 
 #include "optional.h"
-
 #include "rate.h"
 #include "sampling_mechanism.h"
 

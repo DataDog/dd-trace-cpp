@@ -37,10 +37,10 @@
 // error then it cannot be "dereferenced" with `operator*`, i.e. it is analogous
 // to `Optional<Error>` (and is implemented as such).
 
-#include "optional.h"
 #include <variant>
 
 #include "error.h"
+#include "optional.h"
 
 namespace datadog {
 namespace tracing {

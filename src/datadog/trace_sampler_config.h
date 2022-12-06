@@ -7,11 +7,11 @@
 // `TraceSamplerConfig` is specified as the `trace_sampler` property of
 // `TracerConfig`.
 
-#include "optional.h"
 #include <vector>
 
 #include "expected.h"
 #include "json_fwd.hpp"
+#include "optional.h"
 #include "rate.h"
 #include "span_matcher.h"
 

@@ -10,12 +10,11 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
-#include "optional.h"
-
 #include "clock.h"
 #include "error.h"
 #include "expected.h"
 #include "id_generator.h"
+#include "optional.h"
 #include "span.h"
 #include "tracer_config.h"
 

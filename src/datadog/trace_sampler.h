@@ -84,13 +84,13 @@
 // `DD_TRACE_RATE_LIMIT` environment variable.
 
 #include <mutex>
-#include "optional.h"
 #include <string>
 #include <unordered_map>
 
 #include "clock.h"
 #include "json_fwd.hpp"
 #include "limiter.h"
+#include "optional.h"
 #include "rate.h"
 #include "trace_sampler_config.h"
 

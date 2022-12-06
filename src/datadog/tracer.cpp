@@ -38,8 +38,7 @@ class ExtractionPolicy {
 
 class DatadogExtractionPolicy : public ExtractionPolicy {
   Expected<Optional<std::uint64_t>> id(const DictReader& headers,
-                                            StringView header,
-                                            StringView kind) {
+                                       StringView header, StringView kind) {
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;
@@ -109,8 +108,7 @@ class DatadogExtractionPolicy : public ExtractionPolicy {
 
 class B3ExtractionPolicy : public DatadogExtractionPolicy {
   Expected<Optional<std::uint64_t>> id(const DictReader& headers,
-                                            StringView header,
-                                            StringView kind) {
+                                       StringView header, StringView kind) {
     auto found = headers.lookup(header);
     if (!found) {
       return std::nullopt;

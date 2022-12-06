@@ -5,12 +5,12 @@
 
 #include <cstddef>
 #include <memory>
-#include "optional.h"
 #include <string>
 #include <unordered_map>
 
 #include "clock.h"
 #include "expected.h"
+#include "optional.h"
 #include "string_view.h"
 
 namespace datadog {

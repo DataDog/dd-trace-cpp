@@ -3,7 +3,6 @@
 #include <cassert>
 #include <charconv>
 #include <limits>
-#include "optional.h"
 #include <string>
 #include <system_error>
 #include <unordered_map>
@@ -14,6 +13,7 @@
 #include "dict_writer.h"
 #include "error.h"
 #include "logger.h"
+#include "optional.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
@@ -46,8 +46,8 @@ TraceSegment::TraceSegment(
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
     const PropagationStyles& injection_styles,
-    const Optional<std::string>& hostname,
-    Optional<std::string> origin, std::size_t tags_header_max_size,
+    const Optional<std::string>& hostname, Optional<std::string> origin,
+    std::size_t tags_header_max_size,
     std::unordered_map<std::string, std::string> trace_tags,
     Optional<SamplingDecision> sampling_decision,
     std::unique_ptr<SpanData> local_root)
@@ -78,9 +78,7 @@ const Optional<std::string>& TraceSegment::hostname() const {
   return hostname_;
 }
 
-const Optional<std::string>& TraceSegment::origin() const {
-  return origin_;
-}
+const Optional<std::string>& TraceSegment::origin() const { return origin_; }
 
 Optional<SamplingDecision> TraceSegment::sampling_decision() const {
   // `sampling_decision_` can change, so we need a lock.

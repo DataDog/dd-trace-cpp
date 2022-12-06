@@ -43,11 +43,11 @@
 #include <chrono>
 #include <functional>
 #include <memory>
-#include "optional.h"
 
 #include "clock.h"
 #include "error.h"
 #include "id_generator.h"
+#include "optional.h"
 #include "string_view.h"
 
 namespace datadog {
