@@ -213,10 +213,7 @@ TEST_CASE("TracerConfig::defaults") {
          "baz:123 bam:three",
          {{"baz", "123"}, {"bam", "three"}},
          nullopt},
-        {"last one wins",
-         "baz:123 baz:three",
-         {{"baz", "three"}},
-         nullopt},
+        {"last one wins", "baz:123 baz:three", {{"baz", "three"}}, nullopt},
     }));
 
     // This will be overriden by the DD_TAGS environment variable.
@@ -425,16 +422,15 @@ TEST_CASE("TracerConfig::agent") {
       auto test_case = GENERATE(values<TestCase>({
           {"http://dd-agent:8126", nullopt, "http", "dd-agent:8126", ""},
           {"http://dd-agent:8126/", nullopt, "http", "dd-agent:8126", "/"},
-          {"https://dd-agent:8126/", nullopt, "https", "dd-agent:8126",
-           "/"},
+          {"https://dd-agent:8126/", nullopt, "https", "dd-agent:8126", "/"},
           {"unix:///var/run/datadog/trace-agent.sock", nullopt, "unix",
            "/var/run/datadog/trace-agent.sock"},
           {"unix://var/run/datadog/trace-agent.sock",
            Error::URL_UNIX_DOMAIN_SOCKET_PATH_NOT_ABSOLUTE},
-          {"http+unix:///run/datadog/trace-agent.sock", nullopt,
-           "http+unix", "/run/datadog/trace-agent.sock"},
-          {"https+unix:///run/datadog/trace-agent.sock", nullopt,
-           "https+unix", "/run/datadog/trace-agent.sock"},
+          {"http+unix:///run/datadog/trace-agent.sock", nullopt, "http+unix",
+           "/run/datadog/trace-agent.sock"},
+          {"https+unix:///run/datadog/trace-agent.sock", nullopt, "https+unix",
+           "/run/datadog/trace-agent.sock"},
           {"tcp://localhost:8126", Error::URL_UNSUPPORTED_SCHEME},
           {"/var/run/datadog/trace-agent.sock", Error::URL_MISSING_SEPARATOR},
       }));

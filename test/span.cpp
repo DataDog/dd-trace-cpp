@@ -234,8 +234,7 @@ TEST_CASE(".error() and .set_error*()") {
   };
 
   auto test_case = GENERATE(values<TestCase>(
-      {{"No error → no error.", [](Span&) {}, false, nullopt, nullopt,
-        nullopt},
+      {{"No error → no error.", [](Span&) {}, false, nullopt, nullopt, nullopt},
        {"set_error(true) → error", [](Span& span) { span.set_error(true); },
         true, nullopt, nullopt, nullopt},
        {"set_error_message → error and error message",

@@ -99,9 +99,13 @@ void Span::remove_tag(StringView name) {
   }
 }
 
-void Span::set_service_name(StringView service) { assign(data_->service, service); }
+void Span::set_service_name(StringView service) {
+  assign(data_->service, service);
+}
 
-void Span::set_service_type(StringView type) { assign(data_->service_type, type); }
+void Span::set_service_type(StringView type) {
+  assign(data_->service_type, type);
+}
 
 void Span::set_resource_name(StringView resource) {
   assign(data_->resource, resource);

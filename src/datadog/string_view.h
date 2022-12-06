@@ -48,14 +48,14 @@ using StringView = std::string_view;
 // `operator+=(string&, StringView)` isn't defined.  To work around this, use
 // `append` everywhere.
 inline void append(std::string& destination, StringView text) {
-    destination.append(text.data(), text.size());
+  destination.append(text.data(), text.size());
 }
 
 // When `StringView` is not the same as `std::string_view`,
 // `operator=(string&, StringView)` isn't defined.  To work around this, use
 // `assign` everywhere.
 inline void assign(std::string& destination, StringView text) {
-    destination.assign(text.data(), text.size());
+  destination.assign(text.data(), text.size());
 }
 
 }  // namespace tracing
