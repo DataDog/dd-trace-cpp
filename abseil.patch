@@ -1,5 +1,5 @@
 diff --git a/absl/base/options.h b/absl/base/options.h
-index 6868c77b..a6577ed0 100644
+index 6868c77b..e544fe6c 100644
 --- a/absl/base/options.h
 +++ b/absl/base/options.h
 @@ -135,7 +135,7 @@
@@ -20,3 +20,12 @@ index 6868c77b..a6577ed0 100644
  
  // ABSL_OPTION_USE_STD_VARIANT
  //
+@@ -188,7 +188,7 @@
+ // absl::variant is a typedef of std::variant, use the feature macro
+ // ABSL_USES_STD_VARIANT.
+ 
+-#define ABSL_OPTION_USE_STD_VARIANT 2
++#define ABSL_OPTION_USE_STD_VARIANT 0
+ 
+ 
+ // ABSL_OPTION_USE_INLINE_NAMESPACE
