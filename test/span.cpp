@@ -234,19 +234,19 @@ TEST_CASE(".error() and .set_error*()") {
   };
 
   auto test_case = GENERATE(values<TestCase>(
-      {{"No error → no error.", [](Span&) {}, false, std::nullopt, std::nullopt,
-        std::nullopt},
+      {{"No error → no error.", [](Span&) {}, false, nullopt, nullopt,
+        nullopt},
        {"set_error(true) → error", [](Span& span) { span.set_error(true); },
-        true, std::nullopt, std::nullopt, std::nullopt},
+        true, nullopt, nullopt, nullopt},
        {"set_error_message → error and error message",
         [](Span& span) { span.set_error_message("oops!"); }, true, "oops!",
-        std::nullopt, std::nullopt},
+        nullopt, nullopt},
        {"set_error_type → error and error type",
-        [](Span& span) { span.set_error_type("errno"); }, true, std::nullopt,
-        "errno", std::nullopt},
+        [](Span& span) { span.set_error_type("errno"); }, true, nullopt,
+        "errno", nullopt},
        {"set_error_stack → error and error stack",
         [](Span& span) { span.set_error_stack("this is C++, fool"); }, true,
-        std::nullopt, std::nullopt, "this is C++, fool"},
+        nullopt, nullopt, "this is C++, fool"},
        {"set all of them → error, error message, error type, and error stack",
         [](Span& span) {
           span.set_error_message("oops!");
@@ -261,7 +261,7 @@ TEST_CASE(".error() and .set_error*()") {
           span.set_error_stack("this too");
           span.set_error(false);
         },
-        false, std::nullopt, std::nullopt, std::nullopt}}));
+        false, nullopt, nullopt, nullopt}}));
 
   TracerConfig config;
   config.defaults.service = "testsvc";

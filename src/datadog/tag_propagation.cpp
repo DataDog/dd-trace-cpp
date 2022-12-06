@@ -38,7 +38,7 @@ Expected<void> decode_tag(
   if (separator == entry.end()) {
     std::string message;
     message += "invalid key=value pair for encoded tag: missing \"=\" in: ";
-    message += entry;
+    append(message, entry);
     return Error{Error::MALFORMED_TRACE_TAGS, std::move(message)};
   }
 
@@ -47,7 +47,7 @@ Expected<void> decode_tag(
   // Among duplicate keys, most recent value wins.
   destination.insert_or_assign(std::string(key), std::string(value));
 
-  return std::nullopt;
+  return nullopt;
 }
 
 void append_tag(std::string& serialized_tags, StringView tag_key,
@@ -77,7 +77,7 @@ Expected<std::unordered_map<std::string, std::string>> decode_tags(
     if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Error decoding trace tags \"";
-      prefix += header_value;
+      append(prefix, header_value);
       prefix += "\": ";
       return error->with_prefix(prefix);
     }

@@ -103,7 +103,7 @@ SpanSamplerConfig::Rule by_name_and_tags(
   return rule;
 }
 
-const auto x = std::nullopt;
+const auto x = nullopt;
 
 }  // namespace
 

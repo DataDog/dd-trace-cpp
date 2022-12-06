@@ -18,7 +18,7 @@ class MockDictReader : public DictReader {
   Optional<StringView> lookup(StringView key) const override {
     auto found = map_->find(std::string(key));
     if (found == map_->end()) {
-      return std::nullopt;
+      return nullopt;
     }
     return found->second;
   }

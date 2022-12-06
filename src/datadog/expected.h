@@ -2,7 +2,7 @@
 
 // This component provides a class template, `Expected<T>`, that is either an
 // instance of `T` or an instance of `Error`.  `Expected<void>` is either
-// `std::nullopt` or an instance of `Error`.
+// `nullopt` or an instance of `Error`.
 //
 // `Expected` is inspired by, but incompatible with, C++23's `std::expected`.
 //

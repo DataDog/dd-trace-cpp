@@ -12,7 +12,7 @@ namespace tracing {
 Optional<std::string> get_hostname() {
   char buffer[256];
   if (::gethostname(buffer, sizeof buffer)) {
-    return std::nullopt;
+    return nullopt;
   }
   return buffer;
 }

@@ -56,14 +56,14 @@ Expected<SpanMatcher> SpanMatcher::from_json(const nlohmann::json& json) {
           StringView expected_type) -> Optional<Error> {
     type = value.type_name();
     if (type == expected_type) {
-      return std::nullopt;
+      return nullopt;
     }
 
     std::string message;
     message += "Rule property \"";
-    message += property;
+    append(message, property);
     message += "\" should have type \"";
-    message += expected_type;
+    append(message, expected_type);
     message += "\", but has type \"";
     message += type;
     message += "\": ";

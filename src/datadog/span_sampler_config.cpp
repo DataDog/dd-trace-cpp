@@ -26,9 +26,9 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
   } catch (const nlohmann::json::parse_error &error) {
     std::string message;
     message += "Unable to parse JSON from ";
-    message += env_var;
+    append(message, env_var);
     message += " value ";
-    message += rules_raw;
+    append(message, rules_raw);
     message += ": ";
     message += error.what();
     return Error{Error::SPAN_SAMPLING_RULES_INVALID_JSON, std::move(message)};
@@ -38,15 +38,15 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
   if (type != "array") {
     std::string message;
     message += "Trace sampling rules must be an array, but JSON in ";
-    message += env_var;
+    append(message, env_var);
     message += " has type \"";
     message += type;
     message += "\": ";
-    message += rules_raw;
+    append(message, rules_raw);
     return Error{Error::SPAN_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
   }
 
-  const std::unordered_set<StringView> allowed_properties{
+  const std::unordered_set<std::string> allowed_properties{
       "service", "name", "resource", "tags", "sample_rate", "max_per_second"};
 
   for (const auto &json_rule : json_rules) {
@@ -54,9 +54,9 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
     if (auto *error = matcher.if_error()) {
       std::string prefix;
       prefix += "Unable to create a rule from ";
-      prefix += env_var;
+      append(prefix, env_var);
       prefix += " JSON ";
-      prefix += rules_raw;
+      append(prefix, rules_raw);
       prefix += ": ";
       return error->with_prefix(prefix);
     }
@@ -69,9 +69,9 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
       if (type != "number") {
         std::string message;
         message += "Unable to parse a rule from ";
-        message += env_var;
+        append(message, env_var);
         message += " JSON ";
-        message += rules_raw;
+        append(message, rules_raw);
         message += ".  The \"sample_rate\" property of the rule ";
         message += json_rule.dump();
         message += " is not a number, but instead has type \"";
@@ -89,9 +89,9 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
       if (type != "number") {
         std::string message;
         message += "Unable to parse a rule from ";
-        message += env_var;
+        append(message, env_var);
         message += " JSON ";
-        message += rules_raw;
+        append(message, rules_raw);
         message += ".  The \"max_per_second\" property of the rule ";
         message += json_rule.dump();
         message += " is not a number, but instead has type \"";
@@ -116,9 +116,9 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
       message += " in trace sampling rule ";
       message += json_rule.dump();
       message += ".  Error occurred while parsing from ";
-      message += env_var;
+      append(message, env_var);
       message += ": ";
-      message += rules_raw;
+      append(message, rules_raw);
       return Error{Error::SPAN_SAMPLING_RULES_UNKNOWN_PROPERTY,
                    std::move(message)};
     }
@@ -155,13 +155,13 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
           name(environment::DD_SPAN_SAMPLING_RULES_FILE);
       const auto rules_name = name(environment::DD_SPAN_SAMPLING_RULES);
       std::string message;
-      message += rules_file_name;
+      append(message, rules_file_name);
       message += " is overridden by ";
-      message += rules_name;
+      append(message, rules_name);
       message += ".  Since both are set, ";
-      message += rules_name;
+      append(message, rules_name);
       message += " takes precedence, and ";
-      message += rules_file_name;
+      append(message, rules_file_name);
       message += " will be ignored.";
       logger.log_error(message);
     } else {
@@ -174,7 +174,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
         message += " file \"";
         message += span_rules_file;
         message += "\" specified as value of environment variable ";
-        message += name(environment::DD_SPAN_SAMPLING_RULES_FILE);
+        append(message, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
 
         return Error{Error::SPAN_SAMPLING_RULES_FILE_IO, std::move(message)};
       };
@@ -195,9 +195,9 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
       if (auto *error = maybe_rules.if_error()) {
         std::string prefix;
         prefix += "With ";
-        prefix += name(environment::DD_SPAN_SAMPLING_RULES_FILE);
+        append(prefix, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
         prefix += '=';
-        prefix += *file_env;
+        append(prefix, *file_env);
         prefix += ": ";
         return error->with_prefix(prefix);
       }
