@@ -4,9 +4,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include "string_view.h"
 
 #include "expected.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

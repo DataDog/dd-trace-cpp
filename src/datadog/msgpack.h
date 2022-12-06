@@ -14,10 +14,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include "string_view.h"
 #include <utility>
 
 #include "expected.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

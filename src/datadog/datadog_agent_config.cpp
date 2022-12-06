@@ -25,7 +25,7 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
 
   const StringView scheme = range(input.begin(), after_scheme);
   const StringView supported[] = {"http", "https", "unix", "http+unix",
-                                        "https+unix"};
+                                  "https+unix"};
   const auto found =
       std::find(std::begin(supported), std::end(supported), scheme);
   if (found == std::end(supported)) {

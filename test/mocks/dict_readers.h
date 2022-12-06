@@ -23,9 +23,8 @@ class MockDictReader : public DictReader {
     return found->second;
   }
 
-  void visit(
-      const std::function<void(StringView key, StringView value)>&
-          visitor) const override {
+  void visit(const std::function<void(StringView key, StringView value)>&
+                 visitor) const override {
     for (const auto& [key, value] : *map_) {
       visitor(key, value);
     }

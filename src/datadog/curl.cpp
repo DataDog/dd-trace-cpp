@@ -11,7 +11,6 @@
 #include <list>
 #include <memory>
 #include <mutex>
-#include "string_view.h"
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
@@ -22,6 +21,7 @@
 #include "json.hpp"
 #include "logger.h"
 #include "parse_util.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -72,9 +72,8 @@ class CurlImpl {
     explicit HeaderReader(
         std::unordered_map<std::string, std::string> *response_headers_lower);
     std::optional<StringView> lookup(StringView key) const override;
-    void visit(
-        const std::function<void(StringView key, StringView value)>
-            &visitor) const override;
+    void visit(const std::function<void(StringView key, StringView value)>
+                   &visitor) const override;
   };
 
   void run();
@@ -439,8 +438,7 @@ CurlImpl::HeaderReader::HeaderReader(
     std::unordered_map<std::string, std::string> *response_headers_lower)
     : response_headers_lower_(response_headers_lower) {}
 
-std::optional<StringView> CurlImpl::HeaderReader::lookup(
-    StringView key) const {
+std::optional<StringView> CurlImpl::HeaderReader::lookup(StringView key) const {
   buffer_.clear();
   std::transform(key.begin(), key.end(), std::back_inserter(buffer_),
                  &to_lower);
@@ -453,8 +451,8 @@ std::optional<StringView> CurlImpl::HeaderReader::lookup(
 }
 
 void CurlImpl::HeaderReader::visit(
-    const std::function<void(StringView key, StringView value)>
-        &visitor) const {
+    const std::function<void(StringView key, StringView value)> &visitor)
+    const {
   for (const auto &[key, value] : *response_headers_lower_) {
     visitor(key, value);
   }

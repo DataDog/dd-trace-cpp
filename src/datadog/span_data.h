@@ -7,11 +7,11 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include "string_view.h"
 #include <unordered_map>
 
 #include "clock.h"
 #include "expected.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

@@ -3,11 +3,11 @@
 #include <cassert>
 #include <optional>
 #include <string>
-#include "string_view.h"
 
 #include "dict_writer.h"
 #include "span_config.h"
 #include "span_data.h"
+#include "string_view.h"
 #include "tags.h"
 #include "trace_segment.h"
 
@@ -99,13 +99,9 @@ void Span::remove_tag(StringView name) {
   }
 }
 
-void Span::set_service_name(StringView service) {
-  data_->service = service;
-}
+void Span::set_service_name(StringView service) { data_->service = service; }
 
-void Span::set_service_type(StringView type) {
-  data_->service_type = type;
-}
+void Span::set_service_type(StringView type) { data_->service_type = type; }
 
 void Span::set_resource_name(StringView resource) {
   data_->resource = resource;

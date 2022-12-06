@@ -4,7 +4,6 @@
 #include <cctype>
 #include <cstddef>
 #include <string>
-#include "string_view.h"
 #include <unordered_map>
 #include <vector>
 
@@ -13,6 +12,7 @@
 #include "environment.h"
 #include "null_collector.h"
 #include "parse_util.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

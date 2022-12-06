@@ -2,7 +2,6 @@
 // `glob_match`, defined in `glob.h`.
 
 #include <datadog/glob.h>
-
 #include <datadog/string_view.h>
 
 #include "test.h"

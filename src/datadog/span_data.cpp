@@ -1,12 +1,12 @@
 #include "span_data.h"
 
 #include <cstddef>
-#include "string_view.h"
 
 #include "error.h"
 #include "msgpack.h"
 #include "span_config.h"
 #include "span_defaults.h"
+#include "string_view.h"
 #include "tags.h"
 
 namespace datadog {

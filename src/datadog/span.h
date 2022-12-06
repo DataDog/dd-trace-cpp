@@ -44,11 +44,11 @@
 #include <functional>
 #include <memory>
 #include <optional>
-#include "string_view.h"
 
 #include "clock.h"
 #include "error.h"
 #include "id_generator.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

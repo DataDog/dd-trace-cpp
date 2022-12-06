@@ -41,6 +41,7 @@
 
 #include <functional>
 #include <ostream>
+
 #include "string_view.h"
 
 namespace datadog {

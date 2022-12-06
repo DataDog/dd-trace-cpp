@@ -14,11 +14,11 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include "string_view.h"
 #include <variant>
 
 #include "expected.h"
 #include "http_client.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

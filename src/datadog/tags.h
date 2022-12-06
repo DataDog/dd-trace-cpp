@@ -4,6 +4,7 @@
 // meaning.
 
 #include <string>
+
 #include "string_view.h"
 
 namespace datadog {

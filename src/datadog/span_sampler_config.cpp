@@ -16,8 +16,8 @@ namespace {
 
 // `env_var` is the name of the environment variable from which `rules_raw` was
 // obtained.  It's used for error messages.
-Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(
-    StringView rules_raw, StringView env_var) {
+Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
+                                                           StringView env_var) {
   std::vector<SpanSamplerConfig::Rule> rules;
   nlohmann::json json_rules;
 

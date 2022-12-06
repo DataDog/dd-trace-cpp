@@ -12,10 +12,10 @@
 // "x-datadog-tags" header format.
 
 #include <string>
-#include "string_view.h"
 #include <unordered_map>
 
 #include "expected.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
