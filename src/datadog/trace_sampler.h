@@ -84,7 +84,7 @@
 // `DD_TRACE_RATE_LIMIT` environment variable.
 
 #include <mutex>
-#include <optional>
+#include "optional.h"
 #include <string>
 #include <unordered_map>
 
@@ -104,7 +104,7 @@ struct SpanData;
 class TraceSampler {
   std::mutex mutex_;
 
-  std::optional<Rate> collector_default_sample_rate_;
+  Optional<Rate> collector_default_sample_rate_;
   std::unordered_map<std::string, Rate> collector_sample_rates_;
 
   std::vector<FinalizedTraceSamplerConfig::Rule> rules_;

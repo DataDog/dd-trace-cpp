@@ -3,6 +3,7 @@
 // for propagation.
 
 #include <datadog/clock.h>
+#include <datadog/optional.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/tag_propagation.h>
@@ -14,7 +15,6 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
-#include <optional>
 #include <string>
 
 #include "matchers.h"
@@ -228,9 +228,9 @@ TEST_CASE(".error() and .set_error*()") {
     std::string name;
     std::function<void(Span&)> mutate;
     bool expected_error;
-    std::optional<StringView> expected_error_message;
-    std::optional<StringView> expected_error_type;
-    std::optional<StringView> expected_error_stack;
+    Optional<StringView> expected_error_message;
+    Optional<StringView> expected_error_type;
+    Optional<StringView> expected_error_stack;
   };
 
   auto test_case = GENERATE(values<TestCase>(

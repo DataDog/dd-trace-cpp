@@ -35,9 +35,9 @@
 //
 // `Expected<void>` is like `Expected<T>`, except that if the value is not an
 // error then it cannot be "dereferenced" with `operator*`, i.e. it is analogous
-// to `std::optional<Error>` (and is implemented as such).
+// to `Optional<Error>` (and is implemented as such).
 
-#include <optional>
+#include "optional.h"
 #include <variant>
 
 #include "error.h"
@@ -189,7 +189,7 @@ const Error* Expected<Value>::if_error() const& {
 
 template <>
 class Expected<void> {
-  std::optional<Error> data_;
+  Optional<Error> data_;
 
  public:
   Expected() = default;

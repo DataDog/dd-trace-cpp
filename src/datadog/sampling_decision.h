@@ -4,7 +4,7 @@
 // keep/drop sampling decision (for either trace sampling or span sampling) and
 // contains supporting information about the reason for the decision.
 
-#include <optional>
+#include "optional.h"
 
 #include "rate.h"
 #include "sampling_mechanism.h"
@@ -33,15 +33,15 @@ struct SamplingDecision {
   // "drop."
   int priority;
   // See `sampling_mechanism.h`.
-  std::optional<int> mechanism;
+  Optional<int> mechanism;
   // The sample rate associated with this decision, if any.
-  std::optional<Rate> configured_rate;
+  Optional<Rate> configured_rate;
   // The effective rate of the limiter consulted in this decision, if any. A
   // limiter's effective rate is `num_allowed / num_asked`.
-  std::optional<Rate> limiter_effective_rate;
+  Optional<Rate> limiter_effective_rate;
   // The per-second maximum allowed number of "keeps" configured for the limiter
   // consulted in this decision, if any.
-  std::optional<double> limiter_max_per_second;
+  Optional<double> limiter_max_per_second;
   // The provenance of this decision.
   Origin origin;
 };

@@ -1,7 +1,7 @@
 #include "span_matcher.h"
 
 #include <algorithm>
-#include <optional>
+#include "optional.h"
 
 #include "error.h"
 #include "glob.h"
@@ -53,7 +53,7 @@ Expected<SpanMatcher> SpanMatcher::from_json(const nlohmann::json& json) {
 
   const auto check_property_type =
       [&](StringView property, const nlohmann::json& value,
-          StringView expected_type) -> std::optional<Error> {
+          StringView expected_type) -> Optional<Error> {
     type = value.type_name();
     if (type == expected_type) {
       return std::nullopt;

@@ -13,7 +13,7 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-std::optional<StringView> lookup(
+Optional<StringView> lookup(
     const std::string& key,
     const std::unordered_map<std::string, std::string>& map) {
   const auto found = map.find(key);
@@ -25,11 +25,11 @@ std::optional<StringView> lookup(
 
 }  // namespace
 
-std::optional<StringView> SpanData::environment() const {
+Optional<StringView> SpanData::environment() const {
   return lookup(tags::environment, tags);
 }
 
-std::optional<StringView> SpanData::version() const {
+Optional<StringView> SpanData::version() const {
   return lookup(tags::version, tags);
 }
 

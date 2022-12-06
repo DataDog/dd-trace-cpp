@@ -1,17 +1,17 @@
 #pragma once
 
 #include <datadog/event_scheduler.h>
+#include <datadog/optional.h>
 
 #include <chrono>
 #include <datadog/json.hpp>
 #include <functional>
-#include <optional>
 
 using namespace datadog::tracing;
 
 struct MockEventScheduler : public EventScheduler {
   std::function<void()> event_callback;
-  std::optional<std::chrono::steady_clock::duration> recurrence_interval;
+  Optional<std::chrono::steady_clock::duration> recurrence_interval;
   bool cancelled = false;
 
   Cancel schedule_recurring_event(std::chrono::steady_clock::duration interval,

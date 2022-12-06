@@ -29,7 +29,7 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
-#include <optional>
+#include "optional.h"
 #include <unordered_map>
 #include <vector>
 
@@ -59,14 +59,14 @@ class TraceSegment {
 
   std::shared_ptr<const SpanDefaults> defaults_;
   const PropagationStyles injection_styles_;
-  const std::optional<std::string> hostname_;
-  const std::optional<std::string> origin_;
+  const Optional<std::string> hostname_;
+  const Optional<std::string> origin_;
   const std::size_t tags_header_max_size_;
   std::unordered_map<std::string, std::string> trace_tags_;
 
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
-  std::optional<SamplingDecision> sampling_decision_;
+  Optional<SamplingDecision> sampling_decision_;
   bool awaiting_delegated_sampling_decision_ = false;
 
  public:
@@ -76,17 +76,17 @@ class TraceSegment {
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
                const PropagationStyles& injection_styles,
-               const std::optional<std::string>& hostname,
-               std::optional<std::string> origin,
+               const Optional<std::string>& hostname,
+               Optional<std::string> origin,
                std::size_t tags_header_max_size,
                std::unordered_map<std::string, std::string> trace_tags,
-               std::optional<SamplingDecision> sampling_decision,
+               Optional<SamplingDecision> sampling_decision,
                std::unique_ptr<SpanData> local_root);
 
   const SpanDefaults& defaults() const;
-  const std::optional<std::string>& hostname() const;
-  const std::optional<std::string>& origin() const;
-  std::optional<SamplingDecision> sampling_decision() const;
+  const Optional<std::string>& hostname() const;
+  const Optional<std::string>& origin() const;
+  Optional<SamplingDecision> sampling_decision() const;
 
   Logger& logger() const;
 

@@ -76,6 +76,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/msgpack.cpp
     src/datadog/net_util.cpp
     src/datadog/null_collector.cpp
+    src/datadog/optional.cpp
     src/datadog/parse_util.cpp
     src/datadog/propagation_styles.cpp
     src/datadog/rate.cpp
@@ -132,6 +133,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/msgpack.h
   src/datadog/net_util.h
   src/datadog/null_collector.h
+  src/datadog/optional.h
   src/datadog/parse_util.h
   src/datadog/propagation_styles.h
   src/datadog/rate.h

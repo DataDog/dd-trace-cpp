@@ -10,7 +10,7 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
-#include <optional>
+#include "optional.h"
 
 #include "clock.h"
 #include "error.h"
@@ -37,7 +37,7 @@ class Tracer {
   std::shared_ptr<const SpanDefaults> defaults_;
   PropagationStyles injection_styles_;
   PropagationStyles extraction_styles_;
-  std::optional<std::string> hostname_;
+  Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
 
  public:

@@ -43,7 +43,7 @@
 #include <chrono>
 #include <functional>
 #include <memory>
-#include <optional>
+#include "optional.h"
 
 #include "clock.h"
 #include "error.h"
@@ -63,7 +63,7 @@ class Span {
   SpanData* data_;
   IDGenerator generate_span_id_;
   Clock clock_;
-  std::optional<std::chrono::steady_clock::time_point> end_time_;
+  Optional<std::chrono::steady_clock::time_point> end_time_;
 
  public:
   // Create a span whose properties are stored in the specified `data` and that
@@ -98,7 +98,7 @@ class Span {
   std::uint64_t trace_id() const;
   // Return the ID of this span's parent span, or return null if this span has
   // no parent.
-  std::optional<std::uint64_t> parent_id() const;
+  Optional<std::uint64_t> parent_id() const;
   // Return the start time of this span.
   TimePoint start_time() const;
   // Return whether this span has been marked as an error having occurred during
@@ -107,7 +107,7 @@ class Span {
 
   // Return the value of the tag having the specified `name`, or return null if
   // there is no such tag.
-  std::optional<StringView> lookup_tag(StringView name) const;
+  Optional<StringView> lookup_tag(StringView name) const;
   // Overwrite the tag having the specified `name` so that it has the specified
   // `value`, or create a new tag.
   void set_tag(StringView name, StringView value);

@@ -9,7 +9,7 @@
 namespace datadog {
 namespace tracing {
 
-std::optional<std::string> get_hostname() {
+Optional<std::string> get_hostname() {
   char buffer[256];
   if (::gethostname(buffer, sizeof buffer)) {
     return std::nullopt;

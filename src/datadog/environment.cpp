@@ -10,7 +10,7 @@ namespace environment {
 
 StringView name(Variable variable) { return variable_names[variable]; }
 
-std::optional<StringView> lookup(Variable variable) {
+Optional<StringView> lookup(Variable variable) {
   const char *name = variable_names[variable];
   const char *value = std::getenv(name);
   if (!value) {

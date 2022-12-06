@@ -1,7 +1,7 @@
 #include "span.h"
 
 #include <cassert>
-#include <optional>
+#include "optional.h"
 #include <string>
 
 #include "dict_writer.h"
@@ -64,7 +64,7 @@ std::uint64_t Span::id() const { return data_->span_id; }
 
 std::uint64_t Span::trace_id() const { return data_->trace_id; }
 
-std::optional<std::uint64_t> Span::parent_id() const {
+Optional<std::uint64_t> Span::parent_id() const {
   if (data_->parent_id == 0) {
     return std::nullopt;
   }
@@ -75,7 +75,7 @@ TimePoint Span::start_time() const { return data_->start; }
 
 bool Span::error() const { return data_->error; }
 
-std::optional<StringView> Span::lookup_tag(StringView name) const {
+Optional<StringView> Span::lookup_tag(StringView name) const {
   if (tags::is_internal(name)) {
     return std::nullopt;
   }

@@ -1,10 +1,10 @@
+#include <datadog/optional.h>
 #include <datadog/span_data.h>
 #include <datadog/span_sampler.h>
 #include <datadog/tags.h>
 #include <datadog/tracer.h>
 
 #include <cstddef>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -18,7 +18,7 @@ using namespace datadog::tracing;
 
 namespace std {
 
-std::ostream& operator<<(std::ostream& stream, std::optional<double> value) {
+std::ostream& operator<<(std::ostream& stream, Optional<double> value) {
   if (value) {
     return stream << *value;
   }
@@ -46,9 +46,9 @@ std::ostream& operator<<(
 namespace {
 
 struct SpanSamplingTags {
-  std::optional<double> mechanism;
-  std::optional<double> rule_rate;
-  std::optional<double> max_per_second;
+  Optional<double> mechanism;
+  Optional<double> rule_rate;
+  Optional<double> max_per_second;
 };
 
 SpanSamplingTags span_sampling_tags(const SpanData& span) {
@@ -292,7 +292,7 @@ TEST_CASE("span rule limiter") {
   struct TestCase {
     std::string name;
     std::size_t num_spans;
-    std::optional<double> max_per_second;
+    Optional<double> max_per_second;
     std::size_t expected_count;
   };
 

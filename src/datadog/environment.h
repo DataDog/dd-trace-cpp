@@ -14,7 +14,7 @@
 //
 // `lookup` retrieves the value of `Variable` in the environment.
 
-#include <optional>
+#include "optional.h"
 
 #include "json_fwd.hpp"
 #include "string_view.h"
@@ -70,7 +70,7 @@ StringView name(Variable variable);
 
 // Return the value of the specified environment `variable`, or return
 // `std::nullptr` if that variable is not set in the environment.
-std::optional<StringView> lookup(Variable variable);
+Optional<StringView> lookup(Variable variable);
 
 nlohmann::json to_json();
 

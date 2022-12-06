@@ -3,7 +3,7 @@
 #include <cassert>
 #include <charconv>
 #include <limits>
-#include <optional>
+#include "optional.h"
 #include <string>
 #include <system_error>
 #include <unordered_map>
@@ -46,10 +46,10 @@ TraceSegment::TraceSegment(
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
     const PropagationStyles& injection_styles,
-    const std::optional<std::string>& hostname,
-    std::optional<std::string> origin, std::size_t tags_header_max_size,
+    const Optional<std::string>& hostname,
+    Optional<std::string> origin, std::size_t tags_header_max_size,
     std::unordered_map<std::string, std::string> trace_tags,
-    std::optional<SamplingDecision> sampling_decision,
+    Optional<SamplingDecision> sampling_decision,
     std::unique_ptr<SpanData> local_root)
     : logger_(logger),
       collector_(collector),
@@ -74,15 +74,15 @@ TraceSegment::TraceSegment(
 
 const SpanDefaults& TraceSegment::defaults() const { return *defaults_; }
 
-const std::optional<std::string>& TraceSegment::hostname() const {
+const Optional<std::string>& TraceSegment::hostname() const {
   return hostname_;
 }
 
-const std::optional<std::string>& TraceSegment::origin() const {
+const Optional<std::string>& TraceSegment::origin() const {
   return origin_;
 }
 
-std::optional<SamplingDecision> TraceSegment::sampling_decision() const {
+Optional<SamplingDecision> TraceSegment::sampling_decision() const {
   // `sampling_decision_` can change, so we need a lock.
   std::lock_guard<std::mutex> lock(mutex_);
   return sampling_decision_;

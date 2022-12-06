@@ -11,7 +11,7 @@
 // `response_handler` parameter to `Collector::send`.
 
 #include <memory>
-#include <optional>
+#include "optional.h"
 #include <vector>
 
 #include "expected.h"

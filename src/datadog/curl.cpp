@@ -71,7 +71,7 @@ class CurlImpl {
    public:
     explicit HeaderReader(
         std::unordered_map<std::string, std::string> *response_headers_lower);
-    std::optional<StringView> lookup(StringView key) const override;
+    Optional<StringView> lookup(StringView key) const override;
     void visit(const std::function<void(StringView key, StringView value)>
                    &visitor) const override;
   };
@@ -438,7 +438,7 @@ CurlImpl::HeaderReader::HeaderReader(
     std::unordered_map<std::string, std::string> *response_headers_lower)
     : response_headers_lower_(response_headers_lower) {}
 
-std::optional<StringView> CurlImpl::HeaderReader::lookup(StringView key) const {
+Optional<StringView> CurlImpl::HeaderReader::lookup(StringView key) const {
   buffer_.clear();
   std::transform(key.begin(), key.end(), std::back_inserter(buffer_),
                  &to_lower);

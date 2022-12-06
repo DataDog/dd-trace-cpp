@@ -5,7 +5,7 @@
 // context from externalized formats: HTTP headers, gRPC metadata, etc.
 
 #include <functional>
-#include <optional>
+#include "optional.h"
 
 #include "string_view.h"
 
@@ -18,7 +18,7 @@ class DictReader {
 
   // Return the value at the specified `key`, or return `std::nullopt` if there
   // is no value at `key`.
-  virtual std::optional<StringView> lookup(StringView key) const = 0;
+  virtual Optional<StringView> lookup(StringView key) const = 0;
 
   // Invoke the specified `visitor` once for each key/value pair in this object.
   virtual void visit(

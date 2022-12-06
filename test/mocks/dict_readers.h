@@ -15,7 +15,7 @@ class MockDictReader : public DictReader {
       const std::unordered_map<std::string, std::string>& map)
       : map_(&map) {}
 
-  std::optional<StringView> lookup(StringView key) const override {
+  Optional<StringView> lookup(StringView key) const override {
     auto found = map_->find(std::string(key));
     if (found == map_->end()) {
       return std::nullopt;
