@@ -1,0 +1,55 @@
+version: 2.1
+
+jobs:
+  format:
+    docker:
+    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: small
+    steps:
+    - checkout
+    - run: bin/check-format
+  
+  build-bazel:
+    parameters:
+      toolchain:
+        type: string
+    docker:
+    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: xlarge
+    environment:
+      MAKE_JOB_COUNT: 8
+    steps:
+    - checkout
+    - run: bin/with-toolchain << parameters.toolchain >> bazelisk build --jobs $MAKE_JOB_COUNT dd_trace_cpp
+  
+  test-cmake:
+    parameters:
+      toolchain:
+        type: string
+      sanitize:
+        type: string
+    docker:
+    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: xlarge
+    environment:
+      MAKE_JOB_COUNT: 8
+    steps:
+    - checkout
+    - run: mkdir .build
+    - run: cd .build && ../bin/with-toolchain << parameters.toolchain >> cmake .. -DBUILD_TESTING=1 -DSANITIZE=<< parameters.sanitize >>
+    - run: cd .build && make -j $MAKE_JOB_COUNT VERBOSE=1
+    - run: cd .build && test/tests
+
+workflows:
+  pull-request:
+    jobs:
+    - format
+    - test-cmake:
+        matrix:
+          parameters:
+            toolchain: ["gnu", "llvm"]
+            sanitize: ["on", "off"]
+    - build-bazel:
+        matrix:
+          parameters:
+            toolchain: ["gnu", "llvm"]

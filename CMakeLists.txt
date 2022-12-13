@@ -18,6 +18,14 @@ include(ProcessorCount)
 ProcessorCount(NUM_PROCESSORS)
 set(MAKE_JOB_COUNT ${NUM_PROCESSORS} CACHE STRING "Number of jobs to use when building libcurl")
 
+if (SANITIZE)
+  add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
+  add_compile_options(-fsanitize=undefined)
+  add_link_options(-fsanitize=undefined)
+  # Thread sanitizer fails with "unexpected memory mapping".
+endif()
+
 include (ExternalProject)
 ExternalProject_Add(curl
   URL "https://github.com/curl/curl/releases/download/curl-7_85_0/curl-7.85.0.tar.gz"
@@ -34,18 +42,10 @@ if (MSVC)
     add_compile_options(/W4 /WX)
 else()
     add_compile_options(-Wall -Wextra -pedantic -Werror)
-    if(BUILD_COVERAGE)
+    if (BUILD_COVERAGE)
       add_compile_options(-g -O0 -fprofile-arcs -ftest-coverage)
     endif()
 endif()
-
-# TODO: The sanitizers have been giving me "fatal errors" and other chicanery.
-# add_compile_options(-fsanitize=address)
-# add_link_options(-fsanitize=address)
-# add_compile_options(-fsanitize=undefined)
-# add_link_options(-fsanitize=undefined)
-# add_compile_options(-fsanitize=thread)
-# add_link_options(-fsanitize=thread)
 
 if(BUILD_COVERAGE)
   set(COVERAGE_LIBRARIES gcov)
