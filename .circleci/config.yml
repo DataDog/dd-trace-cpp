@@ -45,11 +45,11 @@ workflows:
     jobs:
     - format
     - test-cmake:
-      matrix:
-        parameters:
-          toolchain: ["gnu", "llvm"]
-          sanitize: ["on", "off"]
+        matrix:
+          parameters:
+            toolchain: ["gnu", "llvm"]
+            sanitize: ["on", "off"]
     - build-bazel:
-      matrix:
-        parameters:
-          toolchain: ["gnu", "llvm"]
+        matrix:
+          parameters:
+            toolchain: ["gnu", "llvm"]
