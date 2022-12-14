@@ -13,7 +13,7 @@ The following jobs are defined:
   - Based on the `toolchain` parameter, the build will use either g++ or
     clang++.
   - Based on the `sanitize` parameter, the build might use [AddressSanitizer and
-    MemorySanitizer][3].
+    UndefinedBehaviorSanitizer][3].
 
 [1]: https://bazel.build/
 [2]: https://cmake.org/
