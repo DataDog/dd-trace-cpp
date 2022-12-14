@@ -6,6 +6,7 @@
 #include <datadog/tracer_config.h>
 
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -985,6 +986,20 @@ TEST_CASE("TracerConfig propagation styles") {
   TracerConfig config;
   config.defaults.service = "testsvc";
 
+  SECTION("DD_TRACE_PROPAGATION_STYLE overrides defaults") {
+    const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE", "B3"};
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    REQUIRE(!finalized->injection_styles.datadog);
+    REQUIRE(finalized->injection_styles.b3);
+    REQUIRE(!finalized->injection_styles.none);
+
+    REQUIRE(!finalized->extraction_styles.datadog);
+    REQUIRE(finalized->extraction_styles.b3);
+    REQUIRE(!finalized->extraction_styles.none);
+  }
+
   SECTION("injection_styles") {
     SECTION("defaults to just Datadog") {
       auto finalized = finalize_config(config);
@@ -1001,9 +1016,31 @@ TEST_CASE("TracerConfig propagation styles") {
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_INJECTION_STYLE);
     }
 
-    SECTION("DD_PROPAGATION_STYLE_INJECT") {
+    SECTION("DD_TRACE_PROPAGATION_STYLE_INJECT") {
       SECTION("overrides injection_styles") {
-        const EnvGuard guard{"DD_PROPAGATION_STYLE_INJECT", "B3"};
+        const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_INJECT", "B3"};
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        REQUIRE(!finalized->injection_styles.datadog);
+        REQUIRE(finalized->injection_styles.b3);
+        REQUIRE(!finalized->injection_styles.none);
+      }
+
+      SECTION("overrides DD_PROPAGATION_STYLE_INJECT") {
+        const EnvGuard guard1{"DD_TRACE_PROPAGATION_STYLE_INJECT", "B3"};
+        const EnvGuard guard2{"DD_PROPAGATION_STYLE_INJECT", "Datadog"};
+        config.logger = std::make_shared<MockLogger>();  // suppress warning
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        REQUIRE(!finalized->injection_styles.datadog);
+        REQUIRE(finalized->injection_styles.b3);
+        REQUIRE(!finalized->injection_styles.none);
+      }
+
+      SECTION("overrides DD_TRACE_PROPAGATION_STYLE") {
+        const EnvGuard guard1{"DD_TRACE_PROPAGATION_STYLE_INJECT", "B3"};
+        const EnvGuard guard2{"DD_TRACE_PROPAGATION_STYLE", "Datadog"};
+        config.logger = std::make_shared<MockLogger>();  // suppress warning
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
         REQUIRE(!finalized->injection_styles.datadog);
@@ -1045,7 +1082,7 @@ TEST_CASE("TracerConfig propagation styles") {
         CAPTURE(test_case.line);
         CAPTURE(test_case.env_value);
 
-        const EnvGuard guard{"DD_PROPAGATION_STYLE_INJECT",
+        const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_INJECT",
                              test_case.env_value};
         auto finalized = finalize_config(config);
         if (test_case.expected_error) {
@@ -1083,9 +1120,31 @@ TEST_CASE("TracerConfig propagation styles") {
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_EXTRACTION_STYLE);
     }
 
-    SECTION("DD_PROPAGATION_STYLE_EXTRACT") {
+    SECTION("DD_TRACE_PROPAGATION_STYLE_EXTRACT") {
       SECTION("overrides extraction_styles") {
-        const EnvGuard guard{"DD_PROPAGATION_STYLE_EXTRACT", "B3"};
+        const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "B3"};
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        REQUIRE(!finalized->extraction_styles.datadog);
+        REQUIRE(finalized->extraction_styles.b3);
+        REQUIRE(!finalized->extraction_styles.none);
+      }
+
+      SECTION("overrides DD_PROPAGATION_STYLE_EXTRACT") {
+        const EnvGuard guard1{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "B3"};
+        const EnvGuard guard2{"DD_PROPAGATION_STYLE_EXTRACT", "Datadog"};
+        config.logger = std::make_shared<MockLogger>();  // suppress warning
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        REQUIRE(!finalized->extraction_styles.datadog);
+        REQUIRE(finalized->extraction_styles.b3);
+        REQUIRE(!finalized->extraction_styles.none);
+      }
+
+      SECTION("overrides DD_TRACE_PROPAGATION_STYLE") {
+        const EnvGuard guard1{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "B3"};
+        const EnvGuard guard2{"DD_TRACE_PROPAGATION_STYLE", "Datadog"};
+        config.logger = std::make_shared<MockLogger>();  // suppress warning
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
         REQUIRE(!finalized->extraction_styles.datadog);
@@ -1101,6 +1160,55 @@ TEST_CASE("TracerConfig propagation styles") {
         auto finalized = finalize_config(config);
         REQUIRE(!finalized);
         REQUIRE(finalized.error().code == Error::UNKNOWN_PROPAGATION_STYLE);
+      }
+    }
+  }
+
+  SECTION("warn if one env var overrides another") {
+    const auto logger = std::make_shared<MockLogger>();
+    config.logger = logger;
+    const auto ts = "DD_TRACE_PROPAGATION_STYLE";
+    const auto tse = "DD_TRACE_PROPAGATION_STYLE_EXTRACT";
+    const auto se = "DD_PROPAGATION_STYLE_EXTRACT";
+    const auto tsi = "DD_TRACE_PROPAGATION_STYLE_INJECT";
+    const auto si = "DD_PROPAGATION_STYLE_INJECT";
+    const char* const vars[] = {ts, tse, se, tsi, si};
+    constexpr auto n = sizeof(vars) / sizeof(vars[0]);
+    // clang-format off
+    const bool x = false; // ignored values    
+    const bool expect_warning[n][n] = {      
+    //          ts    tse   se    tsi    si    
+    //          ---   ---   ---   ---    ---    
+    /* ts  */{  x,    true, true, true,  true  },    
+                                                  
+    /* tse */{  x,    x,    true, false, false },    
+                                                     
+    /* se  */{  x,    x,    x,    false, false },    
+    
+    /* tsi */{  x,    x,    x,    x,     true  },    
+                                                  
+    /* si  */{  x,    x,    x,    x,     x     },    
+    };
+    // clang-format on
+    for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t j = i + 1; j < n; ++j) {
+        CAPTURE(i);
+        CAPTURE(vars[i]);
+        CAPTURE(j);
+        CAPTURE(vars[j]);
+        CAPTURE(expect_warning[i][j]);
+        const EnvGuard guard1{vars[i], "B3"};
+        const EnvGuard guard2{vars[j], "B3"};
+        const auto finalized_config = finalize_config(config);
+        REQUIRE(finalized_config);
+        if (expect_warning[i][j]) {
+          REQUIRE(logger->error_count() == 1);
+          REQUIRE(logger->first_error().code ==
+                  Error::MULTIPLE_PROPAGATION_STYLE_ENVIRONMENT_VARIABLES);
+        } else {
+          REQUIRE(logger->error_count() == 0);
+        }
+        logger->entries.clear();
       }
     }
   }

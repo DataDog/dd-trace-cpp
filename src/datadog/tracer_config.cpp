@@ -10,6 +10,7 @@
 #include "cerr_logger.h"
 #include "datadog_agent.h"
 #include "environment.h"
+#include "json.hpp"
 #include "null_collector.h"
 #include "parse_util.h"
 #include "string_view.h"
@@ -121,40 +122,127 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
   return tags;
 }
 
-Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
-                                           const TracerConfig &config) {
-  result.extraction_styles = config.extraction_styles;
-  if (auto styles_env = lookup(environment::DD_PROPAGATION_STYLE_EXTRACT)) {
-    auto styles = parse_propagation_styles(*styles_env);
-    if (auto *error = styles.if_error()) {
-      std::string prefix;
-      prefix += "Unable to parse ";
-      append(prefix, name(environment::DD_PROPAGATION_STYLE_EXTRACT));
-      prefix += " environment variable: ";
-      return error->with_prefix(prefix);
-    }
-    result.extraction_styles = *styles;
+// Return a `PropagationStyles` parsed from the specified `env_var`.
+// If `env_var` is not in the environment, return `nullopt`.
+// If an error occurs, throw an `Error`.
+Optional<PropagationStyles> styles_from_env(environment::Variable env_var) {
+  const auto styles_env = lookup(env_var);
+  if (!styles_env) {
+    return {};
   }
 
-  result.injection_styles = config.injection_styles;
-  if (auto styles_env = lookup(environment::DD_PROPAGATION_STYLE_INJECT)) {
-    auto styles = parse_propagation_styles(*styles_env);
-    if (auto *error = styles.if_error()) {
-      std::string prefix;
-      prefix += "Unable to parse ";
-      append(prefix, name(environment::DD_PROPAGATION_STYLE_INJECT));
-      prefix += " environment variable: ";
-      return error->with_prefix(prefix);
+  auto styles = parse_propagation_styles(*styles_env);
+  if (auto *error = styles.if_error()) {
+    std::string prefix;
+    prefix += "Unable to parse ";
+    append(prefix, name(env_var));
+    prefix += " environment variable: ";
+    throw error->with_prefix(prefix);
+  }
+  return *styles;
+}
+
+std::string json_quoted(StringView text) {
+  std::string unquoted;
+  assign(unquoted, text);
+  return nlohmann::json(unquoted).dump();
+}
+
+Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
+                                           const TracerConfig &config,
+                                           Logger &logger) {
+  namespace env = environment;
+  // Print a warning if a questionable combination of environment variables is
+  // defined.
+  const auto ts = env::DD_TRACE_PROPAGATION_STYLE;
+  const auto tse = env::DD_TRACE_PROPAGATION_STYLE_EXTRACT;
+  const auto se = env::DD_PROPAGATION_STYLE_EXTRACT;
+  const auto tsi = env::DD_TRACE_PROPAGATION_STYLE_INJECT;
+  const auto si = env::DD_PROPAGATION_STYLE_INJECT;
+  // clang-format off
+  /*
+           ts    tse   se    tsi   si
+           ---   ---   ---   ---   ---
+    ts  |  x     warn  warn  warn  warn
+        |
+    tse |  x     x     warn  ok    ok
+        |
+    se  |  x     x     x     ok    ok
+        |
+    tsi |  x     x     x     x     warn
+        |
+    si  |  x     x     x     x     x
+  */
+  // In each pair, the first would be overridden by the second.
+  const std::pair<env::Variable, env::Variable> questionable_combinations[] = {
+           {ts, tse}, {ts, se},  {ts, tsi}, {ts, si},
+
+                      {se, tse}, /* ok */   /* ok */
+
+                                 /* ok */   /* ok */
+
+                                            {si, tsi},
+  };
+  // clang-format on
+
+  const auto warn_message = [](StringView name, StringView value,
+                               StringView name_override,
+                               StringView value_override) {
+    std::string message;
+    message += "Both the environment variables ";
+    append(message, name);
+    message += "=";
+    message += json_quoted(value);
+    message += " and ";
+    append(message, name_override);
+    message += "=";
+    message += json_quoted(value_override);
+    message += " are defined. ";
+    append(message, name_override);
+    message += " will take precedence.";
+    return message;
+  };
+
+  for (const auto &[var, var_override] : questionable_combinations) {
+    const auto value = lookup(var);
+    if (!value) {
+      continue;
     }
-    result.injection_styles = *styles;
+    const auto value_override = lookup(var_override);
+    if (!value_override) {
+      continue;
+    }
+    const auto var_name = name(var);
+    const auto var_name_override = name(var_override);
+    logger.log_error(Error{
+        Error::MULTIPLE_PROPAGATION_STYLE_ENVIRONMENT_VARIABLES,
+        warn_message(var_name, *value, var_name_override, *value_override)});
+  }
+
+  // Parse the propagation styles from the configuration and/or from the
+  // environment.
+  // Exceptions make this section simpler.
+  try {
+    const auto global_styles = styles_from_env(env::DD_TRACE_PROPAGATION_STYLE);
+    result.extraction_styles =
+        value_or(styles_from_env(env::DD_TRACE_PROPAGATION_STYLE_EXTRACT),
+                 styles_from_env(env::DD_PROPAGATION_STYLE_EXTRACT),
+                 global_styles, config.extraction_styles);
+    result.injection_styles =
+        value_or(styles_from_env(env::DD_TRACE_PROPAGATION_STYLE_INJECT),
+                 styles_from_env(env::DD_PROPAGATION_STYLE_INJECT),
+                 global_styles, config.injection_styles);
+  } catch (Error &error) {
+    return std::move(error);
   }
 
   if (!result.extraction_styles.datadog && !result.extraction_styles.b3 &&
       !result.extraction_styles.none) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
                  "At least one extraction style must be specified."};
-  } else if (!result.injection_styles.datadog && !result.injection_styles.b3 &&
-             !result.injection_styles.none) {
+  }
+  if (!result.injection_styles.datadog && !result.injection_styles.b3 &&
+      !result.injection_styles.none) {
     return Error{Error::MISSING_SPAN_INJECTION_STYLE,
                  "At least one injection style must be specified."};
   }
@@ -236,7 +324,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     return std::move(span_sampler_config.error());
   }
 
-  auto maybe_error = finalize_propagation_styles(result, config);
+  auto maybe_error =
+      finalize_propagation_styles(result, config, *result.logger);
   if (!maybe_error) {
     return maybe_error.error();
   }
