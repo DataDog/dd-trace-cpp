@@ -1008,6 +1008,7 @@ TEST_CASE("TracerConfig propagation styles") {
         REQUIRE(finalized);
         REQUIRE(!finalized->injection_styles.datadog);
         REQUIRE(finalized->injection_styles.b3);
+        REQUIRE(!finalized->injection_styles.none);
       }
 
       SECTION("parsing") {
@@ -1020,20 +1021,24 @@ TEST_CASE("TracerConfig propagation styles") {
 
         // clang-format off
         auto test_case = GENERATE(values<TestCase>({
-          {__LINE__, "Datadog", x, {true, false}},
-          {__LINE__, "DaTaDoG", x, {true, false}},
-          {__LINE__, "B3", x, {false, true}},
-          {__LINE__, "b3", x, {false, true}},
-          {__LINE__, "Datadog B3", x, {true, true}},
-          {__LINE__, "B3 Datadog", x, {true, true}},
-          {__LINE__, "b3 datadog", x, {true, true}},
-          {__LINE__, "b3, datadog", x, {true, true}},
-          {__LINE__, "b3,datadog", x, {true, true}},
-          {__LINE__, "b3,             datadog", x, {true, true}},
+          {__LINE__, "Datadog", x, {true, false, false}},
+          {__LINE__, "DaTaDoG", x, {true, false, false}},
+          {__LINE__, "B3", x, {false, true, false}},
+          {__LINE__, "b3", x, {false, true, false}},
+          {__LINE__, "b3MULTI", x, {false, true, false}},
+          {__LINE__, "b3, b3multi", x, {false, true, false}},
+          {__LINE__, "Datadog B3", x, {true, true, false}},
+          {__LINE__, "Datadog B3 none", x, {true, true, true}},
+          {__LINE__, "NONE", x, {false, false, true}},
+          {__LINE__, "B3 Datadog", x, {true, true, false}},
+          {__LINE__, "b3 datadog", x, {true, true, false}},
+          {__LINE__, "b3, datadog", x, {true, true, false}},
+          {__LINE__, "b3,datadog", x, {true, true, false}},
+          {__LINE__, "b3,             datadog", x, {true, true, false}},
           {__LINE__, "b3,,datadog", Error::UNKNOWN_PROPAGATION_STYLE},
           {__LINE__, "b3,datadog,w3c", Error::UNKNOWN_PROPAGATION_STYLE},
-          {__LINE__, "b3,datadog,datadog", x, {true, true}},
-          {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ", x, {false, true}},
+          {__LINE__, "b3,datadog,datadog", x, {true, true, false}},
+          {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ", x, {false, true, false}},
         }));
         // clang-format on
 
@@ -1052,6 +1057,8 @@ TEST_CASE("TracerConfig propagation styles") {
                   test_case.expected_styles.datadog);
           REQUIRE(finalized->injection_styles.b3 ==
                   test_case.expected_styles.b3);
+          REQUIRE(finalized->injection_styles.none ==
+                  test_case.expected_styles.none);
         }
       }
     }
@@ -1064,11 +1071,13 @@ TEST_CASE("TracerConfig propagation styles") {
       REQUIRE(finalized);
       REQUIRE(finalized->extraction_styles.datadog);
       REQUIRE(!finalized->extraction_styles.b3);
+      REQUIRE(!finalized->extraction_styles.none);
     }
 
     SECTION("need at least one") {
       config.extraction_styles.datadog = false;
       config.extraction_styles.b3 = false;
+      config.extraction_styles.none = false;
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_EXTRACTION_STYLE);
@@ -1081,6 +1090,7 @@ TEST_CASE("TracerConfig propagation styles") {
         REQUIRE(finalized);
         REQUIRE(!finalized->extraction_styles.datadog);
         REQUIRE(finalized->extraction_styles.b3);
+        REQUIRE(!finalized->extraction_styles.none);
       }
 
       // It's the same as for injection styles, so let's omit most of the

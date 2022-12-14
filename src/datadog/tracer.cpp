@@ -174,6 +174,21 @@ bool operator!=(const ExtractedData& left, const ExtractedData& right) {
          left.sampling_priority != right.sampling_priority;
 }
 
+nlohmann::json to_json(const ExtractedData& data) {
+  auto result = nlohmann::json::object({});
+#define ADD_FIELD(FIELD)          \
+  if (data.FIELD) {               \
+    result[#FIELD] = *data.FIELD; \
+  }
+  ADD_FIELD(trace_id)
+  ADD_FIELD(parent_id)
+  ADD_FIELD(origin)
+  ADD_FIELD(trace_tags)
+  ADD_FIELD(sampling_priority)
+#undef ADD_FIELD
+  return result;
+}
+
 Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
                                      const DictReader& reader) {
   ExtractedData extracted_data;
@@ -325,11 +340,22 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       std::string message;
       message += "B3 extracted different data than did ";
       message += extracted_by;
-      // TODO: diagnose difference
+      message += ".  B3 extracted ";
+      message += to_json(*data).dump();
+      message += " while previously ";
+      message += extracted_by;
+      message += " extracted ";
+      message += to_json(*extracted_data).dump();
+      message += '.';
       return Error{Error::INCONSISTENT_EXTRACTION_STYLES, std::move(message)};
     }
     extracted_data = *data;
     extracted_by = "B3";
+  }
+
+  if (extraction_styles_.none && !extracted_data) {
+    extracted_data.emplace();
+    extracted_by = "none";
   }
 
   assert(extracted_data);
@@ -349,7 +375,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   //           producing a root span
   //     - if origin is _not_ set, then it's an error
   // - trace ID and parent ID means we're extracting a child span
-  // - parent ID without trace ID is an error
 
   if (!trace_id && !parent_id) {
     return Error{Error::NO_SPAN_TO_EXTRACT,

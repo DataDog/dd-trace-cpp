@@ -552,6 +552,31 @@ TEST_CASE("span extraction") {
     checks(test_case, *span);
   }
 
+  SECTION("extraction can be disabled using the \"none\" style") {
+    config.extraction_styles.datadog = false;
+    config.extraction_styles.b3 = false;
+    config.extraction_styles.none = true;  // this one
+
+    const auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+    const std::unordered_map<std::string, std::string> headers{
+        // It doesn't matter which headers are present.
+        // The "none" extraction style will not inspect them, and will return
+        // the "no span to extract" error.
+        {"X-Datadog-Trace-ID", "foo"},
+        {"X-Datadog-Parent-ID", "bar"},
+        {"X-Datadog-Sampling-Priority", "baz"},
+        {"X-B3-TraceID", "foo"},
+        {"X-B3-SpanID", "bar"},
+        {"X-B3-Sampled", "baz"},
+    };
+    MockDictReader reader{headers};
+    const auto result = tracer.extract_span(reader);
+    REQUIRE(!result);
+    REQUIRE(result.error().code == Error::NO_SPAN_TO_EXTRACT);
+  }
+
   SECTION("x-datadog-tags") {
     auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);

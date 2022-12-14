@@ -221,8 +221,14 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
     encoded_trace_tags = encode_tags(trace_tags_);
   }
 
-  // Origin and trace tag headers are always propagated.
+  // Origin and trace tag headers are always propagated, unless the only
+  // injection style is "none".
   // Other headers depend on the injection styles.
+  if (injection_styles_.none && !injection_styles_.datadog &&
+      !injection_styles_.b3) {
+    return;
+  }
+
   if (origin_) {
     writer.set("x-datadog-origin", *origin_);
   }

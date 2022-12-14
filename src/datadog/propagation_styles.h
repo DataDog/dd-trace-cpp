@@ -11,8 +11,14 @@ namespace datadog {
 namespace tracing {
 
 struct PropagationStyles {
+  // Datadog headers, e.g. X-Datadog-Trace-ID
   bool datadog = true;
+  // B3 multi-header style, e.g. X-B3-TraceID
   bool b3 = false;
+  // The absence of propagation.  If this is the only style set, then
+  // propagation is disabled in the relevant direction (extraction or
+  // injection).
+  bool none = false;
 };
 
 nlohmann::json to_json(const PropagationStyles&);

@@ -16,6 +16,9 @@ nlohmann::json to_json(const PropagationStyles& styles) {
   if (styles.b3) {
     selected_names.emplace_back("B3");
   }
+  if (styles.none) {
+    selected_names.emplace_back("none");
+  }
   return selected_names;
 }
 

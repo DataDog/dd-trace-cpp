@@ -76,8 +76,10 @@ Expected<PropagationStyles> parse_propagation_styles(StringView input) {
     to_lower(token);
     if (token == "datadog") {
       styles.datadog = true;
-    } else if (token == "b3") {
+    } else if (token == "b3" || token == "b3multi") {
       styles.b3 = true;
+    } else if (token == "none") {
+      styles.none = true;
     } else {
       std::string message;
       message += "Unsupported propagation style \"";
@@ -219,10 +221,12 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     result.injection_styles = *styles;
   }
 
-  if (!result.extraction_styles.datadog && !result.extraction_styles.b3) {
+  if (!result.extraction_styles.datadog && !result.extraction_styles.b3 &&
+      !result.extraction_styles.none) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
                  "At least one extraction style must be specified."};
-  } else if (!result.injection_styles.datadog && !result.injection_styles.b3) {
+  } else if (!result.injection_styles.datadog && !result.injection_styles.b3 &&
+             !result.injection_styles.none) {
     return Error{Error::MISSING_SPAN_INJECTION_STYLE,
                  "At least one injection style must be specified."};
   }
