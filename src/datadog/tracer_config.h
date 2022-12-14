@@ -59,14 +59,15 @@ struct TracerConfig {
 
   // `injection_styles` indicates with which tracing systems trace propagation
   // will be compatible when injecting (sending) trace context.
-  // `injection_styles` is overridden by the `DD_PROPAGATION_STYLE_INJECT`
-  // environment variable.
+  // `injection_styles` is overridden by the `DD_TRACE_PROPAGATION_STYLE_INJECT`
+  // and `DD_TRACE_PROPAGATION_STYLE` environment variables.
   PropagationStyles injection_styles;
 
   // `extraction_styles` indicates with which tracing systems trace propagation
   // will be compatible when extracting (receiving) trace context.
-  // `extraction_styles` is overridden by the `DD_PROPAGATION_STYLE_EXTRACT`
-  // environment variable.
+  // `extraction_styles` is overridden by the
+  // `DD_TRACE_PROPAGATION_STYLE_EXTRACT` and `DD_TRACE_PROPAGATION_STYLE`
+  // environment variables.
   PropagationStyles extraction_styles;
 
   // `report_hostname` indicates whether the tracer will include the result of

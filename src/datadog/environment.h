@@ -29,6 +29,9 @@ namespace environment {
   MACRO(DD_ENV)                               \
   MACRO(DD_PROPAGATION_STYLE_EXTRACT)         \
   MACRO(DD_PROPAGATION_STYLE_INJECT)          \
+  MACRO(DD_TRACE_PROPAGATION_STYLE_EXTRACT)   \
+  MACRO(DD_TRACE_PROPAGATION_STYLE_INJECT)    \
+  MACRO(DD_TRACE_PROPAGATION_STYLE)           \
   MACRO(DD_SERVICE)                           \
   MACRO(DD_SPAN_SAMPLING_RULES)               \
   MACRO(DD_SPAN_SAMPLING_RULES_FILE)          \

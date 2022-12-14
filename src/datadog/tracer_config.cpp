@@ -121,6 +121,47 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
   return tags;
 }
 
+Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
+                                           const TracerConfig &config) {
+  result.extraction_styles = config.extraction_styles;
+  if (auto styles_env = lookup(environment::DD_PROPAGATION_STYLE_EXTRACT)) {
+    auto styles = parse_propagation_styles(*styles_env);
+    if (auto *error = styles.if_error()) {
+      std::string prefix;
+      prefix += "Unable to parse ";
+      append(prefix, name(environment::DD_PROPAGATION_STYLE_EXTRACT));
+      prefix += " environment variable: ";
+      return error->with_prefix(prefix);
+    }
+    result.extraction_styles = *styles;
+  }
+
+  result.injection_styles = config.injection_styles;
+  if (auto styles_env = lookup(environment::DD_PROPAGATION_STYLE_INJECT)) {
+    auto styles = parse_propagation_styles(*styles_env);
+    if (auto *error = styles.if_error()) {
+      std::string prefix;
+      prefix += "Unable to parse ";
+      append(prefix, name(environment::DD_PROPAGATION_STYLE_INJECT));
+      prefix += " environment variable: ";
+      return error->with_prefix(prefix);
+    }
+    result.injection_styles = *styles;
+  }
+
+  if (!result.extraction_styles.datadog && !result.extraction_styles.b3 &&
+      !result.extraction_styles.none) {
+    return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
+                 "At least one extraction style must be specified."};
+  } else if (!result.injection_styles.datadog && !result.injection_styles.b3 &&
+             !result.injection_styles.none) {
+    return Error{Error::MISSING_SPAN_INJECTION_STYLE,
+                 "At least one injection style must be specified."};
+  }
+
+  return {};
+}
+
 }  // namespace
 
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
@@ -195,40 +236,9 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     return std::move(span_sampler_config.error());
   }
 
-  result.extraction_styles = config.extraction_styles;
-  if (auto styles_env = lookup(environment::DD_PROPAGATION_STYLE_EXTRACT)) {
-    auto styles = parse_propagation_styles(*styles_env);
-    if (auto *error = styles.if_error()) {
-      std::string prefix;
-      prefix += "Unable to parse ";
-      append(prefix, name(environment::DD_PROPAGATION_STYLE_EXTRACT));
-      prefix += " environment variable: ";
-      return error->with_prefix(prefix);
-    }
-    result.extraction_styles = *styles;
-  }
-
-  result.injection_styles = config.injection_styles;
-  if (auto styles_env = lookup(environment::DD_PROPAGATION_STYLE_INJECT)) {
-    auto styles = parse_propagation_styles(*styles_env);
-    if (auto *error = styles.if_error()) {
-      std::string prefix;
-      prefix += "Unable to parse ";
-      append(prefix, name(environment::DD_PROPAGATION_STYLE_INJECT));
-      prefix += " environment variable: ";
-      return error->with_prefix(prefix);
-    }
-    result.injection_styles = *styles;
-  }
-
-  if (!result.extraction_styles.datadog && !result.extraction_styles.b3 &&
-      !result.extraction_styles.none) {
-    return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
-                 "At least one extraction style must be specified."};
-  } else if (!result.injection_styles.datadog && !result.injection_styles.b3 &&
-             !result.injection_styles.none) {
-    return Error{Error::MISSING_SPAN_INJECTION_STYLE,
-                 "At least one injection style must be specified."};
+  auto maybe_error = finalize_propagation_styles(result, config);
+  if (!maybe_error) {
+    return maybe_error.error();
   }
 
   result.report_hostname = config.report_hostname;
