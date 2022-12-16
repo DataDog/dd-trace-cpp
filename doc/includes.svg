@@ -187,7 +187,7 @@
 <g id="node86" class="node">
 <title>node85</title>
 <ellipse fill="none" stroke="black" cx="952.93" cy="-1157" rx="107.48" ry="18"/>
-<text text-anchor="middle" x="952.93" y="-1153.3" font-family="Times,serif" font-size="14.00">propagation_styles.h</text>
+<text text-anchor="middle" x="952.93" y="-1153.3" font-family="Times,serif" font-size="14.00">propagation_style.h</text>
 </g>
 <!-- node4&#45;&gt;node85 -->
 <g id="edge11" class="edge">
@@ -1465,7 +1465,7 @@
 <g id="node77" class="node">
 <title>node76</title>
 <ellipse fill="none" stroke="black" cx="318.72" cy="-2841" rx="118.08" ry="18"/>
-<text text-anchor="middle" x="318.72" y="-2837.3" font-family="Times,serif" font-size="14.00">propagation_styles.cpp</text>
+<text text-anchor="middle" x="318.72" y="-2837.3" font-family="Times,serif" font-size="14.00">propagation_style.cpp</text>
 </g>
 <!-- node76&#45;&gt;node7 -->
 <g id="edge161" class="edge">

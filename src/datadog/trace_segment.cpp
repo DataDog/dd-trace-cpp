@@ -45,7 +45,7 @@ TraceSegment::TraceSegment(
     const std::shared_ptr<TraceSampler>& trace_sampler,
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
-    const PropagationStyles& injection_styles,
+    const std::vector<PropagationStyle>& injection_styles,
     const Optional<std::string>& hostname, Optional<std::string> origin,
     std::size_t tags_header_max_size,
     std::unordered_map<std::string, std::string> trace_tags,
@@ -224,8 +224,8 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   // Origin and trace tag headers are always propagated, unless the only
   // injection style is "none".
   // Other headers depend on the injection styles.
-  if (injection_styles_.none && !injection_styles_.datadog &&
-      !injection_styles_.b3) {
+  if (injection_styles_.size() == 1 &&
+      injection_styles_[0] == PropagationStyle::NONE) {
     return;
   }
 
@@ -248,17 +248,22 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
     writer.set("x-datadog-tags", encoded_trace_tags);
   }
 
-  if (injection_styles_.datadog) {
-    writer.set("x-datadog-trace-id", std::to_string(span.trace_id));
-    writer.set("x-datadog-parent-id", std::to_string(span.span_id));
-    writer.set("x-datadog-sampling-priority",
-               std::to_string(sampling_priority));
-  }
-
-  if (injection_styles_.b3) {
-    writer.set("x-b3-traceid", hex(span.trace_id));
-    writer.set("x-b3-spanid", hex(span.span_id));
-    writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
+  for (const auto style : injection_styles_) {
+    switch (style) {
+      case PropagationStyle::DATADOG:
+        writer.set("x-datadog-trace-id", std::to_string(span.trace_id));
+        writer.set("x-datadog-parent-id", std::to_string(span.span_id));
+        writer.set("x-datadog-sampling-priority",
+                   std::to_string(sampling_priority));
+        break;
+      case PropagationStyle::B3:
+        writer.set("x-b3-traceid", hex(span.trace_id));
+        writer.set("x-b3-spanid", hex(span.span_id));
+        writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
+        break;
+      case PropagationStyle::NONE:
+        break;
+    }
   }
 }
 

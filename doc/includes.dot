@@ -75,7 +75,7 @@ digraph G {
 	node73 [label="version.cpp"];
 	node74 [label="span_matcher.h"];
 	node75 [label="span_sampler_config.h"];
-	node76 [label="propagation_styles.cpp"];
+	node76 [label="propagation_style.cpp"];
 	node77 [label="dict_reader.h"];
 	node78 [label="span_matcher.cpp"];
 	node79 [label="default_http_client_curl.cpp"];
@@ -84,7 +84,7 @@ digraph G {
 	node82 [label="clock.cpp"];
 	node83 [label="collector_response.cpp"];
 	node84 [label="sampling_priority.h"];
-	node85 [label="propagation_styles.h"];
+	node85 [label="propagation_style.h"];
 	node86 [label="limiter.cpp"];
 	node87 [label="net_util.h"];
 	node88 [label="error.cpp"];

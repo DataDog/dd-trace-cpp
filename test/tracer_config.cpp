@@ -1,6 +1,6 @@
 #include <datadog/id_generator.h>
 #include <datadog/optional.h>
-#include <datadog/propagation_styles.h>
+#include <datadog/propagation_style.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
@@ -31,7 +31,7 @@ namespace datadog {
 namespace tracing {
 
 std::ostream& operator<<(std::ostream& stream,
-                         const PropagationStyles& styles) {
+                         const std::vector<PropagationStyle>& styles) {
   stream << '{';
   const char* separator = "";
   if (styles.datadog) {
@@ -1053,7 +1053,8 @@ TEST_CASE("TracerConfig propagation styles") {
           int line;
           std::string env_value;
           Optional<Error::Code> expected_error;
-          PropagationStyles expected_styles = PropagationStyles{};
+          std::vector<PropagationStyle> expected_styles =
+              std::vector<PropagationStyle>{};
         };
 
         // clang-format off

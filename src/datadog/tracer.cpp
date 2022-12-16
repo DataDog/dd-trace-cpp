@@ -168,27 +168,6 @@ struct ExtractedData {
   Optional<int> sampling_priority;
 };
 
-bool operator!=(const ExtractedData& left, const ExtractedData& right) {
-  return left.trace_id != right.trace_id || left.parent_id != right.parent_id ||
-         left.origin != right.origin || left.trace_tags != right.trace_tags ||
-         left.sampling_priority != right.sampling_priority;
-}
-
-nlohmann::json to_json(const ExtractedData& data) {
-  auto result = nlohmann::json::object({});
-#define ADD_FIELD(FIELD)          \
-  if (data.FIELD) {               \
-    result[#FIELD] = *data.FIELD; \
-  }
-  ADD_FIELD(trace_id)
-  ADD_FIELD(parent_id)
-  ADD_FIELD(origin)
-  ADD_FIELD(trace_tags)
-  ADD_FIELD(sampling_priority)
-#undef ADD_FIELD
-  return result;
-}
-
 Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
                                      const DictReader& reader) {
   ExtractedData extracted_data;
@@ -226,8 +205,8 @@ void log_startup_message(Logger& logger, StringView tracer_version_string,
                          const SpanDefaults& defaults,
                          const TraceSampler& trace_sampler,
                          const SpanSampler& span_sampler,
-                         const PropagationStyles& injection_styles,
-                         const PropagationStyles& extraction_styles,
+                         const std::vector<PropagationStyle>& injection_styles,
+                         const std::vector<PropagationStyle>& extraction_styles,
                          const Optional<std::string>& hostname,
                          std::size_t tags_header_max_size) {
   // clang-format off
@@ -315,52 +294,38 @@ Expected<Span> Tracer::extract_span(const DictReader& reader) {
 
 Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
-  assert(extraction_styles_.datadog || extraction_styles_.b3);
+  assert(!extraction_styles_.empty());
 
-  Optional<ExtractedData> extracted_data;
-  const char* extracted_by;
+  ExtractedData extracted_data;
 
-  if (extraction_styles_.datadog) {
-    DatadogExtractionPolicy extract;
-    auto data = extract_data(extract, reader);
+  for (const auto style : extraction_styles_) {
+    DatadogExtractionPolicy extract_datadog;
+    B3ExtractionPolicy extract_b3;
+    ExtractionPolicy* extract;
+    switch (style) {
+      case PropagationStyle::DATADOG:
+        extract = &extract_datadog;
+        break;
+      case PropagationStyle::B3:
+        extract = &extract_b3;
+        break;
+      default:
+        assert(style == PropagationStyle::NONE);
+        extracted_data = ExtractedData{};
+        continue;
+    }
+    auto data = extract_data(*extract, reader);
     if (auto* error = data.if_error()) {
       return std::move(*error);
     }
     extracted_data = *data;
-    extracted_by = "Datadog";
-  }
-
-  if (extraction_styles_.b3) {
-    B3ExtractionPolicy extract;
-    auto data = extract_data(extract, reader);
-    if (auto* error = data.if_error()) {
-      return std::move(*error);
+    if (extracted_data.trace_id) {
+      break;
     }
-    if (extracted_data && *data != *extracted_data) {
-      std::string message;
-      message += "B3 extracted different data than did ";
-      message += extracted_by;
-      message += ".  B3 extracted ";
-      message += to_json(*data).dump();
-      message += " while previously ";
-      message += extracted_by;
-      message += " extracted ";
-      message += to_json(*extracted_data).dump();
-      message += '.';
-      return Error{Error::INCONSISTENT_EXTRACTION_STYLES, std::move(message)};
-    }
-    extracted_data = *data;
-    extracted_by = "B3";
   }
 
-  if (extraction_styles_.none && !extracted_data) {
-    extracted_data.emplace();
-    extracted_by = "none";
-  }
-
-  assert(extracted_data);
   auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] =
-      *extracted_data;
+      extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:

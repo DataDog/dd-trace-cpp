@@ -1,6 +1,7 @@
 #include "tracer_config.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <cstddef>
 #include <string>
@@ -68,19 +69,37 @@ std::vector<StringView> parse_list(StringView input) {
   return items;
 }
 
-Expected<PropagationStyles> parse_propagation_styles(StringView input) {
-  PropagationStyles styles{false, false};
+Expected<std::vector<PropagationStyle>> parse_propagation_styles(
+    StringView input) {
+  std::vector<PropagationStyle> styles;
+
+  const auto last_is_duplicate = [&]() -> Optional<Error> {
+    assert(!styles.empty());
+
+    const auto dupe =
+        std::find(styles.begin(), styles.end() - 1, styles.back());
+    if (dupe == styles.end()) {
+      return nullopt;  // no duplicate
+    }
+
+    std::string message;
+    message += "The propagation style ";
+    message += to_json(styles.back()).dump();
+    message += " is duplicated in: ";
+    append(message, input);
+    return Error{Error::DUPLICATE_PROPAGATION_STYLE, std::move(message)};
+  };
 
   // Style names are separated by spaces, or a comma, or some combination.
   for (const StringView &item : parse_list(input)) {
     auto token = std::string(item);
     to_lower(token);
     if (token == "datadog") {
-      styles.datadog = true;
+      styles.push_back(PropagationStyle::DATADOG);
     } else if (token == "b3" || token == "b3multi") {
-      styles.b3 = true;
+      styles.push_back(PropagationStyle::B3);
     } else if (token == "none") {
-      styles.none = true;
+      styles.push_back(PropagationStyle::NONE);
     } else {
       std::string message;
       message += "Unsupported propagation style \"";
@@ -89,6 +108,10 @@ Expected<PropagationStyles> parse_propagation_styles(StringView input) {
       append(message, input);
       message += "\".  The following styles are supported: Datadog, B3.";
       return Error{Error::UNKNOWN_PROPAGATION_STYLE, std::move(message)};
+    }
+
+    if (auto maybe_error = last_is_duplicate()) {
+      return *maybe_error;
     }
   }
 
@@ -122,10 +145,11 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
   return tags;
 }
 
-// Return a `PropagationStyles` parsed from the specified `env_var`.
-// If `env_var` is not in the environment, return `nullopt`.
-// If an error occurs, throw an `Error`.
-Optional<PropagationStyles> styles_from_env(environment::Variable env_var) {
+// Return a `std::vector<PropagationStyle>` parsed from the specified `env_var`.
+// If `env_var` is not in the environment, return `nullopt`. If an error occurs,
+// throw an `Error`.
+Optional<std::vector<PropagationStyle>> styles_from_env(
+    environment::Variable env_var) {
   const auto styles_env = lookup(env_var);
   if (!styles_env) {
     return {};
@@ -236,13 +260,11 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
     return std::move(error);
   }
 
-  if (!result.extraction_styles.datadog && !result.extraction_styles.b3 &&
-      !result.extraction_styles.none) {
+  if (result.extraction_styles.empty()) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
                  "At least one extraction style must be specified."};
   }
-  if (!result.injection_styles.datadog && !result.injection_styles.b3 &&
-      !result.injection_styles.none) {
+  if (result.injection_styles.empty()) {
     return Error{Error::MISSING_SPAN_INJECTION_STYLE,
                  "At least one injection style must be specified."};
   }

@@ -34,8 +34,8 @@ class Tracer {
   IDGenerator generator_;
   Clock clock_;
   std::shared_ptr<const SpanDefaults> defaults_;
-  PropagationStyles injection_styles_;
-  PropagationStyles extraction_styles_;
+  std::vector<PropagationStyle> injection_styles_;
+  std::vector<PropagationStyle> extraction_styles_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
 

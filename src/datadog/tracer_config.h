@@ -7,11 +7,12 @@
 #include <cstddef>
 #include <memory>
 #include <variant>
+#include <vector>
 
 #include "datadog_agent_config.h"
 #include "error.h"
 #include "expected.h"
-#include "propagation_styles.h"
+#include "propagation_style.h"
 #include "span_defaults.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
@@ -59,16 +60,20 @@ struct TracerConfig {
 
   // `injection_styles` indicates with which tracing systems trace propagation
   // will be compatible when injecting (sending) trace context.
+  // All styles indicated by `injection_styles` are used for injection.
   // `injection_styles` is overridden by the `DD_TRACE_PROPAGATION_STYLE_INJECT`
   // and `DD_TRACE_PROPAGATION_STYLE` environment variables.
-  PropagationStyles injection_styles;
+  std::vector<PropagationStyle> injection_styles;
 
   // `extraction_styles` indicates with which tracing systems trace propagation
   // will be compatible when extracting (receiving) trace context.
+  // Extraction styles are applied in the order in which they appear in
+  // `extraction_styles`. The first style that produces trace context or
+  // produces an error determines the result of extraction.
   // `extraction_styles` is overridden by the
   // `DD_TRACE_PROPAGATION_STYLE_EXTRACT` and `DD_TRACE_PROPAGATION_STYLE`
   // environment variables.
-  PropagationStyles extraction_styles;
+  std::vector<PropagationStyle> extraction_styles;
 
   // `report_hostname` indicates whether the tracer will include the result of
   // `gethostname` with traces sent to the collector.
@@ -110,8 +115,8 @@ class FinalizedTracerConfig {
   FinalizedTraceSamplerConfig trace_sampler;
   FinalizedSpanSamplerConfig span_sampler;
 
-  PropagationStyles injection_styles;
-  PropagationStyles extraction_styles;
+  std::vector<PropagationStyle> injection_styles;
+  std::vector<PropagationStyle> extraction_styles;
 
   bool report_hostname;
   std::size_t tags_header_size;
