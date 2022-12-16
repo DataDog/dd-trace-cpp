@@ -57,7 +57,7 @@ auto value_or(Value&& value) {
 
 template <typename Value, typename... Rest>
 auto value_or(Optional<Value> maybe, Rest&&... rest) {
-  return maybe.value_or(value_or(rest...));
+  return maybe.value_or(value_or(std::forward<Rest>(rest)...));
 }
 
 }  // namespace tracing

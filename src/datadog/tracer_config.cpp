@@ -145,7 +145,7 @@ Optional<PropagationStyles> styles_from_env(environment::Variable env_var) {
 std::string json_quoted(StringView text) {
   std::string unquoted;
   assign(unquoted, text);
-  return nlohmann::json(unquoted).dump();
+  return nlohmann::json(std::move(unquoted)).dump();
 }
 
 Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
