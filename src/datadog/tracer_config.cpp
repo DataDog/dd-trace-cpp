@@ -78,7 +78,7 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
 
     const auto dupe =
         std::find(styles.begin(), styles.end() - 1, styles.back());
-    if (dupe == styles.end()) {
+    if (dupe == styles.end() - 1) {
       return nullopt;  // no duplicate
     }
 

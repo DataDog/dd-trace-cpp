@@ -30,19 +30,8 @@
 namespace datadog {
 namespace tracing {
 
-std::ostream& operator<<(std::ostream& stream,
-                         const std::vector<PropagationStyle>& styles) {
-  stream << '{';
-  const char* separator = "";
-  if (styles.datadog) {
-    stream << "Datadog";
-    separator = ", ";
-  }
-  if (styles.b3) {
-    stream << separator << "B3";
-    separator = ", ";
-  }
-  return stream << '}';
+std::ostream& operator<<(std::ostream& stream, PropagationStyle style) {
+  return stream << to_json(style).dump();
 }
 
 }  // namespace tracing
@@ -991,26 +980,24 @@ TEST_CASE("TracerConfig propagation styles") {
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
-    REQUIRE(!finalized->injection_styles.datadog);
-    REQUIRE(finalized->injection_styles.b3);
-    REQUIRE(!finalized->injection_styles.none);
+    const std::vector<PropagationStyle> expected_styles = {
+        PropagationStyle::B3};
 
-    REQUIRE(!finalized->extraction_styles.datadog);
-    REQUIRE(finalized->extraction_styles.b3);
-    REQUIRE(!finalized->extraction_styles.none);
+    REQUIRE(finalized->injection_styles == expected_styles);
+    REQUIRE(finalized->extraction_styles == expected_styles);
   }
 
   SECTION("injection_styles") {
     SECTION("defaults to just Datadog") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->injection_styles.datadog);
-      REQUIRE(!finalized->injection_styles.b3);
+      const std::vector<PropagationStyle> expected_styles = {
+          PropagationStyle::DATADOG};
+      REQUIRE(finalized->injection_styles == expected_styles);
     }
 
     SECTION("need at least one") {
-      config.injection_styles.datadog = false;
-      config.injection_styles.b3 = false;
+      config.injection_styles.clear();
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_INJECTION_STYLE);
@@ -1021,9 +1008,9 @@ TEST_CASE("TracerConfig propagation styles") {
         const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_INJECT", "B3"};
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
-        REQUIRE(!finalized->injection_styles.datadog);
-        REQUIRE(finalized->injection_styles.b3);
-        REQUIRE(!finalized->injection_styles.none);
+        const std::vector<PropagationStyle> expected_styles = {
+            PropagationStyle::B3};
+        REQUIRE(finalized->injection_styles == expected_styles);
       }
 
       SECTION("overrides DD_PROPAGATION_STYLE_INJECT") {
@@ -1032,9 +1019,9 @@ TEST_CASE("TracerConfig propagation styles") {
         config.logger = std::make_shared<MockLogger>();  // suppress warning
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
-        REQUIRE(!finalized->injection_styles.datadog);
-        REQUIRE(finalized->injection_styles.b3);
-        REQUIRE(!finalized->injection_styles.none);
+        const std::vector<PropagationStyle> expected_styles = {
+            PropagationStyle::B3};
+        REQUIRE(finalized->injection_styles == expected_styles);
       }
 
       SECTION("overrides DD_TRACE_PROPAGATION_STYLE") {
@@ -1043,9 +1030,9 @@ TEST_CASE("TracerConfig propagation styles") {
         config.logger = std::make_shared<MockLogger>();  // suppress warning
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
-        REQUIRE(!finalized->injection_styles.datadog);
-        REQUIRE(finalized->injection_styles.b3);
-        REQUIRE(!finalized->injection_styles.none);
+        const std::vector<PropagationStyle> expected_styles = {
+            PropagationStyle::B3};
+        REQUIRE(finalized->injection_styles == expected_styles);
       }
 
       SECTION("parsing") {
@@ -1053,30 +1040,32 @@ TEST_CASE("TracerConfig propagation styles") {
           int line;
           std::string env_value;
           Optional<Error::Code> expected_error;
-          std::vector<PropagationStyle> expected_styles =
-              std::vector<PropagationStyle>{};
+          std::vector<PropagationStyle> expected_styles = {};
         };
 
+        // brevity
+        const auto datadog = PropagationStyle::DATADOG,
+                   b3 = PropagationStyle::B3, none = PropagationStyle::NONE;
         // clang-format off
         auto test_case = GENERATE(values<TestCase>({
-          {__LINE__, "Datadog", x, {true, false, false}},
-          {__LINE__, "DaTaDoG", x, {true, false, false}},
-          {__LINE__, "B3", x, {false, true, false}},
-          {__LINE__, "b3", x, {false, true, false}},
-          {__LINE__, "b3MULTI", x, {false, true, false}},
-          {__LINE__, "b3, b3multi", x, {false, true, false}},
-          {__LINE__, "Datadog B3", x, {true, true, false}},
-          {__LINE__, "Datadog B3 none", x, {true, true, true}},
-          {__LINE__, "NONE", x, {false, false, true}},
-          {__LINE__, "B3 Datadog", x, {true, true, false}},
-          {__LINE__, "b3 datadog", x, {true, true, false}},
-          {__LINE__, "b3, datadog", x, {true, true, false}},
-          {__LINE__, "b3,datadog", x, {true, true, false}},
-          {__LINE__, "b3,             datadog", x, {true, true, false}},
+          {__LINE__, "Datadog", x, {datadog}},
+          {__LINE__, "DaTaDoG", x, {datadog}},
+          {__LINE__, "B3", x, {b3}},
+          {__LINE__, "b3", x, {b3}},
+          {__LINE__, "b3MULTI", x, {b3}},
+          {__LINE__, "b3, b3multi", Error::DUPLICATE_PROPAGATION_STYLE  },
+          {__LINE__, "Datadog B3", x, {datadog, b3}},
+          {__LINE__, "Datadog B3 none", x, {datadog, b3, none}},
+          {__LINE__, "NONE", x, {none}},
+          {__LINE__, "B3 Datadog", x, {b3, datadog}},
+          {__LINE__, "b3 datadog", x, {b3, datadog}},
+          {__LINE__, "b3, datadog", x, {b3, datadog}},
+          {__LINE__, "b3,datadog", x, {b3, datadog}},
+          {__LINE__, "b3,             datadog", x, {b3, datadog}},
           {__LINE__, "b3,,datadog", Error::UNKNOWN_PROPAGATION_STYLE},
           {__LINE__, "b3,datadog,w3c", Error::UNKNOWN_PROPAGATION_STYLE},
-          {__LINE__, "b3,datadog,datadog", x, {true, true, false}},
-          {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ", x, {false, true, false}},
+          {__LINE__, "b3,datadog,datadog", Error::DUPLICATE_PROPAGATION_STYLE},
+          {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ", Error::DUPLICATE_PROPAGATION_STYLE},
         }));
         // clang-format on
 
@@ -1091,12 +1080,7 @@ TEST_CASE("TracerConfig propagation styles") {
           REQUIRE(finalized.error().code == *test_case.expected_error);
         } else {
           REQUIRE(finalized);
-          REQUIRE(finalized->injection_styles.datadog ==
-                  test_case.expected_styles.datadog);
-          REQUIRE(finalized->injection_styles.b3 ==
-                  test_case.expected_styles.b3);
-          REQUIRE(finalized->injection_styles.none ==
-                  test_case.expected_styles.none);
+          REQUIRE(finalized->injection_styles == test_case.expected_styles);
         }
       }
     }
@@ -1107,15 +1091,13 @@ TEST_CASE("TracerConfig propagation styles") {
     SECTION("defaults to just Datadog") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->extraction_styles.datadog);
-      REQUIRE(!finalized->extraction_styles.b3);
-      REQUIRE(!finalized->extraction_styles.none);
+      const std::vector<PropagationStyle> expected_styles = {
+          PropagationStyle::DATADOG};
+      REQUIRE(finalized->extraction_styles == expected_styles);
     }
 
     SECTION("need at least one") {
-      config.extraction_styles.datadog = false;
-      config.extraction_styles.b3 = false;
-      config.extraction_styles.none = false;
+      config.extraction_styles.clear();
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_EXTRACTION_STYLE);
@@ -1126,9 +1108,9 @@ TEST_CASE("TracerConfig propagation styles") {
         const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "B3"};
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
-        REQUIRE(!finalized->extraction_styles.datadog);
-        REQUIRE(finalized->extraction_styles.b3);
-        REQUIRE(!finalized->extraction_styles.none);
+        const std::vector<PropagationStyle> expected_styles = {
+            PropagationStyle::B3};
+        REQUIRE(finalized->extraction_styles == expected_styles);
       }
 
       SECTION("overrides DD_PROPAGATION_STYLE_EXTRACT") {
@@ -1137,9 +1119,9 @@ TEST_CASE("TracerConfig propagation styles") {
         config.logger = std::make_shared<MockLogger>();  // suppress warning
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
-        REQUIRE(!finalized->extraction_styles.datadog);
-        REQUIRE(finalized->extraction_styles.b3);
-        REQUIRE(!finalized->extraction_styles.none);
+        const std::vector<PropagationStyle> expected_styles = {
+            PropagationStyle::B3};
+        REQUIRE(finalized->extraction_styles == expected_styles);
       }
 
       SECTION("overrides DD_TRACE_PROPAGATION_STYLE") {
@@ -1148,9 +1130,9 @@ TEST_CASE("TracerConfig propagation styles") {
         config.logger = std::make_shared<MockLogger>();  // suppress warning
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
-        REQUIRE(!finalized->extraction_styles.datadog);
-        REQUIRE(finalized->extraction_styles.b3);
-        REQUIRE(!finalized->extraction_styles.none);
+        const std::vector<PropagationStyle> expected_styles = {
+            PropagationStyle::B3};
+        REQUIRE(finalized->extraction_styles == expected_styles);
       }
 
       // It's the same as for injection styles, so let's omit most of the

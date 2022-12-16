@@ -375,9 +375,7 @@ TEST_CASE("injection") {
   config.defaults.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
   config.logger = std::make_shared<MockLogger>();
-  config.injection_styles.datadog = true;
-  config.injection_styles.b3 = true;
-  config.injection_styles.none = false;
+  config.injection_styles = {PropagationStyle::DATADOG, PropagationStyle::B3};
 
   auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);
@@ -455,9 +453,7 @@ TEST_CASE("injection can be disabled using the \"none\" style") {
   config.defaults.name = "spanny";
   config.collector = std::make_shared<MockCollector>();
   config.logger = std::make_shared<MockLogger>();
-  config.injection_styles.datadog = false;
-  config.injection_styles.b3 = false;
-  config.injection_styles.none = true;  // this one
+  config.injection_styles = {PropagationStyle::NONE};
 
   const auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);
