@@ -24,141 +24,31 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-class ExtractionPolicy {
- public:
-  virtual Expected<Optional<std::uint64_t>> trace_id(
-      const DictReader& headers) = 0;
-  virtual Expected<Optional<std::uint64_t>> parent_id(
-      const DictReader& headers) = 0;
-  virtual Expected<Optional<int>> sampling_priority(
-      const DictReader& headers) = 0;
-  virtual Optional<std::string> origin(const DictReader& headers) = 0;
-  virtual Optional<std::string> trace_tags(const DictReader&) = 0;
-};
-
-class DatadogExtractionPolicy : public ExtractionPolicy {
-  Expected<Optional<std::uint64_t>> id(const DictReader& headers,
-                                       StringView header, StringView kind) {
-    auto found = headers.lookup(header);
-    if (!found) {
-      return nullopt;
-    }
-    auto result = parse_uint64(*found, 10);
-    if (auto* error = result.if_error()) {
-      std::string prefix;
-      prefix += "Could not extract Datadog-style ";
-      append(prefix, kind);
-      prefix += "ID from ";
-      append(prefix, header);
-      prefix += ": ";
-      append(prefix, *found);
-      prefix += ' ';
-      return error->with_prefix(prefix);
-    }
-    return *result;
-  }
-
- public:
-  Expected<Optional<std::uint64_t>> trace_id(
-      const DictReader& headers) override {
-    return id(headers, "x-datadog-trace-id", "trace");
-  }
-
-  Expected<Optional<std::uint64_t>> parent_id(
-      const DictReader& headers) override {
-    return id(headers, "x-datadog-parent-id", "parent span");
-  }
-
-  Expected<Optional<int>> sampling_priority(
-      const DictReader& headers) override {
-    const StringView header = "x-datadog-sampling-priority";
-    auto found = headers.lookup(header);
-    if (!found) {
-      return nullopt;
-    }
-    auto result = parse_int(*found, 10);
-    if (auto* error = result.if_error()) {
-      std::string prefix;
-      prefix += "Could not extract Datadog-style sampling priority from ";
-      append(prefix, header);
-      prefix += ": ";
-      append(prefix, *found);
-      prefix += ' ';
-      return error->with_prefix(prefix);
-    }
-    return *result;
-  }
-
-  Optional<std::string> origin(const DictReader& headers) override {
-    auto found = headers.lookup("x-datadog-origin");
-    if (found) {
-      return std::string(*found);
-    }
+Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
+                                                    StringView header,
+                                                    StringView header_kind,
+                                                    StringView style_name,
+                                                    int base) {
+  auto found = headers.lookup(header);
+  if (!found) {
     return nullopt;
   }
-
-  Optional<std::string> trace_tags(const DictReader& headers) override {
-    auto found = headers.lookup("x-datadog-tags");
-    if (found) {
-      return std::string(*found);
-    }
-    return nullopt;
+  auto result = parse_uint64(*found, base);
+  if (auto* error = result.if_error()) {
+    std::string prefix;
+    prefix += "Could not extract ";
+    append(prefix, style_name);
+    prefix += "-style ";
+    append(prefix, header_kind);
+    prefix += "ID from ";
+    append(prefix, header);
+    prefix += ": ";
+    append(prefix, *found);
+    prefix += ' ';
+    return error->with_prefix(prefix);
   }
-};
-
-class B3ExtractionPolicy : public DatadogExtractionPolicy {
-  Expected<Optional<std::uint64_t>> id(const DictReader& headers,
-                                       StringView header, StringView kind) {
-    auto found = headers.lookup(header);
-    if (!found) {
-      return nullopt;
-    }
-    auto result = parse_uint64(*found, 16);
-    if (auto* error = result.if_error()) {
-      std::string prefix;
-      prefix += "Could not extract B3-style ";
-      append(prefix, kind);
-      prefix += "ID from ";
-      append(prefix, header);
-      prefix += ": ";
-      append(prefix, *found);
-      prefix += ' ';
-      return error->with_prefix(prefix);
-    }
-    return *result;
-  }
-
- public:
-  Expected<Optional<std::uint64_t>> trace_id(
-      const DictReader& headers) override {
-    return id(headers, "x-b3-traceid", "trace");
-  }
-
-  Expected<Optional<std::uint64_t>> parent_id(
-      const DictReader& headers) override {
-    return id(headers, "x-b3-spanid", "parent span");
-  }
-
-  Expected<Optional<int>> sampling_priority(
-      const DictReader& headers) override {
-    const StringView header = "x-b3-sampled";
-    auto found = headers.lookup(header);
-    if (!found) {
-      return nullopt;
-    }
-    auto result = parse_int(*found, 10);
-    if (auto* error = result.if_error()) {
-      std::string prefix;
-      prefix += "Could not extract B3-style sampling priority from ";
-      append(prefix, header);
-      prefix += ": ";
-      append(prefix, *found);
-      prefix += ' ';
-      return error->with_prefix(prefix);
-    }
-    return *result;
-  }
-};
+  return *result;
+}
 
 struct ExtractedData {
   Optional<std::uint64_t> trace_id;
@@ -168,36 +58,94 @@ struct ExtractedData {
   Optional<int> sampling_priority;
 };
 
-Expected<ExtractedData> extract_data(ExtractionPolicy& extract,
-                                     const DictReader& reader) {
-  ExtractedData extracted_data;
+Expected<ExtractedData> extract_datadog(const DictReader& headers) {
+  ExtractedData result;
 
-  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] =
-      extracted_data;
-
-  auto maybe_trace_id = extract.trace_id(reader);
-  if (auto* error = maybe_trace_id.if_error()) {
+  auto trace_id =
+      extract_id_header(headers, "x-datadog-trace-id", "trace", "Datadog", 10);
+  if (auto* error = trace_id.if_error()) {
     return std::move(*error);
   }
-  trace_id = *maybe_trace_id;
+  result.trace_id = *trace_id;
 
-  origin = extract.origin(reader);
-
-  auto maybe_parent_id = extract.parent_id(reader);
-  if (auto* error = maybe_parent_id.if_error()) {
+  auto parent_id = extract_id_header(headers, "x-datadog-parent-id",
+                                     "parent span", "Datadog", 10);
+  if (auto* error = parent_id.if_error()) {
     return std::move(*error);
   }
-  parent_id = *maybe_parent_id;
+  result.parent_id = *parent_id;
 
-  auto maybe_sampling_priority = extract.sampling_priority(reader);
-  if (auto* error = maybe_sampling_priority.if_error()) {
+  const StringView sampling_priority_header = "x-datadog-sampling-priority";
+  if (auto found = headers.lookup(sampling_priority_header)) {
+    auto sampling_priority = parse_int(*found, 10);
+    if (auto* error = sampling_priority.if_error()) {
+      std::string prefix;
+      prefix += "Could not extract Datadog-style sampling priority from ";
+      append(prefix, sampling_priority_header);
+      prefix += ": ";
+      append(prefix, *found);
+      prefix += ' ';
+      return error->with_prefix(prefix);
+    }
+    result.sampling_priority = *sampling_priority;
+  }
+
+  auto origin = headers.lookup("x-datadog-origin");
+  if (origin) {
+    result.origin = *origin;
+  }
+
+  auto trace_tags = headers.lookup("x-datadog-tags");
+  if (trace_tags) {
+    result.trace_tags = *trace_tags;
+  }
+
+  return result;
+}
+
+Expected<ExtractedData> extract_b3(const DictReader& headers) {
+  ExtractedData result;
+
+  auto trace_id = extract_id_header(headers, "x-b3-traceid", "trace", "B3", 16);
+  if (auto* error = trace_id.if_error()) {
     return std::move(*error);
   }
-  sampling_priority = *maybe_sampling_priority;
+  result.trace_id = *trace_id;
 
-  trace_tags = extract.trace_tags(reader);
+  auto parent_id =
+      extract_id_header(headers, "x-b3-spanid", "parent span", "B3", 16);
+  if (auto* error = parent_id.if_error()) {
+    return std::move(*error);
+  }
+  result.parent_id = *parent_id;
 
-  return extracted_data;
+  const StringView sampling_priority_header = "x-b3-sampled";
+  if (auto found = headers.lookup(sampling_priority_header)) {
+    auto sampling_priority = parse_int(*found, 10);
+    if (auto* error = sampling_priority.if_error()) {
+      std::string prefix;
+      prefix += "Could not extract B3-style sampling priority from ";
+      append(prefix, sampling_priority_header);
+      prefix += ": ";
+      append(prefix, *found);
+      prefix += ' ';
+      return error->with_prefix(prefix);
+    }
+    result.sampling_priority = *sampling_priority;
+  }
+
+  // Origin and trace tags are still extracted, but from the Datadog headers.
+  auto origin = headers.lookup("x-datadog-origin");
+  if (origin) {
+    result.origin = *origin;
+  }
+
+  auto trace_tags = headers.lookup("x-datadog-tags");
+  if (trace_tags) {
+    result.trace_tags = *trace_tags;
+  }
+
+  return result;
 }
 
 void log_startup_message(Logger& logger, StringView tracer_version_string,
@@ -299,9 +247,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   ExtractedData extracted_data;
 
   for (const auto style : extraction_styles_) {
-    DatadogExtractionPolicy extract_datadog;
-    B3ExtractionPolicy extract_b3;
-    ExtractionPolicy* extract;
+    using Extractor = decltype(&extract_datadog);  // function pointer
+    Extractor extract;
     switch (style) {
       case PropagationStyle::DATADOG:
         extract = &extract_datadog;
@@ -314,11 +261,14 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         extracted_data = ExtractedData{};
         continue;
     }
-    auto data = extract_data(*extract, reader);
+    auto data = extract(reader);
     if (auto* error = data.if_error()) {
       return std::move(*error);
     }
     extracted_data = *data;
+    // If the extractor produced a non-null trace ID, then we consider this
+    // extraction style the one "chosen" for this trace.
+    // Otherwise, we loop around to the next configured extraction style.
     if (extracted_data.trace_id) {
       break;
     }
