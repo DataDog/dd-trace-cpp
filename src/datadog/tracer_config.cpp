@@ -94,10 +94,15 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
   for (const StringView &item : parse_list(input)) {
     auto token = std::string(item);
     to_lower(token);
+    // Note: Make sure that these strings are consistent (modulo case) with
+    // `to_json(PropagationStyle)` in `propagation_style.cpp`.
     if (token == "datadog") {
       styles.push_back(PropagationStyle::DATADOG);
     } else if (token == "b3" || token == "b3multi") {
       styles.push_back(PropagationStyle::B3);
+    } else if (token ==
+               "tracecontext") {  // for compatibility with OpenTelemetry
+      styles.push_back(PropagationStyle::W3C);
     } else if (token == "none") {
       styles.push_back(PropagationStyle::NONE);
     } else {

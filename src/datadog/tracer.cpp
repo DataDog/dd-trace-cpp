@@ -148,6 +148,13 @@ Expected<ExtractedData> extract_b3(const DictReader& headers) {
   return result;
 }
 
+Expected<ExtractedData> extract_w3c(const DictReader& headers) {
+  ExtractedData result;
+  // TODO
+  (void)headers;
+  return result;
+}
+
 void log_startup_message(Logger& logger, StringView tracer_version_string,
                          const Collector& collector,
                          const SpanDefaults& defaults,
@@ -255,6 +262,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         break;
       case PropagationStyle::B3:
         extract = &extract_b3;
+        break;
+      case PropagationStyle::W3C:
+        extract = &extract_w3c;
         break;
       default:
         assert(style == PropagationStyle::NONE);

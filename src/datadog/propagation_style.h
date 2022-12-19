@@ -17,6 +17,8 @@ enum class PropagationStyle {
   DATADOG,
   // B3 multi-header style, e.g. X-B3-TraceID
   B3,
+  // W3C headers style, i.e. traceparent and tracestate
+  W3C,
   // The absence of propagation.  If this is the only style set, then
   // propagation is disabled in the relevant direction (extraction or
   // injection).

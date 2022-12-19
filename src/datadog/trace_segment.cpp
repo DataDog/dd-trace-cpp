@@ -261,7 +261,11 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         writer.set("x-b3-spanid", hex(span.span_id));
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
         break;
-      case PropagationStyle::NONE:
+      case PropagationStyle::W3C:
+        // TODO
+        break;
+      default:
+        assert(style == PropagationStyle::NONE);
         break;
     }
   }
