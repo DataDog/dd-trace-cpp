@@ -92,12 +92,12 @@ Expected<ExtractedData> extract_datadog(const DictReader& headers) {
 
   auto origin = headers.lookup("x-datadog-origin");
   if (origin) {
-    result.origin = *origin;
+    result.origin = std::string(*origin);
   }
 
   auto trace_tags = headers.lookup("x-datadog-tags");
   if (trace_tags) {
-    result.trace_tags = *trace_tags;
+    result.trace_tags = std::string(*trace_tags);
   }
 
   return result;
@@ -137,12 +137,12 @@ Expected<ExtractedData> extract_b3(const DictReader& headers) {
   // Origin and trace tags are still extracted, but from the Datadog headers.
   auto origin = headers.lookup("x-datadog-origin");
   if (origin) {
-    result.origin = *origin;
+    result.origin = std::string(*origin);
   }
 
   auto trace_tags = headers.lookup("x-datadog-tags");
   if (trace_tags) {
-    result.trace_tags = *trace_tags;
+    result.trace_tags = std::string(*trace_tags);
   }
 
   return result;
