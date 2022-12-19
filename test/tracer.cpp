@@ -259,155 +259,82 @@ TEST_CASE("span extraction") {
   SECTION("extraction failures") {
     struct TestCase {
       std::string name;
-      bool extract_datadog;
-      bool extract_b3;
+      std::vector<PropagationStyle> extraction_styles;
       std::unordered_map<std::string, std::string> headers;
       // Null means "don't expect an error."
       Optional<Error::Code> expected_error;
     };
 
     auto test_case = GENERATE(values<TestCase>({
-        {"no span", true, false, {}, Error::NO_SPAN_TO_EXTRACT},
+        {"no span", {PropagationStyle::DATADOG}, {}, Error::NO_SPAN_TO_EXTRACT},
         {"missing trace ID",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "456"}},
          Error::MISSING_TRACE_ID},
         {"missing parent span ID",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}},
          Error::MISSING_PARENT_SPAN_ID},
         {"missing parent span ID, but it's ok because origin",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-origin", "anything"}},
          nullopt},
-        {"datadog and B3 agree",
-         true,
-         true,
-         {{"x-datadog-trace-id", "15"},
-          {"x-b3-traceid", "f"},
-          {"x-datadog-parent-id", "14"},
-          {"x-b3-spanid", "e"}},
-         nullopt},
-        {"datadog and B3 disagree on trace ID",
-         true,
-         true,
-         {{"x-datadog-trace-id", "15"},
-          {"x-b3-traceid", "f0"},
-          {"x-datadog-parent-id", "14"},
-          {"x-b3-spanid", "e"}},
-         Error::INCONSISTENT_EXTRACTION_STYLES},
-        {"datadog and B3 disagree on trace ID (2)",
-         true,
-         true,
-         {{"x-datadog-trace-id", "15"},
-          {"x-datadog-parent-id", "14"},
-          {"x-b3-spanid", "e"}},
-         Error::INCONSISTENT_EXTRACTION_STYLES},
-        {"datadog and B3 disagree on parent ID",
-         true,
-         true,
-         {{"x-datadog-trace-id", "15"},
-          {"x-b3-traceid", "f"},
-          {"x-datadog-parent-id", "13"},
-          {"x-b3-spanid", "e"}},
-         Error::INCONSISTENT_EXTRACTION_STYLES},
-        {"datadog and B3 disagree on parent ID (2)",
-         true,
-         true,
-         {{"x-datadog-trace-id", "15"},
-          {"x-b3-traceid", "f"},
-          {"x-datadog-parent-id", "13"}},
-         Error::INCONSISTENT_EXTRACTION_STYLES},
-        {"datadog and B3 disagree on sampling priority",
-         true,
-         true,
-         {{"x-datadog-trace-id", "15"},
-          {"x-b3-traceid", "f"},
-          {"x-datadog-parent-id", "14"},
-          {"x-b3-spanid", "e"},
-          {"x-datadog-sampling-priority", "2"},
-          {"x-b3-sampled", "1"}},
-         Error::INCONSISTENT_EXTRACTION_STYLES},
-        {"datadog and B3 disagree on sampling priority (2)",
-         true,
-         true,
-         {{"x-datadog-trace-id", "15"},
-          {"x-b3-traceid", "f"},
-          {"x-datadog-parent-id", "14"},
-          {"x-b3-spanid", "e"},
-          {"x-datadog-sampling-priority", "2"}},
-         Error::INCONSISTENT_EXTRACTION_STYLES},
         {"bad x-datadog-trace-id",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "f"}, {"x-datadog-parent-id", "456"}},
          Error::INVALID_INTEGER},
         {"bad x-datadog-trace-id (2)",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "99999999999999999999999999"},
           {"x-datadog-parent-id", "456"}},
          Error::OUT_OF_RANGE_INTEGER},
         {"bad x-datadog-parent-id",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "f"}, {"x-datadog-trace-id", "456"}},
          Error::INVALID_INTEGER},
         {"bad x-datadog-parent-id (2)",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "99999999999999999999999999"},
           {"x-datadog-trace-id", "456"}},
          Error::OUT_OF_RANGE_INTEGER},
         {"bad x-datadog-sampling-priority",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "123"},
           {"x-datadog-trace-id", "456"},
           {"x-datadog-sampling-priority", "keep"}},
          Error::INVALID_INTEGER},
         {"bad x-datadog-sampling-priority (2)",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "123"},
           {"x-datadog-trace-id", "456"},
           {"x-datadog-sampling-priority", "99999999999999999999999999"}},
          Error::OUT_OF_RANGE_INTEGER},
         {"bad x-b3-traceid",
-         false,
-         true,
+         {PropagationStyle::B3},
          {{"x-b3-traceid", "0xdeadbeef"}, {"x-b3-spanid", "def"}},
          Error::INVALID_INTEGER},
         {"bad x-b3-traceid (2)",
-         false,
-         true,
+         {PropagationStyle::B3},
          {{"x-b3-traceid", "ffffffffffffffffffffffffffffff"},
           {"x-b3-spanid", "def"}},
          Error::OUT_OF_RANGE_INTEGER},
         {"bad x-b3-spanid",
-         false,
-         true,
+         {PropagationStyle::B3},
          {{"x-b3-spanid", "0xdeadbeef"}, {"x-b3-traceid", "def"}},
          Error::INVALID_INTEGER},
         {"bad x-b3-spanid (2)",
-         false,
-         true,
+         {PropagationStyle::B3},
          {{"x-b3-spanid", "ffffffffffffffffffffffffffffff"},
           {"x-b3-traceid", "def"}},
          Error::OUT_OF_RANGE_INTEGER},
         {"bad x-b3-sampled",
-         false,
-         true,
+         {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"},
           {"x-b3-spanid", "def"},
           {"x-b3-sampled", "true"}},
          Error::INVALID_INTEGER},
         {"bad x-b3-sampled (2)",
-         false,
-         true,
+         {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"},
           {"x-b3-spanid", "def"},
           {"x-b3-sampled", "99999999999999999999999999"}},
@@ -416,8 +343,7 @@ TEST_CASE("span extraction") {
 
     CAPTURE(test_case.name);
 
-    config.extraction_styles.datadog = test_case.extract_datadog;
-    config.extraction_styles.b3 = test_case.extract_b3;
+    config.extraction_styles = test_case.extraction_styles;
     auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
@@ -449,8 +375,7 @@ TEST_CASE("span extraction") {
   SECTION("extracted span has the expected properties") {
     struct TestCase {
       std::string name;
-      bool extract_datadog;
-      bool extract_b3;
+      std::vector<PropagationStyle> extraction_styles;
       std::unordered_map<std::string, std::string> headers;
       std::uint64_t expected_trace_id;
       Optional<std::uint64_t> expected_parent_id;
@@ -459,8 +384,7 @@ TEST_CASE("span extraction") {
 
     auto test_case = GENERATE(values<TestCase>({
         {"datadog style",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"},
           {"x-datadog-parent-id", "456"},
           {"x-datadog-sampling-priority", "2"}},
@@ -468,22 +392,19 @@ TEST_CASE("span extraction") {
          456,
          2},
         {"datadog style without sampling priority",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-parent-id", "456"}},
          123,
          456,
          nullopt},
         {"datadog style without sampling priority and without parent ID",
-         true,
-         false,
+         {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-origin", "whatever"}},
          123,
          nullopt,
          nullopt},
         {"B3 style",
-         false,
-         true,
+         {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"},
           {"x-b3-spanid", "def"},
           {"x-b3-sampled", "0"}},
@@ -491,40 +412,48 @@ TEST_CASE("span extraction") {
          0xdef,
          0},
         {"B3 style without sampling priority",
-         false,
-         true,
+         {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"}, {"x-b3-spanid", "def"}},
          0xabc,
          0xdef,
          nullopt},
-        {"Datadog and B3 style together",
-         true,
-         true,
+        {"Datadog overriding B3",
+         {PropagationStyle::DATADOG, PropagationStyle::B3},
          {{"x-datadog-trace-id", "255"},
           {"x-datadog-parent-id", "14"},
           {"x-datadog-sampling-priority", "0"},
-          {"x-b3-traceid", "ff"},
-          {"x-b3-spanid", "e"},
+          {"x-b3-traceid", "fff"},
+          {"x-b3-spanid", "ef"},
           {"x-b3-sampled", "0"}},
          255,
          14,
          0},
-        {"Datadog and B3 style together without sampling priority",
-         true,
-         true,
+        {"Datadog overriding B3, without sampling priority",
+         {PropagationStyle::DATADOG, PropagationStyle::B3},
          {{"x-datadog-trace-id", "255"},
           {"x-datadog-parent-id", "14"},
-          {"x-b3-traceid", "ff"},
-          {"x-b3-spanid", "e"}},
+          {"x-b3-traceid", "fff"},
+          {"x-b3-spanid", "ef"}},
          255,
          14,
+         nullopt},
+        {"B3 after Datadog found no context",
+         {PropagationStyle::DATADOG, PropagationStyle::B3},
+         {{"x-b3-traceid", "ff"}, {"x-b3-spanid", "e"}},
+         0xff,
+         0xe,
+         nullopt},
+        {"Datadog after B3 found no context",
+         {PropagationStyle::B3, PropagationStyle::DATADOG},
+         {{"x-b3-traceid", "fff"}, {"x-b3-spanid", "ef"}},
+         0xfff,
+         0xef,
          nullopt},
     }));
 
     CAPTURE(test_case.name);
 
-    config.extraction_styles.datadog = test_case.extract_datadog;
-    config.extraction_styles.b3 = test_case.extract_b3;
+    config.extraction_styles = test_case.extraction_styles;
     auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
@@ -550,6 +479,29 @@ TEST_CASE("span extraction") {
     CAPTURE(method);
     REQUIRE(span);
     checks(test_case, *span);
+  }
+
+  SECTION("extraction can be disabled using the \"none\" style") {
+    config.extraction_styles = {PropagationStyle::NONE};
+
+    const auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+    const std::unordered_map<std::string, std::string> headers{
+        // It doesn't matter which headers are present.
+        // The "none" extraction style will not inspect them, and will return
+        // the "no span to extract" error.
+        {"X-Datadog-Trace-ID", "foo"},
+        {"X-Datadog-Parent-ID", "bar"},
+        {"X-Datadog-Sampling-Priority", "baz"},
+        {"X-B3-TraceID", "foo"},
+        {"X-B3-SpanID", "bar"},
+        {"X-B3-Sampled", "baz"},
+    };
+    MockDictReader reader{headers};
+    const auto result = tracer.extract_span(reader);
+    REQUIRE(!result);
+    REQUIRE(result.error().code == Error::NO_SPAN_TO_EXTRACT);
   }
 
   SECTION("x-datadog-tags") {

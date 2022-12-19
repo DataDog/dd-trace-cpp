@@ -34,7 +34,7 @@
 
 #include "expected.h"
 #include "optional.h"
-#include "propagation_styles.h"
+#include "propagation_style.h"
 #include "sampling_decision.h"
 
 namespace datadog {
@@ -58,7 +58,7 @@ class TraceSegment {
   std::shared_ptr<SpanSampler> span_sampler_;
 
   std::shared_ptr<const SpanDefaults> defaults_;
-  const PropagationStyles injection_styles_;
+  const std::vector<PropagationStyle> injection_styles_;
   const Optional<std::string> hostname_;
   const Optional<std::string> origin_;
   const std::size_t tags_header_max_size_;
@@ -75,7 +75,7 @@ class TraceSegment {
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
-               const PropagationStyles& injection_styles,
+               const std::vector<PropagationStyle>& injection_styles,
                const Optional<std::string>& hostname,
                Optional<std::string> origin, std::size_t tags_header_max_size,
                std::unordered_map<std::string, std::string> trace_tags,

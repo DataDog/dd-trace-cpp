@@ -33,6 +33,8 @@
 #include <optional>
 #endif  // defined DD_USE_ABSEIL_FOR_ENVOY
 
+#include <utility>  // std::forward
+
 namespace datadog {
 namespace tracing {
 
@@ -45,6 +47,18 @@ template <typename Value>
 using Optional = std::optional<Value>;
 inline constexpr auto nullopt = std::nullopt;
 #endif  // defined DD_USE_ABSEIL_FOR_ENVOY
+
+// Return the first non-null argument value.  The last argument must not be
+// `Optional`.
+template <typename Value>
+auto value_or(Value&& value) {
+  return std::forward<Value>(value);
+}
+
+template <typename Value, typename... Rest>
+auto value_or(Optional<Value> maybe, Rest&&... rest) {
+  return maybe.value_or(value_or(std::forward<Rest>(rest)...));
+}
 
 }  // namespace tracing
 }  // namespace datadog

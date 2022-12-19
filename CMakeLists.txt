@@ -6,6 +6,8 @@ project(dd-trace-cpp)
 
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
 option(BUILD_EXAMPLE "Build the example program (example/)" OFF)
+option(BUILD_TESTING "Build the unit tests (test/)" OFF)
+option(SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
 
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -78,7 +80,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/null_collector.cpp
     src/datadog/optional.cpp
     src/datadog/parse_util.cpp
-    src/datadog/propagation_styles.cpp
+    src/datadog/propagation_style.cpp
     src/datadog/rate.cpp
     src/datadog/sampling_decision.cpp
     src/datadog/sampling_mechanism.cpp
@@ -135,7 +137,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/null_collector.h
   src/datadog/optional.h
   src/datadog/parse_util.h
-  src/datadog/propagation_styles.h
+  src/datadog/propagation_style.h
   src/datadog/rate.h
   src/datadog/sampling_decision.h
   src/datadog/sampling_mechanism.h

@@ -375,8 +375,7 @@ TEST_CASE("injection") {
   config.defaults.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
   config.logger = std::make_shared<MockLogger>();
-  config.injection_styles.datadog = true;
-  config.injection_styles.b3 = true;
+  config.injection_styles = {PropagationStyle::DATADOG, PropagationStyle::B3};
 
   auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);
@@ -446,4 +445,23 @@ TEST_CASE("injection") {
       REQUIRE_THAT(*input, ContainsSubset(*output));
     }
   }
+}
+
+TEST_CASE("injection can be disabled using the \"none\" style") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.defaults.name = "spanny";
+  config.collector = std::make_shared<MockCollector>();
+  config.logger = std::make_shared<MockLogger>();
+  config.injection_styles = {PropagationStyle::NONE};
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const auto span = tracer.create_span();
+  MockDictWriter writer;
+  span.inject(writer);
+  const std::unordered_map<std::string, std::string> empty;
+  REQUIRE(writer.items == empty);
 }
