@@ -19,7 +19,7 @@ test assertions.
 [main.cpp](main.cpp) is the test driver (executable).
 
 All other translation units in this directory are the tests themselves.  For
-example, [span.cpp](span.cpp) contains the tests for the `Span` class and
-associated behavior.
+example, [test_span.cpp](test_span.cpp) contains the tests for the `Span` class
+and associated behavior.
 
 [1]: https://github.com/catchorg/Catch2/tree/v2.x
