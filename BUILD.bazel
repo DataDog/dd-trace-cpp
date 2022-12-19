@@ -16,6 +16,7 @@ cc_library(
     "src/datadog/error.cpp",
     "src/datadog/event_scheduler.cpp",
     "src/datadog/expected.cpp",
+    "src/datadog/extracted_data.cpp",
     "src/datadog/glob.cpp",
     "src/datadog/http_client.cpp",
     "src/datadog/id_generator.cpp",
@@ -49,6 +50,7 @@ cc_library(
     "src/datadog/trace_sampler.cpp",
     "src/datadog/trace_segment.cpp",
     "src/datadog/version.cpp",
+    "src/datadog/w3c_propagation.cpp",
     ],
     hdrs = [
     "src/datadog/cerr_logger.h",
@@ -65,6 +67,7 @@ cc_library(
     "src/datadog/error.h",
     "src/datadog/event_scheduler.h",
     "src/datadog/expected.h",
+    "src/datadog/extracted_data.h",
     "src/datadog/glob.h",
     "src/datadog/http_client.h",
     "src/datadog/id_generator.h",
@@ -100,6 +103,7 @@ cc_library(
     "src/datadog/trace_sampler.h",
     "src/datadog/trace_segment.h",
     "src/datadog/version.h",
+    "src/datadog/w3c_propagation.h",
     ],
     copts = [
         "-Wall",

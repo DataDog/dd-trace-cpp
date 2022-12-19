@@ -6,6 +6,7 @@
 #include "datadog_agent.h"
 #include "dict_reader.h"
 #include "environment.h"
+#include "extracted_data.h"
 #include "json.hpp"
 #include "logger.h"
 #include "net_util.h"
@@ -19,6 +20,7 @@
 #include "trace_sampler.h"
 #include "trace_segment.h"
 #include "version.h"
+#include "w3c_propagation.h"
 
 namespace datadog {
 namespace tracing {
@@ -50,15 +52,9 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
   return *result;
 }
 
-struct ExtractedData {
-  Optional<std::uint64_t> trace_id;
-  Optional<std::uint64_t> parent_id;
-  Optional<std::string> origin;
-  Optional<std::string> trace_tags;
-  Optional<int> sampling_priority;
-};
-
-Expected<ExtractedData> extract_datadog(const DictReader& headers) {
+Expected<ExtractedData> extract_datadog(
+    const DictReader& headers,
+    std::unordered_map<std::string, std::string>& /*span_tags*/) {
   ExtractedData result;
 
   auto trace_id =
@@ -103,7 +99,9 @@ Expected<ExtractedData> extract_datadog(const DictReader& headers) {
   return result;
 }
 
-Expected<ExtractedData> extract_b3(const DictReader& headers) {
+Expected<ExtractedData> extract_b3(
+    const DictReader& headers,
+    std::unordered_map<std::string, std::string>& /*span_tags*/) {
   ExtractedData result;
 
   auto trace_id = extract_id_header(headers, "x-b3-traceid", "trace", "B3", 16);
@@ -145,13 +143,6 @@ Expected<ExtractedData> extract_b3(const DictReader& headers) {
     result.trace_tags = std::string(*trace_tags);
   }
 
-  return result;
-}
-
-Expected<ExtractedData> extract_w3c(const DictReader& headers) {
-  ExtractedData result;
-  // TODO
-  (void)headers;
   return result;
 }
 
@@ -251,6 +242,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
   assert(!extraction_styles_.empty());
 
+  auto span_data = std::make_unique<SpanData>();
   ExtractedData extracted_data;
 
   for (const auto style : extraction_styles_) {
@@ -271,7 +263,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         extracted_data = ExtractedData{};
         continue;
     }
-    auto data = extract(reader);
+    auto data = extract(reader, span_data->tags);
     if (auto* error = data.if_error()) {
       return std::move(*error);
     }
@@ -284,8 +276,13 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     }
   }
 
-  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] =
-      extracted_data;
+  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
+         full_w3c_trace_id_hex, additional_w3c_tracestate,
+         additional_datadog_w3c_tracestate] = extracted_data;
+
+  (void)full_w3c_trace_id_hex;              // TODO
+  (void)additional_w3c_tracestate;          // TODO
+  (void)additional_datadog_w3c_tracestate;  // TODO
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -332,7 +329,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   assert(parent_id);
   assert(trace_id);
 
-  auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
   span_data->span_id = generator_();
   span_data->trace_id = *trace_id;

@@ -70,6 +70,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/error.cpp
     src/datadog/event_scheduler.cpp
     src/datadog/expected.cpp
+    src/datadog/extracted_data.cpp
     src/datadog/glob.cpp
     src/datadog/http_client.cpp
     src/datadog/id_generator.cpp
@@ -103,6 +104,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/trace_sampler.cpp
     src/datadog/trace_segment.cpp
     src/datadog/version.cpp
+    src/datadog/w3c_propagation.cpp
 )
 
 # This library's public headers are just its source headers.
@@ -125,6 +127,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/error.h
   src/datadog/event_scheduler.h
   src/datadog/expected.h
+  src/datadog/extracted_data.h
   src/datadog/glob.h
   src/datadog/http_client.h
   src/datadog/id_generator.h
@@ -160,6 +163,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/trace_sampler.h
   src/datadog/trace_segment.h
   src/datadog/version.h
+  src/datadog/w3c_propagation.h
 )
 
 add_dependencies(dd_trace_cpp curl)
