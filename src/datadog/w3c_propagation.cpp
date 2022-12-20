@@ -34,7 +34,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
       "-"
       "([0-9a-f]{2})"  // hex "trace-flags" (match group 5)
       "(?:$|-.*)";     // either the end, or a hyphen preceding further fields
-  thread_local const std::regex regex{pattern};
+  static const std::regex regex{pattern};
 
   std::match_results<StringView::iterator> match;
   if (!std::regex_match(traceparent.begin(), traceparent.end(), regex)) {
