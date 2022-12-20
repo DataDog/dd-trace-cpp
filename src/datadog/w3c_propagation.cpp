@@ -24,7 +24,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
   const auto traceparent = strip(*maybe_traceparent);
 
   // Note that leading and trailing whitespace was already removed above.
-  // Note that the "zero'th" match group is the entire match.
+  // Note that the match group 0 is the entire match.
   static const auto& pattern =
       "([0-9a-f]{2})"  // hex version number (match group 1)
       "-"
@@ -49,6 +49,10 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
     return StringView{submatch.first,
                       std::size_t(submatch.second - submatch.first)};
   };
+
+  if (to_string_view(match[1]) == "ff") {
+    return "invalid_version";
+  }
 
   result.full_w3c_trace_id_hex = std::string{to_string_view(match[2])};
   if (result.full_w3c_trace_id_hex->find_first_not_of('0') ==

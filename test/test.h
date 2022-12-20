@@ -11,7 +11,9 @@
 #include <datadog/string_view.h>
 
 #include <iosfwd>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "catch.hpp"
@@ -21,9 +23,8 @@ namespace std {
 std::ostream& operator<<(std::ostream& stream,
                          const std::pair<const std::string, std::string>& item);
 
-std::ostream& operator<<(
-    std::ostream& stream,
-    const datadog::tracing::Optional<datadog::tracing::StringView>& item);
+std::ostream& operator<<(std::ostream& stream,
+                         const std::optional<std::string_view>& maybe);
 
 }  // namespace std
 

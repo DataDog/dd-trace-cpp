@@ -50,6 +50,9 @@ TraceSegment::TraceSegment(
     std::size_t tags_header_max_size,
     std::unordered_map<std::string, std::string> trace_tags,
     Optional<SamplingDecision> sampling_decision,
+    Optional<std::string> full_w3c_trace_id_hex,
+    Optional<std::string> additional_w3c_tracestate,
+    Optional<std::string> additional_datadog_w3c_tracestate,
     std::unique_ptr<SpanData> local_root)
     : logger_(logger),
       collector_(collector),
@@ -62,7 +65,11 @@ TraceSegment::TraceSegment(
       tags_header_max_size_(tags_header_max_size),
       trace_tags_(std::move(trace_tags)),
       num_finished_spans_(0),
-      sampling_decision_(std::move(sampling_decision)) {
+      sampling_decision_(std::move(sampling_decision)),
+      full_w3c_trace_id_hex_(std::move(full_w3c_trace_id_hex)),
+      additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
+      additional_datadog_w3c_tracestate_(
+          std::move(additional_datadog_w3c_tracestate)) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);

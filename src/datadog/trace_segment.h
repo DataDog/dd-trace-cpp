@@ -67,6 +67,9 @@ class TraceSegment {
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   Optional<SamplingDecision> sampling_decision_;
+  Optional<std::string> full_w3c_trace_id_hex_;
+  Optional<std::string> additional_w3c_tracestate_;
+  Optional<std::string> additional_datadog_w3c_tracestate_;
   bool awaiting_delegated_sampling_decision_ = false;
 
  public:
@@ -80,6 +83,9 @@ class TraceSegment {
                Optional<std::string> origin, std::size_t tags_header_max_size,
                std::unordered_map<std::string, std::string> trace_tags,
                Optional<SamplingDecision> sampling_decision,
+               Optional<std::string> full_w3c_trace_id_hex,
+               Optional<std::string> additional_w3c_tracestate,
+               Optional<std::string> additional_datadog_w3c_tracestate,
                std::unique_ptr<SpanData> local_root);
 
   const SpanDefaults& defaults() const;

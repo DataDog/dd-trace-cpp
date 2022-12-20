@@ -229,7 +229,9 @@ Span Tracer::create_span(const SpanConfig& config) {
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
       std::unordered_map<std::string, std::string>{} /* trace_tags */,
-      nullopt /* sampling_decision */, std::move(span_data));
+      nullopt /* sampling_decision */, nullopt /* full_w3c_trace_id_hex */,
+      nullopt /* additional_w3c_tracestate */,
+      nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;
 }
@@ -279,10 +281,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
          full_w3c_trace_id_hex, additional_w3c_tracestate,
          additional_datadog_w3c_tracestate] = extracted_data;
-
-  (void)full_w3c_trace_id_hex;              // TODO
-  (void)additional_w3c_tracestate;          // TODO
-  (void)additional_datadog_w3c_tracestate;  // TODO
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -365,7 +363,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
       std::move(decoded_trace_tags), std::move(sampling_decision),
-      std::move(span_data));
+      std::move(full_w3c_trace_id_hex), std::move(additional_w3c_tracestate),
+      std::move(additional_datadog_w3c_tracestate), std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;
 }
