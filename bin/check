@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Run some of the checks that are performed by CircleCI.
+# This is convenient to run before committing.
+
+set -e
+
+# Go to the repository root directory.
+cd "$(dirname "$0")"/..
+
+bin/format --dry-run -Werror
+bin/test
+bin/bazel-build
