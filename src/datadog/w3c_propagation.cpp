@@ -15,6 +15,22 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+// Return a predicate that returns whether its `char` argument is any of the
+// following:
+//
+// - outside of the ASCII inclusive range `[lowest_ascii, highest_ascii]`
+// - equal to one of the `disallowed_characters`.
+//
+// `verboten` is used as an argument to `std::replace_if` to sanitize field
+// values within the tracestate header.
+auto verboten(int lowest_ascii, int highest_ascii,
+              StringView disallowed_characters) {
+  return [=, chars = disallowed_characters](char ch) {
+    return int(ch) < lowest_ascii || int(ch) > highest_ascii ||
+           std::find(chars.begin(), chars.end(), ch) != chars.end();
+  };
+}
+
 // Populate the specified `result` with data extracted from the "traceparent"
 // entry of the specified `headers`. Return `nullopt` on success. Return a value
 // for the `tags::internal::w3c_extraction_error` tag if an error occurs.
@@ -148,6 +164,7 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
 // "tracestate" header.
 //
 // `parse_datadog_tracestate` populates the following `ExtractedData` fields:
+//
 // - `origin`
 // - `trace_tags`
 // - `sampling_priority`
@@ -306,34 +323,70 @@ std::string encode_traceparent(
   return result;
 }
 
-std::string encode_tracestate(
+std::string encode_datadog_tracestate(
     int sampling_priority, const Optional<std::string>& origin,
     const std::unordered_map<std::string, std::string>& trace_tags,
-    const Optional<std::string>& additional_datadog_w3c_tracestate,
-    const Optional<std::string>& additional_w3c_tracestate) {
+    const Optional<std::string>& additional_datadog_w3c_tracestate) {
   std::string result = "dd=s:";
   result += std::to_string(sampling_priority);
+
+  const std::size_t max_size = 256;
+  std::size_t last_good_size = result.size();
 
   if (origin) {
     result += ";o:";
     result += *origin;
+    std::replace_if(result.end() - origin->size(), result.end(),
+                    verboten(0x20, 0x7e, ",;="), '_');
   }
+
+  if (result.size() > max_size) {
+    result.resize(last_good_size);
+    return result;
+  }
+  last_good_size = result.size();
 
   for (const auto& [key, value] : trace_tags) {
     // `key` is "_dd.p.<something>", but we want "t.<something>".
     result += ";t.";
-    result.append(key, sizeof("_dd.p.") - 1);
+    const auto prefix_length = sizeof("_dd.p.") - 1;
+    result.append(key, prefix_length);
+    std::replace_if(result.end() - (key.size() - prefix_length), result.end(),
+                    verboten(0x20, 0x7e, " ,;="), '_');
 
+    result += value;
+    std::replace_if(result.end() - value.size(), result.end(),
+                    verboten(0x20, 0x7e, ",;~"), '_');
     // `value` might contain equal signs ("="), which is reserved in tracestate.
     // Replace them with tildes ("~").
-    result += value;
     std::replace(result.end() - value.size(), result.end(), '=', '~');
+
+    if (result.size() > max_size) {
+      result.resize(last_good_size);
+      return result;
+    }
+    last_good_size = result.size();
   }
 
   if (additional_datadog_w3c_tracestate) {
     result += ';';
     result += *additional_datadog_w3c_tracestate;
   }
+
+  if (result.size() > max_size) {
+    result.resize(last_good_size);
+  }
+
+  return result;
+}
+
+std::string encode_tracestate(
+    int sampling_priority, const Optional<std::string>& origin,
+    const std::unordered_map<std::string, std::string>& trace_tags,
+    const Optional<std::string>& additional_datadog_w3c_tracestate,
+    const Optional<std::string>& additional_w3c_tracestate) {
+  std::string result = encode_datadog_tracestate(
+      sampling_priority, origin, trace_tags, additional_datadog_w3c_tracestate);
 
   if (additional_w3c_tracestate) {
     result += ',';

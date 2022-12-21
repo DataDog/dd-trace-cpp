@@ -280,7 +280,6 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         writer.set("traceparent",
                    encode_traceparent(span.trace_id, full_w3c_trace_id_hex_,
                                       span.span_id, sampling_priority));
-        // TODO: handle oversized things.
         writer.set("tracestate",
                    encode_tracestate(sampling_priority, origin_, trace_tags,
                                      additional_datadog_w3c_tracestate_,
