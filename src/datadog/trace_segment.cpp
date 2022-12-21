@@ -1,10 +1,7 @@
 #include "trace_segment.h"
 
 #include <cassert>
-#include <charconv>
-#include <limits>
 #include <string>
-#include <system_error>
 #include <unordered_map>
 #include <utility>
 
@@ -12,6 +9,7 @@
 #include "collector_response.h"
 #include "dict_writer.h"
 #include "error.h"
+#include "hex.h"
 #include "logger.h"
 #include "optional.h"
 #include "span_data.h"
@@ -19,25 +17,10 @@
 #include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
+#include "w3c_propagation.h"
 
 namespace datadog {
 namespace tracing {
-namespace {
-
-template <typename Integer>
-std::string hex(Integer value) {
-  // 4 bits per hex digit char, and then +1 char for possible minus sign
-  char buffer[std::numeric_limits<Integer>::digits / 4 + 1];
-
-  const int base = 16;
-  auto result =
-      std::to_chars(std::begin(buffer), std::end(buffer), value, base);
-  assert(result.ec == std::errc());
-
-  return std::string{std::begin(buffer), result.ptr};
-}
-
-}  // namespace
 
 TraceSegment::TraceSegment(
     const std::shared_ptr<Logger>& logger,
@@ -269,7 +252,10 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
         break;
       case PropagationStyle::W3C:
-        // TODO
+        writer.set("traceparent",
+                   encode_traceparent(span.trace_id, full_w3c_trace_id_hex_,
+                                      span.span_id, sampling_priority));
+        // TODO writer.set("tracestate", ...);
         break;
       default:
         assert(style == PropagationStyle::NONE);

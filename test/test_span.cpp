@@ -3,6 +3,7 @@
 // for propagation.
 
 #include <datadog/clock.h>
+#include <datadog/null_collector.h>
 #include <datadog/optional.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
@@ -464,4 +465,82 @@ TEST_CASE("injection can be disabled using the \"none\" style") {
   span.inject(writer);
   const std::unordered_map<std::string, std::string> empty;
   REQUIRE(writer.items == empty);
+}
+
+TEST_CASE("injecting W3C traceparent header") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.collector = std::make_shared<NullCollector>();
+  config.logger = std::make_shared<NullLogger>();
+  config.injection_styles = {PropagationStyle::W3C};
+
+  SECTION("extracted from W3C traceparent") {
+    config.extraction_styles = {PropagationStyle::W3C};
+    const auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+
+    // Override the tracer's ID generator to always return `expected_parent_id`.
+    constexpr std::uint64_t expected_parent_id = 0xcafebabe;
+    Tracer tracer{*finalized_config, [=]() { return expected_parent_id; },
+                  default_clock};
+
+    const std::unordered_map<std::string, std::string> input_headers{
+        // https://www.w3.org/TR/trace-context/#examples-of-http-traceparent-headers
+        {"traceparent",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
+    };
+    const MockDictReader reader{input_headers};
+    const auto maybe_span = tracer.extract_span(reader);
+    REQUIRE(maybe_span);
+    const auto& span = *maybe_span;
+    REQUIRE(span.id() == expected_parent_id);
+
+    MockDictWriter writer;
+    span.inject(writer);
+    const auto& output_headers = writer.items;
+    const auto found = output_headers.find("traceparent");
+    REQUIRE(found != output_headers.end());
+    // The "00000000cafebabe" is the zero-padded `expected_parent_id`.
+    const StringView expected =
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-00000000cafebabe-01";
+    REQUIRE(found->second == expected);
+  }
+
+  SECTION("not extracted from W3C traceparent") {
+    const auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+
+    // Override the tracer's ID generator to always return a fixed value.
+    // This will be both the trace ID and the parent (root) span ID.
+    constexpr std::uint64_t expected_id = 0xcafebabe;
+    Tracer tracer{*finalized_config, [=]() { return expected_id; },
+                  default_clock};
+
+    auto span = tracer.create_span();
+
+    // Let's test the effect sampling priority plays on the resulting
+    // traceparent, too.
+    struct TestCase {
+      int sampling_priority;
+      std::string expected_flags;
+    };
+    const auto& [sampling_priority, expected_flags] = GENERATE(
+        values<TestCase>({{-1, "00"}, {0, "00"}, {1, "01"}, {2, "01"}}));
+
+    CAPTURE(sampling_priority);
+    CAPTURE(expected_flags);
+
+    span.trace_segment().override_sampling_priority(sampling_priority);
+
+    MockDictWriter writer;
+    span.inject(writer);
+    const auto& output_headers = writer.items;
+    const auto found = output_headers.find("traceparent");
+    REQUIRE(found != output_headers.end());
+    // The "cafebabe"s come from `expected_id`.
+    const std::string expected =
+        "00-000000000000000000000000cafebabe-00000000cafebabe-" +
+        expected_flags;
+    REQUIRE(found->second == expected);
+  }
 }

@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "dict_reader.h"
+#include "hex.h"
 #include "parse_util.h"
 #include "tags.h"
 
@@ -108,6 +109,35 @@ Expected<ExtractedData> extract_w3c(
         std::move(*error_tag_value);
     // Carry on with whatever data was extracted from traceparent.
   }
+
+  return result;
+}
+
+std::string encode_traceparent(
+    std::uint64_t trace_id, const Optional<std::string>& full_w3c_trace_id_hex,
+    std::uint64_t span_id, int sampling_priority) {
+  std::string result;
+  // version
+  result += "00-";
+
+  // trace ID
+  if (full_w3c_trace_id_hex) {
+    result += *full_w3c_trace_id_hex;
+  } else {
+    auto hexed = hex(trace_id);
+    result.append(16 + (16 - hexed.size()), '0');  // leading zeroes
+    result += hexed;
+  }
+  result += '-';
+
+  // span ID
+  auto hexed = hex(span_id);
+  result.append(16 - hexed.size(), '0');  // leading zeroes
+  result += hexed;
+  result += '-';
+
+  // flags
+  result += sampling_priority > 0 ? "01" : "00";
 
   return result;
 }

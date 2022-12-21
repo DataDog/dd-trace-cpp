@@ -72,6 +72,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/expected.cpp
     src/datadog/extracted_data.cpp
     src/datadog/glob.cpp
+    src/datadog/hex.cpp
     src/datadog/http_client.cpp
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
@@ -129,6 +130,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/expected.h
   src/datadog/extracted_data.h
   src/datadog/glob.h
+  src/datadog/hex.h
   src/datadog/http_client.h
   src/datadog/id_generator.h
   src/datadog/json_fwd.hpp
