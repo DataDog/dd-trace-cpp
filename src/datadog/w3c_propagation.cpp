@@ -306,5 +306,42 @@ std::string encode_traceparent(
   return result;
 }
 
+std::string encode_tracestate(
+    int sampling_priority, const Optional<std::string>& origin,
+    const std::unordered_map<std::string, std::string>& trace_tags,
+    const Optional<std::string>& additional_datadog_w3c_tracestate,
+    const Optional<std::string>& additional_w3c_tracestate) {
+  std::string result = "dd=s:";
+  result += std::to_string(sampling_priority);
+
+  if (origin) {
+    result += ";o:";
+    result += *origin;
+  }
+
+  for (const auto& [key, value] : trace_tags) {
+    // `key` is "_dd.p.<something>", but we want "t.<something>".
+    result += ";t.";
+    result.append(key, sizeof("_dd.p.") - 1);
+
+    // `value` might contain equal signs ("="), which is reserved in tracestate.
+    // Replace them with tildes ("~").
+    result += value;
+    std::replace(result.end() - value.size(), result.end(), '=', '~');
+  }
+
+  if (additional_datadog_w3c_tracestate) {
+    result += ';';
+    result += *additional_datadog_w3c_tracestate;
+  }
+
+  if (additional_w3c_tracestate) {
+    result += ',';
+    result += *additional_w3c_tracestate;
+  }
+
+  return result;
+}
+
 }  // namespace tracing
 }  // namespace datadog

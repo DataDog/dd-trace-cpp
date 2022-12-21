@@ -35,5 +35,12 @@ std::string encode_traceparent(
     std::uint64_t trace_id, const Optional<std::string>& full_w3c_trace_id_hex,
     std::uint64_t span_id, int sampling_priority);
 
+// Return a value for the "tracestate" header containing the specified fields.
+std::string encode_tracestate(
+    int sampling_priority, const Optional<std::string>& origin,
+    const std::unordered_map<std::string, std::string>& trace_tags,
+    const Optional<std::string>& additional_datadog_w3c_tracestate,
+    const Optional<std::string>& additional_w3c_tracestate);
+
 }  // namespace tracing
 }  // namespace datadog
