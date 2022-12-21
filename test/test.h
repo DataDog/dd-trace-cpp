@@ -26,6 +26,8 @@ std::ostream& operator<<(std::ostream& stream,
 std::ostream& operator<<(std::ostream& stream,
                          const std::optional<std::string_view>& maybe);
 
+std::ostream& operator<<(std::ostream& stream, const std::optional<int>& maybe);
+
 }  // namespace std
 
 namespace datadog {

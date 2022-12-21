@@ -1,5 +1,6 @@
 #include "w3c_propagation.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <regex>
@@ -27,7 +28,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
   const auto traceparent = strip(*maybe_traceparent);
 
   // Note that leading and trailing whitespace was already removed above.
-  // Note that the match group 0 is the entire match.
+  // Note that match group 0 is the entire match.
   static const auto& pattern =
       "([0-9a-f]{2})"  // hex version number (match group 1)
       "-"
@@ -89,16 +90,13 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
   const char* const begin = tracestate.begin();
   const char* const end = tracestate.end();
   const char* pair_begin = begin;
-  for (;;) {
+  while (pair_begin != end) {
     const char* const pair_end = std::find(pair_begin, end, ',');
     // Note that since this `pair` is `strip`ped, `pair_begin` is not
     // necessarily equal to `pair.begin()` (similarly for the ends).
     const auto pair = strip(range(pair_begin, pair_end));
     if (pair.empty()) {
-      if (pair_end == end) {
-        return result;
-      }
-      pair_begin = pair_end + 1;
+      pair_begin = pair_end == end ? end : pair_end + 1;
       continue;
     }
 
@@ -107,20 +105,14 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
       // This is an invalid entry because it contains a non-whitespace character
       // but not a "=".
       // Let's move on to the next entry.
-      if (pair_end == end) {
-        return result;
-      }
-      pair_begin = pair_end + 1;
+      pair_begin = pair_end == end ? end : pair_end + 1;
       continue;
     }
 
     const auto key = range(pair.begin(), kv_separator);
     if (key != "dd") {
       // On to the next.
-      if (pair_end == end) {
-        return result;
-      }
-      pair_begin = pair_end + 1;
+      pair_begin = pair_end == end ? end : pair_end + 1;
       continue;
     }
 
@@ -128,7 +120,7 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
     result.emplace();
     result->datadog_value = range(kv_separator + 1, pair.end());
     // `result->other_entries` is whatever was before the "dd" entry and
-    // whatever is after the "dd" entry, but without a redundant comma in the
+    // whatever is after the "dd" entry, but without an extra comma in the
     // middle.
     if (pair_begin != begin) {
       // There's a prefix
@@ -142,35 +134,30 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
       append(result->other_entries, range(pair_end + 1, end));
     }
 
-    return result;
+    break;
   }
+
+  return result;
 }
 
 // TODO: document
-Optional<std::string> parse_datadog_tracestate(ExtractedData& result,
-                                               StringView datadog_value) {
+void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
   const char* const begin = datadog_value.begin();
   const char* const end = datadog_value.end();
   const char* pair_begin = begin;
-  for (;;) {
+  while (pair_begin != end) {
     const char* const pair_end = std::find(pair_begin, end, ';');
     const auto pair = range(pair_begin, pair_end);
     if (pair.empty()) {
       // chaff!
-      if (pair_end == end) {
-        break;
-      }
-      pair_begin = pair_end + 1;
+      pair_begin = pair_end == end ? end : pair_end + 1;
       continue;
     }
 
     const auto kv_separator = std::find(pair_begin, pair_end, ':');
     if (kv_separator == pair_end) {
       // chaff!
-      if (pair_end == end) {
-        break;
-      }
-      pair_begin = pair_end + 1;
+      pair_begin = pair_end == end ? end : pair_end + 1;
       continue;
     }
 
@@ -182,10 +169,7 @@ Optional<std::string> parse_datadog_tracestate(ExtractedData& result,
       const auto maybe_priority = parse_int(value, 10);
       if (!maybe_priority) {
         // chaff!
-        if (pair_end == end) {
-          break;
-        }
-        pair_begin = pair_end + 1;
+        pair_begin = pair_end == end ? end : pair_end + 1;
         continue;
       }
       const int priority = *maybe_priority;
@@ -205,8 +189,12 @@ Optional<std::string> parse_datadog_tracestate(ExtractedData& result,
       const auto tag_suffix = key.substr(2);
       std::string tag_name = "_dd.p.";
       append(tag_name, tag_suffix);
+      // The tag value was encoded with all '=' replaced by '~'.  Undo that
+      // transformation.
+      std::string decoded_value{value};
+      std::replace(decoded_value.begin(), decoded_value.end(), '~', '=');
       result.trace_tags.insert_or_assign(std::move(tag_name),
-                                         std::string{value});
+                                         std::move(decoded_value));
     } else {
       // Unrecognized key: append the whole pair to
       // `additional_datadog_w3c_tracestate`, which will be used if/when we
@@ -214,41 +202,39 @@ Optional<std::string> parse_datadog_tracestate(ExtractedData& result,
       auto& entries = result.additional_datadog_w3c_tracestate;
       if (!entries) {
         entries.emplace();
-      }
-      if (!entries->empty()) {
+      } else {
         *entries += ';';
       }
       append(*entries, pair);
     }
 
-    if (pair_end == end) {
-      break;
-    }
-    pair_begin = pair_end + 1;
+    pair_begin = pair_end == end ? end : pair_end + 1;
   }
-
-  return nullopt;
 }
 
 // TODO: document
-Optional<std::string> extract_tracestate(ExtractedData& result,
-                                         const DictReader& headers) {
+void extract_tracestate(ExtractedData& result, const DictReader& headers) {
   const auto maybe_tracestate = headers.lookup("tracestate");
   if (!maybe_tracestate) {
-    return nullopt;
+    return;
   }
 
   const auto tracestate = strip(*maybe_tracestate);
   auto maybe_parsed = parse_tracestate(tracestate);
   if (!maybe_parsed) {
     // No "dd" entry in `tracestate`, so there's nothing to extract.
-    result.additional_w3c_tracestate = std::string{tracestate};
-    return nullopt;
+    if (!tracestate.empty()) {
+      result.additional_w3c_tracestate = std::string{tracestate};
+    }
+    return;
   }
 
   auto& [datadog_value, other_entries] = *maybe_parsed;
-  result.additional_datadog_w3c_tracestate = std::move(other_entries);
-  return parse_datadog_tracestate(result, datadog_value);
+  if (!other_entries.empty()) {
+    result.additional_w3c_tracestate = std::move(other_entries);
+  }
+
+  parse_datadog_tracestate(result, datadog_value);
 }
 
 }  // namespace
@@ -270,11 +256,7 @@ Expected<ExtractedData> extract_w3c(
     return result;
   }
 
-  if (auto error_tag_value = extract_tracestate(result, headers)) {
-    span_tags[tags::internal::w3c_extraction_error] =
-        std::move(*error_tag_value);
-    // Carry on with whatever data was extracted from traceparent.
-  }
+  extract_tracestate(result, headers);
 
   return result;
 }
