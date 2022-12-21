@@ -77,13 +77,16 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
   return nullopt;
 }
 
-// TODO: document
+// `struct PartiallyParsedTracestat` contains the separated Datadog-specific and
+// non-Datadog-specific portions of tracestate.
 struct PartiallyParsedTracestate {
   StringView datadog_value;
   std::string other_entries;
 };
 
-// TODO: document
+// Return the separate Datadog-specific and non-Datadog-specific portions of the
+// specified `tracestate`. If `tracestate` does not have a Datadog-specific
+// portion, return `nullopt`.
 Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
   Optional<PartiallyParsedTracestate> result;
 
@@ -140,7 +143,15 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
   return result;
 }
 
-// TODO: document
+// Fill the specified `result` with information parsed from the specified
+// `datadog_value`. `datadog_value` is the value of the "dd" entry in the
+// "tracestate" header.
+//
+// `parse_datadog_tracestate` populates the following `ExtractedData` fields:
+// - `origin`
+// - `trace_tags`
+// - `sampling_priority`
+// - `additional_datadog_w3c_tracestate`
 void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
   const char* const begin = datadog_value.begin();
   const char* const end = datadog_value.end();
@@ -212,7 +223,12 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
   }
 }
 
-// TODO: document
+// Fill the specified `result` with information parsed from the "tracestate"
+// element of the specified `headers`, if present.
+//
+// `extract_tracestate` populates the `additional_w3c_tracestate` field of
+// `ExtractedData`, in addition to those populated by
+// `parse_datadog_tracestate`.
 void extract_tracestate(ExtractedData& result, const DictReader& headers) {
   const auto maybe_tracestate = headers.lookup("tracestate");
   if (!maybe_tracestate) {

@@ -1,6 +1,8 @@
 #pragma once
 
-// TODO: document
+// This component provides functions for extracting and injecting trace context
+// in the `PropagationStyle::W3C` style. These functions decode and encode the
+// "traceparent" and "tracestate" HTTP request headers.
 
 #include <cstdint>
 #include <string>
