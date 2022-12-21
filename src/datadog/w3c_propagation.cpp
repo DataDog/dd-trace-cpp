@@ -13,7 +13,9 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-// TODO: document
+// Populate the specified `result` with data extracted from the "traceparent"
+// entry of the specified `headers`. Return `nullopt` on success. Return a value
+// for the `tags::internal::w3c_extraction_error` tag if an error occurs.
 Optional<std::string> extract_traceparent(ExtractedData& result,
                                           const DictReader& headers) {
   const auto maybe_traceparent = headers.lookup("traceparent");
