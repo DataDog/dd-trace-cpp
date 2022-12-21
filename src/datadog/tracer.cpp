@@ -26,6 +26,26 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+// Decode the specified `trace_tags` and integrate them into the specified
+// `result`. If an error occurs, add a `tags::internal::propagation_error` tag
+// to the specified `span_tags` and log a diagnostic using the specified
+// `logger`.
+void handle_trace_tags(StringView trace_tags, ExtractedData& result,
+                       std::unordered_map<std::string, std::string>& span_tags,
+                       Logger& logger) {
+  auto maybe_trace_tags = decode_tags(trace_tags);
+  if (auto* error = maybe_trace_tags.if_error()) {
+    logger.log_error(*error);
+    span_tags[tags::internal::propagation_error] = "decoding_error";
+  } else {
+    for (const auto& [key, value] : *maybe_trace_tags) {
+      if (starts_with(key, "_dd.p.")) {
+        result.trace_tags.insert_or_assign(key, value);
+      }
+    }
+  }
+}
+
 Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
                                                     StringView header,
                                                     StringView header_kind,
@@ -54,7 +74,7 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
 
 Expected<ExtractedData> extract_datadog(
     const DictReader& headers,
-    std::unordered_map<std::string, std::string>& /*span_tags*/) {
+    std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
   ExtractedData result;
 
   auto trace_id =
@@ -93,7 +113,7 @@ Expected<ExtractedData> extract_datadog(
 
   auto trace_tags = headers.lookup("x-datadog-tags");
   if (trace_tags) {
-    result.trace_tags = std::string(*trace_tags);
+    handle_trace_tags(*trace_tags, result, span_tags, logger);
   }
 
   return result;
@@ -101,7 +121,7 @@ Expected<ExtractedData> extract_datadog(
 
 Expected<ExtractedData> extract_b3(
     const DictReader& headers,
-    std::unordered_map<std::string, std::string>& /*span_tags*/) {
+    std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
   ExtractedData result;
 
   auto trace_id = extract_id_header(headers, "x-b3-traceid", "trace", "B3", 16);
@@ -140,7 +160,7 @@ Expected<ExtractedData> extract_b3(
 
   auto trace_tags = headers.lookup("x-datadog-tags");
   if (trace_tags) {
-    result.trace_tags = std::string(*trace_tags);
+    handle_trace_tags(*trace_tags, result, span_tags, logger);
   }
 
   return result;
@@ -265,7 +285,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         extracted_data = ExtractedData{};
         continue;
     }
-    auto data = extract(reader, span_data->tags);
+    auto data = extract(reader, span_data->tags, *logger_);
     if (auto* error = data.if_error()) {
       return std::move(*error);
     }
@@ -343,26 +363,11 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     sampling_decision = decision;
   }
 
-  std::unordered_map<std::string, std::string> decoded_trace_tags;
-  if (trace_tags) {
-    auto maybe_trace_tags = decode_tags(*trace_tags);
-    if (auto* error = maybe_trace_tags.if_error()) {
-      logger_->log_error(*error);
-      span_data->tags[tags::internal::propagation_error] = "decoding_error";
-    } else {
-      for (const auto& [key, value] : *maybe_trace_tags) {
-        if (starts_with(key, "_dd.p.")) {
-          decoded_trace_tags.insert_or_assign(key, value);
-        }
-      }
-    }
-  }
-
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
-      std::move(decoded_trace_tags), std::move(sampling_decision),
+      std::move(trace_tags), std::move(sampling_decision),
       std::move(full_w3c_trace_id_hex), std::move(additional_w3c_tracestate),
       std::move(additional_datadog_w3c_tracestate), std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};

@@ -77,19 +77,185 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
 }
 
 // TODO: document
+struct PartiallyParsedTracestate {
+  StringView datadog_value;
+  std::string other_entries;
+};
+
+// TODO: document
+Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
+  Optional<PartiallyParsedTracestate> result;
+
+  const char* const begin = tracestate.begin();
+  const char* const end = tracestate.end();
+  const char* pair_begin = begin;
+  for (;;) {
+    const char* const pair_end = std::find(pair_begin, end, ',');
+    // Note that since this `pair` is `strip`ped, `pair_begin` is not
+    // necessarily equal to `pair.begin()` (similarly for the ends).
+    const auto pair = strip(range(pair_begin, pair_end));
+    if (pair.empty()) {
+      if (pair_end == end) {
+        return result;
+      }
+      pair_begin = pair_end + 1;
+      continue;
+    }
+
+    const auto kv_separator = std::find(pair.begin(), pair.end(), '=');
+    if (kv_separator == pair.end()) {
+      // This is an invalid entry because it contains a non-whitespace character
+      // but not a "=".
+      // Let's move on to the next entry.
+      if (pair_end == end) {
+        return result;
+      }
+      pair_begin = pair_end + 1;
+      continue;
+    }
+
+    const auto key = range(pair.begin(), kv_separator);
+    if (key != "dd") {
+      // On to the next.
+      if (pair_end == end) {
+        return result;
+      }
+      pair_begin = pair_end + 1;
+      continue;
+    }
+
+    // We found the "dd" entry.
+    result.emplace();
+    result->datadog_value = range(kv_separator + 1, pair.end());
+    // `result->other_entries` is whatever was before the "dd" entry and
+    // whatever is after the "dd" entry, but without a redundant comma in the
+    // middle.
+    if (pair_begin != begin) {
+      // There's a prefix
+      append(result->other_entries, range(begin, pair_begin - 1));
+      if (pair_end != end) {
+        // and a suffix
+        append(result->other_entries, range(pair_end, end));
+      }
+    } else if (pair_end != end) {
+      // There's just a suffix
+      append(result->other_entries, range(pair_end + 1, end));
+    }
+
+    return result;
+  }
+}
+
+// TODO: document
+Optional<std::string> parse_datadog_tracestate(ExtractedData& result,
+                                               StringView datadog_value) {
+  const char* const begin = datadog_value.begin();
+  const char* const end = datadog_value.end();
+  const char* pair_begin = begin;
+  for (;;) {
+    const char* const pair_end = std::find(pair_begin, end, ';');
+    const auto pair = range(pair_begin, pair_end);
+    if (pair.empty()) {
+      // chaff!
+      if (pair_end == end) {
+        break;
+      }
+      pair_begin = pair_end + 1;
+      continue;
+    }
+
+    const auto kv_separator = std::find(pair_begin, pair_end, ':');
+    if (kv_separator == pair_end) {
+      // chaff!
+      if (pair_end == end) {
+        break;
+      }
+      pair_begin = pair_end + 1;
+      continue;
+    }
+
+    const auto key = range(pair_begin, kv_separator);
+    const auto value = range(kv_separator + 1, pair_end);
+    if (key == "o") {
+      result.origin = std::string{value};
+    } else if (key == "s") {
+      const auto maybe_priority = parse_int(value, 10);
+      if (!maybe_priority) {
+        // chaff!
+        if (pair_end == end) {
+          break;
+        }
+        pair_begin = pair_end + 1;
+        continue;
+      }
+      const int priority = *maybe_priority;
+      // If we didn't parse a sampling priority from traceparent, or if the one
+      // we just parsed from tracestate is consistent with the previous, then
+      // set the sampling priority to the one we just parsed.
+      // Alternatively, if we already parsed a sampling priority from
+      // traceparent and got a result inconsistent with that parsed here, go
+      // with the one previously parsed from traceparent.
+      if (!result.sampling_priority ||
+          (*result.sampling_priority > 0) == (priority > 0)) {
+        result.sampling_priority = priority;
+      }
+    } else if (starts_with(key, "t.")) {
+      // The part of the key that follows "t." is the name of a trace tag,
+      // except without the "_dd.p." prefix.
+      const auto tag_suffix = key.substr(2);
+      std::string tag_name = "_dd.p.";
+      append(tag_name, tag_suffix);
+      result.trace_tags.insert_or_assign(std::move(tag_name),
+                                         std::string{value});
+    } else {
+      // Unrecognized key: append the whole pair to
+      // `additional_datadog_w3c_tracestate`, which will be used if/when we
+      // inject trace context.
+      auto& entries = result.additional_datadog_w3c_tracestate;
+      if (!entries) {
+        entries.emplace();
+      }
+      if (!entries->empty()) {
+        *entries += ';';
+      }
+      append(*entries, pair);
+    }
+
+    if (pair_end == end) {
+      break;
+    }
+    pair_begin = pair_end + 1;
+  }
+
+  return nullopt;
+}
+
+// TODO: document
 Optional<std::string> extract_tracestate(ExtractedData& result,
                                          const DictReader& headers) {
-  // TODO
-  (void)result;
-  (void)headers;
-  return nullopt;
+  const auto maybe_tracestate = headers.lookup("tracestate");
+  if (!maybe_tracestate) {
+    return nullopt;
+  }
+
+  const auto tracestate = strip(*maybe_tracestate);
+  auto maybe_parsed = parse_tracestate(tracestate);
+  if (!maybe_parsed) {
+    // No "dd" entry in `tracestate`, so there's nothing to extract.
+    result.additional_w3c_tracestate = std::string{tracestate};
+    return nullopt;
+  }
+
+  auto& [datadog_value, other_entries] = *maybe_parsed;
+  result.additional_datadog_w3c_tracestate = std::move(other_entries);
+  return parse_datadog_tracestate(result, datadog_value);
 }
 
 }  // namespace
 
 Expected<ExtractedData> extract_w3c(
     const DictReader& headers,
-    std::unordered_map<std::string, std::string>& span_tags) {
+    std::unordered_map<std::string, std::string>& span_tags, Logger&) {
   ExtractedData result;
 
   if (auto error_tag_value = extract_traceparent(result, headers)) {

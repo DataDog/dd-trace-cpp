@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
 #include "optional.h"
 
@@ -14,7 +15,7 @@ struct ExtractedData {
   Optional<std::uint64_t> trace_id;
   Optional<std::uint64_t> parent_id;
   Optional<std::string> origin;
-  Optional<std::string> trace_tags;
+  std::unordered_map<std::string, std::string> trace_tags;
   Optional<int> sampling_priority;
   // TODO: document
   Optional<std::string> full_w3c_trace_id_hex;

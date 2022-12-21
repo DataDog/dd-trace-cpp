@@ -14,6 +14,7 @@ namespace datadog {
 namespace tracing {
 
 class DictReader;
+class Logger;
 
 // Return `ExtractedData` deduced from the "traceparent" and "tracestate"
 // entries of the specified `headers`. If an error occurs, set a value for the
@@ -22,7 +23,7 @@ class DictReader;
 // `ExtractedData` when extraction fails.
 Expected<ExtractedData> extract_w3c(
     const DictReader& headers,
-    std::unordered_map<std::string, std::string>& span_tags);
+    std::unordered_map<std::string, std::string>& span_tags, Logger&);
 
 // Return a value for the "traceparent" header consisting of the specified
 // `trace_id` or the optionally specified `full_w3c_trace_id_hex` as the trace
