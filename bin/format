@@ -12,7 +12,7 @@ formatter=clang-format-$version
 formatter_options="--style=file -i $@"
 
 find_sources() {
-    find src/ example/ test/ -type f \( -name '*.h' -o -name '*.cpp' \) "$@"
+    find src/ example/ test/ fuzz/ -type f \( -name '*.h' -o -name '*.cpp' \) "$@"
 }
 
 # If the correct version of clang-format is installed, then use it and quit.
@@ -35,7 +35,7 @@ if [ "$(docker image ls --quiet $image | wc -l)" -eq 0 ]; then
     case "$response" in
         y|Y|yes|Yes|YES|'') ;;
         *) exit ;;
-    esac 
+    esac
 fi
 
 mount_path=/mnt/host
