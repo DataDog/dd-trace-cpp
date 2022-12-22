@@ -33,7 +33,6 @@ extern const std::string span_sampling_mechanism;
 extern const std::string span_sampling_rule_rate;
 extern const std::string span_sampling_limit;
 extern const std::string w3c_extraction_error;
-extern const std::string w3c_injection_error;
 }  // namespace internal
 
 // Return whether the specified `tag_name` is reserved for use internal to this

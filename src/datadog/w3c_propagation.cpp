@@ -21,8 +21,8 @@ namespace {
 // - outside of the ASCII inclusive range `[lowest_ascii, highest_ascii]`
 // - equal to one of the `disallowed_characters`.
 //
-// `verboten` is used as an argument to `std::replace_if` to sanitize field
-// values within the tracestate header.
+// `verboten` is used with `std::replace_if` to sanitize field values within the
+// tracestate header.
 auto verboten(int lowest_ascii, int highest_ascii,
               StringView disallowed_characters) {
   return [=, chars = disallowed_characters](char ch) {
@@ -347,13 +347,18 @@ std::string encode_datadog_tracestate(
   last_good_size = result.size();
 
   for (const auto& [key, value] : trace_tags) {
-    // `key` is "_dd.p.<something>", but we want "t.<something>".
+    const StringView prefix = "_dd.p.";
+    if (!starts_with(key, prefix)) {
+      continue;
+    }
+
+    // `key` is "_dd.p.<name>", but we want "t.<name>".
     result += ";t.";
-    const auto prefix_length = sizeof("_dd.p.") - 1;
-    result.append(key, prefix_length);
-    std::replace_if(result.end() - (key.size() - prefix_length), result.end(),
+    result.append(key, prefix.size());
+    std::replace_if(result.end() - (key.size() - prefix.size()), result.end(),
                     verboten(0x20, 0x7e, " ,;="), '_');
 
+    result += ':';
     result += value;
     std::replace_if(result.end() - value.size(), result.end(),
                     verboten(0x20, 0x7e, ",;~"), '_');

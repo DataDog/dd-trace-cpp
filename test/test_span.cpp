@@ -544,3 +544,88 @@ TEST_CASE("injecting W3C traceparent header") {
     REQUIRE(found->second == expected);
   }
 }
+
+TEST_CASE("injecting W3C tracestate header") {
+  // Concerns:
+  // - the basics:
+  //   - sampling priority
+  //   - origin
+  //   - trace tags
+  //   - extra fields (extracted from W3C)
+  //   - all of the above
+  // - character substitutions:
+  //   - in origin
+  //   - in trace tag key
+  //   - in trace tag value
+  //     - special tilde ("~") behavior
+  // - length limit:
+  //   - at origin
+  //   - at a trace tag (extract extra fields from W3C)
+  //   - at the extra fields (extracted from W3C)
+
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  // The order of the extraction styles doesn't matter for this test, because
+  // it'll either be one or the other in the test cases.
+  config.extraction_styles = {PropagationStyle::DATADOG, PropagationStyle::W3C};
+  config.injection_styles = {PropagationStyle::W3C};
+  // If one of these test cases results in a local sampling decision, let it be
+  // "drop."
+  config.trace_sampler.sample_rate = 0.0;
+  const auto logger = std::make_shared<MockLogger>();
+  config.logger = logger;
+  config.collector = std::make_shared<NullCollector>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  struct TestCase {
+    int line;
+    std::string name;
+    std::unordered_map<std::string, std::string> input_headers;
+    std::string expected_tracestate;
+  };
+
+  // clang-format off
+  auto test_case = GENERATE(values<TestCase>({
+    {__LINE__, "sampling priority",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-sampling-priority", "2"}},
+     "dd=s:2"},
+
+    {__LINE__, "origin",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-origin", "France"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;o:France"},
+
+    {__LINE__, "trace tags",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.foo=x,_dd.p.bar=y"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.foo:x;t.bar:y"},
+  }));
+  // clang-format on
+
+  CAPTURE(test_case.name);
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.input_headers);
+  CAPTURE(test_case.expected_tracestate);
+  CAPTURE(logger->entries);
+
+  MockDictReader reader{test_case.input_headers};
+  const auto span = tracer.extract_span(reader);
+  REQUIRE(span);
+
+  MockDictWriter writer;
+  span->inject(writer);
+
+  CAPTURE(writer.items);
+  const auto found = writer.items.find("tracestate");
+  REQUIRE(found != writer.items.end());
+
+  REQUIRE(found->second == test_case.expected_tracestate);
+
+  REQUIRE(logger->error_count() == 0);
+}

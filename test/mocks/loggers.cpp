@@ -13,5 +13,5 @@ std::ostream& operator<<(std::ostream& stream,
     stream << '\n' << (i + 1) << ". " << kind_name << ": ";
     std::visit([&](const auto& value) { stream << value; }, entry.payload);
   }
-  return stream << "</END " << entries.size() << " LOG ENTRIES>";
+  return stream << "\n</END " << entries.size() << " LOG ENTRIES>";
 }
