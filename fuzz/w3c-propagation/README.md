@@ -7,7 +7,7 @@ Libfuzzer invokes the `LLVMFuzzerTestOneInput` function repeatedly with a binary
 blob of varying size and contents.  For each blob, [fuzz.cpp](./fuzz.cpp) runs
 its test multiple times. The input blob is interpreted in the following way:
 ```text
-blob:          _ _ _ _ _ _ _ _ _ _
+blob:          _ _ _ _ _ _ _ _ _
 
 iteration 0:   s s s s s s s s s
 
