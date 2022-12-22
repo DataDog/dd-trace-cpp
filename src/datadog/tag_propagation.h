@@ -12,7 +12,8 @@
 // "x-datadog-tags" header format.
 
 #include <string>
-#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "expected.h"
 #include "string_view.h"
@@ -22,13 +23,13 @@ namespace tracing {
 
 // Return a name->value mapping of tags parsed from the specified
 // `header_value`, or return an `Error` if an error occurs.
-Expected<std::unordered_map<std::string, std::string>> decode_tags(
+Expected<std::vector<std::pair<std::string, std::string>>> decode_tags(
     StringView header_value);
 
 // Serialize the specified `trace_tags` into the propagation format and return
 // the resulting string.
 std::string encode_tags(
-    const std::unordered_map<std::string, std::string>& trace_tags);
+    const std::vector<std::pair<std::string, std::string>>& trace_tags);
 
 }  // namespace tracing
 }  // namespace datadog

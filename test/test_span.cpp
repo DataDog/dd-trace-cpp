@@ -434,8 +434,6 @@ TEST_CASE("injection") {
       span->inject(writer);
 
       REQUIRE(writer.items.at("x-datadog-origin") == "Egypt");
-      // Trace tags could get reordered (because we parse them into a hash
-      // table). So, compare the parsed versions.
       REQUIRE(writer.items.count("x-datadog-tags") == 1);
       const auto output = decode_tags(writer.items.at("x-datadog-tags"));
       const auto input = decode_tags(trace_tags);

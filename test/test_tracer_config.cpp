@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <unordered_map>
 
 #include "mocks/collectors.h"
 #include "mocks/event_schedulers.h"

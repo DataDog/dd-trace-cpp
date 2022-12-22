@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "collector.h"
 #include "collector_response.h"
@@ -30,7 +31,7 @@ namespace {
 // on the specified `local_root_tags`.
 void inject_trace_tags(
     DictWriter& writer,
-    const std::unordered_map<std::string, std::string>& trace_tags,
+    const std::vector<std::pair<std::string, std::string>>& trace_tags,
     std::size_t tags_header_max_size,
     std::unordered_map<std::string, std::string>& local_root_tags,
     Logger& logger) {
@@ -63,7 +64,7 @@ TraceSegment::TraceSegment(
     const std::vector<PropagationStyle>& injection_styles,
     const Optional<std::string>& hostname, Optional<std::string> origin,
     std::size_t tags_header_max_size,
-    std::unordered_map<std::string, std::string> trace_tags,
+    std::vector<std::pair<std::string, std::string>> trace_tags,
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> full_w3c_trace_id_hex,
     Optional<std::string> additional_w3c_tracestate,
@@ -224,11 +225,23 @@ void TraceSegment::update_decision_maker_trace_tag() {
 
   assert(sampling_decision_);
 
+  const auto found = std::find_if(
+      trace_tags_.begin(), trace_tags_.end(), [](const auto& entry) {
+        return entry.first == tags::internal::decision_maker;
+      });
+
   if (sampling_decision_->priority <= 0) {
-    trace_tags_.erase(tags::internal::decision_maker);
+    if (found != trace_tags_.end()) {
+      trace_tags_.erase(found);
+    }
+    return;
+  }
+
+  auto value = "-" + std::to_string(*sampling_decision_->mechanism);
+  if (found == trace_tags_.end()) {
+    trace_tags_.emplace_back(tags::internal::decision_maker, std::move(value));
   } else {
-    trace_tags_[tags::internal::decision_maker] =
-        "-" + std::to_string(*sampling_decision_->mechanism);
+    found->second == std::move(value);
   }
 }
 
@@ -244,7 +257,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   // So, we lock here, make a sampling decision if necessary, and then copy the
   // decision and trace tags before unlocking.
   int sampling_priority;
-  std::unordered_map<std::string, std::string> trace_tags;
+  std::vector<std::pair<std::string, std::string>> trace_tags;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     make_sampling_decision_if_null();

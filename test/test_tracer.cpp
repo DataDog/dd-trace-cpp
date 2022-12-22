@@ -667,7 +667,7 @@ TEST_CASE("span extraction") {
       Optional<std::string> tracestate;
       Optional<int> expected_sampling_priority = {};
       Optional<std::string> expected_origin = {};
-      std::unordered_map<std::string, std::string> expected_trace_tags = {};
+      std::vector<std::pair<std::string, std::string>> expected_trace_tags = {};
       Optional<std::string> expected_additional_w3c_tracestate = {};
       Optional<std::string> expected_additional_datadog_w3c_tracestate = {};
     };

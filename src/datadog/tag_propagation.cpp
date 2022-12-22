@@ -32,7 +32,7 @@ namespace {
 // Insert into the specified `destination` a tag decoded from the specified
 // `entry`.  Return an `Error` if an error occurs.
 Expected<void> decode_tag(
-    std::unordered_map<std::string, std::string>& destination,
+    std::vector<std::pair<std::string, std::string>>& destination,
     StringView entry) {
   const auto separator = std::find(entry.begin(), entry.end(), '=');
   if (separator == entry.end()) {
@@ -44,8 +44,7 @@ Expected<void> decode_tag(
 
   const StringView key = range(entry.begin(), separator);
   const StringView value = range(separator + 1, entry.end());
-  // Among duplicate keys, most recent value wins.
-  destination.insert_or_assign(std::string(key), std::string(value));
+  destination.emplace_back(std::string(key), std::string(value));
 
   return nullopt;
 }
@@ -59,9 +58,9 @@ void append_tag(std::string& serialized_tags, StringView tag_key,
 
 }  // namespace
 
-Expected<std::unordered_map<std::string, std::string>> decode_tags(
+Expected<std::vector<std::pair<std::string, std::string>>> decode_tags(
     StringView header_value) {
-  std::unordered_map<std::string, std::string> tags;
+  std::vector<std::pair<std::string, std::string>> tags;
 
   auto iter = header_value.begin();
   const auto end = header_value.end();
@@ -88,7 +87,7 @@ Expected<std::unordered_map<std::string, std::string>> decode_tags(
 }
 
 std::string encode_tags(
-    const std::unordered_map<std::string, std::string>& trace_tags) {
+    const std::vector<std::pair<std::string, std::string>>& trace_tags) {
   std::string result;
   auto iter = trace_tags.begin();
   if (iter == trace_tags.end()) {

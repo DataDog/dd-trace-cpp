@@ -221,8 +221,8 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
       // transformation.
       std::string decoded_value{value};
       std::replace(decoded_value.begin(), decoded_value.end(), '~', '=');
-      result.trace_tags.insert_or_assign(std::move(tag_name),
-                                         std::move(decoded_value));
+      result.trace_tags.emplace_back(std::move(tag_name),
+                                     std::move(decoded_value));
     } else {
       // Unrecognized key: append the whole pair to
       // `additional_datadog_w3c_tracestate`, which will be used if/when we
@@ -325,7 +325,7 @@ std::string encode_traceparent(
 
 std::string encode_datadog_tracestate(
     int sampling_priority, const Optional<std::string>& origin,
-    const std::unordered_map<std::string, std::string>& trace_tags,
+    const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate) {
   std::string result = "dd=s:";
   result += std::to_string(sampling_priority);
@@ -387,7 +387,7 @@ std::string encode_datadog_tracestate(
 
 std::string encode_tracestate(
     int sampling_priority, const Optional<std::string>& origin,
-    const std::unordered_map<std::string, std::string>& trace_tags,
+    const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate,
     const Optional<std::string>& additional_w3c_tracestate) {
   std::string result = encode_datadog_tracestate(

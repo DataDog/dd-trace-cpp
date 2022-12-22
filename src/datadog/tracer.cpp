@@ -37,11 +37,12 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
   if (auto* error = maybe_trace_tags.if_error()) {
     logger.log_error(*error);
     span_tags[tags::internal::propagation_error] = "decoding_error";
-  } else {
-    for (const auto& [key, value] : *maybe_trace_tags) {
-      if (starts_with(key, "_dd.p.")) {
-        result.trace_tags.insert_or_assign(key, value);
-      }
+    return;
+  }
+
+  for (auto& [key, value] : *maybe_trace_tags) {
+    if (starts_with(key, "_dd.p.")) {
+      result.trace_tags.emplace_back(std::move(key), std::move(value));
     }
   }
 }
@@ -248,7 +249,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
-      std::unordered_map<std::string, std::string>{} /* trace_tags */,
+      std::vector<std::pair<std::string, std::string>>{} /* trace_tags */,
       nullopt /* sampling_decision */, nullopt /* full_w3c_trace_id_hex */,
       nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));

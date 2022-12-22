@@ -5,7 +5,8 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "optional.h"
 
@@ -16,7 +17,7 @@ struct ExtractedData {
   Optional<std::uint64_t> trace_id;
   Optional<std::uint64_t> parent_id;
   Optional<std::string> origin;
-  std::unordered_map<std::string, std::string> trace_tags;
+  std::vector<std::pair<std::string, std::string>> trace_tags;
   Optional<int> sampling_priority;
   // If this `ExtractedData` was created on account of `PropagationStyle::W3C`
   // and trace context was successfully extracted, then `full_w3c_trace_id_hex`
