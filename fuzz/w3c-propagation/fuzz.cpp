@@ -18,7 +18,7 @@ namespace dd = datadog::tracing;
 namespace {
 
 dd::Tracer& tracer_singleton() {
-  static auto tracer = []() {
+  thread_local auto tracer = []() {
     dd::TracerConfig config;
     config.defaults.service = "fuzzer";
     config.collector = std::make_shared<dd::NullCollector>();
