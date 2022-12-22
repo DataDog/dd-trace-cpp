@@ -241,7 +241,7 @@ void TraceSegment::update_decision_maker_trace_tag() {
   if (found == trace_tags_.end()) {
     trace_tags_.emplace_back(tags::internal::decision_maker, std::move(value));
   } else {
-    found->second == std::move(value);
+    found->second = std::move(value);
   }
 }
 
