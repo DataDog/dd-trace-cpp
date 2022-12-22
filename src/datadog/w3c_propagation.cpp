@@ -330,21 +330,12 @@ std::string encode_datadog_tracestate(
   std::string result = "dd=s:";
   result += std::to_string(sampling_priority);
 
-  const std::size_t max_size = 256;
-  std::size_t last_good_size = result.size();
-
   if (origin) {
     result += ";o:";
     result += *origin;
     std::replace_if(result.end() - origin->size(), result.end(),
                     verboten(0x20, 0x7e, ",;="), '_');
   }
-
-  if (result.size() > max_size) {
-    result.resize(last_good_size);
-    return result;
-  }
-  last_good_size = result.size();
 
   for (const auto& [key, value] : trace_tags) {
     const StringView prefix = "_dd.p.";
@@ -365,12 +356,6 @@ std::string encode_datadog_tracestate(
     // `value` might contain equal signs ("="), which is reserved in tracestate.
     // Replace them with tildes ("~").
     std::replace(result.end() - value.size(), result.end(), '=', '~');
-
-    if (result.size() > max_size) {
-      result.resize(last_good_size);
-      return result;
-    }
-    last_good_size = result.size();
   }
 
   if (additional_datadog_w3c_tracestate) {
@@ -378,8 +363,14 @@ std::string encode_datadog_tracestate(
     result += *additional_datadog_w3c_tracestate;
   }
 
-  if (result.size() > max_size) {
-    result.resize(last_good_size);
+  const std::size_t max_size = 256;
+  while (result.size() > max_size) {
+    const auto last_semicolon_index = result.rfind(';');
+    // This assumption is safe, because `result` always begins with
+    // "dd=s:<int>", and that's fewer than `max_size` characters for any
+    // `<int>`.
+    assert(last_semicolon_index != std::string::npos);
+    result.resize(last_semicolon_index);
   }
 
   return result;

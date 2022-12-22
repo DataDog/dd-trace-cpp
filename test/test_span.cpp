@@ -558,7 +558,7 @@ TEST_CASE("injecting W3C tracestate header") {
   //     - special tilde ("~") behavior
   // - length limit:
   //   - at origin
-  //   - at a trace tag (extract extra fields from W3C)
+  //   - at a trace tag
   //   - at the extra fields (extracted from W3C)
 
   TracerConfig config;
@@ -585,6 +585,9 @@ TEST_CASE("injecting W3C tracestate header") {
     std::string expected_tracestate;
   };
 
+  static const auto traceparent_drop =
+      "00-00000000000000000000000000000001-0000000000000001-00";
+
   // clang-format off
   auto test_case = GENERATE(values<TestCase>({
     {__LINE__, "sampling priority",
@@ -600,9 +603,69 @@ TEST_CASE("injecting W3C tracestate header") {
 
     {__LINE__, "trace tags",
      {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-tags", "_dd.p.foo=x,_dd.p.bar=y"}},
+      {"x-datadog-tags", "_dd.p.foo=x,_dd.p.bar=y,ignored=wrong_prefix"}},
       // The "s:-1" comes from the 0% sample rate.
      "dd=s:-1;t.foo:x;t.bar:y"},
+
+    {__LINE__, "extra fields",
+     {{"traceparent", traceparent_drop}, {"tracestate", "dd=foo:bar;boing:boing"}},
+    // The "s:0" comes from the sampling decision in `traceparent_drop`.
+    "dd=s:0;foo:bar;boing:boing"},
+
+    {__LINE__, "all of the above",
+     {{"traceparent", traceparent_drop},
+      {"tracestate", "dd=o:France;t.foo:x;t.bar:y;foo:bar;boing:boing"}},
+    // The "s:0" comes from the sampling decision in `traceparent_drop`.
+    "dd=s:0;o:France;t.foo:x;t.bar:y;foo:bar;boing:boing"},
+
+    {__LINE__, "replace invalid characters in origin",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-origin", "France, is a country=nation; so is 台北."}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;o:France_ is a country_nation_ so is ______."},
+
+    {__LINE__, "replace invalid characters in trace tag key",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.a;d台北x =foo,_dd.p.ok=bar"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.a_d______x_:foo;t.ok:bar"},
+
+    {__LINE__, "replace invalid characters in trace tag value",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.wacky=hello fr~d; how are คุณ?"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.wacky:hello fr_d_ how are _________?"},
+
+    {__LINE__, "replace equal signs with tildes in trace tag value",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.base64_thingy=d2Fra2EhIHdhaw=="}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.base64_thingy:d2Fra2EhIHdhaw~~"},
+
+    {__LINE__, "oversized origin truncates it and subsequent fields",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-origin", "long cat is looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong"},
+      {"x-datadog-tags", "_dd.p.foo=bar,_dd.p.honk=honk"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1"},
+
+    {__LINE__, "oversized trace tag truncates it and subsequent fields",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.foo=bar,_dd.p.long_cat_is=looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,_dd.p.lost=forever"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.foo:bar"},
+
+    {__LINE__, "oversized extra field truncates itself and subsequent fields",
+     {{"traceparent", traceparent_drop},
+      {"tracestate", "dd=foo:bar;long_cat_is:looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong;lost:forever"}},
+     // The "s:0" comes from the sampling decision in `traceparent_drop`.
+     "dd=s:0;foo:bar"},
+
+    {__LINE__, "non-Datadog tracestate",
+     {{"traceparent", traceparent_drop},
+      {"tracestate", "foo=bar,boing=boing"}},
+     // The "s:0" comes from the sampling decision in `traceparent_drop`.
+     "dd=s:0,foo=bar,boing=boing"},
   }));
   // clang-format on
 
