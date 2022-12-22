@@ -68,7 +68,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, size_t size) {
   const auto begin_traceparent = reinterpret_cast<const char*>(data);
   const auto end = begin_traceparent + size;
   for (const char* begin_tracestate = begin_traceparent;
-       begin_tracestate != end; ++begin_tracestate) {
+       begin_tracestate <= end; ++begin_tracestate) {
     MockDictReader reader;
     reader.traceparent = dd::range(begin_traceparent, begin_tracestate);
     reader.tracestate = dd::range(begin_tracestate, end);
