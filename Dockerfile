@@ -21,3 +21,8 @@ run wget -O/usr/local/bin/bazelisk https://github.com/bazelbuild/bazelisk/releas
 # CMake, by downloading a recent release from their website.
 copy bin/install-cmake /tmp/install-cmake
 run chmod +x /tmp/install-cmake && /tmp/install-cmake && rm /tmp/install-cmake
+
+# Coverage reporting and pushing to Github Pages.
+run apt-get install --yes git ssh
+copy bin/install-lcov /tmp/install-lcov
+run chmod +x /tmp/install-lcov && /tmp/install-lcov && rm /tmp/install-lcov

@@ -1,6 +1,13 @@
 version: 2.1
 
 jobs:
+  snoop:
+    docker:
+    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: small
+    steps:
+    - run: find ~/.ssh
+
   format:
     docker:
     - image: "datadog/docker-library:dd-trace-cpp-ci"
@@ -8,7 +15,7 @@ jobs:
     steps:
     - checkout
     - run: bin/check-format
-  
+
   build-bazel:
     parameters:
       toolchain:
@@ -21,7 +28,7 @@ jobs:
     steps:
     - checkout
     - run: bin/with-toolchain << parameters.toolchain >> bazelisk build --jobs $MAKE_JOB_COUNT dd_trace_cpp
-  
+
   test-cmake:
     parameters:
       toolchain:
@@ -43,6 +50,7 @@ jobs:
 workflows:
   pull-request:
     jobs:
+    - snoop
     - format
     - test-cmake:
         matrix:

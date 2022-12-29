@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -x
+set -e
+
+cd /tmp
+wget 'https://github.com/linux-test-project/lcov/releases/download/v1.16/lcov-1.16.tar.gz'
+tar xzf lcov-1.16.tar.gz
+cd lcov-1.16/
+make install
+cd ../
+rm -r lcov-1.16 lcov-1.16.tar.gz
