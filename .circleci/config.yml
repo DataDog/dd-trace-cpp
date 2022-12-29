@@ -6,6 +6,9 @@ jobs:
     - image: "datadog/docker-library:dd-trace-cpp-ci"
     resource_class: small
     steps:
+    - add_ssh_keys:
+        fingerprints:
+        - "90:30:2f:b2:d1:88:73:79:4e:2b:ea:45:e2:b7:ea:b3"
     - run: find ~/.ssh
 
   format:
