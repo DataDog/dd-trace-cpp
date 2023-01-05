@@ -1,6 +1,7 @@
 version: 2.1
 
 jobs:
+
   format:
     docker:
     - image: "datadog/docker-library:dd-trace-cpp-ci"
@@ -8,7 +9,7 @@ jobs:
     steps:
     - checkout
     - run: bin/check-format
-  
+
   build-bazel:
     parameters:
       toolchain:
@@ -21,7 +22,7 @@ jobs:
     steps:
     - checkout
     - run: bin/with-toolchain << parameters.toolchain >> bazelisk build --jobs $MAKE_JOB_COUNT dd_trace_cpp
-  
+
   test-cmake:
     parameters:
       toolchain:
@@ -40,6 +41,20 @@ jobs:
     - run: cd .build && make -j $MAKE_JOB_COUNT VERBOSE=1
     - run: cd .build && test/tests
 
+  coverage:
+    docker:
+    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: xlarge
+    environment:
+      MAKE_JOB_COUNT: 8
+    steps:
+    - checkout
+    - run: bin/test --coverage --verbose
+    - add_ssh_keys:
+        fingerprints:
+        - "d3:8f:a8:6e:b6:ef:37:65:1a:dc:2b:88:3b:ff:50:f4"
+    - run: bin/publish-coverage
+
 workflows:
   pull-request:
     jobs:
@@ -53,3 +68,4 @@ workflows:
         matrix:
           parameters:
             toolchain: ["gnu", "llvm"]
+    - coverage

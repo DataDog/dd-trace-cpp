@@ -2,6 +2,8 @@
 
 set -e
 
+MAKE_JOB_COUNT=${MAKE_JOB_COUNT:-$(nproc)}
+
 if [ "$1" = '--coverage' ]; then
     coverage_flags=-DBUILD_COVERAGE=1
     shift
@@ -38,7 +40,7 @@ cd .build
 cmake .. $coverage_flags -DBUILD_TESTING=1
 # Clean up any code coverage artifacts.
 find . -type f -name '*.gcda' -print0 | xargs -0 rm -f
-make -j $(nproc) $verbosity_flags
+make -j "$MAKE_JOB_COUNT" $verbosity_flags
 
 if [ "$build_only" -eq 1 ]; then
     exit
@@ -57,7 +59,7 @@ if [ "$coverage_flags" != '' ]; then
     # Filter out system headers and test drivers.
     lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
     # Generate an HTML coverage report at ".coverage/report/index.html".
-    genhtml --quiet .coverage/filtered.info --output-directory .coverage/report
+    genhtml --quiet --dark-mode .coverage/filtered.info --output-directory .coverage/report
 
     echo 'Done.'
 fi
