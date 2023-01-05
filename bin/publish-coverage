@@ -22,9 +22,13 @@ cd "$temp_dir"
 # branch (main).  Don't fetch any regular files.
 mkdir dd-trace-cpp-coverage
 cd dd-trace-cpp-coverage
-git init
-git remote add origin 'git@github.com:DataDog/dd-trace-cpp-coverage.git'
 
+git init
+
+git config user.email "david.goffredo@datadoghq.com"
+git config user.name "David Goffredo (via script)"
+
+git remote add origin 'git@github.com:DataDog/dd-trace-cpp-coverage.git'
 branch=gh-pages
 git fetch --depth=1 --filter=blob:none origin "$branch"
 
