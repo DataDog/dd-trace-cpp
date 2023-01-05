@@ -1,22 +1,53 @@
 #!/bin/sh
 
+# Publish an already-generated coverage report from dd-trace-cpp to
+# dd-trace-cpp-coverage.
+#
+# Overall, here's what we're going to do:
+#
+# Clone as little of the dd-trace-cpp-coverage repository as we can manage.
+# Then, move the rendered coverage report from dd-trace-cpp into a specially
+# named location in dd-trace-cpp-coverage.  Commit and push.
+
+set -x
 set -e
 
-cd "$(dirname "$0")"/..
+tracer_dir=$(pwd)
+temp_dir=$(mktemp -d)
 
-# See <https://unix.stackexchange.com/a/155077>
-if output=$(git status --porcelain) && [ -z "$output" ]; then
-  : # Working directory clean
-else 
-  >&2 echo 'Commit or stash changes to the working tree before running this script.'
-  >&2 echo 'See `git status` for more info.'
-  exit 1
-fi
+echo "Using temporary directory: $temp_dir"
+cd "$temp_dir"
 
-bin/test --coverage
-git switch gh-pages
-cp -r .coverage/report/* .
-git add -A
-git commit -m 'update testing code coverage report'
+# Clone directory structure of the most recent commit of one
+# branch (main).  Don't fetch any regular files.
+mkdir dd-trace-cpp-coverage
+cd dd-trace-cpp-coverage
+git init
+git remote add origin 'git@github.com:DataDog/dd-trace-cpp-coverage.git'
+
+branch=gh-pages
+git fetch --depth=1 --filter=blob:none origin "$branch"
+
+# "Sparse checkout" some subdirectory of the repo root.
+# The leaves above and below that directory will be fetched,
+# but its sibling directories will not.
+git sparse-checkout set dummy/
+git checkout "$branch"
+
+# e.g. "2022-12-29 22:09:54 UTC (6c6e440)"
+coverage_report_name() {
+    commit_time_iso=$(git show -s --format=%cI)
+    commit_hash_short=$(git rev-parse HEAD | head -c 7)
+
+    date "--date=$commit_time_iso" --iso-8601=seconds --utc | \
+        sed -e 's/T/ /' -e "s/+.*/ UTC ($commit_hash_short)/"
+}
+
+cd "$tracer_dir"
+report_name=$(coverage_report_name)
+mv .coverage/report "$temp_dir/dd-trace-cpp-coverage/$report_name"
+
+cd "$temp_dir/dd-trace-cpp-coverage"
+git add -A --sparse
+git commit -m "add $report_name"
 git push
-git switch -
