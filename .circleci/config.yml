@@ -1,15 +1,6 @@
 version: 2.1
 
 jobs:
-  snoop:
-    docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci"
-    resource_class: small
-    steps:
-    - add_ssh_keys:
-        fingerprints:
-        - "d3:8f:a8:6e:b6:ef:37:65:1a:dc:2b:88:3b:ff:50:f4"
-    - run: find ~/.ssh
 
   format:
     docker:
@@ -67,7 +58,6 @@ jobs:
 workflows:
   pull-request:
     jobs:
-    - snoop
     - format
     - test-cmake:
         matrix:
