@@ -11,6 +11,7 @@
 //
 // [1]: https://msgpack.org/index.html
 
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -30,6 +31,8 @@ void pack_integer(std::string& buffer, std::int32_t value);
 void pack_double(std::string& buffer, double value);
 
 Expected<void> pack_string(std::string& buffer, StringView value);
+Expected<void> pack_string(std::string& buffer, const char* begin,
+                           std::size_t size);
 
 Expected<void> pack_array(std::string& buffer, std::size_t size);
 
@@ -65,17 +68,16 @@ Expected<void> pack_map(std::string& buffer, const PairIterable& pairs,
 // an even number of arguments.  First in each pair of arguments is `key`, the
 // key name of the corresponding map item.  Second in each pair of arguments is
 // `pack_value`, a function that encodes the corresponding value.  `pack_value`
-// is invoked with two arguments: the first is a reference to `buffer`, and the
-// second is a reference to the current value.  `pack_value` returns an
-// `Expected<void>`. If the return value is an error, then iteration is halted
-// and the error is returned.  If some other error occurs, then an error is
-// returned.  Otherwise, the non-error value is returned.
-template <typename Key, typename PackValue, typename... Rest>
-Expected<void> pack_map(std::string& buffer, Key&& key, PackValue&& pack_value,
-                        Rest&&... rest);
+// is invoked with one argument: a reference to `buffer`. `pack_value` returns
+// an `Expected<void>`.  If the return value is an error, then iteration is
+// halted and the error is returned.  If some other error occurs, then an error
+// is returned.  Otherwise, the non-error value is returned.
+template <typename PackValue, typename... Rest>
+Expected<void> pack_map(std::string& buffer, StringView key,
+                        PackValue&& pack_value, Rest&&... rest);
 
-template <typename Key, typename PackValue, typename... Rest>
-Expected<void> pack_map_suffix(std::string& buffer, Key&& key,
+template <typename PackValue, typename... Rest>
+Expected<void> pack_map_suffix(std::string& buffer, StringView key,
                                PackValue&& pack_value, Rest&&... rest);
 Expected<void> pack_map_suffix(std::string& buffer);
 
@@ -117,25 +119,23 @@ Expected<void> pack_map(std::string& buffer, const PairIterable& pairs,
   return result;
 }
 
-template <typename Key, typename PackValue, typename... Rest>
-Expected<void> pack_map(std::string& buffer, Key&& key, PackValue&& pack_value,
-                        Rest&&... rest) {
-  Expected<void> result;
+template <typename PackValue, typename... Rest>
+Expected<void> pack_map(std::string& buffer, StringView key,
+                        PackValue&& pack_value, Rest&&... rest) {
   static_assert(
       sizeof...(rest) % 2 == 0,
       "pack_map must receive an even number of arguments after the first.");
-  result = pack_map(buffer, 1 + sizeof...(rest) / 2);
-  if (!result) {
-    return result;
-  }
-  result = pack_map_suffix(buffer, std::forward<Key>(key),
-                           std::forward<PackValue>(pack_value),
-                           std::forward<Rest>(rest)...);
-  return result;
+  static_assert(
+      sizeof...(rest) / 2 <= UINT32_MAX,
+      "You're passing more than eight billion arguments to a function.");
+  (void)pack_map(buffer, 1 + sizeof...(rest) / 2);
+
+  return pack_map_suffix(buffer, key, std::forward<PackValue>(pack_value),
+                         std::forward<Rest>(rest)...);
 }
 
-template <typename Key, typename PackValue, typename... Rest>
-Expected<void> pack_map_suffix(std::string& buffer, Key&& key,
+template <typename PackValue, typename... Rest>
+Expected<void> pack_map_suffix(std::string& buffer, StringView key,
                                PackValue&& pack_value, Rest&&... rest) {
   Expected<void> result;
   result = pack_string(buffer, key);
@@ -157,6 +157,10 @@ inline Expected<void> pack_map_suffix(std::string&) {
 
 inline void pack_integer(std::string& buffer, std::int32_t value) {
   pack_integer(buffer, std::int64_t(value));
+}
+
+inline Expected<void> pack_string(std::string& buffer, StringView value) {
+  return pack_string(buffer, value.begin(), value.size());
 }
 
 }  // namespace msgpack

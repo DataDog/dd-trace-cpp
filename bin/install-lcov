@@ -10,3 +10,10 @@ cd lcov-1.16/
 make install
 cd ../
 rm -r lcov-1.16 lcov-1.16.tar.gz
+
+# Install a faster JSON library for Perl using Perl's package manager, cpan.
+# Newer versions of lcov use JSON instead of an old binary format, so if the
+# JSON library is slow, lcov is slow.
+# The PERL_MM_USE_DEFAULT=1 environment variable prevents cpan from prompting
+# us. 
+PERL_MM_USE_DEFAULT=1 cpan JSON:XS
