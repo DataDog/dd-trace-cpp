@@ -8,4 +8,10 @@ std::ostream& operator<<(
   return stream << '{' << item.first << ", " << item.second << '}';
 }
 
+std::ostream& operator<<(
+    std::ostream& stream,
+    const datadog::tracing::Optional<datadog::tracing::StringView>& item) {
+  return stream << item.value_or("<null>");
+}
+
 }  // namespace std

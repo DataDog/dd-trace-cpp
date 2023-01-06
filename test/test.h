@@ -7,6 +7,8 @@
 #define CATCH_CONFIG_CPP17_BYTE
 
 #include <datadog/expected.h>
+#include <datadog/optional.h>
+#include <datadog/string_view.h>
 
 #include <iosfwd>
 #include <string>
@@ -18,6 +20,10 @@ namespace std {
 
 std::ostream& operator<<(std::ostream& stream,
                          const std::pair<const std::string, std::string>& item);
+
+std::ostream& operator<<(
+    std::ostream& stream,
+    const datadog::tracing::Optional<datadog::tracing::StringView>& item);
 
 }  // namespace std
 
