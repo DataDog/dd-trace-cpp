@@ -1,6 +1,7 @@
 #include "msgpack.h"
 
 #include <cassert>
+#include <climits>
 #include <limits>
 #include <type_traits>
 
@@ -50,7 +51,7 @@ void push_number_big_endian(std::string& buffer, Integer integer) {
   // effectively copies the bytes of `value` backwards.
   const int size = sizeof value;
   for (int i = 0; i < size; ++i) {
-    const char byte = (value >> (8 * ((size - 1) - i))) & 0xFF;
+    const char byte = (value >> (CHAR_BIT * ((size - 1) - i))) & 0xFF;
     buf[i] = byte;
   }
 
@@ -93,8 +94,8 @@ void pack_double(std::string& buffer, double value) {
   push_number_big_endian(buffer, memory.as_integer);
 }
 
-Expected<void> pack_string(std::string& buffer, StringView value) {
-  const auto size = value.size();
+Expected<void> pack_string(std::string& buffer, const char* begin,
+                           std::size_t size) {
   const auto max = std::numeric_limits<std::uint32_t>::max();
   if (size > max) {
     return Error{Error::MESSAGEPACK_ENCODE_FAILURE,
@@ -102,11 +103,11 @@ Expected<void> pack_string(std::string& buffer, StringView value) {
   }
   buffer.push_back(static_cast<char>(types::STR32));
   push_number_big_endian(buffer, static_cast<std::uint32_t>(size));
-  buffer.append(value.begin(), value.end());
+  buffer.append(begin, size);
   return {};
 }
 
-Expected<void> pack_array(std::string& buffer, size_t size) {
+Expected<void> pack_array(std::string& buffer, std::size_t size) {
   const auto max = std::numeric_limits<std::uint32_t>::max();
   if (size > max) {
     return Error{Error::MESSAGEPACK_ENCODE_FAILURE,
@@ -117,7 +118,7 @@ Expected<void> pack_array(std::string& buffer, size_t size) {
   return {};
 }
 
-Expected<void> pack_map(std::string& buffer, size_t size) {
+Expected<void> pack_map(std::string& buffer, std::size_t size) {
   const auto max = std::numeric_limits<std::uint32_t>::max();
   if (size > max) {
     return Error{Error::MESSAGEPACK_ENCODE_FAILURE,

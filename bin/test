@@ -55,7 +55,8 @@ if [ "$coverage_flags" != '' ]; then
     rm -rf .coverage
     mkdir -p .coverage
     # Compile the .gcdo files into an intermediate format.
-    lcov --quiet --capture --directory .build --output-file .coverage/raw.info # -rc geninfo_json_module=JSON::XS
+    # Use the faster JSON Perl module, JSON:XS, to speed things up.
+    lcov --quiet --capture --directory .build --output-file .coverage/raw.info --rc geninfo_json_module=JSON::XS
     # Filter out system headers and test drivers.
     lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
     # Generate an HTML coverage report at ".coverage/report/index.html".
