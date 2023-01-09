@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 # Go to the repository root directory.
 cd "$(dirname "$0")"/..
 
@@ -9,7 +11,7 @@ cd "$(dirname "$0")"/..
 # occasionally bumps the required version, reformatting everything.
 version=14
 formatter=clang-format-$version
-formatter_options="--style=file -i $@"
+formatter_options="--style=file -i"
 
 find_sources() {
     find src/ example/ test/ fuzz/ -type f \( -name '*.h' -o -name '*.cpp' \) "$@"
@@ -17,6 +19,7 @@ find_sources() {
 
 # If the correct version of clang-format is installed, then use it and quit.
 if >/dev/null command -v "$formatter"; then
+    # shellcheck disable=SC2086
     find_sources -print0 | xargs -0 "$formatter" $formatter_options
     exit
 fi
@@ -31,7 +34,7 @@ fi
 image=silkeh/clang:$version
 if [ "$(docker image ls --quiet $image | wc -l)" -eq 0 ]; then
     printf '%s is not installed. Download docker image %s instead? [Y/n] ' "$formatter" "$image"
-    read response
+    read -r response
     case "$response" in
         y|Y|yes|Yes|YES|'') ;;
         *) exit ;;
@@ -52,6 +55,7 @@ process_arg() {
 }
 
 docker_clang_format() {
+    # shellcheck disable=SC2086
     find_sources | while IFS= read -r arg; do
         process_arg "$arg"
     done | xargs -0 \
