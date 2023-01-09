@@ -14,7 +14,7 @@ env DEBIAN_FRONTEND=noninteractive
 run apt-get update && apt-get install --yes software-properties-common && \
     add-apt-repository ppa:git-core/ppa --yes && \
     apt-get update && apt-get upgrade --yes && \
-    apt-get install --yes wget build-essential clang sed gdb clang-format git ssh
+    apt-get install --yes wget build-essential clang sed gdb clang-format git ssh shellcheck
 
 # bazelisk, a launcher for bazel. `bazelisk --help` will cause the latest
 # version to be downloaded.
