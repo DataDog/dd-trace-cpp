@@ -12,12 +12,13 @@ add_executable(tests
     mocks/event_schedulers.cpp
     mocks/http_clients.cpp
     mocks/loggers.cpp
-    
+
     # utilities
     matchers.cpp
-    
+
     # test cases
     test_cerr_logger.cpp
+    test_curl.cpp
     test_datadog_agent.cpp
     test_glob.cpp
     test_limiter.cpp

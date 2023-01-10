@@ -102,7 +102,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/trace_sampler_config.cpp
     src/datadog/trace_sampler.cpp
     src/datadog/trace_segment.cpp
-    src/datadog/version.cpp    
+    src/datadog/version.cpp
 )
 
 # This library's public headers are just its source headers.
@@ -164,12 +164,12 @@ target_sources(dd_trace_cpp PUBLIC
 
 add_dependencies(dd_trace_cpp curl)
 
-# Make the build libcurl visible to dd_trace_cpp, but not to its dependents.
-target_include_directories(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/include)
+# Make the build libcurl visible to dd_trace_cpp, and its dependents.
+target_include_directories(dd_trace_cpp PUBLIC ${CMAKE_BINARY_DIR}/include)
 
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp PRIVATE ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
+target_link_libraries(dd_trace_cpp PUBLIC ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
 
 # When installing, install the library and its public headers.
 
