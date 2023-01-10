@@ -221,8 +221,6 @@ TEST_CASE("fail to allocate request handle") {
   REQUIRE(result.error().code == Error::CURL_REQUEST_SETUP_FAILED);
 }
 
-// CURLoption
-
 TEST_CASE("setopt failures") {
   // Each call to `Curl::post` allocates a new "easy handle" and sets various
   // options on it.  Any of those setters can fail.  When one does, `post`
