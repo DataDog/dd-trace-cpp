@@ -112,6 +112,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/threaded_event_scheduler.cpp
     src/datadog/tracer_config.cpp
     src/datadog/tracer.cpp
+    src/datadog/trace_id.cpp
     src/datadog/trace_sampler_config.cpp
     src/datadog/trace_sampler.cpp
     src/datadog/trace_segment.cpp
@@ -172,6 +173,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/threaded_event_scheduler.h
   src/datadog/tracer_config.h
   src/datadog/tracer.h
+  src/datadog/trace_id.h
   src/datadog/trace_sampler_config.h
   src/datadog/trace_sampler.h
   src/datadog/trace_segment.h
