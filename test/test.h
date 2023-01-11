@@ -9,6 +9,7 @@
 #include <datadog/expected.h>
 #include <datadog/optional.h>
 #include <datadog/string_view.h>
+#include <datadog/trace_id.h>
 
 #include <iosfwd>
 #include <optional>
@@ -41,6 +42,8 @@ std::ostream& operator<<(std::ostream& stream,
   }
   return stream << expected.error();
 }
+
+std::ostream& operator<<(std::ostream&, TraceID);
 
 }  // namespace tracing
 }  // namespace datadog

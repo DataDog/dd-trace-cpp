@@ -400,6 +400,7 @@ TEST_CASE("span extraction") {
 
   SECTION("extracted span has the expected properties") {
     struct TestCase {
+      int line;
       std::string name;
       std::vector<PropagationStyle> extraction_styles;
       std::unordered_map<std::string, std::string> headers;
@@ -409,7 +410,8 @@ TEST_CASE("span extraction") {
     };
 
     auto test_case = GENERATE(values<TestCase>({
-        {"datadog style",
+        {__LINE__,
+         "datadog style",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"},
           {"x-datadog-parent-id", "456"},
@@ -417,19 +419,22 @@ TEST_CASE("span extraction") {
          TraceID(123),
          456,
          2},
-        {"datadog style without sampling priority",
+        {__LINE__,
+         "datadog style without sampling priority",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-parent-id", "456"}},
          TraceID(123),
          456,
          nullopt},
-        {"datadog style without sampling priority and without parent ID",
+        {__LINE__,
+         "datadog style without sampling priority and without parent ID",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-origin", "whatever"}},
          TraceID(123),
          nullopt,
          nullopt},
-        {"B3 style",
+        {__LINE__,
+         "B3 style",
          {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"},
           {"x-b3-spanid", "def"},
@@ -437,13 +442,15 @@ TEST_CASE("span extraction") {
          TraceID(0xabc),
          0xdef,
          0},
-        {"B3 style without sampling priority",
+        {__LINE__,
+         "B3 style without sampling priority",
          {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"}, {"x-b3-spanid", "def"}},
          TraceID(0xabc),
          0xdef,
          nullopt},
-        {"Datadog overriding B3",
+        {__LINE__,
+         "Datadog overriding B3",
          {PropagationStyle::DATADOG, PropagationStyle::B3},
          {{"x-datadog-trace-id", "255"},
           {"x-datadog-parent-id", "14"},
@@ -454,7 +461,8 @@ TEST_CASE("span extraction") {
          TraceID(255),
          14,
          0},
-        {"Datadog overriding B3, without sampling priority",
+        {__LINE__,
+         "Datadog overriding B3, without sampling priority",
          {PropagationStyle::DATADOG, PropagationStyle::B3},
          {{"x-datadog-trace-id", "255"},
           {"x-datadog-parent-id", "14"},
@@ -463,13 +471,15 @@ TEST_CASE("span extraction") {
          TraceID(255),
          14,
          nullopt},
-        {"B3 after Datadog found no context",
+        {__LINE__,
+         "B3 after Datadog found no context",
          {PropagationStyle::DATADOG, PropagationStyle::B3},
          {{"x-b3-traceid", "ff"}, {"x-b3-spanid", "e"}},
          TraceID(0xff),
          0xe,
          nullopt},
-        {"Datadog after B3 found no context",
+        {__LINE__,
+         "Datadog after B3 found no context",
          {PropagationStyle::B3, PropagationStyle::DATADOG},
          {{"x-b3-traceid", "fff"}, {"x-b3-spanid", "ef"}},
          TraceID(0xfff),
@@ -477,6 +487,7 @@ TEST_CASE("span extraction") {
          nullopt},
     }));
 
+    CAPTURE(test_case.line);
     CAPTURE(test_case.name);
 
     config.extraction_styles = test_case.extraction_styles;

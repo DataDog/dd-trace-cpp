@@ -6,17 +6,17 @@
 namespace datadog {
 namespace tracing {
 
-TraceID::TraceID() : low(0) {}
+TraceID::TraceID() : low(0), high(0) {}
 
-TraceID::TraceID(std::uint64_t low) : low(low) {}
+TraceID::TraceID(std::uint64_t low) : low(low), high(0) {}
 
 TraceID::TraceID(std::uint64_t low, std::uint64_t high)
     : low(low), high(high) {}
 
 std::string TraceID::hex() const {
   std::string result;
-  if (high && *high) {
-    result += ::datadog::tracing::hex(*high);
+  if (high) {
+    result += ::datadog::tracing::hex(high);
   }
   result += ::datadog::tracing::hex(low);
   return result;
@@ -82,17 +82,11 @@ bool operator!=(TraceID left, TraceID right) {
 }
 
 bool operator==(TraceID left, std::uint64_t right) {
-  if (left.high) {
-    return *left.high == 0 && left.low == right;
-  }
-  return left.low == right;
+  return left.high == 0 && left.low == right;
 }
 
 bool operator!=(TraceID left, std::uint64_t right) {
-  if (left.high) {
-    return *left.high != 0 || left.low != right;
-  }
-  return left.low != right;
+  return left.high != 0 || left.low != right;
 }
 
 }  // namespace tracing

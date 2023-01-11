@@ -23,3 +23,13 @@ std::ostream& operator<<(std::ostream& stream,
 }
 
 }  // namespace std
+
+namespace datadog {
+namespace tracing {
+
+std::ostream& operator<<(std::ostream& stream, TraceID trace_id) {
+  return stream << trace_id.debug();
+}
+
+}  // namespace tracing
+}  // namespace datadog

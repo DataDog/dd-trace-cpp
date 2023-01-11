@@ -6,7 +6,6 @@
 #include <string>
 
 #include "expected.h"
-#include "optional.h"
 #include "string_view.h"
 
 namespace datadog {
@@ -14,7 +13,7 @@ namespace tracing {
 
 struct TraceID {
   std::uint64_t low;
-  Optional<std::uint64_t> high;
+  std::uint64_t high;
 
   // TODO: document
   TraceID();
