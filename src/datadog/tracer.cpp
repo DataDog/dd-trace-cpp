@@ -7,6 +7,7 @@
 #include "dict_reader.h"
 #include "environment.h"
 #include "extracted_data.h"
+#include "hex.h"
 #include "json.hpp"
 #include "logger.h"
 #include "net_util.h"
@@ -41,8 +42,27 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
   }
 
   for (auto& [key, value] : *maybe_trace_tags) {
-    if (starts_with(key, "_dd.p.")) {
-      result.trace_tags.emplace_back(std::move(key), std::move(value));
+    if (!starts_with(key, "_dd.p.")) {
+      continue;
+    }
+
+    result.trace_tags.emplace_back(std::move(key), std::move(value));
+
+    if (key == "_dd.p.tid") {
+      // _dd.p.tid contains the high 64 bits of the trace ID.
+      auto high = parse_uint64(value, 16);
+      if (auto* error = high.if_error()) {
+        logger.log_error(
+            error->with_prefix("Unable to parse high bits of the trace ID in "
+                               "Datadog style from the "
+                               "\"_dd.p.tid\" trace tag: "));
+        span_tags[tags::internal::propagation_error] = "decoding_error";
+      }
+      // Note that this assumes the lower 64 bits of the trace ID have already
+      // been extracted (i.e. we look for X-Datadog-Trace-ID first).
+      if (result.trace_id) {
+        result.trace_id->high = *high;
+      }
     }
   }
 }
@@ -114,8 +134,7 @@ Expected<ExtractedData> extract_datadog(
     result.origin = std::string(*origin);
   }
 
-  auto trace_tags = headers.lookup("x-datadog-tags");
-  if (trace_tags) {
+  if (auto trace_tags = headers.lookup("x-datadog-tags")) {
     handle_trace_tags(*trace_tags, result, span_tags, logger);
   }
 
@@ -123,8 +142,8 @@ Expected<ExtractedData> extract_datadog(
 }
 
 Expected<ExtractedData> extract_b3(
-    const DictReader& headers,
-    std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
+    const DictReader& headers, std::unordered_map<std::string, std::string>&,
+    Logger&) {
   ExtractedData result;
 
   if (auto found = headers.lookup("x-b3-traceid")) {
@@ -158,17 +177,6 @@ Expected<ExtractedData> extract_b3(
       return error->with_prefix(prefix);
     }
     result.sampling_priority = *sampling_priority;
-  }
-
-  // Origin and trace tags are still extracted, but from the Datadog headers.
-  auto origin = headers.lookup("x-datadog-origin");
-  if (origin) {
-    result.origin = std::string(*origin);
-  }
-
-  auto trace_tags = headers.lookup("x-datadog-tags");
-  if (trace_tags) {
-    handle_trace_tags(*trace_tags, result, span_tags, logger);
   }
 
   return result;
@@ -248,9 +256,11 @@ Span Tracer::create_span() { return create_span(SpanConfig{}); }
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
+  std::vector<std::pair<std::string, std::string>> trace_tags;
   span_data->trace_id.low = generator_();
   if (/* TODO: feature flag */ true) {
-    span_data->trace_id.high = generator_();
+    const auto high = span_data->trace_id.high = generator_();
+    trace_tags.emplace_back("_dd.p.tid", hex(high));
   }
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
@@ -259,8 +269,8 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
-      std::vector<std::pair<std::string, std::string>>{} /* trace_tags */,
-      nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
+      std::move(trace_tags), nullopt /* sampling_decision */,
+      nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;

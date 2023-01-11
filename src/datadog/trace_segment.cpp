@@ -281,11 +281,6 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         writer.set("x-b3-traceid", span.trace_id.hex());
         writer.set("x-b3-spanid", hex(span.span_id));
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
-        if (origin_) {
-          writer.set("x-datadog-origin", *origin_);
-        }
-        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::W3C:
         writer.set(
