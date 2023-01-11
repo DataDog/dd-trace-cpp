@@ -7,6 +7,7 @@
 #include "dict_reader.h"
 #include "environment.h"
 #include "extracted_data.h"
+#include "hex.h"
 #include "json.hpp"
 #include "logger.h"
 #include "net_util.h"
@@ -114,9 +115,27 @@ Expected<ExtractedData> extract_datadog(
     result.origin = std::string(*origin);
   }
 
-  auto trace_tags = headers.lookup("x-datadog-tags");
-  if (trace_tags) {
+  if (auto trace_tags = headers.lookup("x-datadog-tags")) {
     handle_trace_tags(*trace_tags, result, span_tags, logger);
+  }
+
+  // See if the trace ID has any of its high bits set.
+  // TODO: There are a bunch of combinations with B3 and W3C...
+  // tabulate them and think about it more when you're fresh.
+  const auto found = std::find_if(
+      result.trace_tags.begin(), result.trace_tags.end(),
+      [](const auto& entry) { return entry.first == "_dd.p.tid"; });
+  if (found != result.trace_tags.end()) {
+    auto high = parse_uint64(found->second, 16);
+    if (auto* error = high.if_error()) {
+      // TODO: maybe don't fail
+      return error->with_prefix(
+          "Unable to parse high bits of the trace ID in Datadog style from the "
+          "\"_dd.p.tid\" trace tag: ");
+    }
+    if (result.trace_id) {
+      result.trace_id->high = *high;
+    }
   }
 
   return result;
@@ -248,9 +267,11 @@ Span Tracer::create_span() { return create_span(SpanConfig{}); }
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
+  std::vector<std::pair<std::string, std::string>> trace_tags;
   span_data->trace_id.low = generator_();
   if (/* TODO: feature flag */ true) {
-    span_data->trace_id.high = generator_();
+    const auto high = span_data->trace_id.high = generator_();
+    trace_tags.emplace_back("_dd.p.tid", hex(high));
   }
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
@@ -259,8 +280,8 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
-      std::vector<std::pair<std::string, std::string>>{} /* trace_tags */,
-      nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
+      std::move(trace_tags), nullopt /* sampling_decision */,
+      nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;
