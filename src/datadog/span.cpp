@@ -62,7 +62,7 @@ void Span::inject(DictWriter& writer) const {
 
 std::uint64_t Span::id() const { return data_->span_id; }
 
-std::uint64_t Span::trace_id() const { return data_->trace_id; }
+TraceID Span::trace_id() const { return data_->trace_id; }
 
 Optional<std::uint64_t> Span::parent_id() const {
   if (data_->parent_id == 0) {

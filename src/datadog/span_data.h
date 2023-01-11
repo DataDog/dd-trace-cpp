@@ -12,6 +12,7 @@
 #include "expected.h"
 #include "optional.h"
 #include "string_view.h"
+#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {
@@ -24,7 +25,7 @@ struct SpanData {
   std::string service_type;
   std::string name;
   std::string resource;
-  std::uint64_t trace_id = 0;
+  TraceID trace_id;
   std::uint64_t span_id = 0;
   std::uint64_t parent_id = 0;
   TimePoint start;

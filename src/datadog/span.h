@@ -49,6 +49,7 @@
 #include "id_generator.h"
 #include "optional.h"
 #include "string_view.h"
+#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {
@@ -95,7 +96,7 @@ class Span {
   // Return this span's ID (span ID).
   std::uint64_t id() const;
   // Return the ID of the trace of which this span is a part.
-  std::uint64_t trace_id() const;
+  TraceID trace_id() const;
   // Return the ID of this span's parent span, or return null if this span has
   // no parent.
   Optional<std::uint64_t> parent_id() const;

@@ -269,7 +269,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   for (const auto style : injection_styles_) {
     switch (style) {
       case PropagationStyle::DATADOG:
-        writer.set("x-datadog-trace-id", std::to_string(span.trace_id));
+        writer.set("x-datadog-trace-id", std::to_string(span.trace_id.lower));
         writer.set("x-datadog-parent-id", std::to_string(span.span_id));
         writer.set("x-datadog-sampling-priority",
                    std::to_string(sampling_priority));
@@ -280,7 +280,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
                           spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::B3:
-        writer.set("x-b3-traceid", hex(span.trace_id));
+        writer.set("x-b3-traceid", span.trace_id.hex());
         writer.set("x-b3-spanid", hex(span.span_id));
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
         if (origin_) {
