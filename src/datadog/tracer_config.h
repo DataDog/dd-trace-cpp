@@ -87,7 +87,6 @@ struct TracerConfig {
 
   // `logger` specifies how the tracer will issue diagnostic messages.  If
   // `logger` is null, then it defaults to a logger that inserts into
-  // `std::cerr`.
   std::shared_ptr<Logger> logger = nullptr;
 
   // `log_on_startup` indicates whether the tracer will log a banner of

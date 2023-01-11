@@ -9,22 +9,17 @@
 #include <vector>
 
 #include "optional.h"
+#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {
 
 struct ExtractedData {
-  Optional<std::uint64_t> trace_id;
+  Optional<TraceID> trace_id;
   Optional<std::uint64_t> parent_id;
   Optional<std::string> origin;
   std::vector<std::pair<std::string, std::string>> trace_tags;
   Optional<int> sampling_priority;
-  // If this `ExtractedData` was created on account of `PropagationStyle::W3C`
-  // and trace context was successfully extracted, then `full_w3c_trace_id_hex`
-  // contains the hex-encoded 128-bit trace ID. `trace_id` will be the least
-  // significant 64 bits of the same value. `full_w3c_trace_id_hex` is used for
-  // the `W3C` injection style.
-  Optional<std::string> full_w3c_trace_id_hex;
   // If this `ExtractedData` was created on account of `PropagationStyle::W3C`,
   // then `additional_w3c_tracestate` contains the parts of the "tracestate"
   // header that are not the "dd" (Datadog) entry. If there are no other parts,

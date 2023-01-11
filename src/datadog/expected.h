@@ -17,7 +17,6 @@
 //       auto maybe_int = parse_integer("the answer");
 //       // using the `if_error` method
 //       if (auto *error = maybe_int.if_error()) {
-//         std::cerr << "parse_integer returned error: " << *error << '\n';
 //         return int(error->code);
 //       }
 //
@@ -26,7 +25,6 @@
 //       maybe_int = parse_integer("one hundred twenty-three");
 //       // use the `error` method.
 //       if (!maybe_int) {
-//         std::cerr << "parse_integer returned error: " << maybe_int.error() <<
 //         '\n'; return int(maybe_int.error().code);
 //       }
 //

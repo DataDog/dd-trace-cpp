@@ -1,6 +1,6 @@
 #pragma once
 
-// TODO
+// TODO: document
 
 #include <cstdint>
 #include <string>
@@ -16,13 +16,16 @@ struct TraceID {
   std::uint64_t low;
   Optional<std::uint64_t> high;
 
+  // TODO: document
   TraceID();
   explicit TraceID(std::uint64_t low);
   TraceID(std::uint64_t low, std::uint64_t high);
 
+  // TODO: document
   std::string hex() const;
-  std::string low_dec() const;
+  std::string debug() const;
 
+  // TODO: document
   static Expected<TraceID> parse_hex(StringView);
 };
 

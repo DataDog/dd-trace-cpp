@@ -11,6 +11,7 @@
 #include <datadog/span_defaults.h>
 #include <datadog/tag_propagation.h>
 #include <datadog/tags.h>
+#include <datadog/trace_id.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
@@ -261,6 +262,7 @@ TEST_CASE("span extraction") {
 
   SECTION("extraction failures") {
     struct TestCase {
+      int line;
       std::string name;
       std::vector<PropagationStyle> extraction_styles;
       std::unordered_map<std::string, std::string> headers;
@@ -269,74 +271,94 @@ TEST_CASE("span extraction") {
     };
 
     auto test_case = GENERATE(values<TestCase>({
-        {"no span", {PropagationStyle::DATADOG}, {}, Error::NO_SPAN_TO_EXTRACT},
-        {"missing trace ID",
+        {__LINE__,
+         "no span",
+         {PropagationStyle::DATADOG},
+         {},
+         Error::NO_SPAN_TO_EXTRACT},
+        {__LINE__,
+         "missing trace ID",
          {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "456"}},
          Error::MISSING_TRACE_ID},
-        {"missing parent span ID",
+        {__LINE__,
+         "missing parent span ID",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}},
          Error::MISSING_PARENT_SPAN_ID},
-        {"missing parent span ID, but it's ok because origin",
+        {__LINE__,
+         "missing parent span ID, but it's ok because origin",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-origin", "anything"}},
          nullopt},
-        {"bad x-datadog-trace-id",
+        {__LINE__,
+         "bad x-datadog-trace-id",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "f"}, {"x-datadog-parent-id", "456"}},
          Error::INVALID_INTEGER},
-        {"bad x-datadog-trace-id (2)",
+        {__LINE__,
+         "bad x-datadog-trace-id (2)",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "99999999999999999999999999"},
           {"x-datadog-parent-id", "456"}},
          Error::OUT_OF_RANGE_INTEGER},
-        {"bad x-datadog-parent-id",
+        {__LINE__,
+         "bad x-datadog-parent-id",
          {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "f"}, {"x-datadog-trace-id", "456"}},
          Error::INVALID_INTEGER},
-        {"bad x-datadog-parent-id (2)",
+        {__LINE__,
+         "bad x-datadog-parent-id (2)",
          {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "99999999999999999999999999"},
           {"x-datadog-trace-id", "456"}},
          Error::OUT_OF_RANGE_INTEGER},
-        {"bad x-datadog-sampling-priority",
+        {__LINE__,
+         "bad x-datadog-sampling-priority",
          {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "123"},
           {"x-datadog-trace-id", "456"},
           {"x-datadog-sampling-priority", "keep"}},
          Error::INVALID_INTEGER},
-        {"bad x-datadog-sampling-priority (2)",
+        {__LINE__,
+         "bad x-datadog-sampling-priority (2)",
          {PropagationStyle::DATADOG},
          {{"x-datadog-parent-id", "123"},
           {"x-datadog-trace-id", "456"},
           {"x-datadog-sampling-priority", "99999999999999999999999999"}},
          Error::OUT_OF_RANGE_INTEGER},
-        {"bad x-b3-traceid",
+        {__LINE__,
+         "bad x-b3-traceid",
          {PropagationStyle::B3},
          {{"x-b3-traceid", "0xdeadbeef"}, {"x-b3-spanid", "def"}},
          Error::INVALID_INTEGER},
-        {"bad x-b3-traceid (2)",
+        {__LINE__,
+         "bad x-b3-traceid (2)",
          {PropagationStyle::B3},
-         {{"x-b3-traceid", "ffffffffffffffffffffffffffffff"},
+         {{"x-b3-traceid",
+           "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
           {"x-b3-spanid", "def"}},
          Error::OUT_OF_RANGE_INTEGER},
-        {"bad x-b3-spanid",
+        {__LINE__,
+         "bad x-b3-spanid",
          {PropagationStyle::B3},
          {{"x-b3-spanid", "0xdeadbeef"}, {"x-b3-traceid", "def"}},
          Error::INVALID_INTEGER},
-        {"bad x-b3-spanid (2)",
+        {__LINE__,
+         "bad x-b3-spanid (2)",
          {PropagationStyle::B3},
          {{"x-b3-spanid", "ffffffffffffffffffffffffffffff"},
           {"x-b3-traceid", "def"}},
          Error::OUT_OF_RANGE_INTEGER},
-        {"bad x-b3-sampled",
+        {__LINE__,
+         "bad x-b3-sampled",
          {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"},
           {"x-b3-spanid", "def"},
           {"x-b3-sampled", "true"}},
          Error::INVALID_INTEGER},
-        {"bad x-b3-sampled (2)",
+        {__LINE__,
+         "bad x-b3-sampled (2)",
          {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"},
           {"x-b3-spanid", "def"},
@@ -344,6 +366,7 @@ TEST_CASE("span extraction") {
          Error::OUT_OF_RANGE_INTEGER},
     }));
 
+    CAPTURE(test_case.line);
     CAPTURE(test_case.name);
 
     config.extraction_styles = test_case.extraction_styles;
@@ -380,7 +403,7 @@ TEST_CASE("span extraction") {
       std::string name;
       std::vector<PropagationStyle> extraction_styles;
       std::unordered_map<std::string, std::string> headers;
-      std::uint64_t expected_trace_id;
+      TraceID expected_trace_id;
       Optional<std::uint64_t> expected_parent_id;
       Optional<int> expected_sampling_priority;
     };
@@ -391,19 +414,19 @@ TEST_CASE("span extraction") {
          {{"x-datadog-trace-id", "123"},
           {"x-datadog-parent-id", "456"},
           {"x-datadog-sampling-priority", "2"}},
-         123,
+         TraceID(123),
          456,
          2},
         {"datadog style without sampling priority",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-parent-id", "456"}},
-         123,
+         TraceID(123),
          456,
          nullopt},
         {"datadog style without sampling priority and without parent ID",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-origin", "whatever"}},
-         123,
+         TraceID(123),
          nullopt,
          nullopt},
         {"B3 style",
@@ -411,13 +434,13 @@ TEST_CASE("span extraction") {
          {{"x-b3-traceid", "abc"},
           {"x-b3-spanid", "def"},
           {"x-b3-sampled", "0"}},
-         0xabc,
+         TraceID(0xabc),
          0xdef,
          0},
         {"B3 style without sampling priority",
          {PropagationStyle::B3},
          {{"x-b3-traceid", "abc"}, {"x-b3-spanid", "def"}},
-         0xabc,
+         TraceID(0xabc),
          0xdef,
          nullopt},
         {"Datadog overriding B3",
@@ -428,7 +451,7 @@ TEST_CASE("span extraction") {
           {"x-b3-traceid", "fff"},
           {"x-b3-spanid", "ef"},
           {"x-b3-sampled", "0"}},
-         255,
+         TraceID(255),
          14,
          0},
         {"Datadog overriding B3, without sampling priority",
@@ -437,19 +460,19 @@ TEST_CASE("span extraction") {
           {"x-datadog-parent-id", "14"},
           {"x-b3-traceid", "fff"},
           {"x-b3-spanid", "ef"}},
-         255,
+         TraceID(255),
          14,
          nullopt},
         {"B3 after Datadog found no context",
          {PropagationStyle::DATADOG, PropagationStyle::B3},
          {{"x-b3-traceid", "ff"}, {"x-b3-spanid", "e"}},
-         0xff,
+         TraceID(0xff),
          0xe,
          nullopt},
         {"Datadog after B3 found no context",
          {PropagationStyle::B3, PropagationStyle::DATADOG},
          {{"x-b3-traceid", "fff"}, {"x-b3-spanid", "ef"}},
-         0xfff,
+         TraceID(0xfff),
          0xef,
          nullopt},
     }));
@@ -507,6 +530,12 @@ TEST_CASE("span extraction") {
     REQUIRE(result.error().code == Error::NO_SPAN_TO_EXTRACT);
   }
 
+  SECTION("sanity") {
+    // In the following tabulated cases, we assume that this hex string is a
+    // valid trace ID.
+    REQUIRE(TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"));
+  }
+
   SECTION("W3C traceparent extraction") {
     const std::unordered_map<std::string, std::string> datadog_headers{
         {"x-datadog-trace-id", "18"},
@@ -519,8 +548,7 @@ TEST_CASE("span extraction") {
       std::string name;
       Optional<std::string> traceparent;
       Optional<std::string> expected_error_tag_value = {};
-      Optional<std::string> expected_full_trace_id = {};
-      Optional<std::uint64_t> expected_trace_id = {};
+      Optional<TraceID> expected_trace_id = {};
       Optional<std::uint64_t> expected_parent_id = {};
       Optional<int> expected_sampling_priority = {};
     };
@@ -531,46 +559,42 @@ TEST_CASE("span extraction") {
         {__LINE__, "valid: w3.org example 1",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", // traceparent
          nullopt,
-         "4bf92f3577b34da6a3ce929d0e0e4736", // expected_full_trace_id
-         11803532876627986230ULL, // expected_trace_id
+         *TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"), // expected_trace_id
          67667974448284343ULL, // expected_parent_id
          1}, // expected_sampling_priority
 
         {__LINE__, "valid: w3.org example 2",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", // traceparent
          nullopt,
-         "4bf92f3577b34da6a3ce929d0e0e4736", // expected_full_trace_id
-         11803532876627986230ULL, // expected_trace_id
+         *TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"), // expected_trace_id
          67667974448284343ULL, // expected_parent_id
          0}, // expected_sampling_priority
 
         {__LINE__, "valid: future version",
          "06-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", // traceparent
          nullopt,
-         "4bf92f3577b34da6a3ce929d0e0e4736", // expected_full_trace_id
-         11803532876627986230ULL, // expected_trace_id
+         *TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"), // expected_trace_id
          67667974448284343ULL, // expected_parent_id
          0}, // expected_sampling_priority
 
         {__LINE__, "valid: future version with extra fields",
          "06-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-af-delta", // traceparent
          nullopt,
-         "4bf92f3577b34da6a3ce929d0e0e4736", // expected_full_trace_id
-         11803532876627986230ULL, // expected_trace_id
+         *TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"), // expected_trace_id
          67667974448284343ULL, // expected_parent_id
          0}, // expected_sampling_priority
-        
+
         {__LINE__, "no traceparent",
          nullopt}, // traceparent
-        
+
         {__LINE__, "invalid: not enough fields",
          "06-4bf92f3577b34da6a3ce929d0e0e4736", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
-        
+
         {__LINE__, "invalid: missing hyphen",
          "064bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
-        
+
         {__LINE__, "invalid: extra data not preceded by hyphen",
          "06-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00af-delta", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
@@ -687,7 +711,7 @@ TEST_CASE("span extraction") {
          traceparent_drop, // traceparent
          "", // tracestate
          0}, // expected_sampling_priority
-        
+
         {__LINE__, "no dd entry",
          traceparent_drop, // traceparent
          "foo=hello,@thingy/thing=wah;wah;wah", // tracestate
@@ -696,7 +720,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,@thingy/thing=wah;wah;wah", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "empty entry",
          traceparent_drop, // traceparent
          "foo=hello,,bar=thing", // tracestate
@@ -705,7 +729,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,,bar=thing", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "malformed entry",
          traceparent_drop, // traceparent
          "foo=hello,chicken,bar=thing", // tracestate
@@ -714,7 +738,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,chicken,bar=thing", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "stuff before dd entry",
          traceparent_drop, // traceparent
          "foo=hello,bar=baz,dd=", // tracestate
@@ -723,7 +747,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,bar=baz", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "stuff after dd entry",
          traceparent_drop, // traceparent
          "dd=,foo=hello,bar=baz", // tracestate
@@ -732,7 +756,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,bar=baz", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "stuff before and after dd entry",
          traceparent_drop, // traceparent
          "chicken=yes,nuggets=yes,dd=,foo=hello,bar=baz", // tracestate
@@ -741,7 +765,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "chicken=yes,nuggets=yes,foo=hello,bar=baz", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "dd entry with empty subentries",
          traceparent_drop, // traceparent
          "dd=foo:bar;;;;;baz:bam;;;", // tracestate
@@ -808,12 +832,12 @@ TEST_CASE("span extraction") {
           traceparent_keep, // traceparent
           "dd=s:-1", // tracestate
           1}, // expected_sampling_priority
-        
+
          {__LINE__, "invalid sampling priority (1/2)",
           traceparent_drop, // traceparent
           "dd=s:oops", // tracestate
           0}, // expected_sampling_priority
-        
+
          {__LINE__, "invalid sampling priority (2/2)",
           traceparent_keep, // traceparent
           "dd=s:oops", // tracestate

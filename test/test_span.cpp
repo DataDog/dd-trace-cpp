@@ -392,11 +392,11 @@ TEST_CASE("injection") {
 
     const auto& headers = writer.items;
     REQUIRE(headers.at("x-datadog-trace-id") ==
-            std::to_string(span.trace_id()));
+            std::to_string(span.trace_id().low));
     REQUIRE(headers.at("x-datadog-parent-id") == std::to_string(span.id()));
     REQUIRE(headers.at("x-datadog-sampling-priority") ==
             std::to_string(priority));
-    REQUIRE(headers.at("x-b3-traceid") == hex(span.trace_id()));
+    REQUIRE(headers.at("x-b3-traceid") == span.trace_id().hex());
     REQUIRE(headers.at("x-b3-spanid") == hex(span.id()));
     REQUIRE(headers.at("x-b3-sampled") == std::to_string(int(priority > 0)));
   }
@@ -536,8 +536,10 @@ TEST_CASE("injecting W3C traceparent header") {
     const auto found = output_headers.find("traceparent");
     REQUIRE(found != output_headers.end());
     // The "cafebabe"s come from `expected_id`.
+    // It appears twice in the trace ID because the generator is invoked twice:
+    // once for the low 64 bits, and again for the high 64 bits.
     const std::string expected =
-        "00-000000000000000000000000cafebabe-00000000cafebabe-" +
+        "00-0000000000000000cafebabecafebabe-00000000cafebabe-" +
         expected_flags;
     REQUIRE(found->second == expected);
   }

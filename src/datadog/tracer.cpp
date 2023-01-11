@@ -83,7 +83,9 @@ Expected<ExtractedData> extract_datadog(
   if (auto* error = trace_id.if_error()) {
     return std::move(*error);
   }
-  result.trace_id = *trace_id;
+  if (*trace_id) {
+    result.trace_id = TraceID(**trace_id);
+  }
 
   auto parent_id = extract_id_header(headers, "x-datadog-parent-id",
                                      "parent span", "Datadog", 10);
@@ -125,11 +127,16 @@ Expected<ExtractedData> extract_b3(
     std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
   ExtractedData result;
 
-  auto trace_id = extract_id_header(headers, "x-b3-traceid", "trace", "B3", 16);
-  if (auto* error = trace_id.if_error()) {
-    return std::move(*error);
+  if (auto found = headers.lookup("x-b3-traceid")) {
+    auto parsed = TraceID::parse_hex(*found);
+    if (auto* error = parsed.if_error()) {
+      std::string prefix = "Could not extract B3-style trace ID from \"";
+      append(prefix, *found);
+      prefix += "\": ";
+      return error->with_prefix(prefix);
+    }
+    result.trace_id = *parsed;
   }
-  result.trace_id = *trace_id;
 
   auto parent_id =
       extract_id_header(headers, "x-b3-spanid", "parent span", "B3", 16);
@@ -241,8 +248,11 @@ Span Tracer::create_span() { return create_span(SpanConfig{}); }
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
-  span_data->span_id = generator_();
-  span_data->trace_id = span_data->span_id;
+  span_data->trace_id.low = generator_();
+  if (/* TODO: feature flag */ true) {
+    span_data->trace_id.high = generator_();
+  }
+  span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
 
   const auto span_data_ptr = span_data.get();
@@ -250,8 +260,7 @@ Span Tracer::create_span(const SpanConfig& config) {
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
       std::vector<std::pair<std::string, std::string>>{} /* trace_tags */,
-      nullopt /* sampling_decision */, nullopt /* full_w3c_trace_id_hex */,
-      nullopt /* additional_w3c_tracestate */,
+      nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;
@@ -300,8 +309,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
-         full_w3c_trace_id_hex, additional_w3c_tracestate,
-         additional_datadog_w3c_tracestate] = extracted_data;
+         additional_w3c_tracestate, additional_datadog_w3c_tracestate] =
+      extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -332,7 +341,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     std::string message;
     message +=
         "There's no parent span ID to extract, but there is a trace ID: ";
-    message += std::to_string(*trace_id);
+    message += trace_id->debug();
     return Error{Error::MISSING_PARENT_SPAN_ID, std::move(message)};
   }
 
@@ -369,7 +378,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
       std::move(trace_tags), std::move(sampling_decision),
-      std::move(full_w3c_trace_id_hex), std::move(additional_w3c_tracestate),
+      std::move(additional_w3c_tracestate),
       std::move(additional_datadog_w3c_tracestate), std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;

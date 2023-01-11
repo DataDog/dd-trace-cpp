@@ -15,14 +15,19 @@ TraceID::TraceID(std::uint64_t low, std::uint64_t high)
 
 std::string TraceID::hex() const {
   std::string result;
-  if (high) {
-    result += datadog::tracing::hex(*high);
+  if (high && *high) {
+    result += ::datadog::tracing::hex(*high);
   }
-  result += datadog::tracing::hex(low);
+  result += ::datadog::tracing::hex(low);
   return result;
 }
 
-std::string TraceID::low_dec() const { return std::to_string(low); }
+std::string TraceID::debug() const {
+  if (high) {
+    return "0x" + hex();
+  }
+  return std::to_string(low);
+}
 
 Expected<TraceID> TraceID::parse_hex(StringView input) {
   const auto parse_hex_piece =
@@ -37,9 +42,9 @@ Expected<TraceID> TraceID::parse_hex(StringView input) {
     return result;
   };
 
-  // A 64-bit integer is at most 32 hex characters.  If the input is no
+  // A 64-bit integer is at most 16 hex characters.  If the input is no
   // longer than that, then it will all fit in `TraceID::low`.
-  if (input.size() <= 32) {
+  if (input.size() <= 16) {
     auto result = parse_hex_piece(input);
     if (auto *error = result.if_error()) {
       return std::move(*error);
@@ -48,7 +53,7 @@ Expected<TraceID> TraceID::parse_hex(StringView input) {
   }
 
   // Parse the lower part and the higher part separately.
-  const auto divider = input.begin() + (input.size() - 32);
+  const auto divider = input.begin() + (input.size() - 16);
   const auto high_hex = range(input.begin(), divider);
   const auto low_hex = range(divider, input.end());
   TraceID trace_id;
