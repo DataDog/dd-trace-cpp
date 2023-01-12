@@ -41,12 +41,12 @@
 // via the `set_end_time` member function prior to the span's destruction.
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 
 #include "clock.h"
 #include "error.h"
-#include "id_generator.h"
 #include "optional.h"
 #include "string_view.h"
 #include "trace_id.h"
@@ -62,19 +62,18 @@ class TraceSegment;
 class Span {
   std::shared_ptr<TraceSegment> trace_segment_;
   SpanData* data_;
-  IDGenerator generate_span_id_;
+  std::function<std::uint64_t()> generate_span_id_;
   Clock clock_;
   Optional<std::chrono::steady_clock::time_point> end_time_;
 
  public:
-  // Create a span whose properties are stored in the specified `data` and that
-  // is associated with the specified `trace_segment`.  Optionally specify
-  // `generate_span_id` to generate IDs of child spans, and a `clock` to
-  // determine start and end times.  If `generate_span_id` and `clock` are not
-  // specified`, then `default_id_generator` and `default_clock` are used
-  // instead respectively.
+  // Create a span whose properties are stored in the specified `data`, that is
+  // associated with the specified `trace_segment`, that uses the specified
+  // `generate_span_id` to generate IDs of child spans, and that uses the
+  // specified `clock` to determine start and end times.
   Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
-       const IDGenerator& generate_span_id, const Clock& clock);
+       const std::function<std::uint64_t()>& generate_span_id,
+       const Clock& clock);
   Span(const Span&) = delete;
   Span(Span&&) = default;
   Span& operator=(Span&&) = default;

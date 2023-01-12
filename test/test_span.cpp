@@ -3,6 +3,7 @@
 // for propagation.
 
 #include <datadog/clock.h>
+#include <datadog/hex.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>
 #include <datadog/span.h>
@@ -11,11 +12,9 @@
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 
-#include <charconv>
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <limits>
 #include <string>
 
 #include "matchers.h"
@@ -352,23 +351,6 @@ TEST_CASE("property setters") {
   }
 }
 
-namespace {
-
-template <typename Integer>
-std::string hex(Integer value) {
-  // 4 bits per hex digit char, and then +1 char for possible minus sign
-  char buffer[std::numeric_limits<Integer>::digits / 4 + 1];
-
-  const int base = 16;
-  auto result =
-      std::to_chars(std::begin(buffer), std::end(buffer), value, base);
-  assert(result.ec == std::errc());
-
-  return std::string{std::begin(buffer), result.ptr};
-}
-
-}  // namespace
-
 // Trace context injection is implemented in `TraceSegment`, but it's part of
 // the interface of `Span`, so the test is here.
 TEST_CASE("injection") {
@@ -380,25 +362,32 @@ TEST_CASE("injection") {
 
   auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);
-  auto generator = []() { return 42; };
-  Tracer tracer{*finalized_config, generator, default_clock};
+  // Override the tracer's ID generator to always return a fixed value.
+  struct Generator : public IDGenerator {
+    const std::uint64_t id;
+    explicit Generator(std::uint64_t id) : id(id) {}
+    TraceID trace_id() const override { return TraceID(id); }
+    std::uint64_t span_id() const override { return id; }
+  };
+  Tracer tracer{*finalized_config, std::make_shared<Generator>(42)};
 
   SECTION("trace ID, parent ID ,and sampling priority") {
     auto span = tracer.create_span();
+    REQUIRE(span.trace_id() == 42);
+    REQUIRE(span.id() == 42);
+
     const int priority = 3;  // 😱
     span.trace_segment().override_sampling_priority(priority);
     MockDictWriter writer;
     span.inject(writer);
 
     const auto& headers = writer.items;
-    REQUIRE(headers.at("x-datadog-trace-id") ==
-            std::to_string(span.trace_id().low));
-    REQUIRE(headers.at("x-datadog-parent-id") == std::to_string(span.id()));
-    REQUIRE(headers.at("x-datadog-sampling-priority") ==
-            std::to_string(priority));
-    REQUIRE(headers.at("x-b3-traceid") == span.trace_id().hex());
-    REQUIRE(headers.at("x-b3-spanid") == hex(span.id()));
-    REQUIRE(headers.at("x-b3-sampled") == std::to_string(int(priority > 0)));
+    REQUIRE(headers.at("x-datadog-trace-id") == "42");
+    REQUIRE(headers.at("x-datadog-parent-id") == "42");
+    REQUIRE(headers.at("x-datadog-sampling-priority") == "3");
+    REQUIRE(headers.at("x-b3-traceid") == "000000000000002a");
+    REQUIRE(headers.at("x-b3-spanid") == "000000000000002a");
+    REQUIRE(headers.at("x-b3-sampled") == "1");
   }
 
   SECTION("origin and trace tags") {
@@ -479,8 +468,14 @@ TEST_CASE("injecting W3C traceparent header") {
 
     // Override the tracer's ID generator to always return `expected_parent_id`.
     constexpr std::uint64_t expected_parent_id = 0xcafebabe;
-    Tracer tracer{*finalized_config, [=]() { return expected_parent_id; },
-                  default_clock};
+    struct Generator : public IDGenerator {
+      const std::uint64_t id;
+      explicit Generator(std::uint64_t id) : id(id) {}
+      TraceID trace_id() const override { return TraceID(id); }
+      std::uint64_t span_id() const override { return id; }
+    };
+    Tracer tracer{*finalized_config,
+                  std::make_shared<Generator>(expected_parent_id)};
 
     const std::unordered_map<std::string, std::string> input_headers{
         // https://www.w3.org/TR/trace-context/#examples-of-http-traceparent-headers
@@ -509,10 +504,14 @@ TEST_CASE("injecting W3C traceparent header") {
     REQUIRE(finalized_config);
 
     // Override the tracer's ID generator to always return a fixed value.
-    // This will be both the trace ID and the parent (root) span ID.
     constexpr std::uint64_t expected_id = 0xcafebabe;
-    Tracer tracer{*finalized_config, [=]() { return expected_id; },
-                  default_clock};
+    struct Generator : public IDGenerator {
+      const std::uint64_t id;
+      explicit Generator(std::uint64_t id) : id(id) {}
+      TraceID trace_id() const override { return TraceID(id); }
+      std::uint64_t span_id() const override { return id; }
+    };
+    Tracer tracer{*finalized_config, std::make_shared<Generator>(expected_id)};
 
     auto span = tracer.create_span();
 
@@ -536,10 +535,8 @@ TEST_CASE("injecting W3C traceparent header") {
     const auto found = output_headers.find("traceparent");
     REQUIRE(found != output_headers.end());
     // The "cafebabe"s come from `expected_id`.
-    // It appears twice in the trace ID because the generator is invoked twice:
-    // once for the low 64 bits, and again for the high 64 bits.
     const std::string expected =
-        "00-0000000000000000cafebabecafebabe-00000000cafebabe-" +
+        "00-000000000000000000000000cafebabe-00000000cafebabe-" +
         expected_flags;
     REQUIRE(found->second == expected);
   }

@@ -13,18 +13,21 @@ TraceID::TraceID(std::uint64_t low) : low(low), high(0) {}
 TraceID::TraceID(std::uint64_t low, std::uint64_t high)
     : low(low), high(high) {}
 
-std::string TraceID::hex() const {
+std::string TraceID::hex_padded() const {
+  // TODO
   std::string result;
   if (high) {
-    result += ::datadog::tracing::hex(high);
+    result += ::datadog::tracing::hex_padded(high);
+  } else {
+    result.append(16, '0');
   }
-  result += ::datadog::tracing::hex(low);
+  result += ::datadog::tracing::hex_padded(low);
   return result;
 }
 
 std::string TraceID::debug() const {
   if (high) {
-    return "0x" + hex();
+    return "0x" + hex_padded();
   }
   return std::to_string(low);
 }

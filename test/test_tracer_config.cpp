@@ -96,13 +96,16 @@ class SomewhatSecureTemporaryFile : public std::fstream {
   SomewhatSecureTemporaryFile() try {
     namespace fs = std::filesystem;
 
+    const auto generator = default_id_generator(false);
+    const auto random = [&]() { return generator->span_id(); };
+
     // The goal is to create a file whose name is like
     // "/tmp/342394898324/239489029034", where the directory under /tmp has
     // permissions such that only the current user can read/write/cd it.
     const auto tmp = fs::temp_directory_path();
     const int max_attempts = 5;
     for (int i = 0; i < max_attempts; ++i) {
-      const auto dir = tmp / std::to_string(default_id_generator());
+      const auto dir = tmp / std::to_string(random());
       std::error_code err;
       if (!fs::create_directory(dir, err)) {
         continue;
@@ -111,7 +114,7 @@ class SomewhatSecureTemporaryFile : public std::fstream {
       if (err) {
         continue;
       }
-      const auto file = dir / std::to_string(default_id_generator());
+      const auto file = dir / std::to_string(random());
       if (fs::exists(file, err) || err) {
         continue;
       }
@@ -1164,13 +1167,13 @@ TEST_CASE("TracerConfig propagation styles") {
     //          ts    tse   se    tsi    si
     //          ---   ---   ---   ---    ---
     /* ts  */{  x,    true, true, true,  true  },
-                                                  
+
     /* tse */{  x,    x,    true, false, false },
-                                                     
+
     /* se  */{  x,    x,    x,    false, false },
-    
+
     /* tsi */{  x,    x,    x,    x,     true  },
-                                                  
+
     /* si  */{  x,    x,    x,    x,     x     },
     };
     // clang-format on

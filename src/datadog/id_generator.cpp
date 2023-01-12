@@ -16,7 +16,7 @@ namespace {
 extern "C" void on_fork();
 #endif
 
-class DefaultIDGenerator {
+class Uint64Generator {
   std::mt19937_64 generator_;
   // The distribution used is for a _signed_ integer, and the default minimum
   // value is zero.
@@ -26,7 +26,7 @@ class DefaultIDGenerator {
   std::uniform_int_distribution<std::int64_t> distribution_;
 
  public:
-  DefaultIDGenerator() {
+  Uint64Generator() {
     seed_with_random();
 // If a process links to this library and then calls `fork`, the `generator_` in
 // the parent and child processes will produce the exact same sequence of
@@ -48,17 +48,36 @@ class DefaultIDGenerator {
   void seed_with_random() { generator_.seed(std::random_device{}()); }
 };
 
-thread_local DefaultIDGenerator thread_local_generator;
+thread_local Uint64Generator thread_local_generator;
 
 #ifndef _MSC_VER
 void on_fork() { thread_local_generator.seed_with_random(); }
 #endif
 
+class DefaultIDGenerator : public IDGenerator {
+  const bool trace_id_128_bit_;
+
+ public:
+  explicit DefaultIDGenerator(bool trace_id_128_bit)
+      : trace_id_128_bit_(trace_id_128_bit) {}
+
+  TraceID trace_id() const override {
+    TraceID result;
+    result.low = thread_local_generator();
+    if (trace_id_128_bit_) {
+      result.high = thread_local_generator();
+    }
+    return result;
+  }
+
+  std::uint64_t span_id() const override { return thread_local_generator(); }
+};
+
 }  // namespace
 
-const IDGenerator default_id_generator = []() {
-  return thread_local_generator();
-};
+std::shared_ptr<const IDGenerator> default_id_generator(bool trace_id_128_bit) {
+  return std::make_shared<DefaultIDGenerator>(trace_id_128_bit);
+}
 
 }  // namespace tracing
 }  // namespace datadog

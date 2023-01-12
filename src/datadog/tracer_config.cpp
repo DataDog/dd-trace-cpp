@@ -360,6 +360,9 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   result.report_hostname = config.report_hostname;
   result.tags_header_size = config.tags_header_size;
 
+  // TODO: DD_TRACE_128_BIT...
+  result.trace_id_128_bit = config.trace_id_128_bit;
+
   return result;
 }
 

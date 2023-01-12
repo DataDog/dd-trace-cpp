@@ -21,7 +21,7 @@ struct TraceID {
   TraceID(std::uint64_t low, std::uint64_t high);
 
   // TODO: document
-  std::string hex() const;
+  std::string hex_padded() const;
   std::string debug() const;
 
   // TODO: document

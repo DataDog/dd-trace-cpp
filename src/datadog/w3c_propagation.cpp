@@ -298,15 +298,11 @@ std::string encode_traceparent(TraceID trace_id, std::uint64_t span_id,
   result += "00-";
 
   // trace ID
-  auto hexed = trace_id.hex();
-  result.append(32 - hexed.size(), '0');  // leading zeroes
-  result += hexed;
+  result += trace_id.hex_padded();
   result += '-';
 
   // span ID
-  hexed = hex(span_id);
-  result.append(16 - hexed.size(), '0');  // leading zeroes
-  result += hexed;
+  result += hex_padded(span_id);
   result += '-';
 
   // flags
@@ -331,7 +327,9 @@ std::string encode_datadog_tracestate(
 
   for (const auto& [key, value] : trace_tags) {
     const StringView prefix = "_dd.p.";
-    if (!starts_with(key, prefix)) {
+    if (!starts_with(key, prefix) || key == "_dd.p.tid") {
+      // Either it's not a propagation tag, or it's one of the propagation tags
+      // that need not be included in tracestate.
       continue;
     }
 

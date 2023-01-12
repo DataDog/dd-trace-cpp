@@ -217,10 +217,19 @@ void log_startup_message(Logger& logger, StringView tracer_version_string,
 }  // namespace
 
 Tracer::Tracer(const FinalizedTracerConfig& config)
-    : Tracer(config, default_id_generator, default_clock) {}
+    : Tracer(config, default_id_generator(config.trace_id_128_bit),
+             default_clock) {}
 
 Tracer::Tracer(const FinalizedTracerConfig& config,
-               const IDGenerator& generator, const Clock& clock)
+               const std::shared_ptr<const IDGenerator>& generator)
+    : Tracer(config, generator, default_clock) {}
+
+Tracer::Tracer(const FinalizedTracerConfig& config, const Clock& clock)
+    : Tracer(config, default_id_generator(config.trace_id_128_bit), clock) {}
+
+Tracer::Tracer(const FinalizedTracerConfig& config,
+               const std::shared_ptr<const IDGenerator>& generator,
+               const Clock& clock)
     : logger_(config.logger),
       collector_(/* see constructor body */),
       trace_sampler_(
@@ -257,10 +266,9 @@ Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
   std::vector<std::pair<std::string, std::string>> trace_tags;
-  span_data->trace_id.low = generator_();
-  if (/* TODO: feature flag */ true) {
-    const auto high = span_data->trace_id.high = generator_();
-    trace_tags.emplace_back("_dd.p.tid", hex(high));
+  span_data->trace_id = generator_->trace_id();
+  if (span_data->trace_id.high) {
+    trace_tags.emplace_back("_dd.p.tid", hex(span_data->trace_id.high));
   }
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
@@ -272,7 +280,9 @@ Span Tracer::create_span(const SpanConfig& config) {
       std::move(trace_tags), nullopt /* sampling_decision */,
       nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
-  Span span{span_data_ptr, segment, generator_, clock_};
+  Span span{span_data_ptr, segment,
+            [generator = generator_]() { return generator->span_id(); },
+            clock_};
   return span;
 }
 
@@ -368,7 +378,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   assert(trace_id);
 
   span_data->apply_config(*defaults_, config, clock_);
-  span_data->span_id = generator_();
+  span_data->span_id = generator_->span_id();
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
 
@@ -390,7 +400,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       std::move(trace_tags), std::move(sampling_decision),
       std::move(additional_w3c_tracestate),
       std::move(additional_datadog_w3c_tracestate), std::move(span_data));
-  Span span{span_data_ptr, segment, generator_, clock_};
+  Span span{span_data_ptr, segment,
+            [generator = generator_]() { return generator->span_id(); },
+            clock_};
   return span;
 }
 

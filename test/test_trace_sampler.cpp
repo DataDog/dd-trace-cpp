@@ -133,7 +133,7 @@ TEST_CASE("trace sampling rate limiter") {
   TimePoint current_time = default_clock();
   // Modify `current_time` to advance the clock.
   auto clock = [&current_time]() { return current_time; };
-  Tracer tracer{*finalized, default_id_generator, clock};
+  Tracer tracer{*finalized, clock};
 
   for (std::size_t i = 0; i < test_case.burst_size; ++i) {
     auto span = tracer.create_span();

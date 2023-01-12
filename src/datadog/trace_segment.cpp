@@ -278,8 +278,12 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
                           spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::B3:
-        writer.set("x-b3-traceid", span.trace_id.hex());
-        writer.set("x-b3-spanid", hex(span.span_id));
+        if (span.trace_id.high) {
+          writer.set("x-b3-traceid", span.trace_id.hex_padded());
+        } else {
+          writer.set("x-b3-traceid", hex_padded(span.trace_id.low));
+        }
+        writer.set("x-b3-spanid", hex_padded(span.span_id));
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
         break;
       case PropagationStyle::W3C:
