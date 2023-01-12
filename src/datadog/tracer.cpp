@@ -138,6 +138,25 @@ Expected<ExtractedData> extract_datadog(
     handle_trace_tags(*trace_tags, result, span_tags, logger);
   }
 
+  // See if the trace ID has any of its high bits set.
+  // TODO: There are a bunch of combinations with B3 and W3C...
+  // tabulate them and think about it more when you're fresh.
+  const auto found = std::find_if(
+      result.trace_tags.begin(), result.trace_tags.end(),
+      [](const auto& entry) { return entry.first == "_dd.p.tid"; });
+  if (found != result.trace_tags.end()) {
+    auto high = parse_uint64(found->second, 16);
+    if (auto* error = high.if_error()) {
+      // TODO: maybe don't fail
+      return error->with_prefix(
+          "Unable to parse high bits of the trace ID in Datadog style from the "
+          "\"_dd.p.tid\" trace tag: ");
+    }
+    if (result.trace_id) {
+      result.trace_id->high = *high;
+    }
+  }
+
   return result;
 }
 
