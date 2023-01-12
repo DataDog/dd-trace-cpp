@@ -19,6 +19,8 @@ namespace tracing {
 
 class IDGenerator {
  public:
+  virtual ~IDGenerator() = default;
+
   virtual std::uint64_t span_id() const = 0;
   virtual TraceID trace_id() const = 0;
 };
