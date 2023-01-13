@@ -46,7 +46,8 @@ namespace environment {
   MACRO(DD_TRACE_SAMPLING_RULES)              \
   MACRO(DD_TRACE_STARTUP_LOGS)                \
   MACRO(DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH) \
-  MACRO(DD_VERSION)
+  MACRO(DD_VERSION)                           \
+  MACRO(DD_TRACE_ID_128_BIT_ENABLED)
 
 #define WITH_COMMA(ARG) ARG,
 
