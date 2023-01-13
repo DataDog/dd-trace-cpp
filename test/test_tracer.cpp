@@ -541,12 +541,6 @@ TEST_CASE("span extraction") {
     REQUIRE(result.error().code == Error::NO_SPAN_TO_EXTRACT);
   }
 
-  SECTION("sanity") {
-    // In the following tabulated cases, we assume that this hex string is a
-    // valid trace ID.
-    REQUIRE(TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"));
-  }
-
   SECTION("W3C traceparent extraction") {
     const std::unordered_map<std::string, std::string> datadog_headers{
         {"x-datadog-trace-id", "18"},

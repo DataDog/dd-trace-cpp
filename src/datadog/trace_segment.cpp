@@ -223,6 +223,7 @@ void TraceSegment::update_decision_maker_trace_tag() {
 
   assert(sampling_decision_);
 
+  // Note that `found` might be erased below (in case you refactor this code).
   const auto found = std::find_if(
       trace_tags_.begin(), trace_tags_.end(), [](const auto& entry) {
         return entry.first == tags::internal::decision_maker;
@@ -235,6 +236,7 @@ void TraceSegment::update_decision_maker_trace_tag() {
     return;
   }
 
+  // Note that `value` is moved-from below (in case you refactor this code).
   auto value = "-" + std::to_string(*sampling_decision_->mechanism);
   if (found == trace_tags_.end()) {
     trace_tags_.emplace_back(tags::internal::decision_maker, std::move(value));
@@ -285,6 +287,11 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         }
         writer.set("x-b3-spanid", hex_padded(span.span_id));
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
+        if (origin_) {
+          writer.set("x-datadog-origin", *origin_);
+        }
+        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+                          spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::W3C:
         writer.set(
