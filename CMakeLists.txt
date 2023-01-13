@@ -39,6 +39,10 @@ if (SANITIZE)
   add_sanitizers()
 endif()
 
+if (BUILD_TESTING)
+  set(CMAKE_BUILD_TYPE "Debug")
+endif()
+
 include (ExternalProject)
 ExternalProject_Add(curl
   URL "https://github.com/curl/curl/releases/download/curl-7_85_0/curl-7.85.0.tar.gz"
