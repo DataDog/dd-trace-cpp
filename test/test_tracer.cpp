@@ -10,9 +10,11 @@
 #include <datadog/span_data.h>
 #include <datadog/span_defaults.h>
 #include <datadog/tag_propagation.h>
+#include <datadog/tags.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
+#include <datadog/w3c_propagation.h>
 
 #include <iosfwd>
 
@@ -239,7 +241,8 @@ TEST_CASE("tracer span defaults") {
 TEST_CASE("span extraction") {
   TracerConfig config;
   config.defaults.service = "testsvc";
-  config.collector = std::make_shared<NullCollector>();
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
 
   SECTION(
@@ -502,6 +505,353 @@ TEST_CASE("span extraction") {
     const auto result = tracer.extract_span(reader);
     REQUIRE(!result);
     REQUIRE(result.error().code == Error::NO_SPAN_TO_EXTRACT);
+  }
+
+  SECTION("W3C traceparent extraction") {
+    const std::unordered_map<std::string, std::string> datadog_headers{
+        {"x-datadog-trace-id", "18"},
+        {"x-datadog-parent-id", "23"},
+        {"x-datadog-sampling-priority", "-1"},
+    };
+
+    struct TestCase {
+      int line;
+      std::string name;
+      Optional<std::string> traceparent;
+      Optional<std::string> expected_error_tag_value = {};
+      Optional<std::string> expected_full_trace_id = {};
+      Optional<std::uint64_t> expected_trace_id = {};
+      Optional<std::uint64_t> expected_parent_id = {};
+      Optional<int> expected_sampling_priority = {};
+    };
+
+    // clang-format off
+    auto test_case = GENERATE(values<TestCase>({
+        // https://www.w3.org/TR/trace-context/#examples-of-http-traceparent-headers
+        {__LINE__, "valid: w3.org example 1",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", // traceparent
+         nullopt,
+         "4bf92f3577b34da6a3ce929d0e0e4736", // expected_full_trace_id
+         11803532876627986230ULL, // expected_trace_id
+         67667974448284343ULL, // expected_parent_id
+         1}, // expected_sampling_priority
+
+        {__LINE__, "valid: w3.org example 2",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", // traceparent
+         nullopt,
+         "4bf92f3577b34da6a3ce929d0e0e4736", // expected_full_trace_id
+         11803532876627986230ULL, // expected_trace_id
+         67667974448284343ULL, // expected_parent_id
+         0}, // expected_sampling_priority
+
+        {__LINE__, "valid: future version",
+         "06-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", // traceparent
+         nullopt,
+         "4bf92f3577b34da6a3ce929d0e0e4736", // expected_full_trace_id
+         11803532876627986230ULL, // expected_trace_id
+         67667974448284343ULL, // expected_parent_id
+         0}, // expected_sampling_priority
+
+        {__LINE__, "valid: future version with extra fields",
+         "06-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-af-delta", // traceparent
+         nullopt,
+         "4bf92f3577b34da6a3ce929d0e0e4736", // expected_full_trace_id
+         11803532876627986230ULL, // expected_trace_id
+         67667974448284343ULL, // expected_parent_id
+         0}, // expected_sampling_priority
+        
+        {__LINE__, "no traceparent",
+         nullopt}, // traceparent
+        
+        {__LINE__, "invalid: not enough fields",
+         "06-4bf92f3577b34da6a3ce929d0e0e4736", // traceparent
+         "malformed_traceparent"}, // expected_error_tag_value
+        
+        {__LINE__, "invalid: missing hyphen",
+         "064bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", // traceparent
+         "malformed_traceparent"}, // expected_error_tag_value
+        
+        {__LINE__, "invalid: extra data not preceded by hyphen",
+         "06-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00af-delta", // traceparent
+         "malformed_traceparent"}, // expected_error_tag_value
+
+        {__LINE__, "invalid: version",
+         "ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", // traceparent
+         "invalid_version"}, // expected_error_tag_value
+
+        {__LINE__, "invalid: trace ID zero",
+         "00-00000000000000000000000000000000-00f067aa0ba902b7-00", // traceparent
+         "trace_id_zero"}, // expected_error_tag_value
+
+        {__LINE__, "invalid: parent ID zero",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-00", // traceparent
+         "parent_id_zero"}, // expected_error_tag_value
+    }));
+    // clang-format on
+
+    CAPTURE(test_case.name);
+    CAPTURE(test_case.line);
+
+    config.extraction_styles = {PropagationStyle::W3C,
+                                PropagationStyle::DATADOG};
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+
+    auto headers = datadog_headers;
+    if (test_case.traceparent) {
+      headers["traceparent"] = *test_case.traceparent;
+    }
+    MockDictReader reader{headers};
+
+    // We can't `span->lookup(tags::internal::w3c_extraction_error)`, because
+    // that tag is internal and will not be returned by `lookup`.  Instead, we
+    // finish (destroy) the span to send it to a collector, and then inspect the
+    // `SpanData` at the collector.
+    Optional<SamplingDecision> decision;
+    {
+      auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+      decision = span->trace_segment().sampling_decision();
+    }
+
+    REQUIRE(collector->span_count() == 1);
+    const auto& span_data = collector->first_span();
+
+    if (test_case.expected_error_tag_value) {
+      const auto error_found =
+          span_data.tags.find(tags::internal::w3c_extraction_error);
+      REQUIRE(error_found != span_data.tags.end());
+      REQUIRE(error_found->second == *test_case.expected_error_tag_value);
+      // Extraction would have fallen back to the next configured style (Datadog
+      // -- see `config.extraction_styles`, above), and so the span's properties
+      // should match `datadog_headers`, above.
+      REQUIRE(span_data.trace_id == 18);
+      REQUIRE(span_data.parent_id == 23);
+      REQUIRE(decision);
+      REQUIRE(decision->origin == SamplingDecision::Origin::EXTRACTED);
+      REQUIRE(decision->priority == -1);
+    } else if (!test_case.traceparent) {
+      // There was no error extracting W3C context, but there was none to
+      // extract.
+      // Extraction would have fallen back to the next configured style (Datadog
+      // -- see `config.extraction_styles`, above), and so the span's properties
+      // should match `datadog_headers`, above.
+      REQUIRE(span_data.trace_id == 18);
+      REQUIRE(span_data.parent_id == 23);
+      REQUIRE(decision);
+      REQUIRE(decision->origin == SamplingDecision::Origin::EXTRACTED);
+      REQUIRE(decision->priority == -1);
+    } else {
+      // W3C context was successfully extracted from traceparent header.
+      REQUIRE(span_data.trace_id == *test_case.expected_trace_id);
+      REQUIRE(span_data.parent_id == *test_case.expected_parent_id);
+      REQUIRE(decision);
+      REQUIRE(decision->origin == SamplingDecision::Origin::EXTRACTED);
+      REQUIRE(decision->priority == *test_case.expected_sampling_priority);
+    }
+  }
+
+  SECTION("W3C tracestate extraction") {
+    // Ideally this would test the _behavior_ of W3C tracestate extraction,
+    // rather than its implementation.
+    // However, some of the effects of W3C tracestate extraction cannot be
+    // observed except by injecting trace context, and there's a separate test
+    // for W3C tracestate injection (in `test_span.cpp`).
+    // Here we test the tracestate portion of the `extract_w3c` function,
+    // declared in `w3c_propagation.h`.
+    struct TestCase {
+      int line;
+      std::string name;
+      std::string traceparent;
+      Optional<std::string> tracestate;
+      Optional<int> expected_sampling_priority = {};
+      Optional<std::string> expected_origin = {};
+      std::vector<std::pair<std::string, std::string>> expected_trace_tags = {};
+      Optional<std::string> expected_additional_w3c_tracestate = {};
+      Optional<std::string> expected_additional_datadog_w3c_tracestate = {};
+    };
+
+    static const std::string traceparent_prefix =
+        "00-00000000000000000000000000000001-0000000000000001-0";
+    static const std::string traceparent_drop = traceparent_prefix + "0";
+    static const std::string traceparent_keep = traceparent_prefix + "1";
+    // clang-format off
+    auto test_case = GENERATE(values<TestCase>({
+        {__LINE__, "no tracestate",
+         traceparent_drop, // traceparent
+         nullopt, // tracestate
+         0}, // expected_sampling_priority
+
+        {__LINE__, "empty tracestate",
+         traceparent_drop, // traceparent
+         "", // tracestate
+         0}, // expected_sampling_priority
+        
+        {__LINE__, "no dd entry",
+         traceparent_drop, // traceparent
+         "foo=hello,@thingy/thing=wah;wah;wah", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {}, // expected_trace_tags
+         "foo=hello,@thingy/thing=wah;wah;wah", // expected_additional_w3c_tracestate
+         nullopt}, // expected_additional_datadog_w3c_tracestate
+        
+        {__LINE__, "empty entry",
+         traceparent_drop, // traceparent
+         "foo=hello,,bar=thing", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {}, // expected_trace_tags
+         "foo=hello,,bar=thing", // expected_additional_w3c_tracestate
+         nullopt}, // expected_additional_datadog_w3c_tracestate
+        
+        {__LINE__, "malformed entry",
+         traceparent_drop, // traceparent
+         "foo=hello,chicken,bar=thing", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {}, // expected_trace_tags
+         "foo=hello,chicken,bar=thing", // expected_additional_w3c_tracestate
+         nullopt}, // expected_additional_datadog_w3c_tracestate
+        
+        {__LINE__, "stuff before dd entry",
+         traceparent_drop, // traceparent
+         "foo=hello,bar=baz,dd=", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {}, // expected_trace_tags
+         "foo=hello,bar=baz", // expected_additional_w3c_tracestate
+         nullopt}, // expected_additional_datadog_w3c_tracestate
+        
+        {__LINE__, "stuff after dd entry",
+         traceparent_drop, // traceparent
+         "dd=,foo=hello,bar=baz", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {}, // expected_trace_tags
+         "foo=hello,bar=baz", // expected_additional_w3c_tracestate
+         nullopt}, // expected_additional_datadog_w3c_tracestate
+        
+        {__LINE__, "stuff before and after dd entry",
+         traceparent_drop, // traceparent
+         "chicken=yes,nuggets=yes,dd=,foo=hello,bar=baz", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {}, // expected_trace_tags
+         "chicken=yes,nuggets=yes,foo=hello,bar=baz", // expected_additional_w3c_tracestate
+         nullopt}, // expected_additional_datadog_w3c_tracestate
+        
+        {__LINE__, "dd entry with empty subentries",
+         traceparent_drop, // traceparent
+         "dd=foo:bar;;;;;baz:bam;;;", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {}, // expected_trace_tags
+         nullopt, // expected_additional_w3c_tracestate
+         "foo:bar;baz:bam"}, // expected_additional_datadog_w3c_tracestate
+
+        {__LINE__, "dd entry with malformed subentries",
+         traceparent_drop, // traceparent
+         "dd=foo:bar;chicken;chicken;baz:bam;chicken", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {}, // expected_trace_tags
+         nullopt, // expected_additional_w3c_tracestate
+         "foo:bar;baz:bam"}, // expected_additional_datadog_w3c_tracestate
+
+         {__LINE__, "origin, trace tags, and extra fields",
+          traceparent_drop, // traceparent
+          "dd=o:France;t.foo:thing1;t.bar:thing2;x:wow;y:wow", // tracestate
+          0, // expected_sampling_priority
+          "France", // expected_origin
+          {{"_dd.p.foo", "thing1"}, {"_dd.p.bar", "thing2"}}, // expected_trace_tags
+          nullopt, // expected_additional_w3c_tracestate
+          "x:wow;y:wow"}, // expected_additional_datadog_w3c_tracestate
+
+         {__LINE__, "traceparent and tracestate sampling agree (1/4)",
+          traceparent_drop, // traceparent
+          "dd=s:0", // tracestate
+          0}, // expected_sampling_priority
+
+         {__LINE__, "traceparent and tracestate sampling agree (2/4)",
+          traceparent_drop, // traceparent
+          "dd=s:-1", // tracestate
+          -1}, // expected_sampling_priority
+
+         {__LINE__, "traceparent and tracestate sampling agree (3/4)",
+          traceparent_keep, // traceparent
+          "dd=s:1", // tracestate
+          1}, // expected_sampling_priority
+
+         {__LINE__, "traceparent and tracestate sampling agree (4/4)",
+          traceparent_keep, // traceparent
+          "dd=s:2", // tracestate
+          2}, // expected_sampling_priority
+
+         {__LINE__, "traceparent and tracestate sampling disagree (1/4)",
+          traceparent_drop, // traceparent
+          "dd=s:1", // tracestate
+          0}, // expected_sampling_priority
+
+         {__LINE__, "traceparent and tracestate sampling disagree (2/4)",
+          traceparent_drop, // traceparent
+          "dd=s:2", // tracestate
+          0}, // expected_sampling_priority
+
+         {__LINE__, "traceparent and tracestate sampling disagree (3/4)",
+          traceparent_keep, // traceparent
+          "dd=s:0", // tracestate
+          1}, // expected_sampling_priority
+
+         {__LINE__, "traceparent and tracestate sampling disagree (4/4)",
+          traceparent_keep, // traceparent
+          "dd=s:-1", // tracestate
+          1}, // expected_sampling_priority
+        
+         {__LINE__, "invalid sampling priority (1/2)",
+          traceparent_drop, // traceparent
+          "dd=s:oops", // tracestate
+          0}, // expected_sampling_priority
+        
+         {__LINE__, "invalid sampling priority (2/2)",
+          traceparent_keep, // traceparent
+          "dd=s:oops", // tracestate
+          1}, // expected_sampling_priority
+    }));
+    // clang-format on
+
+    CAPTURE(test_case.name);
+    CAPTURE(test_case.line);
+    CAPTURE(test_case.traceparent);
+    CAPTURE(test_case.tracestate);
+
+    std::unordered_map<std::string, std::string> span_tags;
+    MockLogger logger;
+    CAPTURE(logger.entries);
+    CAPTURE(span_tags);
+
+    std::unordered_map<std::string, std::string> headers;
+    headers["traceparent"] = test_case.traceparent;
+    if (test_case.tracestate) {
+      headers["tracestate"] = *test_case.tracestate;
+    }
+    MockDictReader reader{headers};
+
+    const auto extracted = extract_w3c(reader, span_tags, logger);
+    REQUIRE(extracted);
+
+    REQUIRE(extracted->origin == test_case.expected_origin);
+    REQUIRE(extracted->trace_tags == test_case.expected_trace_tags);
+    REQUIRE(extracted->sampling_priority ==
+            test_case.expected_sampling_priority);
+    REQUIRE(extracted->additional_w3c_tracestate ==
+            test_case.expected_additional_w3c_tracestate);
+    REQUIRE(extracted->additional_datadog_w3c_tracestate ==
+            test_case.expected_additional_datadog_w3c_tracestate);
+
+    REQUIRE(logger.entries.empty());
+    REQUIRE(span_tags.empty());
   }
 
   SECTION("x-datadog-tags") {

@@ -10,6 +10,14 @@ jobs:
     - checkout
     - run: bin/check-format
 
+  shellcheck:
+    docker:
+    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: small
+    steps:
+    - checkout
+    - run: find bin/ -executable -type f | xargs shellcheck
+
   build-bazel:
     parameters:
       toolchain:
@@ -59,6 +67,7 @@ workflows:
   pull-request:
     jobs:
     - format
+    - shellcheck
     - test-cmake:
         matrix:
           parameters:

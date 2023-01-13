@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <unordered_map>
 
 #include "mocks/collectors.h"
 #include "mocks/event_schedulers.h"
@@ -1158,19 +1159,19 @@ TEST_CASE("TracerConfig propagation styles") {
     const char* const vars[] = {ts, tse, se, tsi, si};
     constexpr auto n = sizeof(vars) / sizeof(vars[0]);
     // clang-format off
-    const bool x = false; // ignored values    
-    const bool expect_warning[n][n] = {      
-    //          ts    tse   se    tsi    si    
-    //          ---   ---   ---   ---    ---    
-    /* ts  */{  x,    true, true, true,  true  },    
+    const bool x = false; // ignored values
+    const bool expect_warning[n][n] = {
+    //          ts    tse   se    tsi    si
+    //          ---   ---   ---   ---    ---
+    /* ts  */{  x,    true, true, true,  true  },
                                                   
-    /* tse */{  x,    x,    true, false, false },    
+    /* tse */{  x,    x,    true, false, false },
                                                      
-    /* se  */{  x,    x,    x,    false, false },    
+    /* se  */{  x,    x,    x,    false, false },
     
-    /* tsi */{  x,    x,    x,    x,     true  },    
+    /* tsi */{  x,    x,    x,    x,     true  },
                                                   
-    /* si  */{  x,    x,    x,    x,     x     },    
+    /* si  */{  x,    x,    x,    x,     x     },
     };
     // clang-format on
     for (std::size_t i = 0; i < n; ++i) {

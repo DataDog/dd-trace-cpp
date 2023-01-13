@@ -38,7 +38,9 @@ void SpanData::apply_config(const SpanDefaults& defaults,
   service = config.service.value_or(defaults.service);
   name = config.name.value_or(defaults.name);
 
-  tags = defaults.tags;
+  for (const auto& item : defaults.tags) {
+    tags.insert(item);
+  }
   std::string environment = config.environment.value_or(defaults.environment);
   if (!environment.empty()) {
     tags.insert_or_assign(tags::environment, environment);

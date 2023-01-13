@@ -3,6 +3,7 @@
 // for propagation.
 
 #include <datadog/clock.h>
+#include <datadog/null_collector.h>
 #include <datadog/optional.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
@@ -433,8 +434,6 @@ TEST_CASE("injection") {
       span->inject(writer);
 
       REQUIRE(writer.items.at("x-datadog-origin") == "Egypt");
-      // Trace tags could get reordered (because we parse them into a hash
-      // table). So, compare the parsed versions.
       REQUIRE(writer.items.count("x-datadog-tags") == 1);
       const auto output = decode_tags(writer.items.at("x-datadog-tags"));
       const auto input = decode_tags(trace_tags);
@@ -464,4 +463,230 @@ TEST_CASE("injection can be disabled using the \"none\" style") {
   span.inject(writer);
   const std::unordered_map<std::string, std::string> empty;
   REQUIRE(writer.items == empty);
+}
+
+TEST_CASE("injecting W3C traceparent header") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.collector = std::make_shared<NullCollector>();
+  config.logger = std::make_shared<NullLogger>();
+  config.injection_styles = {PropagationStyle::W3C};
+
+  SECTION("extracted from W3C traceparent") {
+    config.extraction_styles = {PropagationStyle::W3C};
+    const auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+
+    // Override the tracer's ID generator to always return `expected_parent_id`.
+    constexpr std::uint64_t expected_parent_id = 0xcafebabe;
+    Tracer tracer{*finalized_config, [=]() { return expected_parent_id; },
+                  default_clock};
+
+    const std::unordered_map<std::string, std::string> input_headers{
+        // https://www.w3.org/TR/trace-context/#examples-of-http-traceparent-headers
+        {"traceparent",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
+    };
+    const MockDictReader reader{input_headers};
+    const auto maybe_span = tracer.extract_span(reader);
+    REQUIRE(maybe_span);
+    const auto& span = *maybe_span;
+    REQUIRE(span.id() == expected_parent_id);
+
+    MockDictWriter writer;
+    span.inject(writer);
+    const auto& output_headers = writer.items;
+    const auto found = output_headers.find("traceparent");
+    REQUIRE(found != output_headers.end());
+    // The "00000000cafebabe" is the zero-padded `expected_parent_id`.
+    const StringView expected =
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-00000000cafebabe-01";
+    REQUIRE(found->second == expected);
+  }
+
+  SECTION("not extracted from W3C traceparent") {
+    const auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+
+    // Override the tracer's ID generator to always return a fixed value.
+    // This will be both the trace ID and the parent (root) span ID.
+    constexpr std::uint64_t expected_id = 0xcafebabe;
+    Tracer tracer{*finalized_config, [=]() { return expected_id; },
+                  default_clock};
+
+    auto span = tracer.create_span();
+
+    // Let's test the effect sampling priority plays on the resulting
+    // traceparent, too.
+    struct TestCase {
+      int sampling_priority;
+      std::string expected_flags;
+    };
+    const auto& [sampling_priority, expected_flags] = GENERATE(
+        values<TestCase>({{-1, "00"}, {0, "00"}, {1, "01"}, {2, "01"}}));
+
+    CAPTURE(sampling_priority);
+    CAPTURE(expected_flags);
+
+    span.trace_segment().override_sampling_priority(sampling_priority);
+
+    MockDictWriter writer;
+    span.inject(writer);
+    const auto& output_headers = writer.items;
+    const auto found = output_headers.find("traceparent");
+    REQUIRE(found != output_headers.end());
+    // The "cafebabe"s come from `expected_id`.
+    const std::string expected =
+        "00-000000000000000000000000cafebabe-00000000cafebabe-" +
+        expected_flags;
+    REQUIRE(found->second == expected);
+  }
+}
+
+TEST_CASE("injecting W3C tracestate header") {
+  // Concerns:
+  // - the basics:
+  //   - sampling priority
+  //   - origin
+  //   - trace tags
+  //   - extra fields (extracted from W3C)
+  //   - all of the above
+  // - character substitutions:
+  //   - in origin
+  //   - in trace tag key
+  //   - in trace tag value
+  //     - special tilde ("~") behavior
+  // - length limit:
+  //   - at origin
+  //   - at a trace tag
+  //   - at the extra fields (extracted from W3C)
+
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  // The order of the extraction styles doesn't matter for this test, because
+  // it'll either be one or the other in the test cases.
+  config.extraction_styles = {PropagationStyle::DATADOG, PropagationStyle::W3C};
+  config.injection_styles = {PropagationStyle::W3C};
+  // If one of these test cases results in a local sampling decision, let it be
+  // "drop."
+  config.trace_sampler.sample_rate = 0.0;
+  const auto logger = std::make_shared<MockLogger>();
+  config.logger = logger;
+  config.collector = std::make_shared<NullCollector>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  struct TestCase {
+    int line;
+    std::string name;
+    std::unordered_map<std::string, std::string> input_headers;
+    std::string expected_tracestate;
+  };
+
+  static const auto traceparent_drop =
+      "00-00000000000000000000000000000001-0000000000000001-00";
+
+  // clang-format off
+  auto test_case = GENERATE(values<TestCase>({
+    {__LINE__, "sampling priority",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-sampling-priority", "2"}},
+     "dd=s:2"},
+
+    {__LINE__, "origin",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-origin", "France"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;o:France"},
+
+    {__LINE__, "trace tags",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.foo=x,_dd.p.bar=y,ignored=wrong_prefix"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.foo:x;t.bar:y"},
+
+    {__LINE__, "extra fields",
+     {{"traceparent", traceparent_drop}, {"tracestate", "dd=foo:bar;boing:boing"}},
+    // The "s:0" comes from the sampling decision in `traceparent_drop`.
+    "dd=s:0;foo:bar;boing:boing"},
+
+    {__LINE__, "all of the above",
+     {{"traceparent", traceparent_drop},
+      {"tracestate", "dd=o:France;t.foo:x;t.bar:y;foo:bar;boing:boing"}},
+    // The "s:0" comes from the sampling decision in `traceparent_drop`.
+    "dd=s:0;o:France;t.foo:x;t.bar:y;foo:bar;boing:boing"},
+
+    {__LINE__, "replace invalid characters in origin",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-origin", "France, is a country=nation; so is 台北."}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;o:France_ is a country_nation_ so is ______."},
+
+    {__LINE__, "replace invalid characters in trace tag key",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.a;d台北x =foo,_dd.p.ok=bar"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.a_d______x_:foo;t.ok:bar"},
+
+    {__LINE__, "replace invalid characters in trace tag value",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.wacky=hello fr~d; how are คุณ?"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.wacky:hello fr_d_ how are _________?"},
+
+    {__LINE__, "replace equal signs with tildes in trace tag value",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.base64_thingy=d2Fra2EhIHdhaw=="}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.base64_thingy:d2Fra2EhIHdhaw~~"},
+
+    {__LINE__, "oversized origin truncates it and subsequent fields",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-origin", "long cat is looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong"},
+      {"x-datadog-tags", "_dd.p.foo=bar,_dd.p.honk=honk"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1"},
+
+    {__LINE__, "oversized trace tag truncates it and subsequent fields",
+     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
+      {"x-datadog-tags", "_dd.p.foo=bar,_dd.p.long_cat_is=looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,_dd.p.lost=forever"}},
+      // The "s:-1" comes from the 0% sample rate.
+     "dd=s:-1;t.foo:bar"},
+
+    {__LINE__, "oversized extra field truncates itself and subsequent fields",
+     {{"traceparent", traceparent_drop},
+      {"tracestate", "dd=foo:bar;long_cat_is:looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong;lost:forever"}},
+     // The "s:0" comes from the sampling decision in `traceparent_drop`.
+     "dd=s:0;foo:bar"},
+
+    {__LINE__, "non-Datadog tracestate",
+     {{"traceparent", traceparent_drop},
+      {"tracestate", "foo=bar,boing=boing"}},
+     // The "s:0" comes from the sampling decision in `traceparent_drop`.
+     "dd=s:0,foo=bar,boing=boing"},
+  }));
+  // clang-format on
+
+  CAPTURE(test_case.name);
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.input_headers);
+  CAPTURE(test_case.expected_tracestate);
+  CAPTURE(logger->entries);
+
+  MockDictReader reader{test_case.input_headers};
+  const auto span = tracer.extract_span(reader);
+  REQUIRE(span);
+
+  MockDictWriter writer;
+  span->inject(writer);
+
+  CAPTURE(writer.items);
+  const auto found = writer.items.find("tracestate");
+  REQUIRE(found != writer.items.end());
+
+  REQUIRE(found->second == test_case.expected_tracestate);
+
+  REQUIRE(logger->error_count() == 0);
 }

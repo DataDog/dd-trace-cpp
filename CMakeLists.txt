@@ -8,6 +8,7 @@ option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" 
 option(BUILD_EXAMPLE "Build the example program (example/)" OFF)
 option(BUILD_TESTING "Build the unit tests (test/)" OFF)
 option(SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
+option(FUZZ_W3C_PROPAGATION "Build a fuzzer for W3C propagation" OFF)
 
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -20,12 +21,26 @@ include(ProcessorCount)
 ProcessorCount(NUM_PROCESSORS)
 set(MAKE_JOB_COUNT ${NUM_PROCESSORS} CACHE STRING "Number of jobs to use when building libcurl")
 
-if (SANITIZE)
+function(add_sanitizers)
   add_compile_options(-fsanitize=address)
   add_link_options(-fsanitize=address)
   add_compile_options(-fsanitize=undefined)
   add_link_options(-fsanitize=undefined)
-  # Thread sanitizer fails with "unexpected memory mapping".
+endfunction()
+
+if(FUZZ_W3C_PROPAGATION)
+  add_compile_options(-fsanitize=fuzzer)
+  add_link_options(-fsanitize=fuzzer)
+  add_sanitizers()
+  add_subdirectory(fuzz/w3c-propagation)
+endif()
+
+if (SANITIZE)
+  add_sanitizers()
+endif()
+
+if (BUILD_TESTING)
+  set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
 include (ExternalProject)
@@ -70,7 +85,9 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/error.cpp
     src/datadog/event_scheduler.cpp
     src/datadog/expected.cpp
+    src/datadog/extracted_data.cpp
     src/datadog/glob.cpp
+    src/datadog/hex.cpp
     src/datadog/http_client.cpp
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
@@ -103,6 +120,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/trace_sampler.cpp
     src/datadog/trace_segment.cpp
     src/datadog/version.cpp
+    src/datadog/w3c_propagation.cpp
 )
 
 # This library's public headers are just its source headers.
@@ -125,7 +143,9 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/error.h
   src/datadog/event_scheduler.h
   src/datadog/expected.h
+  src/datadog/extracted_data.h
   src/datadog/glob.h
+  src/datadog/hex.h
   src/datadog/http_client.h
   src/datadog/id_generator.h
   src/datadog/json_fwd.hpp
@@ -160,6 +180,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/trace_sampler.h
   src/datadog/trace_segment.h
   src/datadog/version.h
+  src/datadog/w3c_propagation.h
 )
 
 add_dependencies(dd_trace_cpp curl)

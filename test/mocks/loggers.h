@@ -4,6 +4,7 @@
 #include <datadog/logger.h>
 
 #include <algorithm>
+#include <iosfwd>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -97,3 +98,5 @@ struct MockLogger : public Logger {
     return std::get<std::string>(found->payload);
   }
 };
+
+std::ostream& operator<<(std::ostream&, const std::vector<MockLogger::Entry>&);

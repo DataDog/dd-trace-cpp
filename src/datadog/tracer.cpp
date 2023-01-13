@@ -6,6 +6,7 @@
 #include "datadog_agent.h"
 #include "dict_reader.h"
 #include "environment.h"
+#include "extracted_data.h"
 #include "json.hpp"
 #include "logger.h"
 #include "net_util.h"
@@ -19,10 +20,32 @@
 #include "trace_sampler.h"
 #include "trace_segment.h"
 #include "version.h"
+#include "w3c_propagation.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
+
+// Decode the specified `trace_tags` and integrate them into the specified
+// `result`. If an error occurs, add a `tags::internal::propagation_error` tag
+// to the specified `span_tags` and log a diagnostic using the specified
+// `logger`.
+void handle_trace_tags(StringView trace_tags, ExtractedData& result,
+                       std::unordered_map<std::string, std::string>& span_tags,
+                       Logger& logger) {
+  auto maybe_trace_tags = decode_tags(trace_tags);
+  if (auto* error = maybe_trace_tags.if_error()) {
+    logger.log_error(*error);
+    span_tags[tags::internal::propagation_error] = "decoding_error";
+    return;
+  }
+
+  for (auto& [key, value] : *maybe_trace_tags) {
+    if (starts_with(key, "_dd.p.")) {
+      result.trace_tags.emplace_back(std::move(key), std::move(value));
+    }
+  }
+}
 
 Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
                                                     StringView header,
@@ -50,15 +73,9 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
   return *result;
 }
 
-struct ExtractedData {
-  Optional<std::uint64_t> trace_id;
-  Optional<std::uint64_t> parent_id;
-  Optional<std::string> origin;
-  Optional<std::string> trace_tags;
-  Optional<int> sampling_priority;
-};
-
-Expected<ExtractedData> extract_datadog(const DictReader& headers) {
+Expected<ExtractedData> extract_datadog(
+    const DictReader& headers,
+    std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
   ExtractedData result;
 
   auto trace_id =
@@ -97,13 +114,15 @@ Expected<ExtractedData> extract_datadog(const DictReader& headers) {
 
   auto trace_tags = headers.lookup("x-datadog-tags");
   if (trace_tags) {
-    result.trace_tags = std::string(*trace_tags);
+    handle_trace_tags(*trace_tags, result, span_tags, logger);
   }
 
   return result;
 }
 
-Expected<ExtractedData> extract_b3(const DictReader& headers) {
+Expected<ExtractedData> extract_b3(
+    const DictReader& headers,
+    std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
   ExtractedData result;
 
   auto trace_id = extract_id_header(headers, "x-b3-traceid", "trace", "B3", 16);
@@ -142,7 +161,7 @@ Expected<ExtractedData> extract_b3(const DictReader& headers) {
 
   auto trace_tags = headers.lookup("x-datadog-tags");
   if (trace_tags) {
-    result.trace_tags = std::string(*trace_tags);
+    handle_trace_tags(*trace_tags, result, span_tags, logger);
   }
 
   return result;
@@ -230,8 +249,10 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
-      std::unordered_map<std::string, std::string>{} /* trace_tags */,
-      nullopt /* sampling_decision */, std::move(span_data));
+      std::vector<std::pair<std::string, std::string>>{} /* trace_tags */,
+      nullopt /* sampling_decision */, nullopt /* full_w3c_trace_id_hex */,
+      nullopt /* additional_w3c_tracestate */,
+      nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;
 }
@@ -244,6 +265,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
   assert(!extraction_styles_.empty());
 
+  auto span_data = std::make_unique<SpanData>();
   ExtractedData extracted_data;
 
   for (const auto style : extraction_styles_) {
@@ -256,12 +278,15 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       case PropagationStyle::B3:
         extract = &extract_b3;
         break;
+      case PropagationStyle::W3C:
+        extract = &extract_w3c;
+        break;
       default:
         assert(style == PropagationStyle::NONE);
         extracted_data = ExtractedData{};
         continue;
     }
-    auto data = extract(reader);
+    auto data = extract(reader, span_data->tags, *logger_);
     if (auto* error = data.if_error()) {
       return std::move(*error);
     }
@@ -274,8 +299,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     }
   }
 
-  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority] =
-      extracted_data;
+  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
+         full_w3c_trace_id_hex, additional_w3c_tracestate,
+         additional_datadog_w3c_tracestate] = extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -322,7 +348,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   assert(parent_id);
   assert(trace_id);
 
-  auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
   span_data->span_id = generator_();
   span_data->trace_id = *trace_id;
@@ -339,27 +364,13 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     sampling_decision = decision;
   }
 
-  std::unordered_map<std::string, std::string> decoded_trace_tags;
-  if (trace_tags) {
-    auto maybe_trace_tags = decode_tags(*trace_tags);
-    if (auto* error = maybe_trace_tags.if_error()) {
-      logger_->log_error(*error);
-      span_data->tags[tags::internal::propagation_error] = "decoding_error";
-    } else {
-      for (const auto& [key, value] : *maybe_trace_tags) {
-        if (starts_with(key, "_dd.p.")) {
-          decoded_trace_tags.insert_or_assign(key, value);
-        }
-      }
-    }
-  }
-
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
-      std::move(decoded_trace_tags), std::move(sampling_decision),
-      std::move(span_data));
+      std::move(trace_tags), std::move(sampling_decision),
+      std::move(full_w3c_trace_id_hex), std::move(additional_w3c_tracestate),
+      std::move(additional_datadog_w3c_tracestate), std::move(span_data));
   Span span{span_data_ptr, segment, generator_, clock_};
   return span;
 }

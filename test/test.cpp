@@ -11,7 +11,15 @@ std::ostream& operator<<(
 std::ostream& operator<<(
     std::ostream& stream,
     const datadog::tracing::Optional<datadog::tracing::StringView>& item) {
-  return stream << item.value_or("<null>");
+  return stream << item.value_or("<nullopt>");
+}
+
+std::ostream& operator<<(std::ostream& stream,
+                         const std::optional<int>& maybe) {
+  if (maybe) {
+    return stream << *maybe;
+  }
+  return stream << "<nullopt>";
 }
 
 }  // namespace std

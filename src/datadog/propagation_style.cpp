@@ -8,11 +8,15 @@ namespace datadog {
 namespace tracing {
 
 nlohmann::json to_json(PropagationStyle style) {
+  // Note: Make sure that these strings are consistent (modulo case) with
+  // `parse_propagation_styles` in `tracer_config.cpp`.
   switch (style) {
     case PropagationStyle::DATADOG:
-      return "datadog";
+      return "Datadog";
     case PropagationStyle::B3:
       return "B3";
+    case PropagationStyle::W3C:
+      return "tracecontext";  // for compatibility with OpenTelemetry
     default:
       assert(style == PropagationStyle::NONE);
       return "none";

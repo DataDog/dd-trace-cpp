@@ -1,17 +1,16 @@
 #include "trace_segment.h"
 
 #include <cassert>
-#include <charconv>
-#include <limits>
 #include <string>
-#include <system_error>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "collector.h"
 #include "collector_response.h"
 #include "dict_writer.h"
 #include "error.h"
+#include "hex.h"
 #include "logger.h"
 #include "optional.h"
 #include "span_data.h"
@@ -19,22 +18,39 @@
 #include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
+#include "w3c_propagation.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
 
-template <typename Integer>
-std::string hex(Integer value) {
-  // 4 bits per hex digit char, and then +1 char for possible minus sign
-  char buffer[std::numeric_limits<Integer>::digits / 4 + 1];
+// Encode the specified `trace_tags`. If the encoded value is not longer than
+// the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
+// header using the specified `writer`. If the encoded value is oversized, then
+// write a diagnostic to the specified `logger` and set a propagation error tag
+// on the specified `local_root_tags`.
+void inject_trace_tags(
+    DictWriter& writer,
+    const std::vector<std::pair<std::string, std::string>>& trace_tags,
+    std::size_t tags_header_max_size,
+    std::unordered_map<std::string, std::string>& local_root_tags,
+    Logger& logger) {
+  const std::string encoded_trace_tags = encode_tags(trace_tags);
 
-  const int base = 16;
-  auto result =
-      std::to_chars(std::begin(buffer), std::end(buffer), value, base);
-  assert(result.ec == std::errc());
-
-  return std::string{std::begin(buffer), result.ptr};
+  if (encoded_trace_tags.size() > tags_header_max_size) {
+    std::string message;
+    message +=
+        "Serialized x-datadog-tags header value is too large.  The configured "
+        "maximum size is ";
+    message += std::to_string(tags_header_max_size);
+    message += " bytes, but the encoded value is ";
+    message += std::to_string(encoded_trace_tags.size());
+    message += " bytes.";
+    logger.log_error(message);
+    local_root_tags[tags::internal::propagation_error] = "inject_max_size";
+  } else if (!encoded_trace_tags.empty()) {
+    writer.set("x-datadog-tags", encoded_trace_tags);
+  }
 }
 
 }  // namespace
@@ -48,8 +64,11 @@ TraceSegment::TraceSegment(
     const std::vector<PropagationStyle>& injection_styles,
     const Optional<std::string>& hostname, Optional<std::string> origin,
     std::size_t tags_header_max_size,
-    std::unordered_map<std::string, std::string> trace_tags,
+    std::vector<std::pair<std::string, std::string>> trace_tags,
     Optional<SamplingDecision> sampling_decision,
+    Optional<std::string> full_w3c_trace_id_hex,
+    Optional<std::string> additional_w3c_tracestate,
+    Optional<std::string> additional_datadog_w3c_tracestate,
     std::unique_ptr<SpanData> local_root)
     : logger_(logger),
       collector_(collector),
@@ -62,7 +81,11 @@ TraceSegment::TraceSegment(
       tags_header_max_size_(tags_header_max_size),
       trace_tags_(std::move(trace_tags)),
       num_finished_spans_(0),
-      sampling_decision_(std::move(sampling_decision)) {
+      sampling_decision_(std::move(sampling_decision)),
+      full_w3c_trace_id_hex_(std::move(full_w3c_trace_id_hex)),
+      additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
+      additional_datadog_w3c_tracestate_(
+          std::move(additional_datadog_w3c_tracestate)) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);
@@ -202,50 +225,47 @@ void TraceSegment::update_decision_maker_trace_tag() {
 
   assert(sampling_decision_);
 
+  // Note that `found` might be erased below (in case you refactor this code).
+  const auto found = std::find_if(
+      trace_tags_.begin(), trace_tags_.end(), [](const auto& entry) {
+        return entry.first == tags::internal::decision_maker;
+      });
+
   if (sampling_decision_->priority <= 0) {
-    trace_tags_.erase(tags::internal::decision_maker);
+    if (found != trace_tags_.end()) {
+      trace_tags_.erase(found);
+    }
+    return;
+  }
+
+  // Note that `value` is moved-from below (in case you refactor this code).
+  auto value = "-" + std::to_string(*sampling_decision_->mechanism);
+  if (found == trace_tags_.end()) {
+    trace_tags_.emplace_back(tags::internal::decision_maker, std::move(value));
   } else {
-    trace_tags_[tags::internal::decision_maker] =
-        "-" + std::to_string(*sampling_decision_->mechanism);
+    found->second = std::move(value);
   }
 }
 
 void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
-  int sampling_priority;
-  std::string encoded_trace_tags;
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    make_sampling_decision_if_null();
-    assert(sampling_decision_);
-    sampling_priority = sampling_decision_->priority;
-    encoded_trace_tags = encode_tags(trace_tags_);
-  }
-
-  // Origin and trace tag headers are always propagated, unless the only
-  // injection style is "none".
-  // Other headers depend on the injection styles.
+  // If the only injection style is `NONE`, then don't do anything.
   if (injection_styles_.size() == 1 &&
       injection_styles_[0] == PropagationStyle::NONE) {
     return;
   }
 
-  if (origin_) {
-    writer.set("x-datadog-origin", *origin_);
-  }
-  if (encoded_trace_tags.size() > tags_header_max_size_) {
-    std::string message;
-    message +=
-        "Serialized x-datadog-tags header value is too large.  The configured "
-        "maximum size is ";
-    message += std::to_string(tags_header_max_size_);
-    message += " bytes, but the encoded value is ";
-    message += std::to_string(encoded_trace_tags.size());
-    message += " bytes.";
-    logger_->log_error(message);
-    SpanData& local_root = *spans_.front();
-    local_root.tags[tags::internal::propagation_error] = "inject_max_size";
-  } else if (!encoded_trace_tags.empty()) {
-    writer.set("x-datadog-tags", encoded_trace_tags);
+  // The sampling priority can change (it can be overridden on another thread),
+  // and trace tags might change when that happens ("_dd.p.dm").
+  // So, we lock here, make a sampling decision if necessary, and then copy the
+  // decision and trace tags before unlocking.
+  int sampling_priority;
+  std::vector<std::pair<std::string, std::string>> trace_tags;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    make_sampling_decision_if_null();
+    assert(sampling_decision_);
+    sampling_priority = sampling_decision_->priority;
+    trace_tags = trace_tags_;
   }
 
   for (const auto style : injection_styles_) {
@@ -255,13 +275,33 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         writer.set("x-datadog-parent-id", std::to_string(span.span_id));
         writer.set("x-datadog-sampling-priority",
                    std::to_string(sampling_priority));
+        if (origin_) {
+          writer.set("x-datadog-origin", *origin_);
+        }
+        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+                          spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::B3:
         writer.set("x-b3-traceid", hex(span.trace_id));
         writer.set("x-b3-spanid", hex(span.span_id));
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
+        if (origin_) {
+          writer.set("x-datadog-origin", *origin_);
+        }
+        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+                          spans_.front()->tags, *logger_);
         break;
-      case PropagationStyle::NONE:
+      case PropagationStyle::W3C:
+        writer.set("traceparent",
+                   encode_traceparent(span.trace_id, full_w3c_trace_id_hex_,
+                                      span.span_id, sampling_priority));
+        writer.set("tracestate",
+                   encode_tracestate(sampling_priority, origin_, trace_tags,
+                                     additional_datadog_w3c_tracestate_,
+                                     additional_w3c_tracestate_));
+        break;
+      default:
+        assert(style == PropagationStyle::NONE);
         break;
     }
   }

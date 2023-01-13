@@ -19,8 +19,9 @@ cd "$(dirname "$0")"/..
 
 mkdir -p .build
 cd .build
-cmake .. $coverage_flags -DBUILD_EXAMPLE=1
-make -j $(nproc) $verbosity_flags
+cmake .. -DBUILD_EXAMPLE=1
+# shellcheck disable=SC2086
+make -j "$(nproc)" $verbosity_flags
 
 if [ "$build_only" -eq 1 ]; then
     exit
@@ -35,6 +36,6 @@ if [ "$DD_API_KEY" = '' ]; then
 fi
 docker compose --project-directory ../example up --detach --remove-orphans
 # docker compose --project-directory ../example logs --follow &
-./example/example"$@"
+./example/example "$@"
 docker compose --project-directory ../example down
 # wait

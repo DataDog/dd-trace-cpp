@@ -37,9 +37,11 @@ cd "$(dirname "$0")"/..
 
 mkdir -p .build
 cd .build
+# shellcheck disable=SC2086
 cmake .. $coverage_flags -DBUILD_TESTING=1
 # Clean up any code coverage artifacts.
 find . -type f -name '*.gcda' -print0 | xargs -0 rm -f
+# shellcheck disable=SC2086
 make -j "$MAKE_JOB_COUNT" $verbosity_flags
 
 if [ "$build_only" -eq 1 ]; then
