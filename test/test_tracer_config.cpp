@@ -976,6 +976,17 @@ TEST_CASE("TracerConfig propagation styles") {
   TracerConfig config;
   config.defaults.service = "testsvc";
 
+  SECTION("default styles are [W3C, Datadog]") {
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    const std::vector<PropagationStyle> expected_styles = {
+        PropagationStyle::W3C, PropagationStyle::DATADOG};
+
+    REQUIRE(finalized->injection_styles == expected_styles);
+    REQUIRE(finalized->extraction_styles == expected_styles);
+  }
+
   SECTION("DD_TRACE_PROPAGATION_STYLE overrides defaults") {
     const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE", "B3"};
     auto finalized = finalize_config(config);
@@ -989,14 +1000,6 @@ TEST_CASE("TracerConfig propagation styles") {
   }
 
   SECTION("injection_styles") {
-    SECTION("defaults to just Datadog") {
-      auto finalized = finalize_config(config);
-      REQUIRE(finalized);
-      const std::vector<PropagationStyle> expected_styles = {
-          PropagationStyle::DATADOG};
-      REQUIRE(finalized->injection_styles == expected_styles);
-    }
-
     SECTION("need at least one") {
       config.injection_styles.clear();
       auto finalized = finalize_config(config);
@@ -1089,14 +1092,6 @@ TEST_CASE("TracerConfig propagation styles") {
 
   // This section is very much like "injection_styles", above.
   SECTION("extraction_styles") {
-    SECTION("defaults to just Datadog") {
-      auto finalized = finalize_config(config);
-      REQUIRE(finalized);
-      const std::vector<PropagationStyle> expected_styles = {
-          PropagationStyle::DATADOG};
-      REQUIRE(finalized->extraction_styles == expected_styles);
-    }
-
     SECTION("need at least one") {
       config.extraction_styles.clear();
       auto finalized = finalize_config(config);
@@ -1164,13 +1159,13 @@ TEST_CASE("TracerConfig propagation styles") {
     //          ts    tse   se    tsi    si
     //          ---   ---   ---   ---    ---
     /* ts  */{  x,    true, true, true,  true  },
-                                                  
+
     /* tse */{  x,    x,    true, false, false },
-                                                     
+
     /* se  */{  x,    x,    x,    false, false },
-    
+
     /* tsi */{  x,    x,    x,    x,     true  },
-                                                  
+
     /* si  */{  x,    x,    x,    x,     x     },
     };
     // clang-format on
