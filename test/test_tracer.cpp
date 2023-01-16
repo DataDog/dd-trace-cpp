@@ -5,6 +5,7 @@
 #include <datadog/net_util.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>
+#include <datadog/parse_util.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
@@ -934,5 +935,38 @@ TEST_CASE("report hostname") {
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
     REQUIRE(tracer.create_span().trace_segment().hostname() == get_hostname());
+  }
+}
+
+TEST_CASE("128-bit trace IDs") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.trace_id_128_bit = true;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<MockLogger>();
+  const auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+  Tracer tracer{*finalized};
+
+  SECTION("are generated") {
+    const auto span = tracer.create_span();
+    // The chance that it's zero is ~2**(-64), which I'm willing to neglect.
+    REQUIRE(span.trace_id().high != 0);
+  }
+
+  SECTION("result in _dd.p.tid trace tag being sent to collector") {
+    TraceID generated_id;
+    {
+      const auto span = tracer.create_span();
+      generated_id = span.trace_id();
+    }
+    REQUIRE(collector->span_count() == 1);
+    const auto& span = collector->first_span();
+    const auto found = span.tags.find("_dd.p.tid");
+    REQUIRE(found != span.tags.end());
+    const auto high = parse_uint64(found->second, 16);
+    REQUIRE(high);
+    REQUIRE(*high == generated_id.high);
   }
 }
