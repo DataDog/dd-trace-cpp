@@ -46,8 +46,6 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
       continue;
     }
 
-    result.trace_tags.emplace_back(std::move(key), std::move(value));
-
     if (key == "_dd.p.tid") {
       // _dd.p.tid contains the high 64 bits of the trace ID.
       auto high = parse_uint64(value, 16);
@@ -64,6 +62,8 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
         result.trace_id->high = *high;
       }
     }
+
+    result.trace_tags.emplace_back(std::move(key), std::move(value));
   }
 }
 

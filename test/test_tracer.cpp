@@ -2,6 +2,7 @@
 // spans and for extracting spans from propagated trace context.
 
 #include <datadog/error.h>
+#include <datadog/hex.h>
 #include <datadog/net_util.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>
@@ -944,7 +945,12 @@ TEST_CASE("128-bit trace IDs") {
   config.trace_id_128_bit = true;
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
-  config.logger = std::make_shared<MockLogger>();
+  const auto logger = std::make_shared<MockLogger>();
+  config.logger = logger;
+  config.extraction_styles.clear();
+  config.extraction_styles.push_back(PropagationStyle::W3C);
+  config.extraction_styles.push_back(PropagationStyle::DATADOG);
+  config.extraction_styles.push_back(PropagationStyle::B3);
   const auto finalized = finalize_config(config);
   REQUIRE(finalized);
   Tracer tracer{*finalized};
@@ -961,6 +967,8 @@ TEST_CASE("128-bit trace IDs") {
       const auto span = tracer.create_span();
       generated_id = span.trace_id();
     }
+    CAPTURE(logger->entries);
+    REQUIRE(logger->error_count() == 0);
     REQUIRE(collector->span_count() == 1);
     const auto& span = collector->first_span();
     const auto found = span.tags.find("_dd.p.tid");
@@ -968,5 +976,43 @@ TEST_CASE("128-bit trace IDs") {
     const auto high = parse_uint64(found->second, 16);
     REQUIRE(high);
     REQUIRE(*high == generated_id.high);
+  }
+
+  SECTION("extracted from W3C") {
+    std::unordered_map<std::string, std::string> headers;
+    headers["traceparent"] =
+        "00-deadbeefdeadbeefcafebabecafebabe-0000000000000001-01";
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    CAPTURE(logger->entries);
+    REQUIRE(logger->error_count() == 0);
+    REQUIRE(span);
+    REQUIRE(hex(span->trace_id().high) == "deadbeefdeadbeef");
+  }
+
+  SECTION("extracted from Datadog (_dd.p.tid)") {
+    std::unordered_map<std::string, std::string> headers;
+    headers["x-datadog-trace-id"] = "4";
+    headers["x-datadog-parent-id"] = "42";
+    headers["x-datadog-tags"] = "_dd.p.tid=beef";
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    CAPTURE(logger->entries);
+    REQUIRE(logger->error_count() == 0);
+    REQUIRE(span);
+    REQUIRE(span->trace_id().hex_padded() ==
+            "000000000000beef0000000000000004");
+  }
+
+  SECTION("extracted from B3") {
+    std::unordered_map<std::string, std::string> headers;
+    headers["x-b3-traceid"] = "deadbeefdeadbeefcafebabecafebabe";
+    headers["x-b3-spanid"] = "42";
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    CAPTURE(logger->entries);
+    REQUIRE(logger->error_count() == 0);
+    REQUIRE(span);
+    REQUIRE(hex(span->trace_id().high) == "deadbeefdeadbeef");
   }
 }
