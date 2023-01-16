@@ -689,3 +689,63 @@ TEST_CASE("injecting W3C tracestate header") {
 
   REQUIRE(logger->error_count() == 0);
 }
+
+TEST_CASE("128-bit trace ID injection") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.logger = std::make_shared<MockLogger>();
+  config.trace_id_128_bit = true;
+  config.injection_styles.clear();
+  config.injection_styles.push_back(PropagationStyle::W3C);
+  config.injection_styles.push_back(PropagationStyle::DATADOG);
+  config.injection_styles.push_back(PropagationStyle::B3);
+
+  const auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+
+  class MockIDGenerator : public IDGenerator {
+    const TraceID trace_id_;
+
+   public:
+    explicit MockIDGenerator(TraceID trace_id) : trace_id_(trace_id) {}
+    TraceID trace_id() const override { return trace_id_; }
+    // `span_id` won't be called, because root spans use the lower part of
+    // `trace_id` for the span ID.
+    std::uint64_t span_id() const override { return 42; }
+  };
+
+  const auto maybe_trace_id =
+      TraceID::parse_hex("deadbeefdeadbeefcafebabecafebabe");
+  REQUIRE(maybe_trace_id);
+  const TraceID trace_id = *maybe_trace_id;
+  const auto expected_low = 14627333968358193854ULL;
+  const auto expected_high = 16045690984833335023ULL;
+  REQUIRE(trace_id.low == expected_low);
+  REQUIRE(trace_id.high == expected_high);
+  Tracer tracer{*finalized, std::make_shared<MockIDGenerator>(trace_id)};
+
+  auto span = tracer.create_span();
+  span.trace_segment().override_sampling_priority(2);
+  MockDictWriter writer;
+  span.inject(writer);
+
+  // PropagationStyle::DATADOG
+  auto found = writer.items.find("x-datadog-trace-id");
+  REQUIRE(found != writer.items.end());
+  REQUIRE(found->second == std::to_string(expected_low));
+  found = writer.items.find("x-datadog-tags");
+  REQUIRE(found != writer.items.end());
+  REQUIRE(found->second.find("_dd.p.tid=deadbeefdeadbeef") !=
+          std::string::npos);
+
+  // PropagationStyle::W3C
+  found = writer.items.find("traceparent");
+  REQUIRE(found != writer.items.end());
+  REQUIRE(found->second ==
+          "00-deadbeefdeadbeefcafebabecafebabe-cafebabecafebabe-01");
+
+  // PropagationStyle::B3
+  found = writer.items.find("x-b3-traceid");
+  REQUIRE(found != writer.items.end());
+  REQUIRE(found->second == "deadbeefdeadbeefcafebabecafebabe");
+}

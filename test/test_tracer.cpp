@@ -971,7 +971,7 @@ TEST_CASE("128-bit trace IDs") {
     REQUIRE(logger->error_count() == 0);
     REQUIRE(collector->span_count() == 1);
     const auto& span = collector->first_span();
-    const auto found = span.tags.find("_dd.p.tid");
+    const auto found = span.tags.find(tags::internal::trace_id_high);
     REQUIRE(found != span.tags.end());
     const auto high = parse_uint64(found->second, 16);
     REQUIRE(high);

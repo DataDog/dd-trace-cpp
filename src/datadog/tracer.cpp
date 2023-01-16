@@ -46,7 +46,7 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
       continue;
     }
 
-    if (key == "_dd.p.tid") {
+    if (key == tags::internal::trace_id_high) {
       // _dd.p.tid contains the high 64 bits of the trace ID.
       auto high = parse_uint64(value, 16);
       if (auto* error = high.if_error()) {
@@ -269,7 +269,8 @@ Span Tracer::create_span(const SpanConfig& config) {
   std::vector<std::pair<std::string, std::string>> trace_tags;
   span_data->trace_id = generator_->trace_id();
   if (span_data->trace_id.high) {
-    trace_tags.emplace_back("_dd.p.tid", hex(span_data->trace_id.high));
+    trace_tags.emplace_back(tags::internal::trace_id_high,
+                            hex(span_data->trace_id.high));
   }
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;

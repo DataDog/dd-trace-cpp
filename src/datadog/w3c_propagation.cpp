@@ -327,7 +327,7 @@ std::string encode_datadog_tracestate(
 
   for (const auto& [key, value] : trace_tags) {
     const StringView prefix = "_dd.p.";
-    if (!starts_with(key, prefix) || key == "_dd.p.tid") {
+    if (!starts_with(key, prefix) || key == tags::internal::trace_id_high) {
       // Either it's not a propagation tag, or it's one of the propagation tags
       // that need not be included in tracestate.
       continue;
