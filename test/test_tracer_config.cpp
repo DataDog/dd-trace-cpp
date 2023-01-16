@@ -1210,7 +1210,7 @@ TEST_CASE("configure 128-bit trace IDs") {
     REQUIRE(finalized->trace_id_128_bit == value);
   }
 
-  SECTION("value overridden by DD_TRACE_ID_128_BIT_ENABLED") {
+  SECTION("value overridden by DD_TRACE_128_BIT_TRACEID_ENABLED") {
     struct TestCase {
       int line;
       std::string env_value;
@@ -1231,7 +1231,7 @@ TEST_CASE("configure 128-bit trace IDs") {
     CAPTURE(test_case.line);
     CAPTURE(test_case.env_value);
 
-    EnvGuard guard{"DD_TRACE_ID_128_BIT_ENABLED", test_case.env_value};
+    EnvGuard guard{"DD_TRACE_128_BIT_TRACEID_ENABLED", test_case.env_value};
 
     config.trace_id_128_bit = true;
     CAPTURE(config.trace_id_128_bit);

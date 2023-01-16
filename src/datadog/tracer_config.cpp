@@ -360,7 +360,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   result.report_hostname = config.report_hostname;
   result.tags_header_size = config.tags_header_size;
 
-  if (auto enabled_env = lookup(environment::DD_TRACE_ID_128_BIT_ENABLED)) {
+  if (auto enabled_env =
+          lookup(environment::DD_TRACE_128_BIT_TRACEID_ENABLED)) {
     result.trace_id_128_bit = !falsy(*enabled_env);
   } else {
     result.trace_id_128_bit = config.trace_id_128_bit;
