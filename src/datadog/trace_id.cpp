@@ -33,7 +33,7 @@ std::string TraceID::debug() const {
 
 Expected<TraceID> TraceID::parse_hex(StringView input) {
   const auto parse_hex_piece =
-      [&](StringView piece) -> Expected<std::uint64_t> {
+      [input](StringView piece) -> Expected<std::uint64_t> {
     auto result = parse_uint64(piece, 16);
     if (auto *error = result.if_error()) {
       std::string prefix = "Unable to parse trace ID from \"";
