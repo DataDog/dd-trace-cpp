@@ -1195,3 +1195,54 @@ TEST_CASE("TracerConfig propagation styles") {
     }
   }
 }
+
+TEST_CASE("configure 128-bit trace IDs") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+
+  SECTION("defaults to false") { REQUIRE(config.trace_id_128_bit == false); }
+
+  SECTION("value honored in finalizer") {
+    const auto value = GENERATE(true, false);
+    config.trace_id_128_bit = value;
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_id_128_bit == value);
+  }
+
+  SECTION("value overridden by DD_TRACE_ID_128_BIT_ENABLED") {
+    struct TestCase {
+      int line;
+      std::string env_value;
+      bool expected_value;
+    };
+
+    // clang-format off
+    const auto test_case = GENERATE(values<TestCase>({
+      {__LINE__, "true", true},
+      {__LINE__, "false", false},
+      {__LINE__, "no", false},
+      {__LINE__, "nein", true},
+      {__LINE__, "0", false},
+      {__LINE__, "", true},
+    }));
+    // clang-format on
+
+    CAPTURE(test_case.line);
+    CAPTURE(test_case.env_value);
+
+    EnvGuard guard{"DD_TRACE_ID_128_BIT_ENABLED", test_case.env_value};
+
+    config.trace_id_128_bit = true;
+    CAPTURE(config.trace_id_128_bit);
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
+
+    config.trace_id_128_bit = false;
+    CAPTURE(config.trace_id_128_bit);
+    finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
+  }
+}

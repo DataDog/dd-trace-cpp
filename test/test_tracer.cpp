@@ -939,7 +939,7 @@ TEST_CASE("report hostname") {
   }
 }
 
-TEST_CASE("128-bit trace IDs") {
+TEST_CASE("create 128-bit trace IDs") {
   TracerConfig config;
   config.defaults.service = "testsvc";
   config.trace_id_128_bit = true;
