@@ -14,7 +14,6 @@ TraceID::TraceID(std::uint64_t low, std::uint64_t high)
     : low(low), high(high) {}
 
 std::string TraceID::hex_padded() const {
-  // TODO
   std::string result;
   if (high) {
     result += ::datadog::tracing::hex_padded(high);
