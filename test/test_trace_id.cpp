@@ -4,14 +4,24 @@
 #include <datadog/optional.h>
 #include <datadog/trace_id.h>
 
+#include <ostream>
+
 #include "test.h"
 
 using namespace datadog::tracing;
 
+std::ostream& operator<<(std::ostream& stream, TraceID trace_id) {
+  return stream << trace_id.debug();
+}
+
 TEST_CASE("TraceID defaults to zero") {
-  TraceID id;
-  REQUIRE(id.low == 0);
-  REQUIRE(id.high == 0);
+  TraceID id1;
+  REQUIRE(id1.low == 0);
+  REQUIRE(id1.high == 0);
+
+  TraceID id2{0xdeadbeef};
+  REQUIRE(id2.low == 0xdeadbeef);
+  REQUIRE(id2.high == 0);
 }
 
 TEST_CASE("TraceID parsed from hexadecimal") {
@@ -47,5 +57,36 @@ TEST_CASE("TraceID parsed from hexadecimal") {
   } else {
     REQUIRE(result);
     REQUIRE(*result == *test_case.expected_id);
+  }
+}
+
+TEST_CASE("TraceID comparisons") {
+  struct TestCase {
+    int line;
+    std::string name;
+    TraceID left;
+    TraceID right;
+    bool equal;
+  };
+
+  // clang-format off
+  const auto test_case = GENERATE(values<TestCase>({
+    {__LINE__, "defaults", TraceID{}, TraceID{}, true},
+    {__LINE__, "lowers equal", TraceID{0xcafebabe}, TraceID{0xcafebabe}, true},
+    {__LINE__, "lowers not equal", TraceID{0xcafebabe}, TraceID{0xdeadbeef}, false},
+    {__LINE__, "highers zeroness agree", TraceID{0xcafebabe, 0xdeadbeef}, TraceID{0xcafebabe, 0xdeadbeef}, true},
+    {__LINE__, "highers zeroness disagree", TraceID{0xdeadbeef}, TraceID{0xcafebabe, 0xdeadbeef}, false},
+    {__LINE__, "highers disagree", TraceID{0xdeadbeef, 0xdeadbeef}, TraceID{0xcafebabe, 0xdeadbeef}, false},
+  }));
+  // clang-format on
+
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.name);
+  if (test_case.equal) {
+    REQUIRE(test_case.left == test_case.right);
+    REQUIRE_FALSE(test_case.left != test_case.right);
+  } else {
+    REQUIRE_FALSE(test_case.left == test_case.right);
+    REQUIRE(test_case.left != test_case.right);
   }
 }
