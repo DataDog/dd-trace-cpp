@@ -330,6 +330,6 @@ TEST_CASE("span rule limiter") {
   // allowed.  I'm not sure how that works, but we are using a real clock and
   // different machines run these cases at different rates, so let's build in a
   // fudge factor.
-  REQUIRE(count_of_sampled_spans >= test_case.expected_count - 5);
-  REQUIRE(count_of_sampled_spans <= test_case.expected_count + 5);
+  REQUIRE(count_of_sampled_spans >= test_case.expected_count - 10);
+  REQUIRE(count_of_sampled_spans <= test_case.expected_count + 10);
 }
