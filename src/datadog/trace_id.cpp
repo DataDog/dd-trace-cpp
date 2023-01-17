@@ -84,11 +84,11 @@ bool operator!=(TraceID left, TraceID right) {
 }
 
 bool operator==(TraceID left, std::uint64_t right) {
-  return left.high == 0 && left.low == right;
+  return left == TraceID{right};
 }
 
 bool operator!=(TraceID left, std::uint64_t right) {
-  return left.high != 0 || left.low != right;
+  return left != TraceID{right};
 }
 
 }  // namespace tracing

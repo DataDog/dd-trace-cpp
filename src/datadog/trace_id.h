@@ -1,6 +1,9 @@
 #pragma once
 
-// TODO: document
+// This component provides a `struct`, `TraceID`, that represents an opaque,
+// unique identifier for a trace.
+// `TraceID` is 128 bits wide, though in some contexts only the lower 64 bits
+// are used.
 
 #include <cstdint>
 #include <string>
@@ -15,16 +18,29 @@ struct TraceID {
   std::uint64_t low;
   std::uint64_t high;
 
-  // TODO: document
+  // Create a zero trace ID.
   TraceID();
+
+  // Create a trace ID whose lower 64 bits are the specified `low` and whose
+  // higher 64 bits are zero.
   explicit TraceID(std::uint64_t low);
+
+  // Create a trace ID whose lower 64 bits are the specified `low` and whose
+  // higher 64 bits are the specified `high`.
   TraceID(std::uint64_t low, std::uint64_t high);
 
-  // TODO: document
+  // Return a 32 character lower-case hexadecimal representation of this trace
+  // ID, padded with zeroes on the left.
   std::string hex_padded() const;
+
+  // Return either a decimal or a "0x"-prefixed hexadecimal representation of
+  // this trace ID, depending on whether the higher 64 bits are zero. This
+  // representation is meant for use in error diagnostics.
   std::string debug() const;
 
-  // TODO: document
+  // Return a `TraceID` parsed from the specified hexadecimal string, or return
+  // an `Error`. It is an error of the input contains any non-hexadecimal
+  // characters.
   static Expected<TraceID> parse_hex(StringView);
 };
 
