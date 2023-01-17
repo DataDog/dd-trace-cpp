@@ -25,7 +25,6 @@ TEST_CASE("TraceID defaults to zero") {
 }
 
 TEST_CASE("TraceID parsed from hexadecimal") {
-  // TODO: leading zeroes might be a corner case.
   struct TestCase {
     int line;
     std::string input;
