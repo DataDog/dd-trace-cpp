@@ -98,3 +98,31 @@ TEST_CASE("TraceID comparisons") {
     REQUIRE(test_case.left != test_case.right);
   }
 }
+
+TEST_CASE("TraceID serialization") {
+  struct TestCase {
+    int line;
+    std::string trace_id_source;
+    TraceID trace_id;
+    std::string expected_hex;
+    std::string expected_debug;
+  };
+
+#define CASE(TRACE_ID, HEX, DEBUG) \
+  { __LINE__, #TRACE_ID, TRACE_ID, HEX, DEBUG }
+  // clang-format off
+  const auto test_case = GENERATE(values<TestCase>({
+    CASE(TraceID(), "00000000000000000000000000000000", "0"),
+    CASE(TraceID(16), "00000000000000000000000000000010", "16"),
+    CASE(TraceID(0xcafebabe), "000000000000000000000000cafebabe", "3405691582"),
+    CASE(TraceID(0, 1), "00000000000000010000000000000000", "0x00000000000000010000000000000000"),
+    CASE(TraceID(15, 0xcafebabe), "00000000cafebabe000000000000000f", "0x00000000cafebabe000000000000000f"),
+  }));
+// clang-format on
+#undef CASE
+
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.trace_id_source);
+  REQUIRE(test_case.trace_id.hex_padded() == test_case.expected_hex);
+  REQUIRE(test_case.trace_id.debug() == test_case.expected_debug);
+}
