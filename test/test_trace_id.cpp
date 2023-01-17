@@ -61,6 +61,15 @@ TEST_CASE("TraceID parsed from hexadecimal") {
 }
 
 TEST_CASE("TraceID comparisons") {
+  // First, comparing integers with the `TraceID.low`.
+  REQUIRE(TraceID{12345} == 12345);
+  REQUIRE_FALSE(TraceID{12345} != 12345);
+  REQUIRE(TraceID{12345} != 54321);
+  REQUIRE_FALSE(TraceID{12345} == 54321);
+  REQUIRE(TraceID{6789, 12345} != 12345);
+  REQUIRE_FALSE(TraceID{6789, 12345} == 12345);
+
+  // Second, comparing trace IDs with other trace IDs.
   struct TestCase {
     int line;
     std::string name;
