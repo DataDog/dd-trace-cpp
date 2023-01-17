@@ -714,14 +714,7 @@ TEST_CASE("128-bit trace ID injection") {
     std::uint64_t span_id() const override { return 42; }
   };
 
-  const auto maybe_trace_id =
-      TraceID::parse_hex("deadbeefdeadbeefcafebabecafebabe");
-  REQUIRE(maybe_trace_id);
-  const TraceID trace_id = *maybe_trace_id;
-  const auto expected_low = 14627333968358193854ULL;
-  const auto expected_high = 16045690984833335023ULL;
-  REQUIRE(trace_id.low == expected_low);
-  REQUIRE(trace_id.high == expected_high);
+  const TraceID trace_id{0xcafebabecafebabeULL, 0xdeadbeefdeadbeefULL};
   Tracer tracer{*finalized, std::make_shared<MockIDGenerator>(trace_id)};
 
   auto span = tracer.create_span();
@@ -732,7 +725,7 @@ TEST_CASE("128-bit trace ID injection") {
   // PropagationStyle::DATADOG
   auto found = writer.items.find("x-datadog-trace-id");
   REQUIRE(found != writer.items.end());
-  REQUIRE(found->second == std::to_string(expected_low));
+  REQUIRE(found->second == std::to_string(trace_id.low));
   found = writer.items.find("x-datadog-tags");
   REQUIRE(found != writer.items.end());
   REQUIRE(found->second.find("_dd.p.tid=deadbeefdeadbeef") !=
