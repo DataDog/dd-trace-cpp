@@ -13,6 +13,7 @@
 #include "hex.h"
 #include "logger.h"
 #include "optional.h"
+#include "platform_util.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
@@ -23,6 +24,19 @@
 namespace datadog {
 namespace tracing {
 namespace {
+
+extern "C" void reset_process_id_on_fork();
+
+int& cached_process_id() {
+  static int process_id = []() {
+    (void)at_fork_in_child(&reset_process_id_on_fork);
+    return get_process_id();
+  }();
+
+  return process_id;
+}
+
+void reset_process_id_on_fork() { cached_process_id() = get_process_id(); }
 
 // Encode the specified `trace_tags`. If the encoded value is not longer than
 // the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
@@ -179,12 +193,13 @@ void TraceSegment::span_finished() {
     }
   }
 
-  // Origin is repeated on all spans.
-  if (origin_) {
-    for (const auto& span_ptr : spans_) {
-      SpanData& span = *span_ptr;
+  // Some tags are repeated on all spans.
+  for (const auto& span_ptr : spans_) {
+    SpanData& span = *span_ptr;
+    if (origin_) {
       span.tags[tags::internal::origin] = *origin_;
     }
+    span.numeric_tags[tags::internal::process_id] = cached_process_id();
   }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);
