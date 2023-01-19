@@ -1,6 +1,6 @@
 #pragma once
 
-// This component provides networking-related miscellanea.
+// This component provides platform-dependent miscellanea.
 
 #include <string>
 

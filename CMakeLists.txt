@@ -93,10 +93,10 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
     src/datadog/msgpack.cpp
-    src/datadog/net_util.cpp
     src/datadog/null_collector.cpp
     src/datadog/optional.cpp
     src/datadog/parse_util.cpp
+    src/datadog/platform_util.cpp
     src/datadog/propagation_style.cpp
     src/datadog/rate.cpp
     src/datadog/sampling_decision.cpp
@@ -154,10 +154,10 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/limiter.h
   src/datadog/logger.h
   src/datadog/msgpack.h
-  src/datadog/net_util.h
   src/datadog/null_collector.h
   src/datadog/optional.h
   src/datadog/parse_util.h
+  src/datadog/platform_util.h
   src/datadog/propagation_style.h
   src/datadog/rate.h
   src/datadog/sampling_decision.h

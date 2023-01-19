@@ -1,4 +1,4 @@
-#include <datadog/net_util.h>
+#include <datadog/platform_util.h>
 #include <datadog/rate.h>
 #include <datadog/tags.h>
 #include <datadog/trace_segment.h>
