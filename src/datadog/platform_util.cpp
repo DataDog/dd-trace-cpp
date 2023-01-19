@@ -4,6 +4,7 @@
 #include <processthreadsapi.h>
 #include <winsock.h>
 #else
+#include <pthread.h>
 #include <unistd.h>
 #endif
 
@@ -23,6 +24,17 @@ int get_process_id() {
   return GetCurrentProcessId();
 #else
   return ::getpid();
+#endif
+}
+
+int at_fork_in_child(void (*on_fork)()) {
+// Windows does not have `fork`, and so this is not relevant there.
+#ifdef _MSC_VER
+  return 0;
+#else
+  // https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_atfork.html
+  return pthread_atfork(/*before fork*/ nullptr, /*in parent*/ nullptr,
+                        /*in child*/ on_fork);
 #endif
 }
 

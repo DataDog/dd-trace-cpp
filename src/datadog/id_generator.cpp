@@ -4,17 +4,13 @@
 #include <limits>
 #include <random>
 
-#ifndef _MSC_VER
-#include <pthread.h>
-#endif
+#include "platform_util.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
 
-#ifndef _MSC_VER
 extern "C" void on_fork();
-#endif
 
 class Uint64Generator {
   std::mt19937_64 generator_;
@@ -28,19 +24,14 @@ class Uint64Generator {
  public:
   Uint64Generator() {
     seed_with_random();
-// If a process links to this library and then calls `fork`, the `generator_` in
-// the parent and child processes will produce the exact same sequence of
-// values, which is bad.
-// A subsequent call to `exec` would remedy this, but nginx in particular does
-// not call `exec` after forking its worker processes.
-// So, we use `pthread_atfork` to re-seed `generator_` in the child process
-// after `fork`.
-// Windows does not have `fork`, and so this is not relevant there.
-#ifndef _MSC_VER
-    // https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_atfork.html
-    (void)pthread_atfork(/*before fork*/ nullptr, /*in parent*/ nullptr,
-                         /*in child*/ &on_fork);
-#endif
+    // If a process links to this library and then calls `fork`, the
+    // `generator_` in the parent and child processes will produce the exact
+    // same sequence of values, which is bad.
+    // A subsequent call to `exec` would remedy this, but nginx in particular
+    // does not call `exec` after forking its worker processes.
+    // So, we use `at_fork_in_child` to re-seed `generator_` in the child
+    // process after `fork`.
+    (void)at_fork_in_child(&on_fork);
   }
 
   std::uint64_t operator()() { return distribution_(generator_); }
@@ -50,9 +41,7 @@ class Uint64Generator {
 
 thread_local Uint64Generator thread_local_generator;
 
-#ifndef _MSC_VER
 void on_fork() { thread_local_generator.seed_with_random(); }
-#endif
 
 class DefaultIDGenerator : public IDGenerator {
   const bool trace_id_128_bit_;

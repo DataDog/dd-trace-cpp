@@ -13,5 +13,7 @@ Optional<std::string> get_hostname();
 
 int get_process_id();
 
+int at_fork_in_child(void (*on_fork)());
+
 }  // namespace tracing
 }  // namespace datadog
