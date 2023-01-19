@@ -800,6 +800,15 @@ TEST_CASE("span extraction") {
           nullopt, // expected_additional_w3c_tracestate
           "x:wow;y:wow"}, // expected_additional_datadog_w3c_tracestate
 
+        {__LINE__, "_dd.p.tid trace tag is ignored",
+         traceparent_drop, // traceparent
+         "dd=t.tid:deadbeef;t.foo:bar", // tracestate
+         0, // expected_sampling_priority
+         nullopt, // expected_origin
+         {{"_dd.p.foo", "bar"}}, // expected_trace_tags
+         nullopt, // expected_additional_w3c_tracestate
+         nullopt}, // expected_additional_datadog_w3c_tracestate
+
          {__LINE__, "traceparent and tracestate sampling agree (1/4)",
           traceparent_drop, // traceparent
           "dd=s:0", // tracestate
