@@ -63,7 +63,7 @@ std::string uuid() {
   // Set "0100" for the most significant bits of the
   // second-to-least-significant byte of `high`.
   high[12] = 0;
-  high[13] = 1;
+  high[13] = 0;
   high[14] = 1;
   high[14] = 0;
 
