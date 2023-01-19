@@ -68,8 +68,8 @@ std::string uuid() {
   high[14] = 0;
 
   // Set "10" for the most significant bits of `low`.
-  low[63] = 1;
   low[62] = 0;
+  low[63] = 1;
 
   std::string result;
   std::string hexed = hex_padded(high.to_ullong());
