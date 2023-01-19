@@ -381,7 +381,8 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
   }  // root span
 
-  SECTION("every span tagged with: _dd.origin, process_id, language") {
+  SECTION(
+      "every span tagged with: _dd.origin, process_id, language, resource-id") {
     const auto finalized = finalize_config(config);
     REQUIRE(finalized);
     Tracer tracer{*finalized};
