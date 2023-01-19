@@ -98,6 +98,7 @@ target_sources(dd_trace_cpp PRIVATE
     src/datadog/parse_util.cpp
     src/datadog/platform_util.cpp
     src/datadog/propagation_style.cpp
+    src/datadog/random.cpp
     src/datadog/rate.cpp
     src/datadog/sampling_decision.cpp
     src/datadog/sampling_mechanism.cpp
@@ -159,6 +160,7 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/parse_util.h
   src/datadog/platform_util.h
   src/datadog/propagation_style.h
+  src/datadog/random.h
   src/datadog/rate.h
   src/datadog/sampling_decision.h
   src/datadog/sampling_mechanism.h
