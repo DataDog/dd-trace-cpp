@@ -26,12 +26,10 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-extern "C" void reset_process_id_on_fork();
-extern "C" void reset_runtime_id_on_fork();
-
 int& cached_process_id() {
   static int process_id = []() {
-    (void)at_fork_in_child(&reset_process_id_on_fork);
+    (void)at_fork_in_child(static_cast<void (*)()>(
+        []() { cached_process_id() = get_process_id(); }));
     return get_process_id();
   }();
 
@@ -40,16 +38,13 @@ int& cached_process_id() {
 
 std::string& cached_runtime_id() {
   static std::string runtime_id = []() {
-    (void)at_fork_in_child(&reset_runtime_id_on_fork);
+    (void)at_fork_in_child(
+        static_cast<void (*)()>([]() { cached_runtime_id() = uuid(); }));
     return uuid();
   }();
 
   return runtime_id;
 }
-
-void reset_process_id_on_fork() { cached_process_id() = get_process_id(); }
-
-void reset_runtime_id_on_fork() { cached_runtime_id() = uuid(); }
 
 // Encode the specified `trace_tags`. If the encoded value is not longer than
 // the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
