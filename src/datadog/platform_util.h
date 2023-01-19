@@ -11,5 +11,7 @@ namespace tracing {
 
 Optional<std::string> get_hostname();
 
+int get_process_id();
+
 }  // namespace tracing
 }  // namespace datadog
