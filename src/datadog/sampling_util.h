@@ -11,6 +11,16 @@
 namespace datadog {
 namespace tracing {
 
+// Return a hash value for the specified `value`.  `value` is one of the
+// following:
+//
+// - a 64-bit span ID
+// - a 64-bit trace ID
+// - the lower 64 bits of a 128-bit trace ID
+//
+// The resulting hash value is compared with an upper bound provided by
+// `max_id_from_rate` (below) to determine whether the span/trace associated
+// with `value` is eligible for keeping on statistical grounds.
 inline std::uint64_t knuth_hash(std::uint64_t value) {
   return value * UINT64_C(1111111111111111111);
 }
