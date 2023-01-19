@@ -33,11 +33,6 @@ struct TraceID {
   // ID, padded with zeroes on the left.
   std::string hex_padded() const;
 
-  // Return either a decimal or a "0x"-prefixed hexadecimal representation of
-  // this trace ID, depending on whether the higher 64 bits are zero. This
-  // representation is meant for use in error diagnostics.
-  std::string debug() const;
-
   // Return a `TraceID` parsed from the specified hexadecimal string, or return
   // an `Error`. It is an error of the input contains any non-hexadecimal
   // characters.

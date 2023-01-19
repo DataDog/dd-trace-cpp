@@ -24,13 +24,6 @@ std::string TraceID::hex_padded() const {
   return result;
 }
 
-std::string TraceID::debug() const {
-  if (high) {
-    return "0x" + hex_padded();
-  }
-  return std::to_string(low);
-}
-
 Expected<TraceID> TraceID::parse_hex(StringView input) {
   const auto parse_hex_piece =
       [input](StringView piece) -> Expected<std::uint64_t> {

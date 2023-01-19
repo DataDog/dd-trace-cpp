@@ -4,15 +4,9 @@
 #include <datadog/optional.h>
 #include <datadog/trace_id.h>
 
-#include <ostream>
-
 #include "test.h"
 
 using namespace datadog::tracing;
-
-std::ostream& operator<<(std::ostream& stream, TraceID trace_id) {
-  return stream << trace_id.debug();
-}
 
 TEST_CASE("TraceID defaults to zero") {
   TraceID id1;
@@ -105,18 +99,17 @@ TEST_CASE("TraceID serialization") {
     std::string trace_id_source;
     TraceID trace_id;
     std::string expected_hex;
-    std::string expected_debug;
   };
 
-#define CASE(TRACE_ID, HEX, DEBUG) \
-  { __LINE__, #TRACE_ID, TRACE_ID, HEX, DEBUG }
+#define CASE(TRACE_ID, HEX) \
+  { __LINE__, #TRACE_ID, TRACE_ID, HEX }
   // clang-format off
   const auto test_case = GENERATE(values<TestCase>({
-    CASE(TraceID(), "00000000000000000000000000000000", "0"),
-    CASE(TraceID(16), "00000000000000000000000000000010", "16"),
-    CASE(TraceID(0xcafebabe), "000000000000000000000000cafebabe", "3405691582"),
-    CASE(TraceID(0, 1), "00000000000000010000000000000000", "0x00000000000000010000000000000000"),
-    CASE(TraceID(15, 0xcafebabe), "00000000cafebabe000000000000000f", "0x00000000cafebabe000000000000000f"),
+    CASE(TraceID(), "00000000000000000000000000000000"),
+    CASE(TraceID(16), "00000000000000000000000000000010"),
+    CASE(TraceID(0xcafebabe), "000000000000000000000000cafebabe"),
+    CASE(TraceID(0, 1), "00000000000000010000000000000000"),
+    CASE(TraceID(15, 0xcafebabe), "00000000cafebabe000000000000000f"),
   }));
 // clang-format on
 #undef CASE
@@ -124,5 +117,4 @@ TEST_CASE("TraceID serialization") {
   CAPTURE(test_case.line);
   CAPTURE(test_case.trace_id_source);
   REQUIRE(test_case.trace_id.hex_padded() == test_case.expected_hex);
-  REQUIRE(test_case.trace_id.debug() == test_case.expected_debug);
 }

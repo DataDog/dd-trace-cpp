@@ -363,7 +363,13 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     std::string message;
     message +=
         "There's no parent span ID to extract, but there is a trace ID: ";
-    message += trace_id->debug();
+    message += "[hexadecimal = ";
+    message += trace_id->hex_padded();
+    if (trace_id->high == 0) {
+      message += ", decimal = ";
+      message += std::to_string(trace_id->low);
+    }
+    message += ']';
     return Error{Error::MISSING_PARENT_SPAN_ID, std::move(message)};
   }
 
