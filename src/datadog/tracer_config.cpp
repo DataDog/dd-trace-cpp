@@ -361,7 +361,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   result.tags_header_size = config.tags_header_size;
 
   if (auto enabled_env =
-          lookup(environment::DD_TRACE_128_BIT_TRACEID_ENABLED)) {
+          lookup(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)) {
     result.trace_id_128_bit = !falsy(*enabled_env);
   } else {
     result.trace_id_128_bit = config.trace_id_128_bit;
