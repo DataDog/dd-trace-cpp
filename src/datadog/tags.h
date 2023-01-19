@@ -35,6 +35,7 @@ extern const std::string span_sampling_limit;
 extern const std::string w3c_extraction_error;
 extern const std::string trace_id_high;
 extern const std::string process_id;
+extern const std::string language;
 }  // namespace internal
 
 // Return whether the specified `tag_name` is reserved for use internal to this

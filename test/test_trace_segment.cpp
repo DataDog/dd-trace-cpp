@@ -380,7 +380,7 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
   }  // root span
 
-  SECTION("_dd.origin and process_id tags are on every span") {
+  SECTION("every span tagged with: _dd.origin, process_id, language") {
     const auto finalized = finalize_config(config);
     REQUIRE(finalized);
     Tracer tracer{*finalized};
@@ -409,9 +409,13 @@ TEST_CASE("TraceSegment finalization of spans") {
       for (const auto& span : chunk) {
         REQUIRE(span);
 
-        const auto found_string = span->tags.find(tags::internal::origin);
+        auto found_string = span->tags.find(tags::internal::origin);
         REQUIRE(found_string != span->tags.end());
         REQUIRE(found_string->second == "พัทยา");
+
+        found_string = span->tags.find(tags::internal::language);
+        REQUIRE(found_string != span->tags.end());
+        REQUIRE(found_string->second == "cpp");
 
         const auto found_number =
             span->numeric_tags.find(tags::internal::process_id);

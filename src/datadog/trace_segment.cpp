@@ -200,6 +200,7 @@ void TraceSegment::span_finished() {
       span.tags[tags::internal::origin] = *origin_;
     }
     span.numeric_tags[tags::internal::process_id] = cached_process_id();
+    span.tags[tags::internal::language] = "cpp";
   }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);
