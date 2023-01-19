@@ -5,6 +5,7 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <regex>
 #include <vector>
 
 #include "matchers.h"
@@ -403,6 +404,19 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
 
     const int process_id = get_process_id();
+    // clang-format off
+    const char uuid_pattern[] =
+        "[0-9a-f]{8}"
+        "-"
+        "[0-9a-f]{4}"
+        "-"
+        "[0-9a-f]{4}"
+        "-"
+        "[0-9a-f]{4}"
+        "-"
+        "[0-9a-f]{12}";
+    // clang-format on
+    const std::regex uuid_regex{uuid_pattern};
 
     REQUIRE(collector->span_count() == 2 * 10 + 1);
     for (const auto& chunk : collector->chunks) {
@@ -416,6 +430,12 @@ TEST_CASE("TraceSegment finalization of spans") {
         found_string = span->tags.find(tags::internal::language);
         REQUIRE(found_string != span->tags.end());
         REQUIRE(found_string->second == "cpp");
+
+        found_string = span->tags.find(tags::internal::runtime_id);
+        REQUIRE(found_string != span->tags.end());
+        const auto found_uuid = found_string->second;
+        CAPTURE(found_uuid);
+        REQUIRE(std::regex_match(found_uuid, uuid_regex));
 
         const auto found_number =
             span->numeric_tags.find(tags::internal::process_id);

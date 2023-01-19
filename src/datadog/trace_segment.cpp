@@ -14,6 +14,7 @@
 #include "logger.h"
 #include "optional.h"
 #include "platform_util.h"
+#include "random.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
@@ -26,6 +27,7 @@ namespace tracing {
 namespace {
 
 extern "C" void reset_process_id_on_fork();
+extern "C" void reset_runtime_id_on_fork();
 
 int& cached_process_id() {
   static int process_id = []() {
@@ -36,7 +38,18 @@ int& cached_process_id() {
   return process_id;
 }
 
+std::string& cached_runtime_id() {
+  static std::string runtime_id = []() {
+    (void)at_fork_in_child(&reset_runtime_id_on_fork);
+    return uuid();
+  }();
+
+  return runtime_id;
+}
+
 void reset_process_id_on_fork() { cached_process_id() = get_process_id(); }
+
+void reset_runtime_id_on_fork() { cached_runtime_id() = uuid(); }
 
 // Encode the specified `trace_tags`. If the encoded value is not longer than
 // the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
@@ -201,6 +214,7 @@ void TraceSegment::span_finished() {
     }
     span.numeric_tags[tags::internal::process_id] = cached_process_id();
     span.tags[tags::internal::language] = "cpp";
+    span.tags[tags::internal::runtime_id] = cached_runtime_id();
   }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);
