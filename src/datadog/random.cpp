@@ -65,7 +65,7 @@ std::string uuid() {
   high[12] = 0;
   high[13] = 0;
   high[14] = 1;
-  high[14] = 0;
+  high[15] = 0;
 
   // Set "10" for the most significant bits of `low`.
   low[62] = 0;
