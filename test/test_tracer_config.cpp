@@ -96,13 +96,16 @@ class SomewhatSecureTemporaryFile : public std::fstream {
   SomewhatSecureTemporaryFile() try {
     namespace fs = std::filesystem;
 
+    const auto generator = default_id_generator(false);
+    const auto random = [&]() { return generator->span_id(); };
+
     // The goal is to create a file whose name is like
     // "/tmp/342394898324/239489029034", where the directory under /tmp has
     // permissions such that only the current user can read/write/cd it.
     const auto tmp = fs::temp_directory_path();
     const int max_attempts = 5;
     for (int i = 0; i < max_attempts; ++i) {
-      const auto dir = tmp / std::to_string(default_id_generator());
+      const auto dir = tmp / std::to_string(random());
       std::error_code err;
       if (!fs::create_directory(dir, err)) {
         continue;
@@ -111,7 +114,7 @@ class SomewhatSecureTemporaryFile : public std::fstream {
       if (err) {
         continue;
       }
-      const auto file = dir / std::to_string(default_id_generator());
+      const auto file = dir / std::to_string(random());
       if (fs::exists(file, err) || err) {
         continue;
       }
@@ -1190,5 +1193,57 @@ TEST_CASE("TracerConfig propagation styles") {
         logger->entries.clear();
       }
     }
+  }
+}
+
+TEST_CASE("configure 128-bit trace IDs") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+
+  SECTION("defaults to false") { REQUIRE(config.trace_id_128_bit == false); }
+
+  SECTION("value honored in finalizer") {
+    const auto value = GENERATE(true, false);
+    config.trace_id_128_bit = value;
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_id_128_bit == value);
+  }
+
+  SECTION("value overridden by DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED") {
+    struct TestCase {
+      int line;
+      std::string env_value;
+      bool expected_value;
+    };
+
+    // clang-format off
+    const auto test_case = GENERATE(values<TestCase>({
+      {__LINE__, "true", true},
+      {__LINE__, "false", false},
+      {__LINE__, "no", false},
+      {__LINE__, "nein", true},
+      {__LINE__, "0", false},
+      {__LINE__, "", true},
+    }));
+    // clang-format on
+
+    CAPTURE(test_case.line);
+    CAPTURE(test_case.env_value);
+
+    EnvGuard guard{"DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED",
+                   test_case.env_value};
+
+    config.trace_id_128_bit = true;
+    CAPTURE(config.trace_id_128_bit);
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
+
+    config.trace_id_128_bit = false;
+    CAPTURE(config.trace_id_128_bit);
+    finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
   }
 }

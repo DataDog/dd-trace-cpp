@@ -48,11 +48,11 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
   static const auto& pattern =
       "([0-9a-f]{2})"  // hex version number (match group 1)
       "-"
-      "([0-9a-f]{16}([0-9a-f]{16}))"  // hex trace ID (match groups 2 and 3)
+      "([0-9a-f]{32})"  // hex trace ID (match group 2)
       "-"
-      "([0-9a-f]{16})"  // hex parent span ID (match group 4)
+      "([0-9a-f]{16})"  // hex parent span ID (match group 3)
       "-"
-      "([0-9a-f]{2})"  // hex "trace-flags" (match group 5)
+      "([0-9a-f]{2})"  // hex "trace-flags" (match group 4)
       "(?:$|-.*)";     // either the end, or a hyphen preceding further fields
   static const std::regex regex{pattern};
 
@@ -62,7 +62,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
   }
 
   assert(match.ready());
-  assert(match.size() == 5 + 1);
+  assert(match.size() == 4 + 1);
 
   const auto to_string_view = [](const auto& submatch) {
     assert(submatch.first <= submatch.second);
@@ -74,20 +74,17 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
     return "invalid_version";
   }
 
-  result.full_w3c_trace_id_hex = std::string{to_string_view(match[2])};
-  if (result.full_w3c_trace_id_hex->find_first_not_of('0') ==
-      std::string::npos) {
+  result.trace_id = *TraceID::parse_hex(to_string_view(match[2]));
+  if (result.trace_id == 0) {
     return "trace_id_zero";
   }
 
-  result.trace_id = *parse_uint64(to_string_view(match[3]), 16);
-
-  result.parent_id = *parse_uint64(to_string_view(match[4]), 16);
+  result.parent_id = *parse_uint64(to_string_view(match[3]), 16);
   if (*result.parent_id == 0) {
     return "parent_id_zero";
   }
 
-  const auto flags = *parse_uint64(to_string_view(match[5]), 16);
+  const auto flags = *parse_uint64(to_string_view(match[4]), 16);
   result.sampling_priority = int(flags & 1);
 
   return nullopt;
@@ -217,6 +214,12 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
       const auto tag_suffix = key.substr(2);
       std::string tag_name = "_dd.p.";
       append(tag_name, tag_suffix);
+      // The "_dd.p.tid" trace tag is ignored in this context, since its value
+      // is better inferred from the higher 64 bits of the trace ID.
+      if (tag_name == "_dd.p.tid") {
+        pair_begin = pair_end == end ? end : pair_end + 1;
+        continue;
+      }
       // The tag value was encoded with all '=' replaced by '~'.  Undo that
       // transformation.
       std::string decoded_value{value};
@@ -294,27 +297,18 @@ Expected<ExtractedData> extract_w3c(
   return result;
 }
 
-std::string encode_traceparent(
-    std::uint64_t trace_id, const Optional<std::string>& full_w3c_trace_id_hex,
-    std::uint64_t span_id, int sampling_priority) {
+std::string encode_traceparent(TraceID trace_id, std::uint64_t span_id,
+                               int sampling_priority) {
   std::string result;
   // version
   result += "00-";
 
   // trace ID
-  if (full_w3c_trace_id_hex) {
-    result += *full_w3c_trace_id_hex;
-  } else {
-    auto hexed = hex(trace_id);
-    result.append(16 + (16 - hexed.size()), '0');  // leading zeroes
-    result += hexed;
-  }
+  result += trace_id.hex_padded();
   result += '-';
 
   // span ID
-  auto hexed = hex(span_id);
-  result.append(16 - hexed.size(), '0');  // leading zeroes
-  result += hexed;
+  result += hex_padded(span_id);
   result += '-';
 
   // flags
@@ -339,7 +333,9 @@ std::string encode_datadog_tracestate(
 
   for (const auto& [key, value] : trace_tags) {
     const StringView prefix = "_dd.p.";
-    if (!starts_with(key, prefix)) {
+    if (!starts_with(key, prefix) || key == tags::internal::trace_id_high) {
+      // Either it's not a propagation tag, or it's one of the propagation tags
+      // that need not be included in tracestate.
       continue;
     }
 

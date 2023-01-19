@@ -97,6 +97,12 @@ struct TracerConfig {
   // `log_on_startup` is overridden by the `DD_TRACE_STARTUP_LOGS` environment
   // variable.
   bool log_on_startup = true;
+
+  // `trace_id_128_bit` indicates whether the tracer will generate 128-bit trace
+  // IDs.  If true, the tracer will generate 128-bit trace IDs. If false, the
+  // tracer will generate 64-bit trace IDs. `trace_id_128_bit` is overridden by
+  // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
+  bool trace_id_128_bit = false;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -124,6 +130,7 @@ class FinalizedTracerConfig {
   std::size_t tags_header_size;
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
+  bool trace_id_128_bit;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

@@ -7,6 +7,7 @@
 #include "dict_reader.h"
 #include "environment.h"
 #include "extracted_data.h"
+#include "hex.h"
 #include "json.hpp"
 #include "logger.h"
 #include "net_util.h"
@@ -41,9 +42,28 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
   }
 
   for (auto& [key, value] : *maybe_trace_tags) {
-    if (starts_with(key, "_dd.p.")) {
-      result.trace_tags.emplace_back(std::move(key), std::move(value));
+    if (!starts_with(key, "_dd.p.")) {
+      continue;
     }
+
+    if (key == tags::internal::trace_id_high) {
+      // _dd.p.tid contains the high 64 bits of the trace ID.
+      auto high = parse_uint64(value, 16);
+      if (auto* error = high.if_error()) {
+        logger.log_error(
+            error->with_prefix("Unable to parse high bits of the trace ID in "
+                               "Datadog style from the "
+                               "\"_dd.p.tid\" trace tag: "));
+        span_tags[tags::internal::propagation_error] = "decoding_error";
+      }
+      // Note that this assumes the lower 64 bits of the trace ID have already
+      // been extracted (i.e. we look for X-Datadog-Trace-ID first).
+      if (result.trace_id) {
+        result.trace_id->high = *high;
+      }
+    }
+
+    result.trace_tags.emplace_back(std::move(key), std::move(value));
   }
 }
 
@@ -83,7 +103,9 @@ Expected<ExtractedData> extract_datadog(
   if (auto* error = trace_id.if_error()) {
     return std::move(*error);
   }
-  result.trace_id = *trace_id;
+  if (*trace_id) {
+    result.trace_id = TraceID(**trace_id);
+  }
 
   auto parent_id = extract_id_header(headers, "x-datadog-parent-id",
                                      "parent span", "Datadog", 10);
@@ -121,15 +143,20 @@ Expected<ExtractedData> extract_datadog(
 }
 
 Expected<ExtractedData> extract_b3(
-    const DictReader& headers,
-    std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
+    const DictReader& headers, std::unordered_map<std::string, std::string>&,
+    Logger&) {
   ExtractedData result;
 
-  auto trace_id = extract_id_header(headers, "x-b3-traceid", "trace", "B3", 16);
-  if (auto* error = trace_id.if_error()) {
-    return std::move(*error);
+  if (auto found = headers.lookup("x-b3-traceid")) {
+    auto parsed = TraceID::parse_hex(*found);
+    if (auto* error = parsed.if_error()) {
+      std::string prefix = "Could not extract B3-style trace ID from \"";
+      append(prefix, *found);
+      prefix += "\": ";
+      return error->with_prefix(prefix);
+    }
+    result.trace_id = *parsed;
   }
-  result.trace_id = *trace_id;
 
   auto parent_id =
       extract_id_header(headers, "x-b3-spanid", "parent span", "B3", 16);
@@ -151,17 +178,6 @@ Expected<ExtractedData> extract_b3(
       return error->with_prefix(prefix);
     }
     result.sampling_priority = *sampling_priority;
-  }
-
-  // Origin and trace tags are still extracted, but from the Datadog headers.
-  auto origin = headers.lookup("x-datadog-origin");
-  if (origin) {
-    result.origin = std::string(*origin);
-  }
-
-  auto trace_tags = headers.lookup("x-datadog-tags");
-  if (trace_tags) {
-    handle_trace_tags(*trace_tags, result, span_tags, logger);
   }
 
   return result;
@@ -202,10 +218,19 @@ void log_startup_message(Logger& logger, StringView tracer_version_string,
 }  // namespace
 
 Tracer::Tracer(const FinalizedTracerConfig& config)
-    : Tracer(config, default_id_generator, default_clock) {}
+    : Tracer(config, default_id_generator(config.trace_id_128_bit),
+             default_clock) {}
 
 Tracer::Tracer(const FinalizedTracerConfig& config,
-               const IDGenerator& generator, const Clock& clock)
+               const std::shared_ptr<const IDGenerator>& generator)
+    : Tracer(config, generator, default_clock) {}
+
+Tracer::Tracer(const FinalizedTracerConfig& config, const Clock& clock)
+    : Tracer(config, default_id_generator(config.trace_id_128_bit), clock) {}
+
+Tracer::Tracer(const FinalizedTracerConfig& config,
+               const std::shared_ptr<const IDGenerator>& generator,
+               const Clock& clock)
     : logger_(config.logger),
       collector_(/* see constructor body */),
       trace_sampler_(
@@ -241,19 +266,25 @@ Span Tracer::create_span() { return create_span(SpanConfig{}); }
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
-  span_data->span_id = generator_();
-  span_data->trace_id = span_data->span_id;
+  std::vector<std::pair<std::string, std::string>> trace_tags;
+  span_data->trace_id = generator_->trace_id();
+  if (span_data->trace_id.high) {
+    trace_tags.emplace_back(tags::internal::trace_id_high,
+                            hex(span_data->trace_id.high));
+  }
+  span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
-      std::vector<std::pair<std::string, std::string>>{} /* trace_tags */,
-      nullopt /* sampling_decision */, nullopt /* full_w3c_trace_id_hex */,
+      std::move(trace_tags), nullopt /* sampling_decision */,
       nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
-  Span span{span_data_ptr, segment, generator_, clock_};
+  Span span{span_data_ptr, segment,
+            [generator = generator_]() { return generator->span_id(); },
+            clock_};
   return span;
 }
 
@@ -300,8 +331,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
-         full_w3c_trace_id_hex, additional_w3c_tracestate,
-         additional_datadog_w3c_tracestate] = extracted_data;
+         additional_w3c_tracestate, additional_datadog_w3c_tracestate] =
+      extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -332,7 +363,13 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     std::string message;
     message +=
         "There's no parent span ID to extract, but there is a trace ID: ";
-    message += std::to_string(*trace_id);
+    message += "[hexadecimal = ";
+    message += trace_id->hex_padded();
+    if (trace_id->high == 0) {
+      message += ", decimal = ";
+      message += std::to_string(trace_id->low);
+    }
+    message += ']';
     return Error{Error::MISSING_PARENT_SPAN_ID, std::move(message)};
   }
 
@@ -349,7 +386,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   assert(trace_id);
 
   span_data->apply_config(*defaults_, config, clock_);
-  span_data->span_id = generator_();
+  span_data->span_id = generator_->span_id();
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
 
@@ -369,9 +406,11 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
       std::move(trace_tags), std::move(sampling_decision),
-      std::move(full_w3c_trace_id_hex), std::move(additional_w3c_tracestate),
+      std::move(additional_w3c_tracestate),
       std::move(additional_datadog_w3c_tracestate), std::move(span_data));
-  Span span{span_data_ptr, segment, generator_, clock_};
+  Span span{span_data_ptr, segment,
+            [generator = generator_]() { return generator->span_id(); },
+            clock_};
   return span;
 }
 

@@ -66,7 +66,6 @@ TraceSegment::TraceSegment(
     std::size_t tags_header_max_size,
     std::vector<std::pair<std::string, std::string>> trace_tags,
     Optional<SamplingDecision> sampling_decision,
-    Optional<std::string> full_w3c_trace_id_hex,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
     std::unique_ptr<SpanData> local_root)
@@ -82,7 +81,6 @@ TraceSegment::TraceSegment(
       trace_tags_(std::move(trace_tags)),
       num_finished_spans_(0),
       sampling_decision_(std::move(sampling_decision)),
-      full_w3c_trace_id_hex_(std::move(full_w3c_trace_id_hex)),
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)) {
@@ -271,7 +269,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   for (const auto style : injection_styles_) {
     switch (style) {
       case PropagationStyle::DATADOG:
-        writer.set("x-datadog-trace-id", std::to_string(span.trace_id));
+        writer.set("x-datadog-trace-id", std::to_string(span.trace_id.low));
         writer.set("x-datadog-parent-id", std::to_string(span.span_id));
         writer.set("x-datadog-sampling-priority",
                    std::to_string(sampling_priority));
@@ -282,8 +280,12 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
                           spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::B3:
-        writer.set("x-b3-traceid", hex(span.trace_id));
-        writer.set("x-b3-spanid", hex(span.span_id));
+        if (span.trace_id.high) {
+          writer.set("x-b3-traceid", span.trace_id.hex_padded());
+        } else {
+          writer.set("x-b3-traceid", hex_padded(span.trace_id.low));
+        }
+        writer.set("x-b3-spanid", hex_padded(span.span_id));
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
@@ -292,9 +294,9 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
                           spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::W3C:
-        writer.set("traceparent",
-                   encode_traceparent(span.trace_id, full_w3c_trace_id_hex_,
-                                      span.span_id, sampling_priority));
+        writer.set(
+            "traceparent",
+            encode_traceparent(span.trace_id, span.span_id, sampling_priority));
         writer.set("tracestate",
                    encode_tracestate(sampling_priority, origin_, trace_tags,
                                      additional_datadog_w3c_tracestate_,
