@@ -132,12 +132,32 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
   return message;
 }
 
+class OneAtATime {
+  std::atomic<bool>& is_busy_;
+  bool was_busy_;
+
+ public:
+  explicit OneAtATime(std::atomic<bool>& is_busy)
+      : is_busy_(is_busy), was_busy_(false) {
+    is_busy.compare_exchange_weak(was_busy_, true);
+  }
+
+  ~OneAtATime() {
+    if (!was_busy_) {
+      is_busy_ = false;
+    }
+  }
+
+  bool busy() const { return was_busy_; }
+};
+
 }  // namespace
 
 DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
                            const Clock& clock,
                            const std::shared_ptr<Logger>& logger)
-    : clock_(clock),
+    : flushing_(false),
+      clock_(clock),
       logger_(logger),
       traces_endpoint_(traces_endpoint(config.url)),
       http_client_(config.http_client),
@@ -184,6 +204,12 @@ nlohmann::json DatadogAgent::config_json() const {
 }
 
 void DatadogAgent::flush() {
+  OneAtATime guard{flushing_};
+  if (guard.busy()) {
+    // The previous `flush` is still running.
+    return;
+  }
+
   outgoing_trace_chunks_.clear();
   {
     std::lock_guard<std::mutex> lock(mutex_);
