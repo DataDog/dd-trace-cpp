@@ -286,7 +286,7 @@ TEST_CASE(".error() and .set_error*()") {
   REQUIRE(span_ptr);
   const auto& span = *span_ptr;
 
-  auto found = span.tags.find("error.msg");
+  auto found = span.tags.find("error.message");
   if (test_case.expected_error_message) {
     REQUIRE(found != span.tags.end());
     REQUIRE(found->second == *test_case.expected_error_message);
