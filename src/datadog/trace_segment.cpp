@@ -27,6 +27,10 @@ namespace tracing {
 namespace {
 
 int& cached_process_id() {
+  // Initialize `process_id` with `get_process_id()`, but also install an
+  // "atfork" handler that reinitializes `process_id` in child processes. The
+  // `at_fork_in_child` callback must be a function pointer, and so refers to
+  // `cached_process_id` by name rather than keeping `&process_id` in a closure.
   static int process_id = []() {
     (void)at_fork_in_child(static_cast<void (*)()>(
         []() { cached_process_id() = get_process_id(); }));
@@ -37,6 +41,10 @@ int& cached_process_id() {
 }
 
 std::string& cached_runtime_id() {
+  // Initialize `runtime_id` with `uuid()`, but also install an "atfork" handler
+  // that reinitializes `runtime_id` in child processes. The `at_fork_in_child`
+  // callback must be a function pointer, and so refers to `cached_runtime_id`
+  // by name rather than keeping `&runtime_id` in a closure.
   static std::string runtime_id = []() {
     (void)at_fork_in_child(
         static_cast<void (*)()>([]() { cached_runtime_id() = uuid(); }));
