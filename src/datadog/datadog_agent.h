@@ -6,7 +6,6 @@
 // `DatadogAgent` is configured by `DatadogAgentConfig`.  See
 // `datadog_agent_config.h`.
 
-#include <atomic>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -33,13 +32,9 @@ class DatadogAgent : public Collector {
 
  private:
   std::mutex mutex_;
-  std::atomic<bool> flushing_;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
-  // `incoming_trace_chunks_` are what `send` appends to.
-  std::vector<TraceChunk> incoming_trace_chunks_;
-  // `outgoing_trace_chunks_` are what `flush` consumes from.
-  std::vector<TraceChunk> outgoing_trace_chunks_;
+  std::vector<TraceChunk> trace_chunks_;
   HTTPClient::URL traces_endpoint_;
   std::shared_ptr<HTTPClient> http_client_;
   std::shared_ptr<EventScheduler> event_scheduler_;

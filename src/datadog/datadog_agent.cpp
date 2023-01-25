@@ -132,32 +132,12 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
   return message;
 }
 
-class OneAtATime {
-  std::atomic<bool>& is_busy_;
-  bool was_busy_;
-
- public:
-  explicit OneAtATime(std::atomic<bool>& is_busy)
-      : is_busy_(is_busy), was_busy_(false) {
-    is_busy.compare_exchange_weak(was_busy_, true);
-  }
-
-  ~OneAtATime() {
-    if (!was_busy_) {
-      is_busy_ = false;
-    }
-  }
-
-  bool busy() const { return was_busy_; }
-};
-
 }  // namespace
 
 DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
                            const Clock& clock,
                            const std::shared_ptr<Logger>& logger)
-    : flushing_(false),
-      clock_(clock),
+    : clock_(clock),
       logger_(logger),
       traces_endpoint_(traces_endpoint(config.url)),
       http_client_(config.http_client),
@@ -179,8 +159,7 @@ Expected<void> DatadogAgent::send(
     std::vector<std::unique_ptr<SpanData>>&& spans,
     const std::shared_ptr<TraceSampler>& response_handler) {
   std::lock_guard<std::mutex> lock(mutex_);
-  incoming_trace_chunks_.push_back(
-      TraceChunk{std::move(spans), response_handler});
+  trace_chunks_.push_back(TraceChunk{std::move(spans), response_handler});
   return nullopt;
 }
 
@@ -204,25 +183,19 @@ nlohmann::json DatadogAgent::config_json() const {
 }
 
 void DatadogAgent::flush() {
-  OneAtATime guard{flushing_};
-  if (guard.busy()) {
-    // The previous `flush` is still running.
-    return;
-  }
-
-  outgoing_trace_chunks_.clear();
+  std::vector<TraceChunk> trace_chunks;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     using std::swap;
-    swap(incoming_trace_chunks_, outgoing_trace_chunks_);
+    swap(trace_chunks, trace_chunks_);
   }
 
-  if (outgoing_trace_chunks_.empty()) {
+  if (trace_chunks.empty()) {
     return;
   }
 
   std::string body;
-  auto encode_result = msgpack_encode(body, outgoing_trace_chunks_);
+  auto encode_result = msgpack_encode(body, trace_chunks);
   if (auto* error = encode_result.if_error()) {
     logger_->log_error(*error);
     return;
@@ -232,19 +205,18 @@ void DatadogAgent::flush() {
   // multiple tracers, and thus multiple trace samplers might need to have
   // their rates updated. Unlikely, but possible.
   std::unordered_set<std::shared_ptr<TraceSampler>> response_handlers;
-  for (auto& chunk : outgoing_trace_chunks_) {
+  for (auto& chunk : trace_chunks) {
     response_handlers.insert(std::move(chunk.response_handler));
   }
 
   // This is the callback for setting request headers.
   // It's invoked synchronously (before `post` returns).
-  auto set_request_headers = [this](DictWriter& headers) {
+  auto set_request_headers = [&](DictWriter& headers) {
     headers.set("Content-Type", "application/msgpack");
     headers.set("Datadog-Meta-Lang", "cpp");
     headers.set("Datadog-Meta-Lang-Version", std::to_string(__cplusplus));
     headers.set("Datadog-Meta-Tracer-Version", tracer_version);
-    headers.set("X-Datadog-Trace-Count",
-                std::to_string(outgoing_trace_chunks_.size()));
+    headers.set("X-Datadog-Trace-Count", std::to_string(trace_chunks.size()));
   };
 
   // This is the callback for the HTTP response.  It's invoked
