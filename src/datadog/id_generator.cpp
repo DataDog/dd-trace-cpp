@@ -1,5 +1,7 @@
 #include "id_generator.h"
 
+#include <bitset>
+
 #include "random.h"
 
 namespace datadog {
@@ -18,6 +20,13 @@ class DefaultIDGenerator : public IDGenerator {
     result.low = random_uint64();
     if (trace_id_128_bit_) {
       result.high = random_uint64();
+    } else {
+      // In 64-bit mode, zero the most significant bit for compatibility with
+      // older tracers that can't accept values above
+      // `numeric_limits<int64_t>::max()`.
+      std::bitset<64> bits = result.low;
+      bits[63] = 0;
+      result.low = bits.to_ullong();
     }
     return result;
   }
