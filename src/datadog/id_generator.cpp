@@ -31,7 +31,13 @@ class DefaultIDGenerator : public IDGenerator {
     return result;
   }
 
-  std::uint64_t span_id() const override { return random_uint64(); }
+  std::uint64_t span_id() const override {
+    // Zero the most significant bit for compatibility with older tracers that
+    // can't accept values above `numeric_limits<int64_t>::max()`.
+    std::bitset<64> bits = random_uint64();
+    bits[63] = 0;
+    return bits.to_ullong();
+  }
 };
 
 }  // namespace
