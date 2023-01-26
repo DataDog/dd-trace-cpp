@@ -26,33 +26,28 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-int& cached_process_id() {
-  // Initialize `process_id` with `get_process_id()`, but also install an
-  // "atfork" handler that reinitializes `process_id` in child processes. The
-  // `at_fork_in_child` callback must be a function pointer, and so refers to
-  // `cached_process_id` by name rather than keeping `&process_id` in a closure.
-  static int process_id = []() {
-    (void)at_fork_in_child(static_cast<void (*)()>(
-        []() { cached_process_id() = get_process_id(); }));
-    return get_process_id();
-  }();
+struct Cache {
+  static int process_id;
+  static std::string runtime_id;
 
-  return process_id;
-}
+  static void recalculate_values() {
+    process_id = get_process_id();
+    runtime_id = uuid();
+  }
 
-std::string& cached_runtime_id() {
-  // Initialize `runtime_id` with `uuid()`, but also install an "atfork" handler
-  // that reinitializes `runtime_id` in child processes. The `at_fork_in_child`
-  // callback must be a function pointer, and so refers to `cached_runtime_id`
-  // by name rather than keeping `&runtime_id` in a closure.
-  static std::string runtime_id = []() {
-    (void)at_fork_in_child(
-        static_cast<void (*)()>([]() { cached_runtime_id() = uuid(); }));
-    return uuid();
-  }();
+  Cache() {
+    recalculate_values();
+    at_fork_in_child(&recalculate_values);
+  }
+};
 
-  return runtime_id;
-}
+int Cache::process_id;
+std::string Cache::runtime_id;
+
+// `cache_singleton` exists solely to invoke `Cache`'s constructor.
+// All data members are static, so use e.g. `Cache::process_id` instead of
+// `cache_singleton.process_id`.
+Cache cache_singleton;
 
 // Encode the specified `trace_tags`. If the encoded value is not longer than
 // the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
@@ -215,9 +210,9 @@ void TraceSegment::span_finished() {
     if (origin_) {
       span.tags[tags::internal::origin] = *origin_;
     }
-    span.numeric_tags[tags::internal::process_id] = cached_process_id();
+    span.numeric_tags[tags::internal::process_id] = Cache::process_id;
     span.tags[tags::internal::language] = "cpp";
-    span.tags[tags::internal::runtime_id] = cached_runtime_id();
+    span.tags[tags::internal::runtime_id] = Cache::runtime_id;
   }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);
