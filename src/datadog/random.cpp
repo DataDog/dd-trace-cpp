@@ -14,12 +14,7 @@ extern "C" void on_fork();
 
 class Uint64Generator {
   std::mt19937_64 generator_;
-  // The distribution used is for a _signed_ integer, and the default minimum
-  // value is zero.
-  // This means that we generate IDs with non-negative values that will always
-  // fit into an `int64_t`, which is a polite thing to do when you work with
-  // people who write Java.
-  std::uniform_int_distribution<std::int64_t> distribution_;
+  std::uniform_int_distribution<std::uint64_t> distribution_;
 
  public:
   Uint64Generator() {
