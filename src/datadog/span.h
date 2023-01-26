@@ -81,6 +81,8 @@ class Span {
   // Finish this span and submit it to the associated trace segment.  If
   // `set_end_time` has not been called on this span, then set this span's end
   // time to the current time.
+  // If this span was moved-from, then the destructor has no effect aside from
+  // destroying data members.
   ~Span();
 
   // Return a span that is a child of this span.  Use the optionally specified

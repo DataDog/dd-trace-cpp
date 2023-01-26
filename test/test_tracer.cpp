@@ -3,10 +3,10 @@
 
 #include <datadog/error.h>
 #include <datadog/hex.h>
-#include <datadog/net_util.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>
 #include <datadog/parse_util.h>
+#include <datadog/platform_util.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>

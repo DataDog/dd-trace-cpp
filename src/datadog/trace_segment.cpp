@@ -13,6 +13,8 @@
 #include "hex.h"
 #include "logger.h"
 #include "optional.h"
+#include "platform_util.h"
+#include "random.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
@@ -23,6 +25,29 @@
 namespace datadog {
 namespace tracing {
 namespace {
+
+struct Cache {
+  static int process_id;
+  static std::string runtime_id;
+
+  static void recalculate_values() {
+    process_id = get_process_id();
+    runtime_id = uuid();
+  }
+
+  Cache() {
+    recalculate_values();
+    at_fork_in_child(&recalculate_values);
+  }
+};
+
+int Cache::process_id;
+std::string Cache::runtime_id;
+
+// `cache_singleton` exists solely to invoke `Cache`'s constructor.
+// All data members are static, so use e.g. `Cache::process_id` instead of
+// `cache_singleton.process_id`.
+Cache cache_singleton;
 
 // Encode the specified `trace_tags`. If the encoded value is not longer than
 // the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
@@ -179,12 +204,15 @@ void TraceSegment::span_finished() {
     }
   }
 
-  // Origin is repeated on all spans.
-  if (origin_) {
-    for (const auto& span_ptr : spans_) {
-      SpanData& span = *span_ptr;
+  // Some tags are repeated on all spans.
+  for (const auto& span_ptr : spans_) {
+    SpanData& span = *span_ptr;
+    if (origin_) {
       span.tags[tags::internal::origin] = *origin_;
     }
+    span.numeric_tags[tags::internal::process_id] = Cache::process_id;
+    span.tags[tags::internal::language] = "cpp";
+    span.tags[tags::internal::runtime_id] = Cache::runtime_id;
   }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);

@@ -115,14 +115,14 @@ void Span::set_resource_name(StringView resource) {
 void Span::set_error(bool is_error) {
   data_->error = is_error;
   if (!is_error) {
-    data_->tags.erase("error.msg");
+    data_->tags.erase("error.message");
     data_->tags.erase("error.type");
   }
 }
 
 void Span::set_error_message(StringView message) {
   data_->error = true;
-  data_->tags.insert_or_assign("error.msg", std::string(message));
+  data_->tags.insert_or_assign("error.message", std::string(message));
 }
 
 void Span::set_error_type(StringView type) {

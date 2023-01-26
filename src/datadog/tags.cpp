@@ -30,6 +30,9 @@ const std::string span_sampling_rule_rate = "_dd.span_sampling.rule_rate";
 const std::string span_sampling_limit = "_dd.span_sampling.max_per_second";
 const std::string w3c_extraction_error = "_dd.w3c_extraction_error";
 const std::string trace_id_high = "_dd.p.tid";
+const std::string process_id = "process_id";
+const std::string language = "language";
+const std::string runtime_id = "runtime-id";
 
 }  // namespace internal
 

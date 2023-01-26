@@ -1,9 +1,12 @@
-#include <datadog/net_util.h>
+#include <datadog/platform_util.h>
 #include <datadog/rate.h>
 #include <datadog/tags.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
+
+#include <regex>
+#include <vector>
 
 #include "matchers.h"
 #include "mocks/collectors.h"
@@ -377,4 +380,69 @@ TEST_CASE("TraceSegment finalization of spans") {
       }
     }
   }  // root span
+
+  SECTION(
+      "every span tagged with: _dd.origin, process_id, language, resource-id") {
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized};
+
+    std::unordered_map<std::string, std::string> headers;
+    headers["x-datadog-trace-id"] = "123";
+    headers["x-datadog-parent-id"] = "456";
+    headers["x-datadog-origin"] = "พัทยา";
+    MockDictReader reader{headers};
+    auto maybe_span = tracer.extract_span(reader);
+    REQUIRE(maybe_span);
+    {
+      std::vector<Span> spans;
+      spans.push_back(std::move(*maybe_span));
+      // Create some descendants.
+      for (int i = 0; i < 10; ++i) {
+        spans.push_back(spans.front().create_child());
+        spans.push_back(spans.back().create_child());
+      }
+    }
+
+    const int process_id = get_process_id();
+    // clang-format off
+    const char uuid_pattern[] =
+        "[0-9a-f]{8}"
+        "-"
+        "[0-9a-f]{4}"
+        "-"
+        "[0-9a-f]{4}"
+        "-"
+        "[0-9a-f]{4}"
+        "-"
+        "[0-9a-f]{12}";
+    // clang-format on
+    const std::regex uuid_regex{uuid_pattern};
+
+    REQUIRE(collector->span_count() == 2 * 10 + 1);
+    for (const auto& chunk : collector->chunks) {
+      for (const auto& span : chunk) {
+        REQUIRE(span);
+
+        auto found_string = span->tags.find(tags::internal::origin);
+        REQUIRE(found_string != span->tags.end());
+        REQUIRE(found_string->second == "พัทยา");
+
+        found_string = span->tags.find(tags::internal::language);
+        REQUIRE(found_string != span->tags.end());
+        REQUIRE(found_string->second == "cpp");
+
+        found_string = span->tags.find(tags::internal::runtime_id);
+        REQUIRE(found_string != span->tags.end());
+        const auto found_uuid = found_string->second;
+        CAPTURE(found_uuid);
+        REQUIRE(std::regex_match(found_uuid, uuid_regex));
+
+        const auto found_number =
+            span->numeric_tags.find(tags::internal::process_id);
+        REQUIRE(found_number != span->numeric_tags.end());
+        REQUIRE(found_number->second == process_id);
+      }
+    }
+  }
 }  // span finalizers
