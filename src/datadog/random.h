@@ -14,8 +14,7 @@ namespace tracing {
 std::uint64_t random_uint64();
 
 // Return a pseudo-random UUID in canonical string form as described in RFC
-// 4122. The result does not include the "urn:uuid:" prefix.  Example:
-// "595af0a4-ff29-4a8c-9f37-f8ff055e0f80".
+// 4122. For example, "595af0a4-ff29-4a8c-9f37-f8ff055e0f80".
 std::string uuid();
 
 }  // namespace tracing
