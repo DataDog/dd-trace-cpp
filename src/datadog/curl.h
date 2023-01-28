@@ -77,6 +77,36 @@ class CurlLibrary {
   virtual void slist_free_all(curl_slist *list);
 };
 
+// `class CurlEventLoop` is an interface over the different ways that libcurl
+// can manage I/O. One implementation of `CurlEventLoop` might spawn
+// a thread that polls an internal event loop for I/O events. Another
+// implementation might use an external event loop, such as that provided by
+// nginx, libev, libuv, or libevent.
+class CurlEventLoop {
+  // Add the specified request `handle` to the event loop. Return an error if
+  // the `handle` cannot be added. If the `handle` is successfully added,
+  // register the specified `on_error` callback for when an error occurs in the
+  // processing of the request before a full response is received, and register
+  // the specified `on_done` callback for when a full response is received. If
+  // this function indicates success by returning `nullopt`, then exactly one
+  // of either `on_error` or `on_done` will eventually be invoked.
+  // The caller is responsible for freeing the `handle`. `handle` will be
+  // removed from the event loop before one of `on_error` or `on_done` is
+  // invoked. To remove the `handle` sooner, call `remove_handle`.
+  virtual Expected<void> add_handle(CURL *handle,
+                                    std::function<void(CURLcode)> on_error,
+                                    std::function<void()> on_done) = 0;
+
+  // Remove the specified request `handle` from the event loop. Return an
+  // error if one occurs.
+  virtual Expected<void> remove_handle(CURL *handle) = 0;
+
+  // Destroy this object. Any request handle that was previously added to the
+  // event loop via `add_handle` and that hasn't completed must first be
+  // removed via `remove_handle` by the caller.
+  virtual ~CurlEventLoop() = default;
+};
+
 class CurlImpl;
 class Logger;
 
