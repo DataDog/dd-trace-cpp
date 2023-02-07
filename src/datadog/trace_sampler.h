@@ -66,7 +66,7 @@
 // - service name glob pattern
 // - span name (operation name) glob pattern
 // - resource name glob pattern
-// - tag value global patterns
+// - tag value glob patterns
 //
 // For more information on span matching and glob patterns, see
 // `span_matcher.h`.
