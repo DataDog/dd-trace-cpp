@@ -82,6 +82,7 @@ class CurlLibrary {
 // a thread that polls an internal event loop for I/O events. Another
 // implementation might use an external event loop, such as that provided by
 // nginx, libev, libuv, or libevent.
+// `class Curl` takes a `CurlEventLoop` in its constructor.
 class CurlEventLoop {
   // Add the specified request `handle` to the event loop. Return an error if
   // the `handle` cannot be added. If the `handle` is successfully added,
@@ -105,6 +106,10 @@ class CurlEventLoop {
   // event loop via `add_handle` and that hasn't completed must first be
   // removed via `remove_handle` by the caller.
   virtual ~CurlEventLoop() = default;
+
+  // Wait until there are no more outstanding requests, or until the specified
+  // `deadline`. An implementation is permitted to instead return immediately.
+  virtual void drain(std::chrono::steady_clock::time_point deadline) = 0;
 };
 
 class CurlImpl;
@@ -119,6 +124,13 @@ class Curl : public HTTPClient {
   explicit Curl(const std::shared_ptr<Logger> &);
   Curl(const std::shared_ptr<Logger> &, CurlLibrary &);
   Curl(const std::shared_ptr<Logger> &, CurlLibrary &, const ThreadGenerator &);
+  Curl(const std::shared_ptr<Logger> &,
+       const std::shared_ptr<CurlEventLoop> &event_loop);
+  Curl(const std::shared_ptr<Logger> &,
+       const std::shared_ptr<CurlEventLoop> &event_loop, CurlLibrary &);
+  Curl(const std::shared_ptr<Logger> &,
+       const std::shared_ptr<CurlEventLoop> &event_loop, CurlLibrary &,
+       const ThreadGenerator &);
   ~Curl();
 
   Curl(const Curl &) = delete;
