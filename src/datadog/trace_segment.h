@@ -24,7 +24,7 @@
 // same `TraceSegment`.
 //
 // When all of the `Span`s associated with `TraceSegment` have been destroyed,
-// the `TraceSegment` submits their them in a payload to a `Collector`.
+// the `TraceSegment` submits them in a payload to a `Collector`.
 
 #include <cstddef>
 #include <memory>
