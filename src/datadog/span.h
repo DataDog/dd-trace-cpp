@@ -106,6 +106,17 @@ class Span {
   // Return whether this span has been marked as an error having occurred during
   // its extent.
   bool error() const;
+  // Return the name of the service associated with this span, e.g.
+  // "ingress-nginx-useast1".
+  const std::string& service_name() const;
+  // Return the type of the service associated with this span, e.g. "web".
+  const std::string& service_type() const;
+  // Return the name of the operation associated with the operation that this
+  // span represents, e.g. "handle.request", "execute.query", or "healthcheck".
+  const std::string& name() const;
+  // Return the name of the resource associated with the operation that this
+  // span represents, e.g. "/api/v1/info" or "select count(*) from users".
+  const std::string& resource_name() const;
 
   // Return the value of the tag having the specified `name`, or return null if
   // there is no such tag.
