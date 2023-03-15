@@ -303,7 +303,10 @@ TEST_CASE(".error() and .set_error*()") {
   }
 }
 
-TEST_CASE("property setters") {
+TEST_CASE("property setters and getters") {
+  // Verify that modifications made by `Span::set_...` are visible both in the
+  // corresponding getter method and in the resulting span data sent to the
+  // collector.
   TracerConfig config;
   config.defaults.service = "testsvc";
   auto collector = std::make_shared<MockCollector>();
@@ -318,6 +321,7 @@ TEST_CASE("property setters") {
     {
       auto span = tracer.create_span();
       span.set_service_name("wobble");
+      REQUIRE(span.service_name() == "wobble");
     }
     auto& span = collector->first_span();
     REQUIRE(span.service == "wobble");
@@ -327,6 +331,7 @@ TEST_CASE("property setters") {
     {
       auto span = tracer.create_span();
       span.set_service_type("wobble");
+      REQUIRE(span.service_type() == "wobble");
     }
     auto& span = collector->first_span();
     REQUIRE(span.service_type == "wobble");
@@ -336,6 +341,7 @@ TEST_CASE("property setters") {
     {
       auto span = tracer.create_span();
       span.set_name("wobble");
+      REQUIRE(span.name() == "wobble");
     }
     auto& span = collector->first_span();
     REQUIRE(span.name == "wobble");
@@ -345,6 +351,7 @@ TEST_CASE("property setters") {
     {
       auto span = tracer.create_span();
       span.set_resource_name("wobble");
+      REQUIRE(span.resource_name() == "wobble");
     }
     auto& span = collector->first_span();
     REQUIRE(span.resource == "wobble");

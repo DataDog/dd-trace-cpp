@@ -76,6 +76,14 @@ TimePoint Span::start_time() const { return data_->start; }
 
 bool Span::error() const { return data_->error; }
 
+const std::string& Span::service_name() const { return data_->service; }
+
+const std::string& Span::service_type() const { return data_->service_type; }
+
+const std::string& Span::name() const { return data_->name; }
+
+const std::string& Span::resource_name() const { return data_->resource; }
+
 Optional<StringView> Span::lookup_tag(StringView name) const {
   if (tags::is_internal(name)) {
     return nullopt;
