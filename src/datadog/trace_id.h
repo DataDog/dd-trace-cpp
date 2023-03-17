@@ -43,6 +43,8 @@ bool operator==(TraceID, TraceID);
 bool operator!=(TraceID, TraceID);
 bool operator==(TraceID, std::uint64_t);
 bool operator!=(TraceID, std::uint64_t);
+bool operator==(std::uint64_t, TraceID);
+bool operator!=(std::uint64_t, TraceID);
 
 }  // namespace tracing
 }  // namespace datadog

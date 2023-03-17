@@ -57,10 +57,22 @@ TEST_CASE("TraceID comparisons") {
   // First, comparing integers with the `TraceID.low`.
   REQUIRE(TraceID{12345} == 12345);
   REQUIRE_FALSE(TraceID{12345} != 12345);
+
   REQUIRE(TraceID{12345} != 54321);
   REQUIRE_FALSE(TraceID{12345} == 54321);
+
   REQUIRE(TraceID{6789, 12345} != 12345);
   REQUIRE_FALSE(TraceID{6789, 12345} == 12345);
+
+  // And the opposite argument order.
+  REQUIRE(12345 == TraceID{12345});
+  REQUIRE_FALSE(12345 != TraceID{12345});
+
+  REQUIRE(54321 != TraceID{12345});
+  REQUIRE_FALSE(54321 == TraceID{12345});
+
+  REQUIRE(12345 != TraceID{6789, 12345});
+  REQUIRE_FALSE(12345 == TraceID{6789, 12345});
 
   // Second, comparing trace IDs with other trace IDs.
   struct TestCase {
