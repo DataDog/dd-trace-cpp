@@ -46,6 +46,8 @@ endif()
 # options for curl
 set(BUILD_CURL_EXE OFF)
 set(HTTP_ONLY ON)
+set(USE_ZLIB OFF) # TODO: gets overridden to ON
+set(CURL_ENABLE_SSL OFF)
 
 include(FetchContent)
 FetchContent_Declare(
