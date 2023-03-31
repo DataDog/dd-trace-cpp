@@ -585,20 +585,26 @@ TEST_CASE("TracerConfig::trace_sampler") {
       struct TestCase {
         std::string name;
         std::string env_value;
-        Error::Code expected_error;
+        std::vector<Error::Code> allowed_errors;
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"empty", "", Error::INVALID_DOUBLE},
-          {"nonsense", "nonsense", Error::INVALID_DOUBLE},
-          {"trailing space", "0.23   ", Error::INVALID_DOUBLE},
-          {"out of range of double", "123e9999999999", Error::INVALID_DOUBLE},
-          {"NaN", "NaN", Error::INVALID_DOUBLE},
-          {"nan", "nan", Error::INVALID_DOUBLE},
-          {"inf", "inf", Error::INVALID_DOUBLE},
-          {"Inf", "Inf", Error::INVALID_DOUBLE},
-          {"below range", "-0.1", Error::RATE_OUT_OF_RANGE},
-          {"above range", "1.1", Error::RATE_OUT_OF_RANGE},
+          {"empty", "", {Error::INVALID_DOUBLE}},
+          {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
+          {"trailing space", "0.23   ", {Error::INVALID_DOUBLE}},
+          {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
+          // Some C++ standard libraries parse "nan" and "inf" as the
+          // corresponding special floating point values. Other standard
+          // libraries consider "nan" and "inf" invalid.
+          // So, either the double will fail to parse, or parsing will succeed
+          // but the resulting value will be outside of the inclusive range
+          // [0.0, 1.0] of the `Rate` type.
+          {"NaN", "NaN", {Error::INVALID_DOUBLE, Error::RATE_OUT_OF_RANGE}},
+          {"nan", "nan", {Error::INVALID_DOUBLE, Error::RATE_OUT_OF_RANGE}},
+          {"inf", "inf", {Error::INVALID_DOUBLE, Error::RATE_OUT_OF_RANGE}},
+          {"Inf", "Inf", {Error::INVALID_DOUBLE, Error::RATE_OUT_OF_RANGE}},
+          {"below range", "-0.1", {Error::RATE_OUT_OF_RANGE}},
+          {"above range", "1.1", {Error::RATE_OUT_OF_RANGE}},
       }));
 
       CAPTURE(test_case.name);
@@ -606,7 +612,8 @@ TEST_CASE("TracerConfig::trace_sampler") {
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", test_case.env_value};
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
-      REQUIRE(finalized.error().code == test_case.expected_error);
+      REQUIRE_THAT(test_case.allowed_errors,
+                   Catch::Matchers::VectorContains(finalized.error().code));
     }
   }
 
@@ -644,20 +651,36 @@ TEST_CASE("TracerConfig::trace_sampler") {
       struct TestCase {
         std::string name;
         std::string env_value;
-        Error::Code expected_error;
+        std::vector<Error::Code> allowed_errors;
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"empty", "", Error::INVALID_DOUBLE},
-          {"nonsense", "nonsense", Error::INVALID_DOUBLE},
-          {"trailing space", "23   ", Error::INVALID_DOUBLE},
-          {"out of range of double", "123e9999999999", Error::INVALID_DOUBLE},
-          {"NaN", "NaN", Error::INVALID_DOUBLE},
-          {"nan", "nan", Error::INVALID_DOUBLE},
-          {"inf", "inf", Error::INVALID_DOUBLE},
-          {"Inf", "Inf", Error::INVALID_DOUBLE},
-          {"below range", "-0.1", Error::MAX_PER_SECOND_OUT_OF_RANGE},
-          {"zero (also below range)", "0", Error::MAX_PER_SECOND_OUT_OF_RANGE},
+          {"empty", "", {Error::INVALID_DOUBLE}},
+          {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
+          {"trailing space", "23   ", {Error::INVALID_DOUBLE}},
+          {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
+          // Some C++ standard libraries parse "nan" and "inf" as the
+          // corresponding special floating point values. Other standard
+          // libraries consider "nan" and "inf" invalid.
+          // So, either the double will fail to parse, or parsing will succeed
+          // but the resulting value will be outside of the exclusive range
+          // (0.0, Inf) allowed.
+          {"NaN",
+           "NaN",
+           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"nan",
+           "nan",
+           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"inf",
+           "inf",
+           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"Inf",
+           "Inf",
+           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"below range", "-0.1", {Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"zero (also below range)",
+           "0",
+           {Error::MAX_PER_SECOND_OUT_OF_RANGE}},
       }));
 
       CAPTURE(test_case.name);
@@ -665,7 +688,8 @@ TEST_CASE("TracerConfig::trace_sampler") {
       const EnvGuard guard{"DD_TRACE_RATE_LIMIT", test_case.env_value};
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
-      REQUIRE(finalized.error().code == test_case.expected_error);
+      REQUIRE_THAT(test_case.allowed_errors,
+                   Catch::Matchers::VectorContains(finalized.error().code));
     }
   }
 
