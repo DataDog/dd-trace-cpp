@@ -14,6 +14,7 @@
 #include "error.h"
 #include "expected.h"
 #include "id_generator.h"
+#include "json_fwd.hpp"
 #include "optional.h"
 #include "span.h"
 #include "tracer_config.h"
@@ -69,6 +70,10 @@ class Tracer {
   Expected<Span> extract_or_create_span(const DictReader& reader);
   Expected<Span> extract_or_create_span(const DictReader& reader,
                                         const SpanConfig& config);
+
+  // Return a JSON object describing this Tracer's configuration. It is the same
+  // JSON object that was logged when this Tracer was created.
+  nlohmann::json config_json() const;
 };
 
 }  // namespace tracing
