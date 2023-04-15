@@ -76,7 +76,8 @@ class Span {
        const IDGenerator& generate_span_id, const Clock& clock);
   Span(const Span&) = delete;
   Span(Span&&) = default;
-  Span& operator=(Span&&) = default;
+  Span& operator=(Span&&) = delete;
+  Span& operator=(const Span&) = delete;
 
   // Finish this span and submit it to the associated trace segment.  If
   // `set_end_time` has not been called on this span, then set this span's end

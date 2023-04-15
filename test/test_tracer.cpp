@@ -474,14 +474,18 @@ TEST_CASE("span extraction") {
       }
     };
 
-    auto span = tracer.extract_span(reader);
-    REQUIRE(span);
-    checks(test_case, *span);
-    span = tracer.extract_or_create_span(reader);
-    auto method = "extract_or_create_span";
-    CAPTURE(method);
-    REQUIRE(span);
-    checks(test_case, *span);
+    {
+      auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+      checks(test_case, *span);
+    }
+    {
+      auto span = tracer.extract_or_create_span(reader);
+      auto method = "extract_or_create_span";
+      CAPTURE(method);
+      REQUIRE(span);
+      checks(test_case, *span);
+    }
   }
 
   SECTION("extraction can be disabled using the \"none\" style") {
@@ -559,18 +563,18 @@ TEST_CASE("span extraction") {
          11803532876627986230ULL, // expected_trace_id
          67667974448284343ULL, // expected_parent_id
          0}, // expected_sampling_priority
-        
+
         {__LINE__, "no traceparent",
          nullopt}, // traceparent
-        
+
         {__LINE__, "invalid: not enough fields",
          "06-4bf92f3577b34da6a3ce929d0e0e4736", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
-        
+
         {__LINE__, "invalid: missing hyphen",
          "064bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
-        
+
         {__LINE__, "invalid: extra data not preceded by hyphen",
          "06-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00af-delta", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
@@ -687,7 +691,7 @@ TEST_CASE("span extraction") {
          traceparent_drop, // traceparent
          "", // tracestate
          0}, // expected_sampling_priority
-        
+
         {__LINE__, "no dd entry",
          traceparent_drop, // traceparent
          "foo=hello,@thingy/thing=wah;wah;wah", // tracestate
@@ -696,7 +700,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,@thingy/thing=wah;wah;wah", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "empty entry",
          traceparent_drop, // traceparent
          "foo=hello,,bar=thing", // tracestate
@@ -705,7 +709,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,,bar=thing", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "malformed entry",
          traceparent_drop, // traceparent
          "foo=hello,chicken,bar=thing", // tracestate
@@ -714,7 +718,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,chicken,bar=thing", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "stuff before dd entry",
          traceparent_drop, // traceparent
          "foo=hello,bar=baz,dd=", // tracestate
@@ -723,7 +727,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,bar=baz", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "stuff after dd entry",
          traceparent_drop, // traceparent
          "dd=,foo=hello,bar=baz", // tracestate
@@ -732,7 +736,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "foo=hello,bar=baz", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "stuff before and after dd entry",
          traceparent_drop, // traceparent
          "chicken=yes,nuggets=yes,dd=,foo=hello,bar=baz", // tracestate
@@ -741,7 +745,7 @@ TEST_CASE("span extraction") {
          {}, // expected_trace_tags
          "chicken=yes,nuggets=yes,foo=hello,bar=baz", // expected_additional_w3c_tracestate
          nullopt}, // expected_additional_datadog_w3c_tracestate
-        
+
         {__LINE__, "dd entry with empty subentries",
          traceparent_drop, // traceparent
          "dd=foo:bar;;;;;baz:bam;;;", // tracestate
@@ -808,12 +812,12 @@ TEST_CASE("span extraction") {
           traceparent_keep, // traceparent
           "dd=s:-1", // tracestate
           1}, // expected_sampling_priority
-        
+
          {__LINE__, "invalid sampling priority (1/2)",
           traceparent_drop, // traceparent
           "dd=s:oops", // tracestate
           0}, // expected_sampling_priority
-        
+
          {__LINE__, "invalid sampling priority (2/2)",
           traceparent_keep, // traceparent
           "dd=s:oops", // tracestate
