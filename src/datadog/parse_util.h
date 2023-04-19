@@ -36,5 +36,8 @@ Expected<double> parse_double(StringView input);
 // Return whether the specified `prefix` is a prefix of the specified `subject`.
 bool starts_with(StringView subject, StringView prefix);
 
+// Convert the specified `text` to lower case in-place.
+void to_lower(std::string& text);
+
 }  // namespace tracing
 }  // namespace datadog

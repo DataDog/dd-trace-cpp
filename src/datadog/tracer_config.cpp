@@ -20,11 +20,6 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-void to_lower(std::string &text) {
-  std::transform(text.begin(), text.end(), text.begin(),
-                 [](unsigned char ch) { return std::tolower(ch); });
-}
-
 bool falsy(StringView text) {
   auto lower = std::string{text};
   to_lower(lower);
@@ -92,26 +87,16 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
 
   // Style names are separated by spaces, or a comma, or some combination.
   for (const StringView &item : parse_list(input)) {
-    auto token = std::string(item);
-    to_lower(token);
-    // Note: Make sure that these strings are consistent (modulo case) with
-    // `to_json(PropagationStyle)` in `propagation_style.cpp`.
-    if (token == "datadog") {
-      styles.push_back(PropagationStyle::DATADOG);
-    } else if (token == "b3" || token == "b3multi") {
-      styles.push_back(PropagationStyle::B3);
-    } else if (token ==
-               "tracecontext") {  // for compatibility with OpenTelemetry
-      styles.push_back(PropagationStyle::W3C);
-    } else if (token == "none") {
-      styles.push_back(PropagationStyle::NONE);
+    if (const auto style = parse_propagation_style(item)) {
+      styles.push_back(*style);
     } else {
       std::string message;
       message += "Unsupported propagation style \"";
-      message += token;
+      append(message, item);
       message += "\" in list \"";
       append(message, input);
-      message += "\".  The following styles are supported: Datadog, B3.";
+      message +=
+          "\".  The following styles are supported: Datadog, B3, tracecontext.";
       return Error{Error::UNKNOWN_PROPAGATION_STYLE, std::move(message)};
     }
 

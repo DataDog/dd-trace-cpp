@@ -108,5 +108,10 @@ bool starts_with(StringView subject, StringView prefix) {
          prefix.end();
 }
 
+void to_lower(std::string& text) {
+  std::transform(text.begin(), text.end(), text.begin(),
+                 [](unsigned char ch) { return std::tolower(ch); });
+}
+
 }  // namespace tracing
 }  // namespace datadog
