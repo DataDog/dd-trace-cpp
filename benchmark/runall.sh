@@ -6,4 +6,4 @@ cd $SCRIPT_DIR
 cmake .
 cmake --build . --config Release
 
-./gbench --benchmark_format=json > results.json
+./gbench --benchmark_repetitions=10 --benchmark_format=json > results.json
