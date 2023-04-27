@@ -10,8 +10,11 @@ BENCHMARK(BM_StringCreation);
 // Define another benchmark
 static void BM_StringCopy(benchmark::State& state) {
   std::string x = "hello";
-  for (auto _ : state)
-    std::string copy(x);
+  for (int i = 0; i < 10000; i++) {
+    for (auto _ : state) {
+        std::string copy(x);
+    }
+  }
 }
 BENCHMARK(BM_StringCopy);
 
