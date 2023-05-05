@@ -17,6 +17,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# If we're building with clang, then use the libc++ version of the standard
+# library instead of libstdc++. Better coverage of build configurations.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+endif()
+
 include(ProcessorCount)
 ProcessorCount(NUM_PROCESSORS)
 set(MAKE_JOB_COUNT ${NUM_PROCESSORS} CACHE STRING "Number of jobs to use when building libcurl")
@@ -93,11 +99,12 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
     src/datadog/msgpack.cpp
-    src/datadog/net_util.cpp
     src/datadog/null_collector.cpp
     src/datadog/optional.cpp
     src/datadog/parse_util.cpp
+    src/datadog/platform_util.cpp
     src/datadog/propagation_style.cpp
+    src/datadog/random.cpp
     src/datadog/rate.cpp
     src/datadog/sampling_decision.cpp
     src/datadog/sampling_mechanism.cpp
@@ -116,6 +123,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/threaded_event_scheduler.cpp
     src/datadog/tracer_config.cpp
     src/datadog/tracer.cpp
+    src/datadog/trace_id.cpp
     src/datadog/trace_sampler_config.cpp
     src/datadog/trace_sampler.cpp
     src/datadog/trace_segment.cpp
@@ -153,11 +161,12 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/limiter.h
   src/datadog/logger.h
   src/datadog/msgpack.h
-  src/datadog/net_util.h
   src/datadog/null_collector.h
   src/datadog/optional.h
   src/datadog/parse_util.h
+  src/datadog/platform_util.h
   src/datadog/propagation_style.h
+  src/datadog/random.h
   src/datadog/rate.h
   src/datadog/sampling_decision.h
   src/datadog/sampling_mechanism.h
@@ -176,6 +185,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/threaded_event_scheduler.h
   src/datadog/tracer_config.h
   src/datadog/tracer.h
+  src/datadog/trace_id.h
   src/datadog/trace_sampler_config.h
   src/datadog/trace_sampler.h
   src/datadog/trace_segment.h

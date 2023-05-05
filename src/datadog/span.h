@@ -41,14 +41,15 @@
 // via the `set_end_time` member function prior to the span's destruction.
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 
 #include "clock.h"
 #include "error.h"
-#include "id_generator.h"
 #include "optional.h"
 #include "string_view.h"
+#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {
@@ -61,19 +62,18 @@ class TraceSegment;
 class Span {
   std::shared_ptr<TraceSegment> trace_segment_;
   SpanData* data_;
-  IDGenerator generate_span_id_;
+  std::function<std::uint64_t()> generate_span_id_;
   Clock clock_;
   Optional<std::chrono::steady_clock::time_point> end_time_;
 
  public:
-  // Create a span whose properties are stored in the specified `data` and that
-  // is associated with the specified `trace_segment`.  Optionally specify
-  // `generate_span_id` to generate IDs of child spans, and a `clock` to
-  // determine start and end times.  If `generate_span_id` and `clock` are not
-  // specified`, then `default_id_generator` and `default_clock` are used
-  // instead respectively.
+  // Create a span whose properties are stored in the specified `data`, that is
+  // associated with the specified `trace_segment`, that uses the specified
+  // `generate_span_id` to generate IDs of child spans, and that uses the
+  // specified `clock` to determine start and end times.
   Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
-       const IDGenerator& generate_span_id, const Clock& clock);
+       const std::function<std::uint64_t()>& generate_span_id,
+       const Clock& clock);
   Span(const Span&) = delete;
   Span(Span&&) = default;
   Span& operator=(Span&&) = delete;
@@ -82,6 +82,8 @@ class Span {
   // Finish this span and submit it to the associated trace segment.  If
   // `set_end_time` has not been called on this span, then set this span's end
   // time to the current time.
+  // If this span was moved-from, then the destructor has no effect aside from
+  // destroying data members.
   ~Span();
 
   // Return a span that is a child of this span.  Use the optionally specified
@@ -96,7 +98,7 @@ class Span {
   // Return this span's ID (span ID).
   std::uint64_t id() const;
   // Return the ID of the trace of which this span is a part.
-  std::uint64_t trace_id() const;
+  TraceID trace_id() const;
   // Return the ID of this span's parent span, or return null if this span has
   // no parent.
   Optional<std::uint64_t> parent_id() const;
@@ -105,6 +107,17 @@ class Span {
   // Return whether this span has been marked as an error having occurred during
   // its extent.
   bool error() const;
+  // Return the name of the service associated with this span, e.g.
+  // "ingress-nginx-useast1".
+  const std::string& service_name() const;
+  // Return the type of the service associated with this span, e.g. "web".
+  const std::string& service_type() const;
+  // Return the name of the operation associated with the operation that this
+  // span represents, e.g. "handle.request", "execute.query", or "healthcheck".
+  const std::string& name() const;
+  // Return the name of the resource associated with the operation that this
+  // span represents, e.g. "/api/v1/info" or "select count(*) from users".
+  const std::string& resource_name() const;
 
   // Return the value of the tag having the specified `name`, or return null if
   // there is no such tag.

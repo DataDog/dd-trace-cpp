@@ -32,7 +32,7 @@ class Tracer {
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
-  IDGenerator generator_;
+  std::shared_ptr<const IDGenerator> generator_;
   Clock clock_;
   std::shared_ptr<const SpanDefaults> defaults_;
   std::vector<PropagationStyle> injection_styles_;
@@ -45,7 +45,11 @@ class Tracer {
   // - using the specified `generator` to create trace IDs and span IDs
   // - using the specified `clock` to get the current time.
   explicit Tracer(const FinalizedTracerConfig& config);
-  Tracer(const FinalizedTracerConfig& config, const IDGenerator& generator,
+  Tracer(const FinalizedTracerConfig& config,
+         const std::shared_ptr<const IDGenerator>& generator);
+  Tracer(const FinalizedTracerConfig& config, const Clock& clock);
+  Tracer(const FinalizedTracerConfig& config,
+         const std::shared_ptr<const IDGenerator>& generator,
          const Clock& clock);
 
   // Create a new trace and return the root span of the trace.  Optionally

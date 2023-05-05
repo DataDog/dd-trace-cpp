@@ -34,10 +34,7 @@ class DatadogAgent : public Collector {
   std::mutex mutex_;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
-  // `incoming_trace_chunks_` are what `send` appends to.
-  std::vector<TraceChunk> incoming_trace_chunks_;
-  // `outgoing_trace_chunks_` are what `flush` consumes from.
-  std::vector<TraceChunk> outgoing_trace_chunks_;
+  std::vector<TraceChunk> trace_chunks_;
   HTTPClient::URL traces_endpoint_;
   std::shared_ptr<HTTPClient> http_client_;
   std::shared_ptr<EventScheduler> event_scheduler_;

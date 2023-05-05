@@ -11,6 +11,7 @@
 #include "expected.h"
 #include "extracted_data.h"
 #include "optional.h"
+#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {
@@ -31,9 +32,8 @@ Expected<ExtractedData> extract_w3c(
 // `trace_id` or the optionally specified `full_w3c_trace_id_hex` as the trace
 // ID, the specified `span_id` as the parent ID, and trace flags deduced from
 // the specified `sampling_priority`.
-std::string encode_traceparent(
-    std::uint64_t trace_id, const Optional<std::string>& full_w3c_trace_id_hex,
-    std::uint64_t span_id, int sampling_priority);
+std::string encode_traceparent(TraceID trace_id, std::uint64_t span_id,
+                               int sampling_priority);
 
 // Return a value for the "tracestate" header containing the specified fields.
 std::string encode_tracestate(

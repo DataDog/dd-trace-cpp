@@ -15,7 +15,8 @@ namespace datadog {
 namespace tracing {
 
 Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
-           const IDGenerator& generate_span_id, const Clock& clock)
+           const std::function<std::uint64_t()>& generate_span_id,
+           const Clock& clock)
     : trace_segment_(trace_segment),
       data_(data),
       generate_span_id_(generate_span_id),
@@ -62,7 +63,7 @@ void Span::inject(DictWriter& writer) const {
 
 std::uint64_t Span::id() const { return data_->span_id; }
 
-std::uint64_t Span::trace_id() const { return data_->trace_id; }
+TraceID Span::trace_id() const { return data_->trace_id; }
 
 Optional<std::uint64_t> Span::parent_id() const {
   if (data_->parent_id == 0) {
@@ -74,6 +75,14 @@ Optional<std::uint64_t> Span::parent_id() const {
 TimePoint Span::start_time() const { return data_->start; }
 
 bool Span::error() const { return data_->error; }
+
+const std::string& Span::service_name() const { return data_->service; }
+
+const std::string& Span::service_type() const { return data_->service_type; }
+
+const std::string& Span::name() const { return data_->name; }
+
+const std::string& Span::resource_name() const { return data_->resource; }
 
 Optional<StringView> Span::lookup_tag(StringView name) const {
   if (tags::is_internal(name)) {
@@ -114,14 +123,14 @@ void Span::set_resource_name(StringView resource) {
 void Span::set_error(bool is_error) {
   data_->error = is_error;
   if (!is_error) {
-    data_->tags.erase("error.msg");
+    data_->tags.erase("error.message");
     data_->tags.erase("error.type");
   }
 }
 
 void Span::set_error_message(StringView message) {
   data_->error = true;
-  data_->tags.insert_or_assign("error.msg", std::string(message));
+  data_->tags.insert_or_assign("error.message", std::string(message));
 }
 
 void Span::set_error_type(StringView type) {

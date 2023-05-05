@@ -78,7 +78,7 @@ Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
          return msgpack::pack_string(destination, span.resource);
        },
       "trace_id", [&](auto& destination) {
-         msgpack::pack_integer(destination, span.trace_id);
+         msgpack::pack_integer(destination, span.trace_id.low);
          return Expected<void>{};
        },
       "span_id", [&](auto& destination) {

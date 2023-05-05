@@ -13,6 +13,8 @@
 #include "hex.h"
 #include "logger.h"
 #include "optional.h"
+#include "platform_util.h"
+#include "random.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
@@ -23,6 +25,29 @@
 namespace datadog {
 namespace tracing {
 namespace {
+
+struct Cache {
+  static int process_id;
+  static std::string runtime_id;
+
+  static void recalculate_values() {
+    process_id = get_process_id();
+    runtime_id = uuid();
+  }
+
+  Cache() {
+    recalculate_values();
+    at_fork_in_child(&recalculate_values);
+  }
+};
+
+int Cache::process_id;
+std::string Cache::runtime_id;
+
+// `cache_singleton` exists solely to invoke `Cache`'s constructor.
+// All data members are static, so use e.g. `Cache::process_id` instead of
+// `cache_singleton.process_id`.
+Cache cache_singleton;
 
 // Encode the specified `trace_tags`. If the encoded value is not longer than
 // the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
@@ -66,7 +91,6 @@ TraceSegment::TraceSegment(
     std::size_t tags_header_max_size,
     std::vector<std::pair<std::string, std::string>> trace_tags,
     Optional<SamplingDecision> sampling_decision,
-    Optional<std::string> full_w3c_trace_id_hex,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
     std::unique_ptr<SpanData> local_root)
@@ -82,7 +106,6 @@ TraceSegment::TraceSegment(
       trace_tags_(std::move(trace_tags)),
       num_finished_spans_(0),
       sampling_decision_(std::move(sampling_decision)),
-      full_w3c_trace_id_hex_(std::move(full_w3c_trace_id_hex)),
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)) {
@@ -181,12 +204,15 @@ void TraceSegment::span_finished() {
     }
   }
 
-  // Origin is repeated on all spans.
-  if (origin_) {
-    for (const auto& span_ptr : spans_) {
-      SpanData& span = *span_ptr;
+  // Some tags are repeated on all spans.
+  for (const auto& span_ptr : spans_) {
+    SpanData& span = *span_ptr;
+    if (origin_) {
       span.tags[tags::internal::origin] = *origin_;
     }
+    span.numeric_tags[tags::internal::process_id] = Cache::process_id;
+    span.tags[tags::internal::language] = "cpp";
+    span.tags[tags::internal::runtime_id] = Cache::runtime_id;
   }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);
@@ -271,7 +297,7 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   for (const auto style : injection_styles_) {
     switch (style) {
       case PropagationStyle::DATADOG:
-        writer.set("x-datadog-trace-id", std::to_string(span.trace_id));
+        writer.set("x-datadog-trace-id", std::to_string(span.trace_id.low));
         writer.set("x-datadog-parent-id", std::to_string(span.span_id));
         writer.set("x-datadog-sampling-priority",
                    std::to_string(sampling_priority));
@@ -282,8 +308,12 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
                           spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::B3:
-        writer.set("x-b3-traceid", hex(span.trace_id));
-        writer.set("x-b3-spanid", hex(span.span_id));
+        if (span.trace_id.high) {
+          writer.set("x-b3-traceid", span.trace_id.hex_padded());
+        } else {
+          writer.set("x-b3-traceid", hex_padded(span.trace_id.low));
+        }
+        writer.set("x-b3-spanid", hex_padded(span.span_id));
         writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
@@ -292,9 +322,9 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
                           spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::W3C:
-        writer.set("traceparent",
-                   encode_traceparent(span.trace_id, full_w3c_trace_id_hex_,
-                                      span.span_id, sampling_priority));
+        writer.set(
+            "traceparent",
+            encode_traceparent(span.trace_id, span.span_id, sampling_priority));
         writer.set("tracestate",
                    encode_tracestate(sampling_priority, origin_, trace_tags,
                                      additional_datadog_w3c_tracestate_,

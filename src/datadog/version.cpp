@@ -3,8 +3,10 @@
 namespace datadog {
 namespace tracing {
 
-const char* const tracer_version = "v0.1.5";
-const char* const tracer_version_string = "[dd-trace-cpp version v0.1.5]";
+#define VERSION "v0.1.8"
+
+const char* const tracer_version = VERSION;
+const char* const tracer_version_string = "[dd-trace-cpp version " VERSION "]";
 
 }  // namespace tracing
 }  // namespace datadog

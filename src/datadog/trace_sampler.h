@@ -66,7 +66,7 @@
 // - service name glob pattern
 // - span name (operation name) glob pattern
 // - resource name glob pattern
-// - tag value global patterns
+// - tag value glob patterns
 //
 // For more information on span matching and glob patterns, see
 // `span_matcher.h`.
@@ -75,7 +75,7 @@
 // matching rule is used.
 //
 // The global rate (section 2, above) is implemented as a sampling rule that
-// matches any span and is appended to any configured sampling rules.  This,
+// matches any span and is appended to any configured sampling rules.  Thus,
 // sampling rules override the global sample rate for matching root spans.
 //
 // The volume of traces kept by sampling rules (including the global sample
