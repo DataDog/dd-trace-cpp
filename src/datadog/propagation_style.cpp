@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include "json.hpp"
+#include "parse_util.h"
 
 namespace datadog {
 namespace tracing {
@@ -29,6 +30,25 @@ nlohmann::json to_json(const std::vector<PropagationStyle>& styles) {
     styles_json.push_back(to_json(style));
   }
   return styles_json;
+}
+
+Optional<PropagationStyle> parse_propagation_style(StringView text) {
+  auto token = std::string{text};
+  to_lower(token);
+
+  // Note: Make sure that these strings are consistent (modulo case) with
+  // `to_json`, above.
+  if (token == "datadog") {
+    return PropagationStyle::DATADOG;
+  } else if (token == "b3" || token == "b3multi") {
+    return PropagationStyle::B3;
+  } else if (token == "tracecontext") {
+    return PropagationStyle::W3C;
+  } else if (token == "none") {
+    return PropagationStyle::NONE;
+  }
+
+  return nullopt;
 }
 
 }  // namespace tracing

@@ -19,8 +19,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # If we're building with clang, then use the libc++ version of the standard
 # library instead of libstdc++. Better coverage of build configurations.
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+#
+# But there's one exception: libfuzzer is built with libstdc++ on Ubuntu,
+# and so won't link to libc++. So, if any of the FUZZ_* variables are set,
+# keep to libstdc++ (the default on most systems).
+if ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (NOT ${FUZZ_W3C_PROPAGATION}))
+    add_compile_options(-stdlib=libc++)
+    add_link_options(-stdlib=libc++)
 endif()
 
 include(ProcessorCount)
@@ -74,8 +79,8 @@ if(BUILD_COVERAGE)
   set(COVERAGE_LIBRARIES gcov)
 endif()
 
-add_library(dd_trace_cpp SHARED)
-target_sources(dd_trace_cpp PRIVATE
+add_library(dd_trace_cpp-objects OBJECT)
+target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
     src/datadog/collector.cpp
@@ -132,7 +137,7 @@ target_sources(dd_trace_cpp PRIVATE
 )
 
 # This library's public headers are just its source headers.
-target_sources(dd_trace_cpp PUBLIC
+target_sources(dd_trace_cpp-objects PUBLIC
   FILE_SET public_headers
   TYPE HEADERS
   BASE_DIRS src/
@@ -193,19 +198,29 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/w3c_propagation.h
 )
 
-add_dependencies(dd_trace_cpp curl)
+add_dependencies(dd_trace_cpp-objects curl)
 
-# Make the build libcurl visible to dd_trace_cpp, and its dependents.
-target_include_directories(dd_trace_cpp PUBLIC ${CMAKE_BINARY_DIR}/include)
+# Make the build libcurl visible.
+include_directories(${CMAKE_BINARY_DIR}/include)
 
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp PUBLIC ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
+target_link_libraries(dd_trace_cpp-objects PUBLIC ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
 
 # When installing, install the library and its public headers.
-
-install(TARGETS dd_trace_cpp
+install(TARGETS dd_trace_cpp-objects
   FILE_SET public_headers)
+
+# Produce both shared and static versions of the library.
+add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
+set_target_properties(dd_trace_cpp-shared PROPERTIES OUTPUT_NAME "dd_trace_cpp")
+add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)
+target_link_libraries(dd_trace_cpp-shared dd_trace_cpp-objects)
+
+add_library(dd_trace_cpp-static STATIC $<TARGET_OBJECTS:dd_trace_cpp-objects>)
+set_target_properties(dd_trace_cpp-static PROPERTIES OUTPUT_NAME "dd_trace_cpp")
+add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
+target_link_libraries(dd_trace_cpp-static dd_trace_cpp-objects)
 
 if(BUILD_TESTING)
   add_subdirectory(test)

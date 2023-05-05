@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "json_fwd.hpp"
+#include "optional.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -27,6 +29,8 @@ enum class PropagationStyle {
 
 nlohmann::json to_json(PropagationStyle style);
 nlohmann::json to_json(const std::vector<PropagationStyle>& styles);
+
+Optional<PropagationStyle> parse_propagation_style(StringView text);
 
 }  // namespace tracing
 }  // namespace datadog
