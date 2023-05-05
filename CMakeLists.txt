@@ -19,8 +19,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # If we're building with clang, then use the libc++ version of the standard
 # library instead of libstdc++. Better coverage of build configurations.
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+#
+# But there's one exception: libfuzzer is built with libstdc++ on Ubuntu,
+# and so won't link to libc++. So, if any of the FUZZ_* variables are set,
+# keep to libstdc++ (the default on most systems).
+if ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (NOT ${FUZZ_W3C_PROPAGATION}))
+    add_compile_options(-stdlib=libc++)
+    add_link_options(-stdlib=libc++)
 endif()
 
 include(ProcessorCount)
