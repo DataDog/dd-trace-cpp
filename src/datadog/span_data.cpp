@@ -1,5 +1,6 @@
 #include "span_data.h"
 
+#include <cassert>
 #include <cstddef>
 
 #include "error.h"
@@ -125,6 +126,16 @@ Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
   // clang-format on
 
   return nullopt;
+}
+
+Expected<void> msgpack_encode(
+    std::string& destination,
+    const std::vector<std::unique_ptr<SpanData>>& spans) {
+  return msgpack::pack_array(destination, spans,
+                             [](auto& destination, const auto& span_ptr) {
+                               assert(span_ptr);
+                               return msgpack_encode(destination, *span_ptr);
+                             });
 }
 
 }  // namespace tracing

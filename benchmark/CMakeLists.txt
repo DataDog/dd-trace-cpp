@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
-
-project(dd-trace-cpp-benchmarks)
+# TODO: explain
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -8,9 +6,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-file(GLOB BenchmarksSources *.cpp)
-add_executable(gbench ${BenchmarksSources})
+add_executable(dd_trace_cpp-benchmark
+    benchmark.cpp
+    hasher.cpp
+)
 
-# Add Google Benchmark as a dependency
-find_package(benchmark REQUIRED)
-target_link_libraries(gbench benchmark::benchmark)
+# Google Benchmark is included as a git submodule.
+# It depends on Google Test, which it will download if this option is set.
+set(BENCHMARK_DOWNLOAD_DEPENDENCIES ON)
+set(BENCHMARK_ENABLE_TESTING OFF)
+add_subdirectory(google-benchmark)
+
+target_link_libraries(dd_trace_cpp-benchmark benchmark::benchmark dd_trace_cpp)
