@@ -228,3 +228,7 @@ endif()
 
 # Each example has its own build flag.
 add_subdirectory(examples)
+
+if(BUILD_BENCHMARK)
+  add_subdirectory(benchmark)
+endif()
