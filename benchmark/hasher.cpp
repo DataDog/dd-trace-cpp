@@ -9,6 +9,8 @@
 // directory from the names and digests of its children, combined in some
 // canonical format.  Produce a trace whose structure reflects the directory
 // structure.
+//
+// Files that are neither regular files nor directories are ignored.
 
 #include "hasher.h"
 

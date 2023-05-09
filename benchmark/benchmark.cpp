@@ -7,7 +7,6 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
-#include <iostream> // TODO: no
 #include <memory>
 
 #include "hasher.h"
@@ -16,6 +15,7 @@ namespace {
 
 namespace dd = datadog::tracing;
 
+// `NullLogger` doesn't log. It avoids `log_startup` spam in the benchmark.
 struct NullLogger : public dd::Logger {
   void log_error(const LogFunc&) override {}
   void log_startup(const LogFunc&) override {}
@@ -23,11 +23,13 @@ struct NullLogger : public dd::Logger {
   void log_error(dd::StringView) override {}
 };
 
+// `SerializingCollector` immediately MessagePack-serializes spans sent to it.
+// This allows us to track the overhead of the serialization code, without
+// having to use HTTP as is done in the default collector, `DatadogAgent`.
 struct SerializingCollector : public dd::Collector {
   dd::Expected<void> send(
       std::vector<std::unique_ptr<dd::SpanData>>&& spans,
       const std::shared_ptr<dd::TraceSampler>& /*response_handler*/) override {
-    std::cout << "Received " << spans.size() << " spans.\n"; // TODO: no
     std::string buffer;
     return dd::msgpack_encode(buffer, spans);
   }
@@ -39,20 +41,9 @@ struct SerializingCollector : public dd::Collector {
   }
 };
 
-void BM_Nothing(benchmark::State& state) {
-  for (auto _ : state) {
-  }
-}
-BENCHMARK(BM_Nothing);
-
-void BM_StringCopy(benchmark::State& state) {
-  std::string x = "hello";
-  for (auto _ : state) {
-      std::string copy{x};
-  }
-}
-BENCHMARK(BM_StringCopy);
-
+// The benchmark `BM_TraceTinyCCSource`, for each iteration over `state`,
+// creates a trace whose shape is the same as the file system tree under
+// `./tinycc`. It's similar to what is done in `../example`.
 void BM_TraceTinyCCSource(benchmark::State& state) {
   for (auto _ : state) {
     dd::TracerConfig config;

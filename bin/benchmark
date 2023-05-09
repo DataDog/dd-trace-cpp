@@ -1,5 +1,6 @@
 #!/bin/sh
 
+set -x
 set -e
 
 cd "$(dirname "$0")"/..
@@ -8,7 +9,7 @@ mkdir -p .build
 
 cd .build
 cmake .. -DBUILD_BENCHMARK=1 -DCMAKE_BUILD_TYPE=Release
-make -j "$(nproc)"
+make -j
 cd ../
 
-.build/benchmark/dd_trace_cpp-benchmark
+.build/benchmark/dd_trace_cpp-benchmark "$@"
