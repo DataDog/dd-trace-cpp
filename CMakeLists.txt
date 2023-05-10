@@ -207,10 +207,6 @@ include_directories(${CMAKE_BINARY_DIR}/include)
 find_package(Threads REQUIRED)
 target_link_libraries(dd_trace_cpp-objects PUBLIC ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
 
-# When installing, install the library and its public headers.
-install(TARGETS dd_trace_cpp-objects
-  FILE_SET public_headers)
-
 # Produce both shared and static versions of the library.
 add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
 set_target_properties(dd_trace_cpp-shared PROPERTIES OUTPUT_NAME "dd_trace_cpp")
@@ -221,6 +217,11 @@ add_library(dd_trace_cpp-static STATIC $<TARGET_OBJECTS:dd_trace_cpp-objects>)
 set_target_properties(dd_trace_cpp-static PROPERTIES OUTPUT_NAME "dd_trace_cpp")
 add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
 target_link_libraries(dd_trace_cpp-static dd_trace_cpp-objects)
+
+# When installing, install the static library, the shared library, and the
+# public headers.
+install(TARGETS dd_trace_cpp-static dd_trace_cpp-shared
+  FILE_SET public_headers)
 
 if(BUILD_TESTING)
   add_subdirectory(test)
