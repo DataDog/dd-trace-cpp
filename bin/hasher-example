@@ -19,23 +19,22 @@ cd "$(dirname "$0")"/..
 
 mkdir -p .build
 cd .build
-cmake .. -DBUILD_EXAMPLE=1
+cmake .. -DBUILD_HASHER_EXAMPLE=1
 # shellcheck disable=SC2086
 make -j "$(nproc)" $verbosity_flags
+cd ../
 
 if [ "$build_only" -eq 1 ]; then
     exit
 fi
 
-trap 'docker compose --project-directory ../example down' INT
+trap 'docker compose --project-directory examples/hasher down' INT
 
-echo 'Running example...'
+echo 'Running hasher example...'
 if [ "$DD_API_KEY" = '' ]; then
     >&2 echo "The DD_API_KEY environment variable must be set to a Datadog API key."
     exit 1
 fi
-docker compose --project-directory ../example up --detach --remove-orphans
-# docker compose --project-directory ../example logs --follow &
-./example/example "$@"
-docker compose --project-directory ../example down
-# wait
+docker compose --project-directory examples/hasher up --detach --remove-orphans
+.build/examples/hasher/example "$@"
+docker compose --project-directory examples/hasher down
