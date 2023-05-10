@@ -220,7 +220,7 @@ target_link_libraries(dd_trace_cpp-static dd_trace_cpp-objects)
 
 # When installing, install the static library, the shared library, and the
 # public headers.
-install(TARGETS dd_trace_cpp-static dd_trace_cpp-shared
+install(TARGETS dd_trace_cpp-static dd_trace_cpp-shared dd_trace_cpp-objects
   FILE_SET public_headers)
 
 if(BUILD_TESTING)
