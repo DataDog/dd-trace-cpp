@@ -1,15 +1,3 @@
-/boosty/boost_1_80_0/
-/boosty/cmake-bcp/
-/boosty/boost_1_80_0.tar.gz
-/boosty/example/main
-/boosty/extracted/doc/
-/boosty/extracted/libs/
-/boosty/extracted/boost.png
-
-/example/example
-/example/hasher
-/example/scratch
-
 /bazel-*
 /.build/
 /.coverage/

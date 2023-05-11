@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.24)
 project(dd-trace-cpp)
 
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
-option(BUILD_EXAMPLE "Build the example program (example/)" OFF)
+option(BUILD_HASHER_EXAMPLE "Build the example program examples/hasher" OFF)
 option(BUILD_TESTING "Build the unit tests (test/)" OFF)
 option(SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
 option(FUZZ_W3C_PROPAGATION "Build a fuzzer for W3C propagation" OFF)
@@ -226,6 +226,5 @@ if(BUILD_TESTING)
   add_subdirectory(test)
 endif()
 
-if(BUILD_EXAMPLE)
-  add_subdirectory(example)
-endif()
+# Each example has its own build flag.
+add_subdirectory(examples)
