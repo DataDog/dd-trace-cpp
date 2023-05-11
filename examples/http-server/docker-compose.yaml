@@ -1,6 +1,7 @@
 version: "3.2"
 services:
 
+    # The C++ HTTP server to which we added Datadog tracing
     server:
         build:
             context: ./server
@@ -8,8 +9,11 @@ services:
         ports:
             - "8000:8000"
         environment:
+            # This will override any value of `datadog::tracing::TracerConfig`'s
+            # `.agent.url` in `server.cpp`.
             - DD_AGENT_HOST=datadog-agent
 
+    # The Datadog trace agent
     datadog-agent:
         image: datadog/agent
         volumes:
