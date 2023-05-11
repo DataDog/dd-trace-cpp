@@ -203,6 +203,7 @@ using socket_t = int;
 #include <atomic>
 #include <cassert>
 #include <cctype>
+#include <chrono>
 #include <climits>
 #include <condition_variable>
 #include <cstring>
@@ -465,6 +466,12 @@ struct Request {
   MultipartFormDataMap files;
   Ranges ranges;
   Match matches;
+  // user_data contains any context that the server would like to associate with
+  // this request, for use by registered handlers.
+  // Note that because the Request is passed to most handlers as const, only the
+  // handler set by Server::set_pre_request_handler can assign a value to
+  // user_data.
+  std::shared_ptr<void> user_data;
 
   // for client
   ResponseHandler response_handler;
@@ -678,6 +685,8 @@ public:
   using Expect100ContinueHandler =
       std::function<int(const Request &, Response &)>;
 
+  using MutatingHandler = std::function<void(Request &, Response &)>;
+
   Server();
 
   virtual ~Server();
@@ -707,8 +716,17 @@ public:
   Server &set_error_handler(HandlerWithResponse handler);
   Server &set_error_handler(Handler handler);
   Server &set_exception_handler(ExceptionHandler handler);
+  // The pre-routing handler is invoked after request headers are read, but
+  // before the request body is read.
   Server &set_pre_routing_handler(HandlerWithResponse handler);
+  // The post-routing handler is invoked after the route handler has returned,
+  // but before the response has begun to be written.
   Server &set_post_routing_handler(Handler handler);
+  // The pre-request handler is invoked before request headers are read.
+  Server &set_pre_request_handler(MutatingHandler handler);
+  // The post-request handler is invoked after the response has finished being
+  // written.
+  Server &set_post_request_handler(Handler handler);
 
   Server &set_expect_100_continue_handler(Expect100ContinueHandler handler);
   Server &set_logger(Logger logger);
@@ -835,6 +853,8 @@ private:
   ExceptionHandler exception_handler_;
   HandlerWithResponse pre_routing_handler_;
   Handler post_routing_handler_;
+  MutatingHandler pre_request_handler_;
+  Handler post_request_handler_;
   Logger logger_;
   Expect100ContinueHandler expect_100_continue_handler_;
 
@@ -5264,6 +5284,16 @@ inline Server &Server::set_post_routing_handler(Handler handler) {
   return *this;
 }
 
+inline Server &Server::set_pre_request_handler(MutatingHandler handler) {
+  pre_request_handler_ = std::move(handler);
+  return *this;
+}
+
+inline Server &Server::set_post_request_handler(Handler handler) {
+  post_request_handler_ = std::move(handler);
+  return *this;
+}
+
 inline Server &Server::set_logger(Logger logger) {
   logger_ = std::move(logger);
   return *this;
@@ -6052,6 +6082,12 @@ Server::process_request(Stream &strm, bool close_connection,
   Request req;
   Response res;
 
+  if (pre_request_handler_) { pre_request_handler_(req, res); }
+
+  auto se = detail::scope_exit([this, &req, &res]() {
+    if (post_request_handler_) { post_request_handler_(req, res); }
+  });
+
   res.version = "HTTP/1.1";
 
   for (const auto &header : default_headers_) {
@@ -6131,7 +6167,7 @@ Server::process_request(Stream &strm, bool close_connection,
     }
   }
 
-  // Rounting
+  // Routing
   bool routed = false;
 #ifdef CPPHTTPLIB_NO_EXCEPTIONS
   routed = routing(req, res, strm);
