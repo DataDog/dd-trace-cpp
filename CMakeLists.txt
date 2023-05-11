@@ -61,7 +61,7 @@ ExternalProject_Add(curl
   BUILD_IN_SOURCE 1
   DOWNLOAD_EXTRACT_TIMESTAMP 0
   SOURCE_DIR ${CMAKE_BINARY_DIR}/curl
-  CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/curl/configure --prefix=${CMAKE_BINARY_DIR} --disable-ftp --disable-ldap --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-smtp --disable-gopher --without-ssl --disable-crypto-auth --without-axtls --without-zlib --disable-rtsp --enable-shared=no --enable-static=yes --with-pic --without-brotli
+  CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/curl/configure --prefix=${CMAKE_BINARY_DIR} --disable-ftp --disable-ldap --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-smtp --disable-gopher --without-ssl --disable-crypto-auth --without-axtls --without-zlib --disable-rtsp --enable-shared=no --enable-static=yes --with-pic --without-brotli --without-libidn2
   BUILD_COMMAND make -j${MAKE_JOB_COUNT}
   INSTALL_COMMAND make install
 )
@@ -228,3 +228,7 @@ endif()
 
 # Each example has its own build flag.
 add_subdirectory(examples)
+
+if(BUILD_BENCHMARK)
+  add_subdirectory(benchmark)
+endif()

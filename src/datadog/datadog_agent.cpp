@@ -31,16 +31,6 @@ HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
 
 Expected<void> msgpack_encode(
     std::string& destination,
-    const std::vector<std::unique_ptr<SpanData>>& spans) {
-  return msgpack::pack_array(destination, spans,
-                             [](auto& destination, const auto& span_ptr) {
-                               assert(span_ptr);
-                               return msgpack_encode(destination, *span_ptr);
-                             });
-}
-
-Expected<void> msgpack_encode(
-    std::string& destination,
     const std::vector<DatadogAgent::TraceChunk>& trace_chunks) {
   return msgpack::pack_array(destination, trace_chunks,
                              [](auto& destination, const auto& chunk) {

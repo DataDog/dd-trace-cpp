@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "clock.h"
 #include "expected.h"
@@ -48,6 +49,13 @@ struct SpanData {
 // Append to the specified `destination` the MessagePack representation of the
 // specified `span`.
 Expected<void> msgpack_encode(std::string& destination, const SpanData& span);
+
+// Append to the specified `destination` the MessagePack representation of an
+// array containing each of the specified `spans`.  The behavior is undefined
+// if any span is `nullptr`.
+Expected<void> msgpack_encode(
+    std::string& destination,
+    const std::vector<std::unique_ptr<SpanData>>& spans);
 
 }  // namespace tracing
 }  // namespace datadog
