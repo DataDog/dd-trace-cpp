@@ -1,5 +1,6 @@
 #include <datadog/clock.h>
 #include <datadog/dict_reader.h>
+#include <datadog/dict_writer.h>
 #include <datadog/sampling_decision.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
@@ -105,6 +106,16 @@ class HeaderReader : public dd::DictReader {
   }
 };
 
+// TODO: explain
+class HeaderWriter : public dd::DictWriter {
+  httplib::Headers& headers_;
+
+ public:
+  explicit HeaderWriter(httplib::Headers& headers) : headers_(headers) {}
+
+  void set(std::string_view key, std::string_view value) override { headers_.emplace(key, value); }
+};
+
 // See the implementations of these functions, below `main`, for a description
 // of what they do.
 void on_request_begin(httplib::Request& request);
@@ -117,7 +128,7 @@ void on_post_notes(const httplib::Request& request, httplib::Response& response)
 int main() {
   // Set up the Datadog tracer.  See `src/datadog/tracer_config.h`.
   dd::TracerConfig config;
-  config.defaults.service = "dd-trace-cpp-http-server-example";
+  config.defaults.service = "dd-trace-cpp-http-server-example-server";
   config.defaults.service_type = "server";
 
   // `finalize_config` validates `config` and applies any settings from
@@ -167,7 +178,7 @@ int main() {
 
   // Run the HTTP server.
   std::signal(SIGTERM, hard_stop);
-  server.listen("0.0.0.0", 8000);
+  server.listen("0.0.0.0", 80);
 }
 
 void on_request_begin(httplib::Request& request) {
@@ -273,6 +284,19 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
   std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));
 }
 
+// TODO: put somewhere else
+httplib::Result traced_get(httplib::Client& client, const std::string& endpoint, httplib::Headers& headers,
+                           dd::Span& parent_span) {
+  dd::Span span = parent_span.create_child();
+  span.set_name("http.client");
+  span.set_resource_name("GET " + endpoint);
+  // TODO: tags...
+  HeaderWriter writer{headers};
+  span.inject(writer);
+
+  return client.Get(endpoint, headers);
+}
+
 void on_get_notes(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
@@ -280,8 +304,16 @@ void on_get_notes(const httplib::Request& request, httplib::Response& response) 
   span.set_name("get-notes");
   span.set_tag("http.route", "/notes");
 
-  // TODO: Do something.
-  response.status = 501;  // "not implemented"
+  // TODO
+  httplib::Client database("database", 80);
+  httplib::Headers headers;
+  if (const auto result = traced_get(database, "/", headers, span)) {
+    response.status = result->status;
+    response.set_content(result->body, result->get_header_value("Content-Type"));
+  } else {
+    // TODO enum: result->error()
+    response.status = 500;  // "internal server error"
+  }
 }
 
 void on_post_notes(const httplib::Request& request, httplib::Response& response) {

@@ -7,11 +7,21 @@ services:
             context: ./server
             dockerfile: ./Dockerfile
         ports:
-            - "127.0.0.1:8000:8000"
+            - "127.0.0.1:8000:80"
         environment:
             # This will override any value of `datadog::tracing::TracerConfig`'s
             # `.agent.url` in `server.cpp`.
             - DD_AGENT_HOST=datadog-agent
+
+    # A Python HTTP server that acts as a database backed by SQLite.
+    # It also has Datadog tracing.
+    database:
+        build:
+            context: ./database
+            dockerfile: ./Dockerfile
+        environment:
+            - DD_AGENT_HOST=datadog-agent
+            - DD_SERVICE=dd-trace-cpp-http-server-example-database
 
     # The Datadog trace agent
     datadog-agent:
