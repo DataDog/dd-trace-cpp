@@ -22,4 +22,4 @@ set(BENCHMARK_DOWNLOAD_DEPENDENCIES ON)
 set(BENCHMARK_ENABLE_TESTING OFF)
 add_subdirectory(google-benchmark)
 
-target_link_libraries(dd_trace_cpp-benchmark benchmark::benchmark dd_trace_cpp)
+target_link_libraries(dd_trace_cpp-benchmark benchmark::benchmark dd_trace_cpp-static)
