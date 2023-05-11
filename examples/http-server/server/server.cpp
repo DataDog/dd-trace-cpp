@@ -8,10 +8,13 @@
 #include <datadog/tracer_config.h>
 
 #include <cassert>
+#include <charconv>
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
 #include <stack>
+#include <system_error>
 
 #include "httplib.h"
 
@@ -95,24 +98,21 @@ class HeaderReader : public dd::DictReader {
     return buffer_;
   }
 
-  void visit(
-      const std::function<void(std::string_view key, std::string_view value)>&
-          visitor) const override {
+  void visit(const std::function<void(std::string_view key, std::string_view value)>& visitor) const override {
     for (const auto& [key, value] : headers_) {
       visitor(key, value);
     }
   }
 };
 
-void set_resource_and_tags(dd::Span& span, const httplib::Request& request) {
-  // e.g. "GET /notes"
-  span.set_resource_name(request.method + " " + request.path);
-
-  span.set_tag("network.client.ip", request.remote_addr);
-  span.set_tag("network.client.port", std::to_string(request.remote_port));
-  span.set_tag("http.url_details.path", request.path);
-  span.set_tag("http.method", request.method);
-}
+// See the implementations of these functions, below `main`, for a description
+// of what they do.
+void on_request_begin(httplib::Request& request);
+void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tracer);
+void on_healthcheck(const httplib::Request& request, httplib::Response& response);
+void on_sleep(const httplib::Request& request, httplib::Response& response);
+void on_get_notes(const httplib::Request& request, httplib::Response& response);
+void on_post_notes(const httplib::Request& request, httplib::Response& response);
 
 int main() {
   // Set up the Datadog tracer.  See `src/datadog/tracer_config.h`.
@@ -126,8 +126,7 @@ int main() {
   // `FinalizedTracerConfig` that can then be used to initialize a `Tracer`.
   // If the resulting configuration is invalid, then it will return an
   // `Error` that can be printed, but then no `Tracer` can be created.
-  dd::Expected<dd::FinalizedTracerConfig> finalized_config =
-      dd::finalize_config(config);
+  dd::Expected<dd::FinalizedTracerConfig> finalized_config = dd::finalize_config(config);
   if (dd::Error* error = finalized_config.if_error()) {
     std::cerr << "Error: Datadog is misconfigured. " << *error << '\n';
     return 1;
@@ -139,105 +138,159 @@ int main() {
   httplib::Server server;
 
   // TODO: Explain when this happens.
-  server.set_pre_request_handler(
-      [](httplib::Request& request, httplib::Response&) {
-        const auto now = dd::default_clock();
-        std::cerr << "Here we are before request processing.\n";  // TODO
-        auto context = std::make_shared<RequestTracingContext>();
-        context->request_start = now;
-        request.user_data = std::move(context);
-      });
+  server.set_pre_request_handler([](httplib::Request& request, httplib::Response&) { on_request_begin(request); });
 
   // TODO: Explain when this happens.
-  server.set_pre_routing_handler(
-      [&](const httplib::Request& request, httplib::Response&) {
-        std::cerr << "Here we are before routing.\n";  // TODO
-        auto* context =
-            static_cast<RequestTracingContext*>(request.user_data.get());
+  server.set_pre_routing_handler([&](const httplib::Request& request, httplib::Response&) {
+    on_request_headers_consumed(request, tracer);
+    return httplib::Server::HandlerResponse::Unhandled;
+  });
 
-        // Create the span corresponding to the entire handling of the request.
-        dd::SpanConfig config;
-        config.name = "handle.request";
-        config.start = context->request_start;
-
-        HeaderReader reader{request.headers};
-        auto maybe_span = tracer.extract_or_create_span(reader, config);
-        if (dd::Error* error = maybe_span.if_error()) {
-          std::cerr << "While extracting trace context from request: " << *error
-                    << '\n';
-          // Create a trace from scratch.
-          context->spans.push(tracer.create_span(config));
-        } else {
-          context->spans.push(std::move(*maybe_span));
-        }
-
-        // Set the "resource" of the span to something like "GET /foo", and
-        // set various HTTP-specific tags, such as "http.url".
-        set_resource_and_tags(context->spans.top(), request);
-
-        // Create a span corresponding to reading the request body and executing
-        // the route-specific handler.
-        context->spans.push(context->spans.top().create_child(config));
-        context->spans.top().set_name("route.request");
-
-        return httplib::Server::HandlerResponse::Unhandled;
-      });
+  server.Get("/healthcheck", on_healthcheck);
+  server.Get("/notes", on_get_notes);
+  server.Post("/notes", on_post_notes);
+  server.Get("/sleep", on_sleep);
 
   // TODO: Explain when this happens.
-  server.Get("/healthcheck",
-             [&](const httplib::Request& request, httplib::Response& response) {
-               std::cerr << "Here we are in /healthcheck\n";  // TODO
-               auto* context =
-                   static_cast<RequestTracingContext*>(request.user_data.get());
-
-               // We'd prefer not to send healthcheck traces to Datadog. They're
-               // noisy. So, override the sampling decision to "definitely
-               // drop," and don't even bother creating a span here.
-               context->spans.top().trace_segment().override_sampling_priority(
-                   int(dd::SamplingPriority::USER_DROP));
-
-               response.set_content("I'm still here!\n", "text/plain");
-             });
+  server.set_post_routing_handler([](const httplib::Request& request, httplib::Response&) {
+    auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
+    context->spans.pop();
+    return httplib::Server::HandlerResponse::Unhandled;
+  });
 
   // TODO: Explain when this happens.
-  server.Get("/notes",
-             [&](const httplib::Request& request, httplib::Response& response) {
-               std::cerr << "Here we are in /notes\n";  // TODO
-               auto* context =
-                   static_cast<RequestTracingContext*>(request.user_data.get());
-
-               dd::Span span = context->spans.top().create_child();
-               span.set_name("notes.get");
-               span.set_tag("http.route", "/notes");
-
-               // TODO: Do something.
-               response.status = 501;
-             });
-
-  // TODO: Explain when this happens.
-  server.set_post_routing_handler(
-      [](const httplib::Request& request, httplib::Response&) {
-        // TODO:
-        std::cerr << "Here we are after routing.\n";
-        auto* context =
-            static_cast<RequestTracingContext*>(request.user_data.get());
-        context->spans.pop();
-        return httplib::Server::HandlerResponse::Unhandled;
-      });
-
-  // TODO: Explain when this happens.
-  server.set_post_request_handler(
-      [](const httplib::Request& request, httplib::Response& response) {
-        // TODO:
-        std::cerr << "Here we are after request processing.\n";
-        auto* context =
-            static_cast<RequestTracingContext*>(request.user_data.get());
-        context->spans.top().set_tag("http.status_code",
-                                     std::to_string(response.status));
-        context->spans.pop();
-      });
+  server.set_post_request_handler([](const httplib::Request& request, httplib::Response& response) {
+    auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
+    context->spans.top().set_tag("http.status_code", std::to_string(response.status));
+    context->spans.pop();
+  });
 
   // Run the HTTP server.
   std::signal(SIGTERM, hard_stop);
   server.listen("0.0.0.0", 8000);
+}
+
+void on_request_begin(httplib::Request& request) {
+  const auto now = dd::default_clock();
+  auto context = std::make_shared<RequestTracingContext>();
+  context->request_start = now;
+  request.user_data = std::move(context);
+}
+
+void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tracer) {
+  const auto now = dd::default_clock();
+  auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
+
+  // Create the span corresponding to the entire handling of the request.
+  dd::SpanConfig config;
+  config.name = "handle.request";
+  config.start = context->request_start;
+
+  HeaderReader reader{request.headers};
+  auto maybe_span = tracer.extract_or_create_span(reader, config);
+  if (dd::Error* error = maybe_span.if_error()) {
+    std::cerr << "While extracting trace context from request: " << *error << '\n';
+    // Create a trace from scratch.
+    context->spans.push(tracer.create_span(config));
+  } else {
+    context->spans.push(std::move(*maybe_span));
+  }
+
+  dd::Span& span = context->spans.top();
+  span.set_resource_name(request.method + " " + request.path);
+  span.set_tag("network.client.ip", request.remote_addr);
+  span.set_tag("network.client.port", std::to_string(request.remote_port));
+  span.set_tag("http.url_details.path", request.path);
+  span.set_tag("http.method", request.method);
+
+  // Create a span corresponding to reading the request body and executing
+  // the route-specific handler.
+  config.name = "route.request";
+  config.start = now;
+  context->spans.push(span.create_child(config));
+}
+
+void on_healthcheck(const httplib::Request& request, httplib::Response& response) {
+  auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
+
+  // We'd prefer not to send healthcheck traces to Datadog. They're
+  // noisy. So, override the sampling decision to "definitely
+  // drop," and don't even bother creating a span here.
+  context->spans.top().trace_segment().override_sampling_priority(int(dd::SamplingPriority::USER_DROP));
+
+  response.set_content("I'm still here!\n", "text/plain");
+}
+
+void on_sleep(const httplib::Request& request, httplib::Response& response) {
+  auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
+
+  dd::Span span = context->spans.top().create_child();
+  span.set_name("sleep");
+  span.set_tag("http.route", "/sleep");
+
+  const auto [begin, end] = request.params.equal_range("seconds");
+  switch (std::distance(begin, end)) {
+    case 0:
+      response.status = 400;  // "bad request"
+      response.set_content("\"seconds\" query parameter is required\n", "text/plain");
+      return;
+    case 1:
+      break;
+    default:
+      response.status = 400;  // "bad request"
+      response.set_content("\"seconds\" query parameter cannot be specified more than once\n", "text/plain");
+      return;
+  }
+
+  const std::string_view raw = begin->second;
+  double seconds;
+  const auto result = std::from_chars(raw.begin(), raw.end(), seconds);
+  if (result.ec == std::errc::invalid_argument) {
+    response.status = 400;
+    response.set_content("\"seconds\" query parameter must be a number\n", "text/plain");
+    return;
+  }
+  if (result.ec == std::errc::result_out_of_range) {
+    response.status = 400;
+    response.set_content("\"seconds\" is out of range of an IEEE754 double\n", "text/plain");
+    return;
+  }
+  if (result.ptr != raw.end()) {
+    response.status = 400;
+    response.set_content(
+        "\"seconds\" query parameter must be a number without any other "
+        "trailing characters\n",
+        "text/plain");
+    return;
+  }
+  if (seconds < 0) {
+    response.status = 400;
+    response.set_content("\"seconds\" query parameter must be a non-negative number\n", "text/plain");
+    return;
+  }
+
+  using namespace std::chrono;
+  std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));
+}
+
+void on_get_notes(const httplib::Request& request, httplib::Response& response) {
+  auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
+
+  dd::Span span = context->spans.top().create_child();
+  span.set_name("get-notes");
+  span.set_tag("http.route", "/notes");
+
+  // TODO: Do something.
+  response.status = 501;  // "not implemented"
+}
+
+void on_post_notes(const httplib::Request& request, httplib::Response& response) {
+  auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
+
+  dd::Span span = context->spans.top().create_child();
+  span.set_name("add-note");
+  span.set_tag("http.route", "/notes");
+
+  // TODO: Do something/
+  response.status = 501;  // "not implemented"
 }

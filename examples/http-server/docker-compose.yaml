@@ -7,7 +7,7 @@ services:
             context: ./server
             dockerfile: ./Dockerfile
         ports:
-            - "8000:8000"
+            - "127.0.0.1:8000:8000"
         environment:
             # This will override any value of `datadog::tracing::TracerConfig`'s
             # `.agent.url` in `server.cpp`.
