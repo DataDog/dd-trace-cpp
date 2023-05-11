@@ -240,43 +240,20 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
   span.set_tag("http.route", "/sleep");
 
   const auto [begin, end] = request.params.equal_range("seconds");
-  switch (std::distance(begin, end)) {
-    case 0:
-      response.status = 400;  // "bad request"
-      response.set_content("\"seconds\" query parameter is required\n", "text/plain");
-      return;
-    case 1:
-      break;
-    default:
-      response.status = 400;  // "bad request"
-      response.set_content("\"seconds\" query parameter cannot be specified more than once\n", "text/plain");
-      return;
+  if (std::distance(begin, end) != 1) {
+    response.status = 400;  // "bad request"
+    response.set_content("\"seconds\" query parameter must be specified exactly once.\n", "text/plain");
+    return;
   }
 
   const std::string_view raw = begin->second;
   double seconds;
   const auto result = std::from_chars(raw.begin(), raw.end(), seconds);
-  if (result.ec == std::errc::invalid_argument) {
-    response.status = 400;
-    response.set_content("\"seconds\" query parameter must be a number\n", "text/plain");
-    return;
-  }
-  if (result.ec == std::errc::result_out_of_range) {
-    response.status = 400;
-    response.set_content("\"seconds\" is out of range of an IEEE754 double\n", "text/plain");
-    return;
-  }
-  if (result.ptr != raw.end()) {
-    response.status = 400;
+  if (result.ec == std::errc::invalid_argument || result.ec == std::errc::result_out_of_range ||
+      result.ptr != raw.end() || seconds < 0) {
+    response.status = 400;  // "bad request"
     response.set_content(
-        "\"seconds\" query parameter must be a number without any other "
-        "trailing characters\n",
-        "text/plain");
-    return;
-  }
-  if (seconds < 0) {
-    response.status = 400;
-    response.set_content("\"seconds\" query parameter must be a non-negative number\n", "text/plain");
+        "\"seconds\" query parameter must be a non-negative number in the range of an IEEE754 double.\n", "text/plain");
     return;
   }
 
