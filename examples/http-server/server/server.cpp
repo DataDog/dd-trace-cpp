@@ -52,7 +52,7 @@ namespace dd = datadog::tracing;
 void hard_stop(int /*signal*/) { std::exit(0); }
 
 // `RequestTracingContext` is Datadog tracing specific information that is
-// associated with each incoming request via `Request::user_data`.
+// associated with each incoming request via `httplib::Request::user_data`.
 struct RequestTracingContext {
   // `spans` is a stack of Datadog tracing spans.
   //
@@ -68,7 +68,7 @@ struct RequestTracingContext {
   // route-specific handler (see `set_pre_routing_handler`). The grandchild
   // span, corresponding to the route-specific handler, can live on the call
   // stack of the handler function, and so that span and its descendants are
-  // never added to `stack`.
+  // never added to `spans`.
   //
   // Since there are at most two spans in `spans`, and because we know what
   // they are, we could instead have two data members of type
