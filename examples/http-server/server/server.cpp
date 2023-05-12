@@ -14,6 +14,8 @@
 #include <cstdlib>
 #include <iostream>
 #include <iterator>
+#include <ostream>
+#include <sstream>
 #include <stack>
 #include <system_error>
 
@@ -262,8 +264,8 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
 }
 
 // TODO: put somewhere else
-httplib::Result traced_get(httplib::Client& client, const std::string& endpoint, httplib::Headers& headers,
-                           dd::Span& parent_span) {
+httplib::Result traced_get(httplib::Client& client, const std::string& endpoint, const httplib::Params& params,
+                           httplib::Headers& headers, dd::Span& parent_span) {
   dd::Span span = parent_span.create_child();
   span.set_name("http.client");
   span.set_resource_name("GET " + endpoint);
@@ -271,7 +273,7 @@ httplib::Result traced_get(httplib::Client& client, const std::string& endpoint,
   HeaderWriter writer{headers};
   span.inject(writer);
 
-  return client.Get(endpoint, headers);
+  return client.Get(endpoint, params, headers);
 }
 
 void on_get_notes(const httplib::Request& request, httplib::Response& response) {
@@ -281,17 +283,37 @@ void on_get_notes(const httplib::Request& request, httplib::Response& response) 
   span.set_name("get-notes");
   span.set_tag("http.route", "/notes");
 
-  // TODO
   httplib::Client database("database", 80);
+  httplib::Params params;
+  params.emplace("sql", "select AddedWhen, Body from Note order by AddedWhen desc;");
   httplib::Headers headers;
-  if (const auto result = traced_get(database, "/", headers, span)) {
+  if (const auto result = traced_get(database, "/query", params, headers, span)) {
     response.status = result->status;
     response.set_content(result->body, result->get_header_value("Content-Type"));
   } else {
-    // TODO enum: result->error()
     response.status = 500;  // "internal server error"
   }
 }
+
+// "It's true" -> "'It''s true'"
+class sql_quote {
+  const std::string& text_;
+
+ public:
+  explicit sql_quote(const std::string& text) : text_(text) {}
+
+  friend std::ostream& operator<<(std::ostream& stream, const sql_quote& source) {
+    stream.put('\'');
+    for (char ch : source.text_) {
+      stream.put(ch);
+      if (ch == '\'') {
+        stream.put(ch);
+      }
+    }
+    stream.put('\'');
+    return stream;
+  }
+};
 
 void on_post_notes(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
@@ -299,7 +321,19 @@ void on_post_notes(const httplib::Request& request, httplib::Response& response)
   dd::Span span = context->spans.top().create_child();
   span.set_name("add-note");
   span.set_tag("http.route", "/notes");
+  span.set_tag("note", request.body);
 
-  // TODO: Do something/
   response.status = 501;  // "not implemented"
+  httplib::Client database("database", 80);
+  httplib::Params params;
+  std::ostringstream sql;
+  sql << "insert into Note(AddedWhen, Body) values(datetime(), " << sql_quote(request.body) << ");";
+  params.emplace("sql", sql.str());
+  httplib::Headers headers;
+  if (const auto result = traced_get(database, "/execute", params, headers, span)) {
+    response.status = result->status;
+    response.set_content(result->body, result->get_header_value("Content-Type"));
+  } else {
+    response.status = 500;  // "internal server error"
+  }
 }

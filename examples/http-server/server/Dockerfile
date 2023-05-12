@@ -12,7 +12,7 @@ run /tmp/install-dd-trace-cpp
 # Build the server.
 copy server.cpp httplib.h /tmp
 # run c++ --std=c++17 -Wall -Wextra -pedantic -Og -o /tmp/server /tmp/server.cpp -l:libdd_trace_cpp.a
-run c++ --std=c++17 -Wall -Wextra -pedantic -Og -o /tmp/server /tmp/server.cpp -ldd_trace_cpp
+run c++ --std=c++17 -Wall -Wextra -pedantic -Werror -Og -o /tmp/server /tmp/server.cpp -ldd_trace_cpp
 
 from ubuntu:22.04
 

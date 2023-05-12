@@ -12,6 +12,8 @@ services:
             # This will override any value of `datadog::tracing::TracerConfig`'s
             # `.agent.url` in `server.cpp`.
             - DD_AGENT_HOST=datadog-agent
+        depends_on:
+            - datadog-agent
 
     # A Python HTTP server that acts as a database backed by SQLite.
     # It also has Datadog tracing.
@@ -22,6 +24,8 @@ services:
         environment:
             - DD_AGENT_HOST=datadog-agent
             - DD_SERVICE=dd-trace-cpp-http-server-example-database
+        depends_on:
+            - datadog-agent
 
     # The Datadog trace agent
     datadog-agent:
