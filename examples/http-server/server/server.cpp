@@ -302,7 +302,9 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
   const auto [begin, end] = request.params.equal_range("seconds");
   if (std::distance(begin, end) != 1) {
     response.status = 400;  // "bad request"
-    response.set_content("\"seconds\" query parameter must be specified exactly once.\n", "text/plain");
+    const std::string message = "\"seconds\" query parameter must be specified exactly once.\n";
+    span.set_error_message(message);
+    response.set_content(message, "text/plain");
     return;
   }
 
@@ -312,8 +314,10 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
   if (result.ec == std::errc::invalid_argument || result.ec == std::errc::result_out_of_range ||
       result.ptr != raw.end() || seconds < 0) {
     response.status = 400;  // "bad request"
-    response.set_content(
-        "\"seconds\" query parameter must be a non-negative number in the range of an IEEE754 double.\n", "text/plain");
+    const std::string message =
+        "\"seconds\" query parameter must be a non-negative number in the range of an IEEE754 double.\n";
+    span.set_error_message(message);
+    response.set_content(message, "text/plain");
     return;
   }
 
