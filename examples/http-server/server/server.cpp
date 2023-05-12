@@ -229,7 +229,11 @@ int main() {
   server.listen("0.0.0.0", 80);
 }
 
-// TODO
+// When the request begins, create a `RequestTracingContext` and set it as the
+// request's `user_data`. Also save the current time. We don't create a span,
+// yet, because we don't yet have the request headers, which will tell us
+// whether there's an existing trace or whether to create a new one. That
+// happens in `on_request_headers_consumed`, below.
 void on_request_begin(httplib::Request& request) {
   const auto now = dd::default_clock();
   auto context = std::make_shared<RequestTracingContext>();
@@ -237,7 +241,10 @@ void on_request_begin(httplib::Request& request) {
   request.user_data = std::move(context);
 }
 
-// TODO
+// Once the request headers have been read, but before we route to a request
+// handler, we can start creating spans. Create a span representing the entire
+// request, based on the `RequestTracingContext::request_start` from
+// `on_request_begin`. Then create a child span whose start time is now.
 void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tracer) {
   const auto now = dd::default_clock();
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
@@ -271,7 +278,7 @@ void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tr
   context->spans.push(span.create_child(config));
 }
 
-// TODO
+// The "/heathcheck" endpoint returns status 200 and doesn't do any tracing.
 void on_healthcheck(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
@@ -283,7 +290,8 @@ void on_healthcheck(const httplib::Request& request, httplib::Response& response
   response.set_content("I'm still here!\n", "text/plain");
 }
 
-// TODO
+// The "/sleep" endpoint puts this worker thread to sleep before returning
+// status 200. A span is created representing the sleep operation.
 void on_sleep(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
@@ -313,20 +321,29 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
   std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));
 }
 
-// TODO
+// `traced_get` is a wrapper around `httplib::Client::Get` that also creates a
+// span representing the GET operation. Additionally, trace context headers are
+// added to the outgoing request headers so that the spans here can be
+// correlated with any produced by the target service.
+// `traced_get` is used by `on_get_notes` and `on_post_notes`, below.
 httplib::Result traced_get(httplib::Client& client, const std::string& endpoint, const httplib::Params& params,
                            httplib::Headers& headers, dd::Span& parent_span) {
   dd::Span span = parent_span.create_child();
   span.set_name("http.client");
   span.set_resource_name("GET " + endpoint);
-  // TODO: tags...
+  // Could add tags here...
+
   HeaderWriter writer{headers};
   span.inject(writer);
 
   return client.Get(endpoint, params, headers);
 }
 
-// TODO
+// The "GET" method of the "/notes" endpoint returns a JSON array of all of the
+// notes stored in the database. It accesses the database via the "/query"
+// endpoint of the "database" HTTP service. A child span is created representing
+// the request handler operation, and additionally `traced_get` creates a
+// grandchild span representing the request to the database.
 void on_get_notes(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
@@ -346,8 +363,13 @@ void on_get_notes(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
-// TODO
-// "It's true" -> "'It''s true'"
+// When adding a new note to the database, we need to escape the text of the
+// note in the relevant SQL "insert" command. The "database" service does not
+// support parameter binding.
+//
+// `sql_quote` is a class that takes a reference to a string and then can be
+// inserted into an output stream. The insert operation SQL-quotes the input
+// string, e.g. "It's true" becomes "'It''s true'".
 class sql_quote {
   const std::string& text_;
 
@@ -367,7 +389,11 @@ class sql_quote {
   }
 };
 
-// TODO
+// The "POST" method of the "/notes" endpoint inserts the request body into the
+// database as a new note. It accesses the database via the "/execute" endpoint
+// of the  "database" HTTP service. A child span is created representing the
+// request handler operation, and additionally `traced_get` creates a grandchild
+// span representing the request to the database.
 void on_post_notes(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
