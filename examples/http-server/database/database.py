@@ -1,6 +1,26 @@
 """database - a thin wrapper around a sqlite3 database
 
-TODO
+This is an HTTP server that exposes a SQLite 3 database via the following
+endpoints:
+
+    GET /query?sql=<sql>
+        Execute the <sql> against the database in read-only mode. Return
+        application/json containing an array of the resulting rows, where
+        each row is an array.
+
+        If an error occurs, return a text/plain description of the error.
+
+    GET /execute?sql=<sql>
+        Execute the <sql> against the database in read-write mode.
+        On success, return status 200 with an empty body.
+
+        If an error occurs, return a text/plain description of the error.
+
+The database initially contains the following table:
+
+    create table Note(
+        AddedWhen text,
+        Body text);
 """
 
 import flask
