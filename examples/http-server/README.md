@@ -41,7 +41,26 @@ Datadog service names:
 
 Example Usage
 -------------
-TODO
+In one command shell, run `bin/http-server-example` to bring up the services.
+
+![screenshot of command mentioned above](diagrams/docker-compose.png)
+
+Then, in another command shell, use `curl` to read and write some notes.
+
+![screenshot of curl being used](diagrams/curl.png)
+
+Finally, open the Datadog UI in a web browser and navigate to `APM > Traces`.
+Search for service names matching `dd-trace-cpp-http-server-example-*`.
+
+![screenshot of search results](diagrams/traces.png)
+
+Click one of the results to display a flame graph of the associated trace.
+
+![screenshot of flame graph](diagrams/flame-graph.png)
+
+At the top is the Node.js proxy that we called using `curl`. Below that is the
+C++ server to which the proxy forwarded our request. Below that is the
+Python database service, including a span indicating its use of SQLite.
 
 [1]: https://docs.docker.com/compose/
 [2]: https://docs.datadoghq.com/agent/
