@@ -1,3 +1,8 @@
+"""database - a thin wrapper around a sqlite3 database
+
+TODO
+"""
+
 import flask
 import gevent
 from gevent.pywsgi import WSGIServer

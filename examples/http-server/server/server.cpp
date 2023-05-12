@@ -1,3 +1,26 @@
+// This is an HTTP service for a note-taking app. It's traced by Datadog via
+// manual instrumentation using the dd-trace-cpp library.
+//
+// This service does its work by accessing a database provided by another
+// service called "database".
+//
+// This service provides the following operations:
+//
+//     GET /notes
+//         Return a JSON array of all stored notes, where each note is a JSON
+//         array [created time, note], e.g. ["2023-05-12 12:38:25","here's a note"].
+//
+//     POST /notes
+//         Create a new note.  The body of the request is the note content.
+//
+//     GET /sleep?seconds=<number>
+//
+//         Wait <number> seconds before responding. For example,
+//
+//             GET /sleep?seconds=0.023
+//
+//         will deliver a response after approximately 23 milliseconds.
+
 #include <datadog/clock.h>
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
@@ -70,7 +93,11 @@ struct RequestTracingContext {
   dd::TimePoint request_start;
 };
 
-// TODO: explain
+// `HeaderReader` adapts dd-trace-cpp's reader interface to the HTTP headers
+// object used by this app's HTTP library.
+//
+// dd-trace-cpp uses this to extract trace context from incoming HTTP request
+// headers.
 class HeaderReader : public dd::DictReader {
   const httplib::Headers& headers_;
   mutable std::string buffer_;
@@ -108,7 +135,11 @@ class HeaderReader : public dd::DictReader {
   }
 };
 
-// TODO: explain
+// `HeaderWriter` adapts dd-trace-cpp's writer interface to the HTTP headers
+// object used by this app's HTTP library.
+//
+// dd-trace-cpp uses this to inject trace context into outgoing HTTP request
+// headers.
 class HeaderWriter : public dd::DictWriter {
   httplib::Headers& headers_;
 
@@ -150,28 +181,43 @@ int main() {
   // Configure the HTTP server.
   httplib::Server server;
 
-  // TODO: Explain when this happens.
+  // `httplib` provides a hook into when a request first begins. We call
+  // `on_request_begin`, which installs a `RequestTracingContext` into the
+  // request's `user_data`, so that subsequent callbacks (like the
+  // route-specific request handlers below) have access to the tracing context
+  // for this request.
+  // There is a corresponding hook into when the request ends. See
+  // `set_post_request_handler` below.
   server.set_pre_request_handler([](httplib::Request& request, httplib::Response&) { on_request_begin(request); });
 
-  // TODO: Explain when this happens.
+  // `httplib` provides a hook into when request headers have been read, but
+  // before the route-specific handler is called.
+  // There is a corresponding hook into when the route-specific handler has
+  // returned. See `set_post_routing_handler` below.
   server.set_pre_routing_handler([&](const httplib::Request& request, httplib::Response&) {
     on_request_headers_consumed(request, tracer);
     return httplib::Server::HandlerResponse::Unhandled;
   });
 
-  server.Get("/healthcheck", on_healthcheck);
-  server.Get("/notes", on_get_notes);
-  server.Post("/notes", on_post_notes);
-  server.Get("/sleep", on_sleep);
+  server.Get("/healthcheck", on_healthcheck);  // handler for GET /healthcheck
+  server.Get("/notes", on_get_notes);          // handler for GET /notes
+  server.Post("/notes", on_post_notes);        // handler for POST /notes
+  server.Get("/sleep", on_sleep);              // handler for GET /sleep
 
-  // TODO: Explain when this happens.
+  // `httplib` provides a hook into when the route-specific handler (see above)
+  // has finished.
+  // Here we finish (destroy) one of the `dd::Span` objects that we previously
+  // created. We finish it by popping it off of the span stack.
   server.set_post_routing_handler([](const httplib::Request& request, httplib::Response&) {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
     context->spans.pop();
     return httplib::Server::HandlerResponse::Unhandled;
   });
 
-  // TODO: Explain when this happens.
+  // `httplib` provides a hook into when the the request is completely finished.
+  // Here we finish (destroy) the last remaining, and toplevel, `dd::Span`
+  // object that we previously created. We finish it by popping it off of the
+  // span stack.
   server.set_post_request_handler([](const httplib::Request& request, httplib::Response& response) {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
     context->spans.top().set_tag("http.status_code", std::to_string(response.status));
@@ -183,6 +229,7 @@ int main() {
   server.listen("0.0.0.0", 80);
 }
 
+// TODO
 void on_request_begin(httplib::Request& request) {
   const auto now = dd::default_clock();
   auto context = std::make_shared<RequestTracingContext>();
@@ -190,6 +237,7 @@ void on_request_begin(httplib::Request& request) {
   request.user_data = std::move(context);
 }
 
+// TODO
 void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tracer) {
   const auto now = dd::default_clock();
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
@@ -223,6 +271,7 @@ void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tr
   context->spans.push(span.create_child(config));
 }
 
+// TODO
 void on_healthcheck(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
@@ -234,6 +283,7 @@ void on_healthcheck(const httplib::Request& request, httplib::Response& response
   response.set_content("I'm still here!\n", "text/plain");
 }
 
+// TODO
 void on_sleep(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
@@ -263,7 +313,7 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
   std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));
 }
 
-// TODO: put somewhere else
+// TODO
 httplib::Result traced_get(httplib::Client& client, const std::string& endpoint, const httplib::Params& params,
                            httplib::Headers& headers, dd::Span& parent_span) {
   dd::Span span = parent_span.create_child();
@@ -276,6 +326,7 @@ httplib::Result traced_get(httplib::Client& client, const std::string& endpoint,
   return client.Get(endpoint, params, headers);
 }
 
+// TODO
 void on_get_notes(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
@@ -295,6 +346,7 @@ void on_get_notes(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
+// TODO
 // "It's true" -> "'It''s true'"
 class sql_quote {
   const std::string& text_;
@@ -315,6 +367,7 @@ class sql_quote {
   }
 };
 
+// TODO
 void on_post_notes(const httplib::Request& request, httplib::Response& response) {
   auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
@@ -323,7 +376,6 @@ void on_post_notes(const httplib::Request& request, httplib::Response& response)
   span.set_tag("http.route", "/notes");
   span.set_tag("note", request.body);
 
-  response.status = 501;  // "not implemented"
   httplib::Client database("database", 80);
   httplib::Params params;
   std::ostringstream sql;
