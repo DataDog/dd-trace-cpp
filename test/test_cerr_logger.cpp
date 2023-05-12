@@ -49,7 +49,7 @@ TEST_CASE("CerrLogger") {
 
   SECTION("log_error Error") {
     logger.log_error(Error{Error::OTHER, "hello!"});
-    REQUIRE(stream.str() == "[error code 1] hello!\n");
+    REQUIRE(stream.str() == "[dd-trace-cpp error code 1] hello!\n");
   }
 
   SECTION("log_error string_view") {
