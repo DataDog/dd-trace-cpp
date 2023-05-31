@@ -506,6 +506,7 @@ void CurlImpl::run() {
     }
 
     log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
+    curl_.easy_cleanup(handle);
   }
 
   request_handles_.clear();
