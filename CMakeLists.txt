@@ -231,5 +231,7 @@ endif()
 add_subdirectory(examples)
 
 if(BUILD_BENCHMARK)
+    add_compile_options(-pg)
+    add_link_options(-pg)
   add_subdirectory(benchmark)
 endif()

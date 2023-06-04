@@ -58,6 +58,30 @@ void BM_TraceTinyCCSource(benchmark::State& state) {
 }
 BENCHMARK(BM_TraceTinyCCSource);
 
+// TODO: document
+dd::Tracer& tracer_singleton() {
+    static dd::Tracer tracer{[]() {
+      dd::TracerConfig config;
+      config.defaults.service = "benchmark";
+      config.logger = std::make_shared<NullLogger>();
+      config.collector = std::make_shared<SerializingCollector>();
+      auto valid_config = dd::finalize_config(config);
+      return *valid_config;
+    }()};
+
+    return tracer;
+}
+
+// TODO: document
+void BM_TraceTinyCCSourceNoSetup(benchmark::State& state) {
+  for (auto _ : state) {
+    dd::Tracer& tracer = tracer_singleton();
+    // Note: This assumes that the benchmark is run from the repository root.
+    sha256_traced("benchmark/tinycc", tracer);
+  }
+}
+BENCHMARK(BM_TraceTinyCCSourceNoSetup);
+
 } // namespace
 
 BENCHMARK_MAIN();

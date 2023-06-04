@@ -8,8 +8,8 @@ cd "$(dirname "$0")"/..
 mkdir -p .build
 
 cd .build
-cmake .. -DBUILD_BENCHMARK=1 -DCMAKE_BUILD_TYPE=Release
-make -j
+cmake .. -DBUILD_BENCHMARK=1
+make -j VERBOSE=1
 cd ../
 
 .build/benchmark/dd_trace_cpp-benchmark "$@"
