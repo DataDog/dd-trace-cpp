@@ -231,7 +231,10 @@ endif()
 add_subdirectory(examples)
 
 if(BUILD_BENCHMARK)
-    add_compile_options(-pg)
-    add_link_options(-pg)
+  add_compile_options(-pg)
+  add_link_options(-pg)
+  set(CMAKE_BUILD_TYPE "Debug") # TODO: no
+  # add_compile_options(-O1) # TODO: no
+  add_compile_options(-Og) # TODO: no
   add_subdirectory(benchmark)
 endif()

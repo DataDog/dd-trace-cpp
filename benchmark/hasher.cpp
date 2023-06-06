@@ -33,6 +33,9 @@
 namespace fs = std::filesystem;
 namespace dd = datadog::tracing;
 
+template <typename... Args>
+void dummy_hash(Args&&...) {}
+
 using Digest = std::array<char, picosha2::k_digest_size>;
 
 // Return the specified `digest` formatted as a lower case hexadecimal string.
@@ -55,7 +58,8 @@ int sha256(Digest &digest, const fs::path &file) {
   if (!in) {
     return 1;
   }
-  picosha2::hash256(in, digest.begin(), digest.end());
+  // picosha2::hash256(in, digest.begin(), digest.end());
+  dummy_hash(in, digest.begin(), digest.end());
   return 0;
 }
 
@@ -73,7 +77,8 @@ Digest sha256(std::vector<std::pair<fs::path, Digest>> &children) {
   }
 
   Digest digest;
-  picosha2::hash256(descriptor, digest);
+  // picosha2::hash256(descriptor, digest);
+  dummy_hash(descriptor, digest);
   return digest;
 }
 

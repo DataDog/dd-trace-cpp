@@ -30,8 +30,10 @@ struct SerializingCollector : public dd::Collector {
   dd::Expected<void> send(
       std::vector<std::unique_ptr<dd::SpanData>>&& spans,
       const std::shared_ptr<dd::TraceSampler>& /*response_handler*/) override {
-    std::string buffer;
-    return dd::msgpack_encode(buffer, spans);
+    // TODO std::string buffer;
+    // TODO return dd::msgpack_encode(buffer, spans);
+    (void)spans;
+    return {};
   }
 
   nlohmann::json config_json() const override {
