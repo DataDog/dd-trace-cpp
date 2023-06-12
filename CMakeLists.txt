@@ -88,6 +88,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/curl.cpp
     src/datadog/datadog_agent_config.cpp
     src/datadog/datadog_agent.cpp
+    src/datadog/debug_span.cpp
     src/datadog/default_http_client_curl.cpp
 #     src/datadog/default_http_client_null.cpp use libcurl
     src/datadog/dict_reader.cpp
@@ -150,6 +151,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   # src/datadog/curl.h except for curl.h
   src/datadog/datadog_agent_config.h
   src/datadog/datadog_agent.h
+  src/datadog/debug_span.h
   src/datadog/default_http_client.h
   src/datadog/dict_reader.h
   src/datadog/dict_writer.h

@@ -208,6 +208,8 @@ nlohmann::json make_config_json(
     config["hostname"] = *hostname;
   }
 
+  // TODO: information about the debug configuration
+
   return config;
 }
 
@@ -249,6 +251,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
         std::make_shared<DatadogAgent>(agent_config, clock, config.logger);
   }
 
+  if (config.debug.enabled) {
+    // TODO
+  }
+
   if (config.log_on_startup) {
     auto json = config_json();
     logger_->log_startup([&json](std::ostream& log) {
@@ -266,6 +272,9 @@ nlohmann::json Tracer::config_json() const {
 Span Tracer::create_span() { return create_span(SpanConfig{}); }
 
 Span Tracer::create_span(const SpanConfig& config) {
+  Optional<Span> debug_span;
+  // TODO
+
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
   std::vector<std::pair<std::string, std::string>> trace_tags;
@@ -276,8 +285,6 @@ Span Tracer::create_span(const SpanConfig& config) {
   }
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
-
-  Optional<Span> debug_span;  // TODO
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(

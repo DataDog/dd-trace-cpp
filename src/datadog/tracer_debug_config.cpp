@@ -10,7 +10,6 @@ Expected<FinalizedTracerDebugConfig> finalize_config(
   FinalizedTracerDebugConfig result;
   result.enabled = config.enabled;
   result.service = config.service;
-  result.logger = config.logger;
   return result;
 }
 
