@@ -277,13 +277,16 @@ Span Tracer::create_span(const SpanConfig& config) {
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
 
+  Optional<Span> debug_span;  // TODO
+
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
       std::move(trace_tags), nullopt /* sampling_decision */,
       nullopt /* additional_w3c_tracestate */,
-      nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
+      nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data),
+      std::move(debug_span));
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
@@ -403,13 +406,16 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     sampling_decision = decision;
   }
 
+  Optional<Span> debug_span;  // TODO
+
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
       std::move(trace_tags), std::move(sampling_decision),
       std::move(additional_w3c_tracestate),
-      std::move(additional_datadog_w3c_tracestate), std::move(span_data));
+      std::move(additional_datadog_w3c_tracestate), std::move(span_data),
+      std::move(debug_span));
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};

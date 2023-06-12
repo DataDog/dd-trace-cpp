@@ -16,6 +16,7 @@
 #include "span_defaults.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
+#include "tracer_debug_config.h"
 
 namespace datadog {
 namespace tracing {
@@ -103,6 +104,11 @@ struct TracerConfig {
   // tracer will generate 64-bit trace IDs. `trace_id_128_bit` is overridden by
   // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
   bool trace_id_128_bit = false;
+
+  // `debug` specifies whether debug traces will be created by this tracer.
+  // One debug trace is created per trace.
+  // By default, `debug.enabled == false` and so no debug traces are created.
+  TracerDebugConfig debug;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -131,6 +137,8 @@ class FinalizedTracerConfig {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
+
+  FinalizedTracerDebugConfig debug;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

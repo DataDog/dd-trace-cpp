@@ -352,6 +352,9 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     result.trace_id_128_bit = config.trace_id_128_bit;
   }
 
+  // Finalizing the debug config currently always succeeds.
+  result.debug = *finalize_config(config.debug);
+
   return result;
 }
 

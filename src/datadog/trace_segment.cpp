@@ -15,6 +15,7 @@
 #include "optional.h"
 #include "platform_util.h"
 #include "random.h"
+#include "span.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
@@ -93,7 +94,7 @@ TraceSegment::TraceSegment(
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
-    std::unique_ptr<SpanData> local_root)
+    std::unique_ptr<SpanData> local_root, Optional<Span>&& debug_span)
     : logger_(logger),
       collector_(collector),
       trace_sampler_(trace_sampler),
@@ -108,7 +109,8 @@ TraceSegment::TraceSegment(
       sampling_decision_(std::move(sampling_decision)),
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
-          std::move(additional_datadog_w3c_tracestate)) {
+          std::move(additional_datadog_w3c_tracestate)),
+      debug_segment_span_(std::move(debug_span)) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);

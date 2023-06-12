@@ -36,6 +36,7 @@
 #include "optional.h"
 #include "propagation_style.h"
 #include "sampling_decision.h"
+#include "span.h"
 
 namespace datadog {
 namespace tracing {
@@ -71,6 +72,9 @@ class TraceSegment {
   Optional<std::string> additional_datadog_w3c_tracestate_;
   bool awaiting_delegated_sampling_decision_ = false;
 
+  Optional<Span> debug_segment_span_;
+  Optional<Span> debug_lifetime_span_;
+
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
                const std::shared_ptr<Collector>& collector,
@@ -84,7 +88,8 @@ class TraceSegment {
                Optional<SamplingDecision> sampling_decision,
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
-               std::unique_ptr<SpanData> local_root);
+               std::unique_ptr<SpanData> local_root,
+               Optional<Span>&& debug_span);
 
   const SpanDefaults& defaults() const;
   const Optional<std::string>& hostname() const;
