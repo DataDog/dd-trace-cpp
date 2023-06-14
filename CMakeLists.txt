@@ -17,6 +17,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# This warning has a false positive. See
+# <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108088>.
+add_compile_options(-Wno-error=free-nonheap-object)
+
 # If we're building with clang, then use the libc++ version of the standard
 # library instead of libstdc++. Better coverage of build configurations.
 #
