@@ -164,10 +164,7 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   CurlLibrary &curl_;
   const std::shared_ptr<Logger> logger_;
   CURLM *multi_handle_;
-<<<<<<< HEAD
-=======
   std::unordered_set<CURL *> request_handles_;
->>>>>>> b32e87b59c2bca6908ef5deac647d60e7dce4ef5
   std::vector<CURL *> new_handles_;
   bool shutting_down_;
   int num_active_handles_;
@@ -176,11 +173,7 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
 
 public:
 ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
-<<<<<<< HEAD
-                   const Curl::ThreadGenerator &make_thread)
-=======
                    const Curl::ThreadGenerator &make_thread);
->>>>>>> b32e87b59c2bca6908ef5deac647d60e7dce4ef5
 
   Expected<void> add_handle(CURL *handle,
                                     std::function<void(CURLcode)> on_error,
@@ -188,12 +181,6 @@ ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
 
   Expected<void> remove_handle(CURL *handle) override;
 
-<<<<<<< HEAD
-  ~CurlEventLoop() override;
-
-private:
-  void run();
-=======
   void drain(std::chrono::steady_clock::time_point deadline) override;
 
   ~ThreadedCurlEventLoop() override;
@@ -201,7 +188,6 @@ private:
 private:
   void run();
   CURLcode log_on_error(CURLcode result);
->>>>>>> b32e87b59c2bca6908ef5deac647d60e7dce4ef5
   CURLMcode log_on_error(CURLMcode result);
 };
 
@@ -211,11 +197,8 @@ ThreadedCurlEventLoop::ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logg
       logger_(logger),
       shutting_down_(false),
       num_active_handles_(0) {
-<<<<<<< HEAD
-=======
   assert(logger_);
 
->>>>>>> b32e87b59c2bca6908ef5deac647d60e7dce4ef5
   curl_.global_init(CURL_GLOBAL_ALL);
   multi_handle_ = curl_.multi_init();
   if (multi_handle_ == nullptr) {
@@ -266,19 +249,11 @@ void ThreadedCurlEventLoop::run() {
     lock.lock();
 
     // New requests might have been added while we were sleeping.
-<<<<<<< HEAD
-    for (; !new_handles_.empty(); new_handles_.pop_front()) {
-      CURL *const handle = new_handles_.front();
-      log_on_error(curl_.multi_add_handle(multi_handle_, handle));
-      request_handles_.insert(handle);
-    }
-=======
     for (CURL *handle : new_handles_) {
       log_on_error(curl_.multi_add_handle(multi_handle_, handle));
       request_handles_.insert(handle);
     }
     new_handles_.clear();
->>>>>>> b32e87b59c2bca6908ef5deac647d60e7dce4ef5
 
     if (shutting_down_) {
       break;
