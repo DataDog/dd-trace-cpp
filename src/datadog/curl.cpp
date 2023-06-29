@@ -1,6 +1,7 @@
 #include "curl.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <chrono>
 #include <condition_variable>
@@ -8,7 +9,6 @@
 #include <iterator>
 #include <memory>
 #include <mutex>
-#include <system_error>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -164,6 +164,7 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   CurlLibrary &curl_;
   const std::shared_ptr<Logger> logger_;
   CURLM *multi_handle_;
+  std::unordered_set<CURL *> request_handles_;
   std::vector<CURL *> new_handles_;
   bool shutting_down_;
   int num_active_handles_;
@@ -172,7 +173,7 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
 
 public:
 ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
-                   const Curl::ThreadGenerator &make_thread)
+                   const Curl::ThreadGenerator &make_thread);
 
   Expected<void> add_handle(CURL *handle,
                                     std::function<void(CURLcode)> on_error,
@@ -180,10 +181,13 @@ ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
 
   Expected<void> remove_handle(CURL *handle) override;
 
-  ~CurlEventLoop() override;
+  void drain(std::chrono::steady_clock::time_point deadline) override;
+
+  ~ThreadedCurlEventLoop() override;
 
 private:
   void run();
+  CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
 };
 
@@ -193,6 +197,8 @@ ThreadedCurlEventLoop::ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logg
       logger_(logger),
       shutting_down_(false),
       num_active_handles_(0) {
+  assert(logger_);
+
   curl_.global_init(CURL_GLOBAL_ALL);
   multi_handle_ = curl_.multi_init();
   if (multi_handle_ == nullptr) {
@@ -204,7 +210,7 @@ ThreadedCurlEventLoop::ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logg
 
   try {
     event_loop_ = make_thread([this]() { run(); });
-  } catch (const std::system_error &error) {
+  } catch (const std::exception &error) {
     logger_->log_error(
         Error{Error::CURL_HTTP_CLIENT_SETUP_FAILED, error.what()});
 
@@ -243,11 +249,11 @@ void ThreadedCurlEventLoop::run() {
     lock.lock();
 
     // New requests might have been added while we were sleeping.
-    for (; !new_handles_.empty(); new_handles_.pop_front()) {
-      CURL *const handle = new_handles_.front();
+    for (CURL *handle : new_handles_) {
       log_on_error(curl_.multi_add_handle(multi_handle_, handle));
       request_handles_.insert(handle);
     }
+    new_handles_.clear();
 
     if (shutting_down_) {
       break;
