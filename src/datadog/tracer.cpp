@@ -183,15 +183,13 @@ Expected<ExtractedData> extract_b3(
   return result;
 }
 
-void log_startup_message(Logger& logger, StringView tracer_version_string,
-                         const Collector& collector,
-                         const SpanDefaults& defaults,
-                         const TraceSampler& trace_sampler,
-                         const SpanSampler& span_sampler,
-                         const std::vector<PropagationStyle>& injection_styles,
-                         const std::vector<PropagationStyle>& extraction_styles,
-                         const Optional<std::string>& hostname,
-                         std::size_t tags_header_max_size) {
+nlohmann::json make_config_json(
+    StringView tracer_version_string, const Collector& collector,
+    const SpanDefaults& defaults, const TraceSampler& trace_sampler,
+    const SpanSampler& span_sampler,
+    const std::vector<PropagationStyle>& injection_styles,
+    const std::vector<PropagationStyle>& extraction_styles,
+    const Optional<std::string>& hostname, std::size_t tags_header_max_size) {
   // clang-format off
   auto config = nlohmann::json::object({
     {"version", tracer_version_string},
@@ -210,9 +208,7 @@ void log_startup_message(Logger& logger, StringView tracer_version_string,
     config["hostname"] = *hostname;
   }
 
-  logger.log_startup([&config](std::ostream& log) {
-    log << "DATADOG TRACER CONFIGURATION - " << config;
-  });
+  return config;
 }
 
 }  // namespace
@@ -254,11 +250,17 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 
   if (config.log_on_startup) {
-    log_startup_message(*logger_, tracer_version_string, *collector_,
-                        *defaults_, *trace_sampler_, *span_sampler_,
-                        injection_styles_, extraction_styles_, hostname_,
-                        tags_header_max_size_);
+    auto json = config_json();
+    logger_->log_startup([&json](std::ostream& log) {
+      log << "DATADOG TRACER CONFIGURATION - " << json;
+    });
   }
+}
+
+nlohmann::json Tracer::config_json() const {
+  return make_config_json(tracer_version_string, *collector_, *defaults_,
+                          *trace_sampler_, *span_sampler_, injection_styles_,
+                          extraction_styles_, hostname_, tags_header_max_size_);
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }

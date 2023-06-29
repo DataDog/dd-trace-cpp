@@ -84,5 +84,9 @@ bool operator!=(TraceID left, std::uint64_t right) {
   return left != TraceID{right};
 }
 
+bool operator==(std::uint64_t left, TraceID right) { return right == left; }
+
+bool operator!=(std::uint64_t left, TraceID right) { return right != left; }
+
 }  // namespace tracing
 }  // namespace datadog

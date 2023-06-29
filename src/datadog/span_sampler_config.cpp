@@ -245,13 +245,9 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
 }
 
 nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule &rule) {
-  auto result = nlohmann::json::object({
-      {"service", rule.service},
-      {"name", rule.name},
-      {"resource", rule.resource},
-      {"sample_rate", double(rule.sample_rate)},
-  });
-
+  // Get the base class's fields, then add our own.
+  auto result = static_cast<const SpanMatcher &>(rule).to_json();
+  result["sample_rate"] = double(rule.sample_rate);
   if (rule.max_per_second) {
     result["max_per_second"] = *rule.max_per_second;
   }

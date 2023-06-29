@@ -2,12 +2,12 @@
 
 // This component provides the release version of this library.
 
-#include "string_view.h"
-
 namespace datadog {
 namespace tracing {
 
 // The release version at or before this code revision, e.g. "v0.1.1".
+// That is, this code is at least as recent as `tracer_version`, but may be
+// more recent.
 extern const char *const tracer_version;
 
 // A string literal that contains `tracer_version` but also is easier to `grep`

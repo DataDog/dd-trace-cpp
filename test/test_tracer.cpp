@@ -510,14 +510,18 @@ TEST_CASE("span extraction") {
       }
     };
 
-    auto span = tracer.extract_span(reader);
-    REQUIRE(span);
-    checks(test_case, *span);
-    span = tracer.extract_or_create_span(reader);
-    auto method = "extract_or_create_span";
-    CAPTURE(method);
-    REQUIRE(span);
-    checks(test_case, *span);
+    {
+      auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+      checks(test_case, *span);
+    }
+    {
+      auto span = tracer.extract_or_create_span(reader);
+      auto method = "extract_or_create_span";
+      CAPTURE(method);
+      REQUIRE(span);
+      checks(test_case, *span);
+    }
   }
 
   SECTION("extraction can be disabled using the \"none\" style") {

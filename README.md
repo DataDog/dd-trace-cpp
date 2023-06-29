@@ -35,6 +35,7 @@ int main() {
     std::this_thread::sleep_for(std::chrono::seconds(2));
 }
 ```
+See the [examples](examples) directory for more extensive usage examples.
 
 Build
 -----

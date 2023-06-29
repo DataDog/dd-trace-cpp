@@ -10,11 +10,13 @@ env DEBIAN_FRONTEND=noninteractive
 # - Make available more recent versions of git.
 # - Update the package lists and upgrade already-installed software.
 # - Install build tooling:
-#   - GCC, clang, make, git, debugger, formatter, and miscellanea
+#   - GCC, clang, libc++, make, git, debugger, formatter, and miscellanea
 run apt-get update && apt-get install --yes software-properties-common && \
     add-apt-repository ppa:git-core/ppa --yes && \
     apt-get update && apt-get upgrade --yes && \
-    apt-get install --yes wget build-essential clang sed gdb clang-format git ssh shellcheck
+    apt-get install --yes \
+        wget build-essential clang sed gdb clang-format git ssh shellcheck \
+        libc++-dev libc++abi-dev
 
 # bazelisk, a launcher for bazel. `bazelisk --help` will cause the latest
 # version to be downloaded.

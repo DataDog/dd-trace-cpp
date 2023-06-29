@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.24)
 project(dd-trace-cpp)
 
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
-option(BUILD_EXAMPLE "Build the example program (example/)" OFF)
+option(BUILD_HASHER_EXAMPLE "Build the example program examples/hasher" OFF)
 option(BUILD_TESTING "Build the unit tests (test/)" OFF)
 option(SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
 option(FUZZ_W3C_PROPAGATION "Build a fuzzer for W3C propagation" OFF)
@@ -16,6 +16,21 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# This warning has a false positive. See
+# <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108088>.
+add_compile_options(-Wno-error=free-nonheap-object)
+
+# If we're building with clang, then use the libc++ version of the standard
+# library instead of libstdc++. Better coverage of build configurations.
+#
+# But there's one exception: libfuzzer is built with libstdc++ on Ubuntu,
+# and so won't link to libc++. So, if any of the FUZZ_* variables are set,
+# keep to libstdc++ (the default on most systems).
+if ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (NOT ${FUZZ_W3C_PROPAGATION}))
+    add_compile_options(-stdlib=libc++)
+    add_link_options(-stdlib=libc++)
+endif()
 
 include(ProcessorCount)
 ProcessorCount(NUM_PROCESSORS)
@@ -50,7 +65,7 @@ ExternalProject_Add(curl
   BUILD_IN_SOURCE 1
   DOWNLOAD_EXTRACT_TIMESTAMP 0
   SOURCE_DIR ${CMAKE_BINARY_DIR}/curl
-  CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/curl/configure --prefix=${CMAKE_BINARY_DIR} --disable-ftp --disable-ldap --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-smtp --disable-gopher --without-ssl --disable-crypto-auth --without-axtls --without-zlib --disable-rtsp --enable-shared=no --enable-static=yes --with-pic --without-brotli
+  CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/curl/configure --prefix=${CMAKE_BINARY_DIR} --disable-ftp --disable-ldap --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-smtp --disable-gopher --without-ssl --disable-crypto-auth --without-axtls --without-zlib --disable-rtsp --enable-shared=no --enable-static=yes --with-pic --without-brotli --without-libidn2
   BUILD_COMMAND make -j${MAKE_JOB_COUNT}
   INSTALL_COMMAND make install
 )
@@ -68,8 +83,8 @@ if(BUILD_COVERAGE)
   set(COVERAGE_LIBRARIES gcov)
 endif()
 
-add_library(dd_trace_cpp SHARED)
-target_sources(dd_trace_cpp PRIVATE
+add_library(dd_trace_cpp-objects OBJECT)
+target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
     src/datadog/collector.cpp
@@ -126,7 +141,7 @@ target_sources(dd_trace_cpp PRIVATE
 )
 
 # This library's public headers are just its source headers.
-target_sources(dd_trace_cpp PUBLIC
+target_sources(dd_trace_cpp-objects PUBLIC
   FILE_SET public_headers
   TYPE HEADERS
   BASE_DIRS src/
@@ -187,24 +202,38 @@ target_sources(dd_trace_cpp PUBLIC
   src/datadog/w3c_propagation.h
 )
 
-add_dependencies(dd_trace_cpp curl)
+add_dependencies(dd_trace_cpp-objects curl)
 
-# Make the build libcurl visible to dd_trace_cpp, and its dependents.
-target_include_directories(dd_trace_cpp PUBLIC ${CMAKE_BINARY_DIR}/include)
+# Make the build libcurl visible.
+include_directories(${CMAKE_BINARY_DIR}/include)
 
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp PUBLIC ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
+target_link_libraries(dd_trace_cpp-objects PUBLIC ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
 
-# When installing, install the library and its public headers.
+# Produce both shared and static versions of the library.
+add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
+set_target_properties(dd_trace_cpp-shared PROPERTIES OUTPUT_NAME "dd_trace_cpp")
+add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)
+target_link_libraries(dd_trace_cpp-shared dd_trace_cpp-objects)
 
-install(TARGETS dd_trace_cpp
+add_library(dd_trace_cpp-static STATIC $<TARGET_OBJECTS:dd_trace_cpp-objects>)
+set_target_properties(dd_trace_cpp-static PROPERTIES OUTPUT_NAME "dd_trace_cpp")
+add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
+target_link_libraries(dd_trace_cpp-static dd_trace_cpp-objects)
+
+# When installing, install the static library, the shared library, and the
+# public headers.
+install(TARGETS dd_trace_cpp-static dd_trace_cpp-shared dd_trace_cpp-objects
   FILE_SET public_headers)
 
 if(BUILD_TESTING)
   add_subdirectory(test)
 endif()
 
-if(BUILD_EXAMPLE)
-  add_subdirectory(example)
+# Each example has its own build flag.
+add_subdirectory(examples)
+
+if(BUILD_BENCHMARK)
+  add_subdirectory(benchmark)
 endif()
