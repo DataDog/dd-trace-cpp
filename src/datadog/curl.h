@@ -84,7 +84,7 @@ class CurlLibrary {
 // nginx, libev, libuv, or libevent.
 // `class Curl` takes a `CurlEventLoop` in its constructor.
 class CurlEventLoop {
-public:
+ public:
   // Add the specified request `handle` to the event loop. Return an error if
   // the `handle` cannot be added. If the `handle` is successfully added,
   // register the specified `on_error` callback for when an error occurs in the

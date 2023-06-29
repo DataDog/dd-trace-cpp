@@ -171,13 +171,14 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   std::condition_variable no_requests_;
   std::thread event_loop_;
 
-public:
-ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
-                   const Curl::ThreadGenerator &make_thread);
+ public:
+  ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logger,
+                        CurlLibrary &curl,
+                        const Curl::ThreadGenerator &make_thread);
 
   Expected<void> add_handle(CURL *handle,
-                                    std::function<void(CURLcode)> on_error,
-                                    std::function<void()> on_done) override;
+                            std::function<void(CURLcode)> on_error,
+                            std::function<void()> on_done) override;
 
   Expected<void> remove_handle(CURL *handle) override;
 
@@ -185,14 +186,15 @@ ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
 
   ~ThreadedCurlEventLoop() override;
 
-private:
+ private:
   void run();
   CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
 };
 
-ThreadedCurlEventLoop::ThreadedCurlEventLoop(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
-                   const Curl::ThreadGenerator &make_thread)
+ThreadedCurlEventLoop::ThreadedCurlEventLoop(
+    const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
+    const Curl::ThreadGenerator &make_thread)
     : curl_(curl),
       logger_(logger),
       shutting_down_(false),
@@ -284,7 +286,8 @@ CURLcode ThreadedCurlEventLoop::log_on_error(CURLcode result) {
   return result;
 }
 
-void ThreadedCurlEventLoop::drain(std::chrono::steady_clock::time_point deadline) {
+void ThreadedCurlEventLoop::drain(
+    std::chrono::steady_clock::time_point deadline) {
   std::unique_lock<std::mutex> lock(mutex_);
   no_requests_.wait_until(lock, deadline, [this]() {
     return num_active_handles_ == 0 && new_handles_.empty();
