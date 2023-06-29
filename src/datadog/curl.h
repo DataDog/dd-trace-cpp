@@ -89,7 +89,7 @@ class CurlEventLoop {
   // register the specified `on_error` callback for when an error occurs in the
   // processing of the request before a full response is received, and register
   // the specified `on_done` callback for when a full response is received. If
-  // this function indicates success by returning `nullopt`, then exactly one
+  // this function indicates success, by returning `nullopt`, then exactly one
   // of either `on_error` or `on_done` will eventually be invoked.
   // The caller is responsible for freeing the `handle`. `handle` will be
   // removed from the event loop before one of `on_error` or `on_done` is
