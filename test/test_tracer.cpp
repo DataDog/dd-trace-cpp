@@ -929,31 +929,49 @@ TEST_CASE("span extraction") {
       REQUIRE(tracer.extract_span(reader));
     }
 
-    SECTION("_dd.p.tid is not propagated when it is invalid") {
+    SECTION("invalid _dd.p.tid") {
       const std::string header_value =
           "_dd.p.foobar=hello,_dd.p.tid=invalidhex";
       REQUIRE(decode_tags(header_value));
       headers["x-datadog-tags"] = header_value;
 
-      auto maybe_span = tracer.extract_span(reader);
-      REQUIRE(maybe_span);
-      auto& span = *maybe_span;
+      SECTION("is not propagated") {
+        auto maybe_span = tracer.extract_span(reader);
+        REQUIRE(maybe_span);
+        auto& span = *maybe_span;
 
-      MockDictWriter writer;
-      span.inject(writer);
-      // Expect a valid "x-datadog-tags" header, and it will contain
-      // "_dd.p.foobar", but not "_dd.p.tid".
-      REQUIRE(writer.items.count("x-datadog-tags") == 1);
-      const std::string& injected_header_value =
-          writer.items.find("x-datadog-tags")->second;
-      const auto decoded_tags = decode_tags(injected_header_value);
-      REQUIRE(decoded_tags);
-      CAPTURE(*decoded_tags);
-      const std::unordered_multimap<std::string, std::string> tags{
-          decoded_tags->begin(), decoded_tags->end()};
-      REQUIRE(tags.count("_dd.p.foobar") == 1);
-      REQUIRE(tags.find("_dd.p.foobar")->second == "hello");
-      REQUIRE(tags.count("_dd.p.tid") == 0);
+        MockDictWriter writer;
+        span.inject(writer);
+        // Expect a valid "x-datadog-tags" header, and it will contain
+        // "_dd.p.foobar", but not "_dd.p.tid".
+        REQUIRE(writer.items.count("x-datadog-tags") == 1);
+        const std::string& injected_header_value =
+            writer.items.find("x-datadog-tags")->second;
+        const auto decoded_tags = decode_tags(injected_header_value);
+        REQUIRE(decoded_tags);
+        CAPTURE(*decoded_tags);
+        const std::unordered_multimap<std::string, std::string> tags{
+            decoded_tags->begin(), decoded_tags->end()};
+        REQUIRE(tags.count("_dd.p.foobar") == 1);
+        REQUIRE(tags.find("_dd.p.foobar")->second == "hello");
+        REQUIRE(tags.count("_dd.p.tid") == 0);
+      }
+
+      SECTION("is noted in an error tag value") {
+        {
+          auto maybe_span = tracer.extract_span(reader);
+          REQUIRE(maybe_span);
+        }
+        // Now that the span is destroyed, it will have been sent to the
+        // collector.
+        // We can inspect the `SpanData` in the collector to verify that the
+        // `tags::internal::propagation_error` ("_dd.propagation_error") tag
+        // is set to the expected value.
+        const SpanData& span = collector->first_span();
+        REQUIRE(span.tags.count(tags::internal::propagation_error) == 1);
+        REQUIRE(span.tags.find(tags::internal::propagation_error)->second ==
+                "malformed_tid invalidhex");
+      }
     }
   }
 }

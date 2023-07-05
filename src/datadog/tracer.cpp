@@ -54,7 +54,7 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
             error->with_prefix("Unable to parse high bits of the trace ID in "
                                "Datadog style from the "
                                "\"_dd.p.tid\" trace tag: "));
-        span_tags[tags::internal::propagation_error] = "decoding_error";
+        span_tags[tags::internal::propagation_error] = "malformed_tid " + value;
         continue;
       }
 
