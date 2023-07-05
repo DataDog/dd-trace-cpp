@@ -55,10 +55,12 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
                                "Datadog style from the "
                                "\"_dd.p.tid\" trace tag: "));
         span_tags[tags::internal::propagation_error] = "decoding_error";
+        continue;
       }
-      // Note that this assumes the lower 64 bits of the trace ID have already
-      // been extracted (i.e. we look for X-Datadog-Trace-ID first).
+
       if (result.trace_id) {
+        // Note that this assumes the lower 64 bits of the trace ID have already
+        // been extracted (i.e. we look for X-Datadog-Trace-ID first).
         result.trace_id->high = *high;
       }
     }
