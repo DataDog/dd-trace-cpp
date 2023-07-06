@@ -271,7 +271,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
   std::vector<std::pair<std::string, std::string>> trace_tags;
-  span_data->trace_id = generator_->trace_id();
+  span_data->trace_id = generator_->trace_id(span_data->start);
   if (span_data->trace_id.high) {
     trace_tags.emplace_back(tags::internal::trace_id_high,
                             hex(span_data->trace_id.high));

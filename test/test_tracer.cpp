@@ -19,6 +19,8 @@
 #include <datadog/tracer_config.h>
 #include <datadog/w3c_propagation.h>
 
+#include <chrono>
+#include <ctime>
 #include <iosfwd>
 
 #include "matchers.h"
@@ -998,7 +1000,16 @@ TEST_CASE("report hostname") {
   }
 }
 
-TEST_CASE("create 128-bit trace IDs") {
+TEST_CASE("128-bit trace IDs") {
+  // Use a clock that always returns a hard-coded `TimePoint`.
+  // May 6, 2010 14:45:13 America/New_York
+  const std::time_t flash_crash = 1273171513;
+  const Clock clock = [flash_crash]() {
+    TimePoint result;
+    result.wall = std::chrono::system_clock::from_time_t(flash_crash);
+    return result;
+  };
+
   TracerConfig config;
   config.defaults.service = "testsvc";
   config.trace_id_128_bit = true;
@@ -1012,12 +1023,17 @@ TEST_CASE("create 128-bit trace IDs") {
   config.extraction_styles.push_back(PropagationStyle::B3);
   const auto finalized = finalize_config(config);
   REQUIRE(finalized);
-  Tracer tracer{*finalized};
+  Tracer tracer{*finalized, clock};
 
   SECTION("are generated") {
+    // Specifically, verify that the high 64 bits of the generated trace ID
+    // contain the unix start time of the trace shifted up 32 bits.
+    //
+    // Due to the definition of `clock`, above, that unix time will be
+    // `flash_crash`.
     const auto span = tracer.create_span();
-    // The chance that it's zero is ~2**(-64), which I'm willing to neglect.
-    REQUIRE(span.trace_id().high != 0);
+    const std::uint64_t expected = std::uint64_t(flash_crash) << 32;
+    REQUIRE(span.trace_id().high == expected);
   }
 
   SECTION("result in _dd.p.tid trace tag being sent to collector") {
@@ -1037,7 +1053,7 @@ TEST_CASE("create 128-bit trace IDs") {
     REQUIRE(*high == generated_id.high);
   }
 
-  SECTION("extracted from W3C") {
+  SECTION("are extracted from W3C") {
     std::unordered_map<std::string, std::string> headers;
     headers["traceparent"] =
         "00-deadbeefdeadbeefcafebabecafebabe-0000000000000001-01";
@@ -1049,7 +1065,7 @@ TEST_CASE("create 128-bit trace IDs") {
     REQUIRE(hex(span->trace_id().high) == "deadbeefdeadbeef");
   }
 
-  SECTION("extracted from Datadog (_dd.p.tid)") {
+  SECTION("are extracted from Datadog (_dd.p.tid)") {
     std::unordered_map<std::string, std::string> headers;
     headers["x-datadog-trace-id"] = "4";
     headers["x-datadog-parent-id"] = "42";
@@ -1063,7 +1079,7 @@ TEST_CASE("create 128-bit trace IDs") {
             "000000000000beef0000000000000004");
   }
 
-  SECTION("extracted from B3") {
+  SECTION("are extracted from B3") {
     std::unordered_map<std::string, std::string> headers;
     headers["x-b3-traceid"] = "deadbeefdeadbeefcafebabecafebabe";
     headers["x-b3-spanid"] = "42";

@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "clock.h"
 #include "trace_id.h"
 
 namespace datadog {
@@ -21,8 +22,10 @@ class IDGenerator {
  public:
   virtual ~IDGenerator() = default;
 
+  // Generate a span ID.
   virtual std::uint64_t span_id() const = 0;
-  virtual TraceID trace_id() const = 0;
+  // Generate a trace ID for a trace having the specified `start` time.
+  virtual TraceID trace_id(const TimePoint& start) const = 0;
 };
 
 std::shared_ptr<const IDGenerator> default_id_generator(bool trace_id_128_bit);
