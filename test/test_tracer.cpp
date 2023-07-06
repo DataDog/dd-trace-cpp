@@ -1097,6 +1097,9 @@ TEST_CASE(
        {__LINE__, "_dd.p.tid inconsistent with trace ID", "adfeed",
         "inconsistent_tid "}}));
 
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.name);
+
   TracerConfig config;
   config.defaults.service = "testsvc";
   config.trace_id_128_bit = true;
