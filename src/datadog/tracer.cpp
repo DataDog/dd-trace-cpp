@@ -399,8 +399,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     // corresponding `trace_id_high` tag, so that the Datadog backend is aware
     // of those bits.
     //
-    // First, though, if the `trace_id_high` tag is already set and has a value
-    // inconsistent with the trace ID, tag an error.
+    // First, though, if the `trace_id_high` tag is already set and has a bogus
+    // value or a value inconsistent with the trace ID, tag an error.
     const std::string hex_high = hex(span_data->trace_id.high);
     const auto extant = std::find_if(
         trace_tags.begin(), trace_tags.end(), [&](const auto& pair) {
@@ -408,6 +408,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         });
     if (extant == trace_tags.end()) {
       trace_tags.emplace_back(tags::internal::trace_id_high, hex_high);
+    } else if (!parse_uint64(extant->second, 16)) {
+      span_data->tags[tags::internal::propagation_error] =
+          "malformed_tid " + extant->second;
+      extant->second = hex_high;
     } else if (extant->second != hex_high) {
       span_data->tags[tags::internal::propagation_error] =
           "inconsistent_tid " + extant->second;

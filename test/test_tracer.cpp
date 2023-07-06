@@ -1083,7 +1083,20 @@ TEST_CASE("128-bit trace IDs") {
   REQUIRE(*high == trace_id.high);
 }
 
-TEST_CASE("_dd.p.tid inconsistent with trace ID results in error tag") {
+TEST_CASE(
+    "_dd.p.tid invalid or inconsistent with trace ID results in error tag") {
+  struct TestCase {
+    int line;
+    std::string name;
+    std::string tid_tag_value;
+    std::string expected_error_prefix;
+  };
+
+  auto test_case = GENERATE(values<TestCase>(
+      {{__LINE__, "invalid _dd.p.tid", "noodle", "malformed_tid "},
+       {__LINE__, "_dd.p.tid inconsistent with trace ID", "adfeed",
+        "inconsistent_tid "}}));
+
   TracerConfig config;
   config.defaults.service = "testsvc";
   config.trace_id_128_bit = true;
@@ -1100,7 +1113,7 @@ TEST_CASE("_dd.p.tid inconsistent with trace ID results in error tag") {
   std::unordered_map<std::string, std::string> headers;
   headers["traceparent"] =
       "00-deadbeefdeadbeefcafebabecafebabe-0000000000000001-01";
-  headers["tracestate"] = "dd=t.tid:adfeed";
+  headers["tracestate"] = "dd=t.tid:" + test_case.tid_tag_value;
   MockDictReader reader{headers};
   CAPTURE(logger->entries);
   {
@@ -1113,5 +1126,6 @@ TEST_CASE("_dd.p.tid inconsistent with trace ID results in error tag") {
   const auto& span = collector->first_span();
   const auto found = span.tags.find(tags::internal::propagation_error);
   REQUIRE(found != span.tags.end());
-  REQUIRE(found->second == "inconsistent_tid adfeed");
+  REQUIRE(found->second ==
+          test_case.expected_error_prefix + test_case.tid_tag_value);
 }
