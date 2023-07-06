@@ -16,8 +16,6 @@ extern const std::string service_name;
 extern const std::string span_type;
 extern const std::string operation_name;
 extern const std::string resource_name;
-extern const std::string manual_keep;
-extern const std::string manual_drop;
 extern const std::string version;
 
 namespace internal {
