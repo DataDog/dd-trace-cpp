@@ -395,8 +395,24 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   span_data->parent_id = *parent_id;
 
   if (span_data->trace_id.high) {
-    trace_tags.emplace_back(tags::internal::trace_id_high,
-                            hex(span_data->trace_id.high));
+    // The trace ID has some bits set in the higher 64 bits. Set the
+    // corresponding `trace_id_high` tag, so that the Datadog backend is aware
+    // of those bits.
+    //
+    // First, though, if the `trace_id_high` tag is already set and has a value
+    // inconsistent with the trace ID, tag an error.
+    const std::string hex_high = hex(span_data->trace_id.high);
+    const auto extant = std::find_if(
+        trace_tags.begin(), trace_tags.end(), [&](const auto& pair) {
+          return pair.first == tags::internal::trace_id_high;
+        });
+    if (extant == trace_tags.end()) {
+      trace_tags.emplace_back(tags::internal::trace_id_high, hex_high);
+    } else if (extant->second != hex_high) {
+      span_data->tags[tags::internal::propagation_error] =
+          "inconsistent_tid " + extant->second;
+      extant->second = hex_high;
+    }
   }
 
   Optional<SamplingDecision> sampling_decision;

@@ -807,15 +807,6 @@ TEST_CASE("span extraction") {
           nullopt, // expected_additional_w3c_tracestate
           "x:wow;y:wow"}, // expected_additional_datadog_w3c_tracestate
 
-        {__LINE__, "_dd.p.tid trace tag is ignored",
-         traceparent_drop, // traceparent
-         "dd=t.tid:deadbeef;t.foo:bar", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {{"_dd.p.foo", "bar"}}, // expected_trace_tags
-         nullopt, // expected_additional_w3c_tracestate
-         nullopt}, // expected_additional_datadog_w3c_tracestate
-
          {__LINE__, "traceparent and tracestate sampling agree (1/4)",
           traceparent_drop, // traceparent
           "dd=s:0", // tracestate
@@ -1090,4 +1081,37 @@ TEST_CASE("128-bit trace IDs") {
   const auto high = parse_uint64(found->second, 16);
   REQUIRE(high);
   REQUIRE(*high == trace_id.high);
+}
+
+TEST_CASE("_dd.p.tid inconsistent with trace ID results in error tag") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.trace_id_128_bit = true;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  const auto logger = std::make_shared<MockLogger>();
+  config.logger = logger;
+  config.extraction_styles.clear();
+  config.extraction_styles.push_back(PropagationStyle::W3C);
+  const auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+  Tracer tracer{*finalized};
+
+  std::unordered_map<std::string, std::string> headers;
+  headers["traceparent"] =
+      "00-deadbeefdeadbeefcafebabecafebabe-0000000000000001-01";
+  headers["tracestate"] = "dd=t.tid:adfeed";
+  MockDictReader reader{headers};
+  CAPTURE(logger->entries);
+  {
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+  }
+
+  REQUIRE(logger->error_count() == 0);
+  REQUIRE(collector->span_count() == 1);
+  const auto& span = collector->first_span();
+  const auto found = span.tags.find(tags::internal::propagation_error);
+  REQUIRE(found != span.tags.end());
+  REQUIRE(found->second == "inconsistent_tid adfeed");
 }

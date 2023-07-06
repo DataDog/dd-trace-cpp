@@ -214,12 +214,6 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
       const auto tag_suffix = key.substr(2);
       std::string tag_name = "_dd.p.";
       append(tag_name, tag_suffix);
-      // The "_dd.p.tid" trace tag is ignored in this context, since its value
-      // is better inferred from the higher 64 bits of the trace ID.
-      if (tag_name == "_dd.p.tid") {
-        pair_begin = pair_end == end ? end : pair_end + 1;
-        continue;
-      }
       // The tag value was encoded with all '=' replaced by '~'.  Undo that
       // transformation.
       std::string decoded_value{value};
