@@ -1024,6 +1024,7 @@ TEST_CASE("128-bit trace IDs") {
   const auto finalized = finalize_config(config);
   REQUIRE(finalized);
   Tracer tracer{*finalized, clock};
+  TraceID trace_id;  // used below the following SECTIONs
 
   SECTION("are generated") {
     // Specifically, verify that the high 64 bits of the generated trace ID
@@ -1034,23 +1035,7 @@ TEST_CASE("128-bit trace IDs") {
     const auto span = tracer.create_span();
     const std::uint64_t expected = std::uint64_t(flash_crash) << 32;
     REQUIRE(span.trace_id().high == expected);
-  }
-
-  SECTION("result in _dd.p.tid trace tag being sent to collector") {
-    TraceID generated_id;
-    {
-      const auto span = tracer.create_span();
-      generated_id = span.trace_id();
-    }
-    CAPTURE(logger->entries);
-    REQUIRE(logger->error_count() == 0);
-    REQUIRE(collector->span_count() == 1);
-    const auto& span = collector->first_span();
-    const auto found = span.tags.find(tags::internal::trace_id_high);
-    REQUIRE(found != span.tags.end());
-    const auto high = parse_uint64(found->second, 16);
-    REQUIRE(high);
-    REQUIRE(*high == generated_id.high);
+    trace_id = span.trace_id();
   }
 
   SECTION("are extracted from W3C") {
@@ -1063,6 +1048,7 @@ TEST_CASE("128-bit trace IDs") {
     REQUIRE(logger->error_count() == 0);
     REQUIRE(span);
     REQUIRE(hex(span->trace_id().high) == "deadbeefdeadbeef");
+    trace_id = span->trace_id();
   }
 
   SECTION("are extracted from Datadog (_dd.p.tid)") {
@@ -1077,6 +1063,7 @@ TEST_CASE("128-bit trace IDs") {
     REQUIRE(span);
     REQUIRE(span->trace_id().hex_padded() ==
             "000000000000beef0000000000000004");
+    trace_id = span->trace_id();
   }
 
   SECTION("are extracted from B3") {
@@ -1089,5 +1076,18 @@ TEST_CASE("128-bit trace IDs") {
     REQUIRE(logger->error_count() == 0);
     REQUIRE(span);
     REQUIRE(hex(span->trace_id().high) == "deadbeefdeadbeef");
+    trace_id = span->trace_id();
   }
+
+  // For any 128-bit trace ID, the _dd.p.tid trace tag is always sent to the
+  // collector.
+  CAPTURE(logger->entries);
+  REQUIRE(logger->error_count() == 0);
+  REQUIRE(collector->span_count() == 1);
+  const auto& span = collector->first_span();
+  const auto found = span.tags.find(tags::internal::trace_id_high);
+  REQUIRE(found != span.tags.end());
+  const auto high = parse_uint64(found->second, 16);
+  REQUIRE(high);
+  REQUIRE(*high == trace_id.high);
 }

@@ -394,6 +394,11 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
 
+  if (span_data->trace_id.high) {
+    trace_tags.emplace_back(tags::internal::trace_id_high,
+                            hex(span_data->trace_id.high));
+  }
+
   Optional<SamplingDecision> sampling_decision;
   if (sampling_priority) {
     SamplingDecision decision;
