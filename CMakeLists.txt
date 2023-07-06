@@ -23,7 +23,9 @@ add_compile_options(-Wno-error=free-nonheap-object)
 
 # This warning has a false positive with clang. See
 # <https://stackoverflow.com/questions/52416362>.
-add_compile_options(-Wno-error=unused-lambda-capture)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    add_compile_options(-Wno-error=unused-lambda-capture)
+endif()
 
 # If we're building with clang, then use the libc++ version of the standard
 # library instead of libstdc++. Better coverage of build configurations.
