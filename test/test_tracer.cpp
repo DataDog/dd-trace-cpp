@@ -19,11 +19,14 @@
 #include <datadog/tracer_config.h>
 #include <datadog/w3c_propagation.h>
 
+#include <chrono>
+#include <ctime>
 #include <iosfwd>
 
 #include "matchers.h"
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
+#include "mocks/dict_writers.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
@@ -804,15 +807,6 @@ TEST_CASE("span extraction") {
           nullopt, // expected_additional_w3c_tracestate
           "x:wow;y:wow"}, // expected_additional_datadog_w3c_tracestate
 
-        {__LINE__, "_dd.p.tid trace tag is ignored",
-         traceparent_drop, // traceparent
-         "dd=t.tid:deadbeef;t.foo:bar", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {{"_dd.p.foo", "bar"}}, // expected_trace_tags
-         nullopt, // expected_additional_w3c_tracestate
-         nullopt}, // expected_additional_datadog_w3c_tracestate
-
          {__LINE__, "traceparent and tracestate sampling agree (1/4)",
           traceparent_drop, // traceparent
           "dd=s:0", // tracestate
@@ -927,6 +921,51 @@ TEST_CASE("span extraction") {
       headers["x-datadog-tags"] = header_value;
       REQUIRE(tracer.extract_span(reader));
     }
+
+    SECTION("invalid _dd.p.tid") {
+      const std::string header_value =
+          "_dd.p.foobar=hello,_dd.p.tid=invalidhex";
+      REQUIRE(decode_tags(header_value));
+      headers["x-datadog-tags"] = header_value;
+
+      SECTION("is not propagated") {
+        auto maybe_span = tracer.extract_span(reader);
+        REQUIRE(maybe_span);
+        auto& span = *maybe_span;
+
+        MockDictWriter writer;
+        span.inject(writer);
+        // Expect a valid "x-datadog-tags" header, and it will contain
+        // "_dd.p.foobar", but not "_dd.p.tid".
+        REQUIRE(writer.items.count("x-datadog-tags") == 1);
+        const std::string& injected_header_value =
+            writer.items.find("x-datadog-tags")->second;
+        const auto decoded_tags = decode_tags(injected_header_value);
+        REQUIRE(decoded_tags);
+        CAPTURE(*decoded_tags);
+        const std::unordered_multimap<std::string, std::string> tags{
+            decoded_tags->begin(), decoded_tags->end()};
+        REQUIRE(tags.count("_dd.p.foobar") == 1);
+        REQUIRE(tags.find("_dd.p.foobar")->second == "hello");
+        REQUIRE(tags.count("_dd.p.tid") == 0);
+      }
+
+      SECTION("is noted in an error tag value") {
+        {
+          auto maybe_span = tracer.extract_span(reader);
+          REQUIRE(maybe_span);
+        }
+        // Now that the span is destroyed, it will have been sent to the
+        // collector.
+        // We can inspect the `SpanData` in the collector to verify that the
+        // `tags::internal::propagation_error` ("_dd.propagation_error") tag
+        // is set to the expected value.
+        const SpanData& span = collector->first_span();
+        REQUIRE(span.tags.count(tags::internal::propagation_error) == 1);
+        REQUIRE(span.tags.find(tags::internal::propagation_error)->second ==
+                "malformed_tid invalidhex");
+      }
+    }
   }
 }
 
@@ -952,7 +991,16 @@ TEST_CASE("report hostname") {
   }
 }
 
-TEST_CASE("create 128-bit trace IDs") {
+TEST_CASE("128-bit trace IDs") {
+  // Use a clock that always returns a hard-coded `TimePoint`.
+  // May 6, 2010 14:45:13 America/New_York
+  const std::time_t flash_crash = 1273171513;
+  const Clock clock = [flash_crash]() {
+    TimePoint result;
+    result.wall = std::chrono::system_clock::from_time_t(flash_crash);
+    return result;
+  };
+
   TracerConfig config;
   config.defaults.service = "testsvc";
   config.trace_id_128_bit = true;
@@ -966,32 +1014,22 @@ TEST_CASE("create 128-bit trace IDs") {
   config.extraction_styles.push_back(PropagationStyle::B3);
   const auto finalized = finalize_config(config);
   REQUIRE(finalized);
-  Tracer tracer{*finalized};
+  Tracer tracer{*finalized, clock};
+  TraceID trace_id;  // used below the following SECTIONs
 
   SECTION("are generated") {
+    // Specifically, verify that the high 64 bits of the generated trace ID
+    // contain the unix start time of the trace shifted up 32 bits.
+    //
+    // Due to the definition of `clock`, above, that unix time will be
+    // `flash_crash`.
     const auto span = tracer.create_span();
-    // The chance that it's zero is ~2**(-64), which I'm willing to neglect.
-    REQUIRE(span.trace_id().high != 0);
+    const std::uint64_t expected = std::uint64_t(flash_crash) << 32;
+    REQUIRE(span.trace_id().high == expected);
+    trace_id = span.trace_id();
   }
 
-  SECTION("result in _dd.p.tid trace tag being sent to collector") {
-    TraceID generated_id;
-    {
-      const auto span = tracer.create_span();
-      generated_id = span.trace_id();
-    }
-    CAPTURE(logger->entries);
-    REQUIRE(logger->error_count() == 0);
-    REQUIRE(collector->span_count() == 1);
-    const auto& span = collector->first_span();
-    const auto found = span.tags.find(tags::internal::trace_id_high);
-    REQUIRE(found != span.tags.end());
-    const auto high = parse_uint64(found->second, 16);
-    REQUIRE(high);
-    REQUIRE(*high == generated_id.high);
-  }
-
-  SECTION("extracted from W3C") {
+  SECTION("are extracted from W3C") {
     std::unordered_map<std::string, std::string> headers;
     headers["traceparent"] =
         "00-deadbeefdeadbeefcafebabecafebabe-0000000000000001-01";
@@ -1001,9 +1039,10 @@ TEST_CASE("create 128-bit trace IDs") {
     REQUIRE(logger->error_count() == 0);
     REQUIRE(span);
     REQUIRE(hex(span->trace_id().high) == "deadbeefdeadbeef");
+    trace_id = span->trace_id();
   }
 
-  SECTION("extracted from Datadog (_dd.p.tid)") {
+  SECTION("are extracted from Datadog (_dd.p.tid)") {
     std::unordered_map<std::string, std::string> headers;
     headers["x-datadog-trace-id"] = "4";
     headers["x-datadog-parent-id"] = "42";
@@ -1015,9 +1054,10 @@ TEST_CASE("create 128-bit trace IDs") {
     REQUIRE(span);
     REQUIRE(span->trace_id().hex_padded() ==
             "000000000000beef0000000000000004");
+    trace_id = span->trace_id();
   }
 
-  SECTION("extracted from B3") {
+  SECTION("are extracted from B3") {
     std::unordered_map<std::string, std::string> headers;
     headers["x-b3-traceid"] = "deadbeefdeadbeefcafebabecafebabe";
     headers["x-b3-spanid"] = "42";
@@ -1027,5 +1067,68 @@ TEST_CASE("create 128-bit trace IDs") {
     REQUIRE(logger->error_count() == 0);
     REQUIRE(span);
     REQUIRE(hex(span->trace_id().high) == "deadbeefdeadbeef");
+    trace_id = span->trace_id();
   }
+
+  // For any 128-bit trace ID, the _dd.p.tid trace tag is always sent to the
+  // collector.
+  CAPTURE(logger->entries);
+  REQUIRE(logger->error_count() == 0);
+  REQUIRE(collector->span_count() == 1);
+  const auto& span = collector->first_span();
+  const auto found = span.tags.find(tags::internal::trace_id_high);
+  REQUIRE(found != span.tags.end());
+  const auto high = parse_uint64(found->second, 16);
+  REQUIRE(high);
+  REQUIRE(*high == trace_id.high);
+}
+
+TEST_CASE(
+    "_dd.p.tid invalid or inconsistent with trace ID results in error tag") {
+  struct TestCase {
+    int line;
+    std::string name;
+    std::string tid_tag_value;
+    std::string expected_error_prefix;
+  };
+
+  auto test_case = GENERATE(values<TestCase>(
+      {{__LINE__, "invalid _dd.p.tid", "noodle", "malformed_tid "},
+       {__LINE__, "_dd.p.tid inconsistent with trace ID", "adfeed",
+        "inconsistent_tid "}}));
+
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.name);
+
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.trace_id_128_bit = true;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  const auto logger = std::make_shared<MockLogger>();
+  config.logger = logger;
+  config.extraction_styles.clear();
+  config.extraction_styles.push_back(PropagationStyle::W3C);
+  const auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+  Tracer tracer{*finalized};
+
+  std::unordered_map<std::string, std::string> headers;
+  headers["traceparent"] =
+      "00-deadbeefdeadbeefcafebabecafebabe-0000000000000001-01";
+  headers["tracestate"] = "dd=t.tid:" + test_case.tid_tag_value;
+  MockDictReader reader{headers};
+  CAPTURE(logger->entries);
+  {
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+  }
+
+  REQUIRE(logger->error_count() == 0);
+  REQUIRE(collector->span_count() == 1);
+  const auto& span = collector->first_span();
+  const auto found = span.tags.find(tags::internal::propagation_error);
+  REQUIRE(found != span.tags.end());
+  REQUIRE(found->second ==
+          test_case.expected_error_prefix + test_case.tid_tag_value);
 }

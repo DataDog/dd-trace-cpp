@@ -373,7 +373,7 @@ TEST_CASE("injection") {
   struct Generator : public IDGenerator {
     const std::uint64_t id;
     explicit Generator(std::uint64_t id) : id(id) {}
-    TraceID trace_id() const override { return TraceID(id); }
+    TraceID trace_id(const TimePoint&) const override { return TraceID(id); }
     std::uint64_t span_id() const override { return id; }
   };
   Tracer tracer{*finalized_config, std::make_shared<Generator>(42)};
@@ -478,7 +478,7 @@ TEST_CASE("injecting W3C traceparent header") {
     struct Generator : public IDGenerator {
       const std::uint64_t id;
       explicit Generator(std::uint64_t id) : id(id) {}
-      TraceID trace_id() const override { return TraceID(id); }
+      TraceID trace_id(const TimePoint&) const override { return TraceID(id); }
       std::uint64_t span_id() const override { return id; }
     };
     Tracer tracer{*finalized_config,
@@ -515,7 +515,7 @@ TEST_CASE("injecting W3C traceparent header") {
     struct Generator : public IDGenerator {
       const std::uint64_t id;
       explicit Generator(std::uint64_t id) : id(id) {}
-      TraceID trace_id() const override { return TraceID(id); }
+      TraceID trace_id(const TimePoint&) const override { return TraceID(id); }
       std::uint64_t span_id() const override { return id; }
     };
     Tracer tracer{*finalized_config, std::make_shared<Generator>(expected_id)};
@@ -715,7 +715,7 @@ TEST_CASE("128-bit trace ID injection") {
 
    public:
     explicit MockIDGenerator(TraceID trace_id) : trace_id_(trace_id) {}
-    TraceID trace_id() const override { return trace_id_; }
+    TraceID trace_id(const TimePoint&) const override { return trace_id_; }
     // `span_id` won't be called, because root spans use the lower part of
     // `trace_id` for the span ID.
     std::uint64_t span_id() const override { return 42; }

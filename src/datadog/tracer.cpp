@@ -54,11 +54,13 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
             error->with_prefix("Unable to parse high bits of the trace ID in "
                                "Datadog style from the "
                                "\"_dd.p.tid\" trace tag: "));
-        span_tags[tags::internal::propagation_error] = "decoding_error";
+        span_tags[tags::internal::propagation_error] = "malformed_tid " + value;
+        continue;
       }
-      // Note that this assumes the lower 64 bits of the trace ID have already
-      // been extracted (i.e. we look for X-Datadog-Trace-ID first).
+
       if (result.trace_id) {
+        // Note that this assumes the lower 64 bits of the trace ID have already
+        // been extracted (i.e. we look for X-Datadog-Trace-ID first).
         result.trace_id->high = *high;
       }
     }
@@ -269,7 +271,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
   std::vector<std::pair<std::string, std::string>> trace_tags;
-  span_data->trace_id = generator_->trace_id();
+  span_data->trace_id = generator_->trace_id(span_data->start);
   if (span_data->trace_id.high) {
     trace_tags.emplace_back(tags::internal::trace_id_high,
                             hex(span_data->trace_id.high));
@@ -391,6 +393,31 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   span_data->span_id = generator_->span_id();
   span_data->trace_id = *trace_id;
   span_data->parent_id = *parent_id;
+
+  if (span_data->trace_id.high) {
+    // The trace ID has some bits set in the higher 64 bits. Set the
+    // corresponding `trace_id_high` tag, so that the Datadog backend is aware
+    // of those bits.
+    //
+    // First, though, if the `trace_id_high` tag is already set and has a bogus
+    // value or a value inconsistent with the trace ID, tag an error.
+    const std::string hex_high = hex(span_data->trace_id.high);
+    const auto extant = std::find_if(
+        trace_tags.begin(), trace_tags.end(), [&](const auto& pair) {
+          return pair.first == tags::internal::trace_id_high;
+        });
+    if (extant == trace_tags.end()) {
+      trace_tags.emplace_back(tags::internal::trace_id_high, hex_high);
+    } else if (!parse_uint64(extant->second, 16)) {
+      span_data->tags[tags::internal::propagation_error] =
+          "malformed_tid " + extant->second;
+      extant->second = hex_high;
+    } else if (extant->second != hex_high) {
+      span_data->tags[tags::internal::propagation_error] =
+          "inconsistent_tid " + extant->second;
+      extant->second = hex_high;
+    }
+  }
 
   Optional<SamplingDecision> sampling_decision;
   if (sampling_priority) {
