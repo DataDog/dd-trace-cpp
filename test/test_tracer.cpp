@@ -369,6 +369,18 @@ TEST_CASE("span extraction") {
           {"x-b3-spanid", "def"},
           {"x-b3-sampled", "99999999999999999999999999"}},
          Error::OUT_OF_RANGE_INTEGER},
+        {__LINE__,
+         "zero x-datadog-trace-id",
+         {PropagationStyle::DATADOG},
+         {{"x-datadog-trace-id", "0"},
+          {"x-datadog-parent-id", "1234"},
+          {"x-datadog-sampling-priority", "0"}},
+         Error::ZERO_TRACE_ID},
+        {__LINE__,
+         "zero x-b3-traceid",
+         {PropagationStyle::B3},
+         {{"x-b3-traceid", "0"}, {"x-b3-spanid", "123"}, {"x-b3-sampled", "0"}},
+         Error::ZERO_TRACE_ID},
     }));
 
     CAPTURE(test_case.line);

@@ -363,6 +363,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   //           producing a root span
   //     - if origin is _not_ set, then it's an error
   // - trace ID and parent ID means we're extracting a child span
+  // - if trace ID is zero, then that's an error.
 
   if (!trace_id && !parent_id) {
     return Error{Error::NO_SPAN_TO_EXTRACT,
@@ -396,11 +397,16 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     parent_id = 0;
   }
 
-  // We're done extracting fields.  Now create the span.
-  // This is similar to what we do in `create_span`.
   assert(parent_id);
   assert(trace_id);
 
+  if (*trace_id == 0) {
+    return Error{Error::ZERO_TRACE_ID,
+                 "extracted zero value for trace ID, which is invalid"};
+  }
+
+  // We're done extracting fields.  Now create the span.
+  // This is similar to what we do in `create_span`.
   span_data->apply_config(*defaults_, config, clock_);
   span_data->span_id = generator_->span_id();
   span_data->trace_id = *trace_id;
