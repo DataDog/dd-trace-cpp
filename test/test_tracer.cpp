@@ -636,6 +636,10 @@ TEST_CASE("span extraction") {
         {__LINE__, "invalid: parent ID zero",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-00", // traceparent
          "parent_id_zero"}, // expected_error_tag_value
+
+        {__LINE__, "invalid: trailing characters when version is zero",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-foo", // traceparent
+         "malformed_traceparent"}, // expected_error_tag_value
     }));
     // clang-format on
 

@@ -53,7 +53,8 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
       "([0-9a-f]{16})"  // hex parent span ID (match group 3)
       "-"
       "([0-9a-f]{2})"  // hex "trace-flags" (match group 4)
-      "(?:$|-.*)";     // either the end, or a hyphen preceding further fields
+      "($|-.*)";  // either the end, or a hyphen preceding further fields (match
+                  // group 5)
   static const std::regex regex{pattern};
 
   std::match_results<StringView::iterator> match;
@@ -62,7 +63,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
   }
 
   assert(match.ready());
-  assert(match.size() == 4 + 1);
+  assert(match.size() == 5 + 1);
 
   const auto to_string_view = [](const auto& submatch) {
     assert(submatch.first <= submatch.second);
@@ -70,8 +71,13 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
                       std::size_t(submatch.second - submatch.first)};
   };
 
-  if (to_string_view(match[1]) == "ff") {
+  const auto version = to_string_view(match[1]);
+  if (version == "ff") {
     return "invalid_version";
+  }
+
+  if (version == "00" && !to_string_view(match[5]).empty()) {
+    return "malformed_traceparent";
   }
 
   result.trace_id = *TraceID::parse_hex(to_string_view(match[2]));
