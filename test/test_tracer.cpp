@@ -1042,11 +1042,30 @@ TEST_CASE("128-bit trace IDs") {
     trace_id = span->trace_id();
   }
 
+  SECTION("are, for W3C, extracted preferentially from traceparent") {
+    auto tid = GENERATE(values<std::string>({"decade", "deadbeefdeadbeed"}));
+    std::unordered_map<std::string, std::string> headers;
+    headers["traceparent"] =
+        "00-deadbeefdeadbeefcafebabecafebabe-0000000000000001-01";
+    // The _dd.p.tid value below is either malformed or inconsistent with the
+    // trace ID in the traceparent.
+    // It will be ignored, and the resulting _dd.p.tid value will be consistent
+    // with the higher part of the trace ID in traceparent: "deadbeefdeadbeef".
+    headers["tracestate"] = "dd=t.tid:" + tid;
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    CAPTURE(logger->entries);
+    REQUIRE(logger->error_count() == 0);
+    REQUIRE(span);
+    REQUIRE(hex(span->trace_id().high) == "deadbeefdeadbeef");
+    trace_id = span->trace_id();
+  }
+
   SECTION("are extracted from Datadog (_dd.p.tid)") {
     std::unordered_map<std::string, std::string> headers;
     headers["x-datadog-trace-id"] = "4";
     headers["x-datadog-parent-id"] = "42";
-    headers["x-datadog-tags"] = "_dd.p.tid=beef";
+    headers["x-datadog-tags"] = "_dd.p.tid=000000000000beef";
     MockDictReader reader{headers};
     const auto span = tracer.extract_span(reader);
     CAPTURE(logger->entries);
@@ -1094,7 +1113,9 @@ TEST_CASE(
 
   auto test_case = GENERATE(values<TestCase>(
       {{__LINE__, "invalid _dd.p.tid", "noodle", "malformed_tid "},
-       {__LINE__, "_dd.p.tid inconsistent with trace ID", "adfeed",
+       {__LINE__, "short _dd.p.tid", "beef", "malformed_tid "},
+       {__LINE__, "long _dd.p.tid", "000000000000000000beef", "malformed_tid "},
+       {__LINE__, "_dd.p.tid inconsistent with trace ID", "0000000000adfeed",
         "inconsistent_tid "}}));
 
   CAPTURE(test_case.line);
