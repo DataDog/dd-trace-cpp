@@ -628,7 +628,7 @@ TEST_CASE("injecting W3C tracestate header") {
      {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
       {"x-datadog-origin", "France, is a country=nation; so is 台北."}},
       // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;o:France_ is a country_nation_ so is ______."},
+     "dd=s:-1;o:France_ is a country~nation_ so is ______."},
 
     {__LINE__, "replace invalid characters in trace tag key",
      {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},

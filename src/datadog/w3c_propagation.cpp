@@ -196,6 +196,7 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
     const auto value = range(kv_separator + 1, pair_end);
     if (key == "o") {
       result.origin = std::string{value};
+      std::replace(result.origin->begin(), result.origin->end(), '~', '=');
     } else if (key == "s") {
       const auto maybe_priority = parse_int(value, 10);
       if (!maybe_priority) {
@@ -328,7 +329,8 @@ std::string encode_datadog_tracestate(
     result += ";o:";
     result += *origin;
     std::replace_if(result.end() - origin->size(), result.end(),
-                    verboten(0x20, 0x7e, ",;="), '_');
+                    verboten(0x20, 0x7e, ",;~"), '_');
+    std::replace(result.end() - origin->size(), result.end(), '=', '~');
   }
 
   for (const auto& [key, value] : trace_tags) {

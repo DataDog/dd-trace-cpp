@@ -823,6 +823,12 @@ TEST_CASE("span extraction") {
           nullopt, // expected_additional_w3c_tracestate
           "x:wow;y:wow"}, // expected_additional_datadog_w3c_tracestate
 
+        {__LINE__, "origin with escaped equal sign",
+         traceparent_drop, // traceparent
+         "dd=o:France~country", // tracestate
+         0, // expected_sampling_priority
+         "France=country"}, // expected_origin
+
          {__LINE__, "traceparent and tracestate sampling agree (1/4)",
           traceparent_drop, // traceparent
           "dd=s:0", // tracestate
