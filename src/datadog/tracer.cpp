@@ -421,6 +421,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     if (extant == trace_tags.end()) {
       trace_tags.emplace_back(tags::internal::trace_id_high, hex_high);
     } else {
+      // There is already a `trace_id_high` tag. `hex_high` is its proper value.
+      // Check if the extant value is malformed or different from `hex_high`. In
+      // either case, tag an error and overwrite the tag with `hex_high`.
       const Optional<std::uint64_t> high = parse_trace_id_high(extant->second);
       if (!high) {
         span_data->tags[tags::internal::propagation_error] =
