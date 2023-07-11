@@ -23,6 +23,7 @@ add_executable(tests
     test_glob.cpp
     test_limiter.cpp
     test_msgpack.cpp
+    test_parse_util.cpp
     test_smoke.cpp
     test_span.cpp
     test_span_sampler.cpp
