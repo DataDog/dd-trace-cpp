@@ -17,7 +17,6 @@ namespace {
 template <typename Integer>
 Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
   Integer value;
-  input = strip(input);
   const auto status = std::from_chars(input.begin(), input.end(), value, base);
   if (status.ec == std::errc::invalid_argument) {
     std::string message;
