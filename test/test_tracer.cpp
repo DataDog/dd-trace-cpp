@@ -369,6 +369,18 @@ TEST_CASE("span extraction") {
           {"x-b3-spanid", "def"},
           {"x-b3-sampled", "99999999999999999999999999"}},
          Error::OUT_OF_RANGE_INTEGER},
+        {__LINE__,
+         "zero x-datadog-trace-id",
+         {PropagationStyle::DATADOG},
+         {{"x-datadog-trace-id", "0"},
+          {"x-datadog-parent-id", "1234"},
+          {"x-datadog-sampling-priority", "0"}},
+         Error::ZERO_TRACE_ID},
+        {__LINE__,
+         "zero x-b3-traceid",
+         {PropagationStyle::B3},
+         {{"x-b3-traceid", "0"}, {"x-b3-spanid", "123"}, {"x-b3-sampled", "0"}},
+         Error::ZERO_TRACE_ID},
     }));
 
     CAPTURE(test_case.line);
@@ -624,6 +636,10 @@ TEST_CASE("span extraction") {
         {__LINE__, "invalid: parent ID zero",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-00", // traceparent
          "parent_id_zero"}, // expected_error_tag_value
+
+        {__LINE__, "invalid: trailing characters when version is zero",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-foo", // traceparent
+         "malformed_traceparent"}, // expected_error_tag_value
     }));
     // clang-format on
 
@@ -806,6 +822,12 @@ TEST_CASE("span extraction") {
           {{"_dd.p.foo", "thing1"}, {"_dd.p.bar", "thing2"}}, // expected_trace_tags
           nullopt, // expected_additional_w3c_tracestate
           "x:wow;y:wow"}, // expected_additional_datadog_w3c_tracestate
+
+        {__LINE__, "origin with escaped equal sign",
+         traceparent_drop, // traceparent
+         "dd=o:France~country", // tracestate
+         0, // expected_sampling_priority
+         "France=country"}, // expected_origin
 
          {__LINE__, "traceparent and tracestate sampling agree (1/4)",
           traceparent_drop, // traceparent

@@ -53,7 +53,8 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
       "([0-9a-f]{16})"  // hex parent span ID (match group 3)
       "-"
       "([0-9a-f]{2})"  // hex "trace-flags" (match group 4)
-      "(?:$|-.*)";     // either the end, or a hyphen preceding further fields
+      "($|-.*)";  // either the end, or a hyphen preceding further fields (match
+                  // group 5)
   static const std::regex regex{pattern};
 
   std::match_results<StringView::iterator> match;
@@ -62,7 +63,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
   }
 
   assert(match.ready());
-  assert(match.size() == 4 + 1);
+  assert(match.size() == 5 + 1);
 
   const auto to_string_view = [](const auto& submatch) {
     assert(submatch.first <= submatch.second);
@@ -70,8 +71,13 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
                       std::size_t(submatch.second - submatch.first)};
   };
 
-  if (to_string_view(match[1]) == "ff") {
+  const auto version = to_string_view(match[1]);
+  if (version == "ff") {
     return "invalid_version";
+  }
+
+  if (version == "00" && !to_string_view(match[5]).empty()) {
+    return "malformed_traceparent";
   }
 
   result.trace_id = *TraceID::parse_hex(to_string_view(match[2]));
@@ -190,6 +196,11 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
     const auto value = range(kv_separator + 1, pair_end);
     if (key == "o") {
       result.origin = std::string{value};
+      // Equal signs are allowed in the value of "origin," but equal signs are
+      // also special characters in the `tracestate` encoding. So, equal signs
+      // that would appear in the "origin" value are converted to tildes during
+      // encoding. Here, in decoding, we undo the conversion.
+      std::replace(result.origin->begin(), result.origin->end(), '~', '=');
     } else if (key == "s") {
       const auto maybe_priority = parse_int(value, 10);
       if (!maybe_priority) {
@@ -322,7 +333,8 @@ std::string encode_datadog_tracestate(
     result += ";o:";
     result += *origin;
     std::replace_if(result.end() - origin->size(), result.end(),
-                    verboten(0x20, 0x7e, ",;="), '_');
+                    verboten(0x20, 0x7e, ",;~"), '_');
+    std::replace(result.end() - origin->size(), result.end(), '=', '~');
   }
 
   for (const auto& [key, value] : trace_tags) {
