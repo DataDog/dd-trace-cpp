@@ -29,17 +29,18 @@ namespace {
 
 // Parse the high 64 bits of a trace ID from the specified `value`. If `value`
 // is correctly formatted, then return the resulting bits. If `value` is
-// incorrectly formatted, then add a `tags::internal::propagation_error` tag to
-// the specified `span_tags` and return `nullopt`.
-Optional<std::uint64_t> parse_trace_id_high(
-    const std::string& value,
-    std::unordered_map<std::string, std::string>& span_tags) {
-  auto high = parse_uint64(value, 16);
-  if (!high || value.size() != 16) {
-    span_tags[tags::internal::propagation_error] = "malformed_tid " + value;
+// incorrectly formatted then return `nullopt`.
+Optional<std::uint64_t> parse_trace_id_high(const std::string& value) {
+  if (value.size() != 16) {
     return nullopt;
   }
-  return *high;
+
+  auto high = parse_uint64(value, 16);
+  if (high) {
+    return *high;
+  }
+
+  return nullopt;
 }
 
 // Decode the specified `trace_tags` and integrate them into the specified
@@ -63,9 +64,9 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
 
     if (key == tags::internal::trace_id_high) {
       // _dd.p.tid contains the high 64 bits of the trace ID.
-      const Optional<std::uint64_t> high =
-          parse_trace_id_high(value, span_tags);
+      const Optional<std::uint64_t> high = parse_trace_id_high(value);
       if (!high) {
+        span_tags[tags::internal::propagation_error] = "malformed_tid " + value;
         continue;
       }
 
@@ -420,9 +421,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     if (extant == trace_tags.end()) {
       trace_tags.emplace_back(tags::internal::trace_id_high, hex_high);
     } else {
-      const Optional<std::uint64_t> high =
-          parse_trace_id_high(extant->second, span_data->tags);
+      const Optional<std::uint64_t> high = parse_trace_id_high(extant->second);
       if (!high) {
+        span_data->tags[tags::internal::propagation_error] =
+            "malformed_tid " + extant->second;
         extant->second = hex_high;
       } else if (*high != span_data->trace_id.high) {
         span_data->tags[tags::internal::propagation_error] =
