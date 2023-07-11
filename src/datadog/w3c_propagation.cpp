@@ -196,6 +196,10 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
     const auto value = range(kv_separator + 1, pair_end);
     if (key == "o") {
       result.origin = std::string{value};
+      // Equal signs are allowed in the value of "origin," but equal signs are
+      // also special characters in the `tracestate` encoding. So, equal signs
+      // that would appear in the "origin" value are converted to tildes during
+      // encoding. Here, in decoding, we undo the conversion.
       std::replace(result.origin->begin(), result.origin->end(), '~', '=');
     } else if (key == "s") {
       const auto maybe_priority = parse_int(value, 10);
