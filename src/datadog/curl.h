@@ -95,9 +95,19 @@ class CurlEventLoop {
   // The caller is responsible for freeing the `handle`. `handle` will be
   // removed from the event loop before one of `on_error` or `on_done` is
   // invoked. To remove the `handle` sooner, call `remove_handle`.
+  //
+  // Note that a `CurlEventLoop` implementation might use the private data
+  // pointer property (`CURLINFO_PRIVATE`) of `handle` between when
+  // `add_handle` is called and when one of the following occurs: either of
+  // `on_error` or `on_done` is invoked, `add_handle` returns an error, or
+  // `remove_handle` is called. Any existing private data pointer will be
+  // restored afterward; but, other handlers registered with `handle`, such as
+  // `CURLOPT_HEADERFUNCTION` and `CURLOPT_WRITEFUNCTION`, must not access
+  // `handle`'s private data pointer. This restriction is to afford
+  // implementations of `CurlEventLoop` with limited state.
   virtual Expected<void> add_handle(CURL *handle,
-                                    std::function<void(CURLcode)> on_error,
-                                    std::function<void()> on_done) = 0;
+                                    std::function<void(CURLcode) noexcept> on_error,
+                                    std::function<void() noexcept> on_done) = 0;
 
   // Remove the specified request `handle` from the event loop. Return an
   // error if one occurs.

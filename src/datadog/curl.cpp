@@ -30,6 +30,21 @@ namespace {
 // instance of the default implementation that we can refer to in this file.
 CurlLibrary libcurl;
 
+void *get_user_data(CurlLibrary& curl, CURL *handle) {
+  // libcurl uses a `char*` for legacy reasons. It's really a `void*`.
+  char *user_data = nullptr;
+  // As of libcurl 7.10.3, released January 14 2003, getting the private data
+  // pointer always succeeds.
+  (void)curl.easy_getinfo_private(handle, &user_data);
+  return user_data;
+}
+
+void set_user_data(CurlLibrary& curl, CURL *handle, void *user_data) {
+  // As of libcurl 7.10.3, released January 14 2003, setting the private data
+  // pointer always succeeds.
+  (void)curl.easy_setopt_private(handle, user_data);
+}
+
 }  // namespace
 
 CURL *CurlLibrary::easy_init() { return curl_easy_init(); }
@@ -160,12 +175,23 @@ void CurlLibrary::slist_free_all(curl_slist *list) {
 // libcurl's poll set, and consumes new request handles enqueued via
 // `add_handle`.
 class ThreadedCurlEventLoop : public CurlEventLoop {
+  // `HandleContext` is everything associated with a `CURL*` handle that was
+  // previously passed to `add_handle`. A pointer to `HandleContext` is
+  // installed as the `CURL*`'s private data pointer, i.e. `CURLINFO_PRIVATE`.
+  struct HandleContext {
+    std::function<void(CURLcode) noexcept> on_error;
+    std::function<void() noexcept> on_done;
+    // `user_data` is the `CURLINFO_PRIVATE` property originally associated
+    // with the `CURL*, if any.
+    void *user_data;
+  };
+
   std::mutex mutex_;
   CurlLibrary &curl_;
   const std::shared_ptr<Logger> logger_;
   CURLM *multi_handle_;
-  std::unordered_set<CURL *> request_handles_;
-  std::vector<CURL *> new_handles_;
+  std::unordered_set<CURL*> handles_;
+  std::vector<CURL*> new_handles_;
   bool shutting_down_;
   int num_active_handles_;
   std::condition_variable no_requests_;
@@ -177,8 +203,8 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
                         const Curl::ThreadGenerator &make_thread);
 
   Expected<void> add_handle(CURL *handle,
-                            std::function<void(CURLcode)> on_error,
-                            std::function<void()> on_done) override;
+                            std::function<void(CURLcode) noexcept> on_error,
+                            std::function<void() noexcept> on_done) override;
 
   Expected<void> remove_handle(CURL *handle) override;
 
@@ -187,9 +213,10 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   ~ThreadedCurlEventLoop() override;
 
  private:
+  void handle_message(const CURLMsg &);
+  CURLcode log_on_error(CURLcode);
+  CURLMcode log_on_error(CURLMcode);
   void run();
-  CURLcode log_on_error(CURLcode result);
-  CURLMcode log_on_error(CURLMcode result);
 };
 
 ThreadedCurlEventLoop::ThreadedCurlEventLoop(
@@ -253,7 +280,7 @@ void ThreadedCurlEventLoop::run() {
     // New requests might have been added while we were sleeping.
     for (CURL *handle : new_handles_) {
       log_on_error(curl_.multi_add_handle(multi_handle_, handle));
-      request_handles_.insert(handle);
+      handles_.emplace(handle);
     }
     new_handles_.clear();
 
@@ -263,17 +290,15 @@ void ThreadedCurlEventLoop::run() {
   }
 
   // We're shutting down.  Clean up any remaining request handles.
-  for (const auto &handle : request_handles_) {
-    char *user_data;
-    if (log_on_error(curl_.easy_getinfo_private(handle, &user_data)) ==
-        CURLE_OK) {
-      delete reinterpret_cast<Request *>(user_data);
-    }
-
+  for (CURL *handle : handles_) {
     log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
+    auto *context = static_cast<HandleContext*>(get_user_data(curl_, handle));
+    assert(context);
+    set_user_data(curl_, handle, context->user_data);
+    delete context;
   }
 
-  request_handles_.clear();
+  handles_.clear();
   log_on_error(curl_.multi_cleanup(multi_handle_));
   curl_.global_cleanup();
 }
@@ -286,12 +311,66 @@ CURLcode ThreadedCurlEventLoop::log_on_error(CURLcode result) {
   return result;
 }
 
+Expected<void> ThreadedCurlEventLoop::add_handle(CURL *handle,
+                                    std::function<void(CURLcode) noexcept> on_error,
+                                    std::function<void() noexcept> on_done) {
+  auto context = std::make_unique<HandleContext>();
+  context->on_error = std::move(on_error);
+  context->on_done = std::move(on_done);
+  context->user_data = get_user_data(curl_, handle);
+  
+  set_user_data(curl_, handle, context.get());
+
+  // `handle` now owns `context.get()`. `context` will relinquish ownership,
+  // below, at `context.release()`. If an error occurs before `context`
+  // relinquishes context, then `context` will instead delete `context.get()`.
+  try {
+    // Enqueue `handle` (including with its context, associated with it above).
+    std::unique_lock<std::mutex> lock(mutex_);
+    new_handles_.push_back(handle);
+    context.release();
+  } catch (const std::exception& error) {
+    // Restore the original user data, if any.
+    set_user_data(curl_, handle, context->user_data);
+    // TODO: return error
+  }
+
+  return nullopt;
+}
+
 void ThreadedCurlEventLoop::drain(
     std::chrono::steady_clock::time_point deadline) {
   std::unique_lock<std::mutex> lock(mutex_);
   no_requests_.wait_until(lock, deadline, [this]() {
     return num_active_handles_ == 0 && new_handles_.empty();
   });
+}
+
+void ThreadedCurlEventLoop::handle_message(const CURLMsg &message) {
+  // `CURLMSG_DONE` is the only possible value, but if they were to add another
+  // one in the future, we wouldn't know what to do with it.
+  if (message.msg != CURLMSG_DONE) {
+    return;
+  }
+
+  CURL *handle = message.easy_handle;
+  auto *context = static_cast<HandleContext*>(get_user_data(curl_, handle));
+
+  // `request` is done.  If we got a response, then call the response
+  // handler.  If an error occurred, then call the error handler.
+  // First, remove the handle from the curl "multi" handle and restore the
+  // original user data, if any.
+  log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
+  set_user_data(curl_, handle, context->user_data);
+  const CURLcode result = message.data.result;
+  if (result != CURLE_OK) {
+    context->on_error(result);
+  } else {
+    context->on_done();
+  }
+
+  handles_.erase(handle);
+  delete context;
 }
 
 using ErrorHandler = HTTPClient::ErrorHandler;
@@ -656,6 +735,8 @@ void CurlImpl::run() {
 }
 
 void CurlImpl::handle_message(const CURLMsg &message) {
+  // `CURLMSG_DONE` is the only possible value, but if they were to add another
+  // one in the future, we wouldn't know what to do with it.
   if (message.msg != CURLMSG_DONE) {
     return;
   }
