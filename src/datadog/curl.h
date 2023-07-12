@@ -105,9 +105,9 @@ class CurlEventLoop {
   // `CURLOPT_HEADERFUNCTION` and `CURLOPT_WRITEFUNCTION`, must not access
   // `handle`'s private data pointer. This restriction is to afford
   // implementations of `CurlEventLoop` with limited state.
-  virtual Expected<void> add_handle(CURL *handle,
-                                    std::function<void(CURLcode) noexcept> on_error,
-                                    std::function<void() noexcept> on_done) = 0;
+  virtual Expected<void> add_handle(
+      CURL *handle, std::function<void(CURLcode) noexcept> on_error,
+      std::function<void() noexcept> on_done) = 0;
 
   // Remove the specified request `handle` from the event loop. Return an
   // error if one occurs.

@@ -30,7 +30,7 @@ namespace {
 // instance of the default implementation that we can refer to in this file.
 CurlLibrary libcurl;
 
-void *get_user_data(CurlLibrary& curl, CURL *handle) {
+void *get_user_data(CurlLibrary &curl, CURL *handle) {
   // libcurl uses a `char*` for legacy reasons. It's really a `void*`.
   char *user_data = nullptr;
   // As of libcurl 7.10.3, released January 14 2003, getting the private data
@@ -39,7 +39,7 @@ void *get_user_data(CurlLibrary& curl, CURL *handle) {
   return user_data;
 }
 
-void set_user_data(CurlLibrary& curl, CURL *handle, void *user_data) {
+void set_user_data(CurlLibrary &curl, CURL *handle, void *user_data) {
   // As of libcurl 7.10.3, released January 14 2003, setting the private data
   // pointer always succeeds.
   (void)curl.easy_setopt_private(handle, user_data);
@@ -190,8 +190,8 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   CurlLibrary &curl_;
   const std::shared_ptr<Logger> logger_;
   CURLM *multi_handle_;
-  std::unordered_set<CURL*> handles_;
-  std::vector<CURL*> new_handles_;
+  std::unordered_set<CURL *> handles_;
+  std::vector<CURL *> new_handles_;
   bool shutting_down_;
   int num_active_handles_;
   std::condition_variable no_requests_;
@@ -292,7 +292,7 @@ void ThreadedCurlEventLoop::run() {
   // We're shutting down.  Clean up any remaining request handles.
   for (CURL *handle : handles_) {
     log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
-    auto *context = static_cast<HandleContext*>(get_user_data(curl_, handle));
+    auto *context = static_cast<HandleContext *>(get_user_data(curl_, handle));
     assert(context);
     set_user_data(curl_, handle, context->user_data);
     delete context;
@@ -311,14 +311,14 @@ CURLcode ThreadedCurlEventLoop::log_on_error(CURLcode result) {
   return result;
 }
 
-Expected<void> ThreadedCurlEventLoop::add_handle(CURL *handle,
-                                    std::function<void(CURLcode) noexcept> on_error,
-                                    std::function<void() noexcept> on_done) {
+Expected<void> ThreadedCurlEventLoop::add_handle(
+    CURL *handle, std::function<void(CURLcode) noexcept> on_error,
+    std::function<void() noexcept> on_done) {
   auto context = std::make_unique<HandleContext>();
   context->on_error = std::move(on_error);
   context->on_done = std::move(on_done);
   context->user_data = get_user_data(curl_, handle);
-  
+
   set_user_data(curl_, handle, context.get());
 
   // `handle` now owns `context.get()`. `context` will relinquish ownership,
@@ -329,7 +329,7 @@ Expected<void> ThreadedCurlEventLoop::add_handle(CURL *handle,
     std::unique_lock<std::mutex> lock(mutex_);
     new_handles_.push_back(handle);
     context.release();
-  } catch (const std::exception& error) {
+  } catch (const std::exception &error) {
     // Restore the original user data, if any.
     set_user_data(curl_, handle, context->user_data);
     // TODO: return error
@@ -354,7 +354,7 @@ void ThreadedCurlEventLoop::handle_message(const CURLMsg &message) {
   }
 
   CURL *handle = message.easy_handle;
-  auto *context = static_cast<HandleContext*>(get_user_data(curl_, handle));
+  auto *context = static_cast<HandleContext *>(get_user_data(curl_, handle));
 
   // `request` is done.  If we got a response, then call the response
   // handler.  If an error occurred, then call the error handler.
