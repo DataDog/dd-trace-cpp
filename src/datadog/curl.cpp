@@ -190,7 +190,6 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   CurlLibrary &curl_;
   const std::shared_ptr<Logger> logger_;
   CURLM *multi_handle_;
-  std::unordered_set<CURL *> handles_;
   std::vector<CURL *> new_handles_;
   bool shutting_down_;
   int num_active_handles_;
@@ -213,11 +212,26 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   ~ThreadedCurlEventLoop() override;
 
  private:
-  void handle_message(const CURLMsg &);
+  void handle_message(std::unique_lock<std::mutex> &, const CURLMsg &);
   CURLcode log_on_error(CURLcode);
   CURLMcode log_on_error(CURLMcode);
   void run();
 };
+
+std::shared_ptr<ThreadedCurlEventLoop> default_event_loop(
+    const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
+    const Curl::ThreadGenerator &make_thread) try {
+  return std::make_shared<ThreadedCurlEventLoop>(logger, curl, make_thread);
+} catch (const std::exception &error) {
+  assert(logger);
+  logger->log_error(Error{Error::CURL_HTTP_CLIENT_SETUP_FAILED, error.what()});
+  return nullptr;
+}
+
+auto default_make_thread() {
+  return [](auto &&func) {
+    return std::thread(std::forward<decltype(func)>(func)); });
+}
 
 ThreadedCurlEventLoop::ThreadedCurlEventLoop(
     const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
@@ -231,25 +245,19 @@ ThreadedCurlEventLoop::ThreadedCurlEventLoop(
   curl_.global_init(CURL_GLOBAL_ALL);
   multi_handle_ = curl_.multi_init();
   if (multi_handle_ == nullptr) {
-    logger_->log_error(Error{
-        Error::CURL_HTTP_CLIENT_SETUP_FAILED,
-        "Unable to initialize a curl multi-handle for sending requests."});
-    return;
+    curl_.global_cleanup();
+    throw std::runtime_error(
+        "Unable to initialize a curl multi-handle for sending requests.");
   }
 
   try {
     event_loop_ = make_thread([this]() { run(); });
-  } catch (const std::exception &error) {
-    logger_->log_error(
-        Error{Error::CURL_HTTP_CLIENT_SETUP_FAILED, error.what()});
-
+  } catch (...) {
     // Usually the worker thread would do this, but since the thread failed to
     // start, do it here.
     (void)curl_.multi_cleanup(multi_handle_);
     curl_.global_cleanup();
-
-    // Mark this object as not working.
-    multi_handle_ = nullptr;
+    throw;
   }
 }
 
@@ -268,7 +276,7 @@ void ThreadedCurlEventLoop::run() {
     // us to handle.  Handle any pending messages.
     while ((message = curl_.multi_info_read(multi_handle_,
                                             &num_messages_remaining))) {
-      handle_message(*message);
+      handle_message(lock, *message);
     }
 
     const int max_wait_milliseconds = 10 * 1000;
@@ -280,7 +288,6 @@ void ThreadedCurlEventLoop::run() {
     // New requests might have been added while we were sleeping.
     for (CURL *handle : new_handles_) {
       log_on_error(curl_.multi_add_handle(multi_handle_, handle));
-      handles_.emplace(handle);
     }
     new_handles_.clear();
 
@@ -289,18 +296,24 @@ void ThreadedCurlEventLoop::run() {
     }
   }
 
-  // We're shutting down.  Clean up any remaining request handles.
-  for (CURL *handle : handles_) {
-    log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
-    auto *context = static_cast<HandleContext *>(get_user_data(curl_, handle));
-    assert(context);
-    set_user_data(curl_, handle, context->user_data);
-    delete context;
-  }
-
-  handles_.clear();
   log_on_error(curl_.multi_cleanup(multi_handle_));
   curl_.global_cleanup();
+}
+
+Expected<void> ThreadedCurlEventLoop::remove_handle(CURL *handle) {
+  const CURLMcode result = curl_.multi_remove_handle(multi_handle_, handle);
+  if (result != CURLM_OK) {
+    std::string message = "Unable to remove curl handle from event loop: ";
+    message += curl_.multi_strerror(result);
+    return Error{Error::CURL_HTTP_CLIENT_EVENT_LOOP_REMOVE_FAILURE,
+                 std::move(message)};
+  }
+
+  auto *context = static_cast<HandleContext *>(get_user_data(curl_, handle));
+  assert(context);
+  set_user_data(curl_, handle, context->user_data);
+  delete context;
+  return nullopt;
 }
 
 CURLcode ThreadedCurlEventLoop::log_on_error(CURLcode result) {
@@ -332,7 +345,9 @@ Expected<void> ThreadedCurlEventLoop::add_handle(
   } catch (const std::exception &error) {
     // Restore the original user data, if any.
     set_user_data(curl_, handle, context->user_data);
-    // TODO: return error
+    std::string message = "Unable to enqueue CURL handle: ";
+    message += error.what();
+    return Error{Error::CURL_REQUEST_SETUP_FAILED, std::move(message)};
   }
 
   return nullopt;
@@ -346,7 +361,10 @@ void ThreadedCurlEventLoop::drain(
   });
 }
 
-void ThreadedCurlEventLoop::handle_message(const CURLMsg &message) {
+void ThreadedCurlEventLoop::handle_message(std::unique_lock<std::mutex> &lock,
+                                           const CURLMsg &message) {
+  assert(lock.owns_lock());
+
   // `CURLMSG_DONE` is the only possible value, but if they were to add another
   // one in the future, we wouldn't know what to do with it.
   if (message.msg != CURLMSG_DONE) {
@@ -363,14 +381,22 @@ void ThreadedCurlEventLoop::handle_message(const CURLMsg &message) {
   log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
   set_user_data(curl_, handle, context->user_data);
   const CURLcode result = message.data.result;
+  // Unlock for the duration of the user-specified callback. This allows the
+  // callbacks to send more requests (which won't happen, but it'd be senseless
+  // to forbid).
+  // This is safe because all another thread can do is enqueue another CURL* to
+  // be processed by this thread later. The CURLM* will not be modified
+  // concurrently.
+  // Also, both callbacks are `nothrow`, so we don't have to worry about
+  // jumping out of the unlocked section.
+  lock.unlock();
   if (result != CURLE_OK) {
     context->on_error(result);
   } else {
     context->on_done();
   }
-
-  handles_.erase(handle);
-  delete context;
+  delete context;  // Don't need a lock on this, either.
+  lock.lock();
 }
 
 using ErrorHandler = HTTPClient::ErrorHandler;
@@ -379,16 +405,10 @@ using ResponseHandler = HTTPClient::ResponseHandler;
 using URL = HTTPClient::URL;
 
 class CurlImpl {
-  std::mutex mutex_;
   CurlLibrary &curl_;
+  const std::shared_ptr<CurlEventLoop> event_loop_;
   const std::shared_ptr<Logger> logger_;
-  CURLM *multi_handle_;
-  std::unordered_set<CURL *> request_handles_;
-  std::list<CURL *> new_handles_;
-  bool shutting_down_;
-  int num_active_handles_;
-  std::condition_variable no_requests_;
-  std::thread event_loop_;
+  std::unordered_set<CURL *> handles_;
 
   struct Request {
     CurlLibrary *curl = nullptr;
@@ -427,8 +447,6 @@ class CurlImpl {
                    &visitor) const override;
   };
 
-  void run();
-  void handle_message(const CURLMsg &);
   CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
 
@@ -441,8 +459,9 @@ class CurlImpl {
   static StringView trim(StringView);
 
  public:
-  explicit CurlImpl(const std::shared_ptr<Logger> &, CurlLibrary &,
-                    const Curl::ThreadGenerator &);
+  explicit CurlImpl(const std::shared_ptr<Logger> &,
+                    const std::shared_ptr<CurlEventLoop> &, CurlLibrary &);
+
   ~CurlImpl();
 
   Expected<void> post(const URL &url, HeadersSetter set_headers,
@@ -462,15 +481,25 @@ void throw_on_error(CURLcode result) {
 
 }  // namespace
 
-Curl::Curl(const std::shared_ptr<Logger> &logger) : Curl(logger, libcurl) {}
+Curl::Curl(const std::shared_ptr<Logger> &logger)
+    : Curl(logger, default_event_loop(logger, libcurl, default_make_thread()),
+           libcurl) {}
 
 Curl::Curl(const std::shared_ptr<Logger> &logger, CurlLibrary &curl)
-    : Curl(logger, curl,
-           [](auto &&func) { return std::thread(std::move(func)); }) {}
+    : Curl(logger, default_event_loop(logger, curl, default_make_thread()),
+           curl) {}
 
-Curl::Curl(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
-           const Curl::ThreadGenerator &make_thread)
-    : impl_(new CurlImpl{logger, curl, make_thread}) {}
+Curl::Curl(const std::shared_ptr<Logger> &logger,
+           const std::shared_ptr<CurlEventLoop> &event_loop)
+    : impl_(new CurlImpl{logger, event_loop, libcurl}) {}
+
+Curl::Curl(const std::shared_ptr<Logger> &logger,
+           const Curl::ThreadGenerator &make_thread, CurlLibrary &curl)
+    : Curl(logger, default_event_loop(logger, curl, make_thread), curl) {}
+
+Curl::Curl(const std::shared_ptr<Logger> &logger,
+           const std::shared_ptr<CurlEventLoop> &event_loop, CurlLibrary &curl)
+    : impl_(new CurlImpl{logger, event_loop, curl}) {}
 
 Curl::~Curl() { delete impl_; }
 
@@ -488,56 +517,24 @@ nlohmann::json Curl::config_json() const {
   return nlohmann::json::object({{"type", "datadog::tracing::Curl"}});
 }
 
-CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
-                   const Curl::ThreadGenerator &make_thread)
-    : curl_(curl),
-      logger_(logger),
-      shutting_down_(false),
-      num_active_handles_(0) {
-  curl_.global_init(CURL_GLOBAL_ALL);
-  multi_handle_ = curl_.multi_init();
-  if (multi_handle_ == nullptr) {
-    logger_->log_error(Error{
-        Error::CURL_HTTP_CLIENT_SETUP_FAILED,
-        "Unable to initialize a curl multi-handle for sending requests."});
-    return;
-  }
-
-  try {
-    event_loop_ = make_thread([this]() { run(); });
-  } catch (const std::system_error &error) {
-    logger_->log_error(
-        Error{Error::CURL_HTTP_CLIENT_SETUP_FAILED, error.what()});
-
-    // Usually the worker thread would do this, but since the thread failed to
-    // start, do it here.
-    (void)curl_.multi_cleanup(multi_handle_);
-    curl_.global_cleanup();
-
-    // Mark this object as not working.
-    multi_handle_ = nullptr;
-  }
-}
+CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger,
+                   const std::shared_ptr<CurlEventLoop> &event_loop,
+                   CurlLibrary &curl)
+    : curl_(curl), event_loop_(event_loop), logger_(logger) {}
 
 CurlImpl::~CurlImpl() {
-  if (multi_handle_ == nullptr) {
-    // We're not running; nothing to shut down.
-    return;
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    shutting_down_ = true;
-  }
-  log_on_error(curl_.multi_wakeup(multi_handle_));
-  event_loop_.join();
+  // TODO: There's a race here. :(
+  // We need to event_loop_->remove_handle(handle) for handle in handles_
+  // but the event loop is still running.
+  // TODO: Also, how do we ensure, when using the nginx event loop, that
+  // requests get drained for a little bit? Look into that...
 }
 
 Expected<void> CurlImpl::post(const HTTPClient::URL &url,
                               HeadersSetter set_headers, std::string body,
                               ResponseHandler on_response,
                               ErrorHandler on_error) try {
-  if (multi_handle_ == nullptr) {
+  if (event_loop_ == nullptr) {
     return Error{Error::CURL_HTTP_CLIENT_NOT_RUNNING,
                  "Unable to send request via libcurl because the HTTP client "
                  "failed to start."};
@@ -594,17 +591,58 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   throw_on_error(
       curl_.easy_setopt_httpheader(handle.get(), request->request_headers));
 
-  std::list<CURL *> node;
-  node.push_back(handle.get());
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    new_handles_.splice(new_handles_.end(), node);
+  auto event_loop_on_error = [this,
+                              handle = handle.get()](CURLcode result) noexcept {
+    auto request = static_cast<Request *>(get_user_data(curl_, handle));
+    std::string error_message;
+    error_message += "Error sending request with libcurl (";
+    error_message += curl_.easy_strerror(result);
+    error_message += "): ";
+    error_message += request->error_buffer;
+    try {
+      request->on_error(
+          Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
+    } catch (const std::exception &error) {
+      logger_->log_error(
+          Error{Error::HTTP_CLIENT_ON_ERROR_HANDLER_EXCEPTION, error.what()});
+    }
 
-    headers.release();
-    handle.release();
-    request.release();
+    delete request;
+    curl_.easy_cleanup(handle);
+    handles_.erase(handle);
+  };
+
+  auto event_loop_on_done = [this, handle = handle.get()]() noexcept {
+    long status;
+    if (log_on_error(curl_.easy_getinfo_response_code(handle, &status)) !=
+        CURLE_OK) {
+      status = -1;
+    }
+    auto request = static_cast<Request *>(get_user_data(curl_, handle));
+    HeaderReader reader(&request->response_headers_lower);
+    try {
+      request->on_response(static_cast<int>(status), reader,
+                           std::move(request->response_body));
+    } catch (const std::exception &error) {
+      logger_->log_error(
+          Error{Error::HTTP_CLIENT_ON_DONE_HANDLER_EXCEPTION, error.what()});
+    }
+
+    delete request;
+    curl_.easy_cleanup(handle);
+    handles_.erase(handle);
+  };
+
+  auto result = event_loop_->add_handle(handle.get(), event_loop_on_error,
+                                        event_loop_on_done);
+  if (!result) {
+    return result;
   }
-  log_on_error(curl_.multi_wakeup(multi_handle_));
+  handles_.insert(handle.get());
+
+  headers.release();
+  handle.release();
+  request.release();
 
   return nullopt;
 } catch (CURLcode error) {
@@ -612,10 +650,10 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
 }
 
 void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  no_requests_.wait_until(lock, deadline, [this]() {
-    return num_active_handles_ == 0 && new_handles_.empty();
-  });
+  if (!event_loop_) {
+    return;
+  }
+  event_loop_->drain(deadline);
 }
 
 std::size_t CurlImpl::on_read_header(char *data, std::size_t,
@@ -679,102 +717,6 @@ CURLMcode CurlImpl::log_on_error(CURLMcode result) {
         Error{Error::CURL_HTTP_CLIENT_ERROR, curl_.multi_strerror(result)});
   }
   return result;
-}
-
-void CurlImpl::run() {
-  int num_messages_remaining;
-  CURLMsg *message;
-  std::unique_lock<std::mutex> lock(mutex_);
-
-  for (;;) {
-    log_on_error(curl_.multi_perform(multi_handle_, &num_active_handles_));
-    if (num_active_handles_ == 0) {
-      no_requests_.notify_all();
-    }
-
-    // If a request is done or errored out, curl will enqueue a "message" for
-    // us to handle.  Handle any pending messages.
-    while ((message = curl_.multi_info_read(multi_handle_,
-                                            &num_messages_remaining))) {
-      handle_message(*message);
-    }
-
-    const int max_wait_milliseconds = 10 * 1000;
-    lock.unlock();
-    log_on_error(curl_.multi_poll(multi_handle_, nullptr, 0,
-                                  max_wait_milliseconds, nullptr));
-    lock.lock();
-
-    // New requests might have been added while we were sleeping.
-    for (; !new_handles_.empty(); new_handles_.pop_front()) {
-      CURL *const handle = new_handles_.front();
-      log_on_error(curl_.multi_add_handle(multi_handle_, handle));
-      request_handles_.insert(handle);
-    }
-
-    if (shutting_down_) {
-      break;
-    }
-  }
-
-  // We're shutting down.  Clean up any remaining request handles.
-  for (const auto &handle : request_handles_) {
-    char *user_data;
-    if (log_on_error(curl_.easy_getinfo_private(handle, &user_data)) ==
-        CURLE_OK) {
-      delete reinterpret_cast<Request *>(user_data);
-    }
-
-    log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
-    curl_.easy_cleanup(handle);
-  }
-
-  request_handles_.clear();
-  log_on_error(curl_.multi_cleanup(multi_handle_));
-  curl_.global_cleanup();
-}
-
-void CurlImpl::handle_message(const CURLMsg &message) {
-  // `CURLMSG_DONE` is the only possible value, but if they were to add another
-  // one in the future, we wouldn't know what to do with it.
-  if (message.msg != CURLMSG_DONE) {
-    return;
-  }
-
-  auto *const request_handle = message.easy_handle;
-  char *user_data;
-  if (log_on_error(curl_.easy_getinfo_private(request_handle, &user_data)) !=
-      CURLE_OK) {
-    return;
-  }
-  auto &request = *reinterpret_cast<Request *>(user_data);
-
-  // `request` is done.  If we got a response, then call the response
-  // handler.  If an error occurred, then call the error handler.
-  const auto result = message.data.result;
-  if (result != CURLE_OK) {
-    std::string error_message;
-    error_message += "Error sending request with libcurl (";
-    error_message += curl_.easy_strerror(result);
-    error_message += "): ";
-    error_message += request.error_buffer;
-    request.on_error(
-        Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
-  } else {
-    long status;
-    if (log_on_error(curl_.easy_getinfo_response_code(request_handle,
-                                                      &status)) != CURLE_OK) {
-      status = -1;
-    }
-    HeaderReader reader(&request.response_headers_lower);
-    request.on_response(static_cast<int>(status), reader,
-                        std::move(request.response_body));
-  }
-
-  log_on_error(curl_.multi_remove_handle(multi_handle_, request_handle));
-  curl_.easy_cleanup(request_handle);
-  request_handles_.erase(request_handle);
-  delete &request;
 }
 
 CurlImpl::Request::~Request() { curl->slist_free_all(request_headers); }

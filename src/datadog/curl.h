@@ -134,14 +134,12 @@ class Curl : public HTTPClient {
 
   explicit Curl(const std::shared_ptr<Logger> &);
   Curl(const std::shared_ptr<Logger> &, CurlLibrary &);
-  Curl(const std::shared_ptr<Logger> &, CurlLibrary &, const ThreadGenerator &);
   Curl(const std::shared_ptr<Logger> &,
        const std::shared_ptr<CurlEventLoop> &event_loop);
   Curl(const std::shared_ptr<Logger> &,
        const std::shared_ptr<CurlEventLoop> &event_loop, CurlLibrary &);
-  Curl(const std::shared_ptr<Logger> &,
-       const std::shared_ptr<CurlEventLoop> &event_loop, CurlLibrary &,
-       const ThreadGenerator &);
+  Curl(const std::shared_ptr<Logger> &logger,
+       const Curl::ThreadGenerator &make_thread, CurlLibrary &);
   ~Curl();
 
   Curl(const Curl &) = delete;
