@@ -11,6 +11,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "dict_reader.h"
@@ -179,8 +180,8 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   // previously passed to `add_handle`. A pointer to `HandleContext` is
   // installed as the `CURL*`'s private data pointer, i.e. `CURLINFO_PRIVATE`.
   struct HandleContext {
-    std::function<void(CURLcode) noexcept> on_error;
-    std::function<void() noexcept> on_done;
+    std::function<void(CURLcode) /*noexcept*/> on_error;
+    std::function<void() /*noexcept*/> on_done;
     // `user_data` is the `CURLINFO_PRIVATE` property originally associated
     // with the `CURL*, if any.
     void *user_data;
@@ -191,6 +192,7 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   const std::shared_ptr<Logger> logger_;
   CURLM *multi_handle_;
   std::vector<CURL *> new_handles_;
+  std::unordered_set<CURL *> handles_;
   bool shutting_down_;
   int num_active_handles_;
   std::condition_variable no_requests_;
@@ -201,9 +203,9 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
                         CurlLibrary &curl,
                         const Curl::ThreadGenerator &make_thread);
 
-  Expected<void> add_handle(CURL *handle,
-                            std::function<void(CURLcode) noexcept> on_error,
-                            std::function<void() noexcept> on_done) override;
+  Expected<void> add_handle(
+      CURL *handle, std::function<void(CURLcode) /*noexcept*/> on_error,
+      std::function<void() /*noexcept*/> on_done) override;
 
   Expected<void> remove_handle(CURL *handle) override;
 
@@ -215,6 +217,16 @@ class ThreadedCurlEventLoop : public CurlEventLoop {
   void handle_message(std::unique_lock<std::mutex> &, const CURLMsg &);
   CURLcode log_on_error(CURLcode);
   CURLMcode log_on_error(CURLMcode);
+  // Remove the `CURL*` referred to by the specified `handle_iter` from
+  // `multi_handle_`. Return the context associated with the `CURL*`, and an
+  // error if one occurs. The returned context will not be null, even if an
+  // error occurs. The behavior is undefined unless all of the following are
+  // true:
+  // - `lock.owns_lock()`
+  // - `handle_iter` refers to an element of `handles_`.
+  std::pair<std::unique_ptr<HandleContext>, Expected<void>> remove_handle(
+      const std::unique_lock<std::mutex> &lock,
+      std::unordered_set<CURL *>::iterator handle_iter);
   void run();
 };
 
@@ -230,7 +242,8 @@ std::shared_ptr<ThreadedCurlEventLoop> default_event_loop(
 
 auto default_make_thread() {
   return [](auto &&func) {
-    return std::thread(std::forward<decltype(func)>(func)); });
+    return std::thread(std::forward<decltype(func)>(func));
+  };
 }
 
 ThreadedCurlEventLoop::ThreadedCurlEventLoop(
@@ -261,12 +274,22 @@ ThreadedCurlEventLoop::ThreadedCurlEventLoop(
   }
 }
 
+ThreadedCurlEventLoop::~ThreadedCurlEventLoop() {
+  assert(event_loop_.joinable());
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    shutting_down_ = true;
+  }
+  log_on_error(curl_.multi_wakeup(multi_handle_));
+  event_loop_.join();
+}
+
 void ThreadedCurlEventLoop::run() {
   int num_messages_remaining;
   CURLMsg *message;
   std::unique_lock<std::mutex> lock(mutex_);
 
-  for (;;) {
+  do {
     log_on_error(curl_.multi_perform(multi_handle_, &num_active_handles_));
     if (num_active_handles_ == 0) {
       no_requests_.notify_all();
@@ -287,33 +310,62 @@ void ThreadedCurlEventLoop::run() {
 
     // New requests might have been added while we were sleeping.
     for (CURL *handle : new_handles_) {
-      log_on_error(curl_.multi_add_handle(multi_handle_, handle));
+      if (log_on_error(curl_.multi_add_handle(multi_handle_, handle)) ==
+          CURLM_OK) {
+        handles_.insert(handle);
+      }
     }
     new_handles_.clear();
+  } while (!shutting_down_);
 
-    if (shutting_down_) {
-      break;
+  // We're shutting down.
+  while (!handles_.empty()) {
+    // TODO: break up remove_handle, this is too weird.
+    // TODO: there's a leak here, too. handle's user data is not deleted.
+    const auto iter = handles_.begin();
+    CURL *const handle = *iter;
+    const auto [context, result] = remove_handle(lock, iter);
+    if (const Error *error = result.if_error()) {
+      logger_->log_error(*error);
     }
+    curl_.easy_cleanup(handle);
   }
-
   log_on_error(curl_.multi_cleanup(multi_handle_));
   curl_.global_cleanup();
 }
 
 Expected<void> ThreadedCurlEventLoop::remove_handle(CURL *handle) {
-  const CURLMcode result = curl_.multi_remove_handle(multi_handle_, handle);
-  if (result != CURLM_OK) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  auto [context, result] = remove_handle(lock, handles_.find(handle));
+  return result;
+}
+
+std::pair<std::unique_ptr<ThreadedCurlEventLoop::HandleContext>, Expected<void>>
+ThreadedCurlEventLoop::remove_handle(
+    const std::unique_lock<std::mutex> &lock,
+    std::unordered_set<CURL *>::iterator handle_iter) {
+  assert(lock.owns_lock());
+  (void)lock;  // in case the assert macro doesn't include this "unused" hint
+
+  Expected<void> result;
+  const CURLMcode curl_result =
+      curl_.multi_remove_handle(multi_handle_, *handle_iter);
+  if (curl_result != CURLM_OK) {
     std::string message = "Unable to remove curl handle from event loop: ";
-    message += curl_.multi_strerror(result);
-    return Error{Error::CURL_HTTP_CLIENT_EVENT_LOOP_REMOVE_FAILURE,
-                 std::move(message)};
+    message += curl_.multi_strerror(curl_result);
+    result = Error{Error::CURL_HTTP_CLIENT_EVENT_LOOP_REMOVE_FAILURE,
+                   std::move(message)};
   }
 
-  auto *context = static_cast<HandleContext *>(get_user_data(curl_, handle));
+  auto *context =
+      static_cast<HandleContext *>(get_user_data(curl_, *handle_iter));
   assert(context);
-  set_user_data(curl_, handle, context->user_data);
-  delete context;
-  return nullopt;
+  set_user_data(curl_, *handle_iter, context->user_data);
+
+  handles_.erase(handle_iter);
+
+  return std::make_pair(std::unique_ptr<HandleContext>(context),
+                        std::move(result));
 }
 
 CURLcode ThreadedCurlEventLoop::log_on_error(CURLcode result) {
@@ -324,9 +376,17 @@ CURLcode ThreadedCurlEventLoop::log_on_error(CURLcode result) {
   return result;
 }
 
+CURLMcode ThreadedCurlEventLoop::log_on_error(CURLMcode result) {
+  if (result != CURLM_OK) {
+    logger_->log_error(
+        Error{Error::CURL_HTTP_CLIENT_ERROR, curl_.multi_strerror(result)});
+  }
+  return result;
+}
+
 Expected<void> ThreadedCurlEventLoop::add_handle(
-    CURL *handle, std::function<void(CURLcode) noexcept> on_error,
-    std::function<void() noexcept> on_done) {
+    CURL *handle, std::function<void(CURLcode) /*noexcept*/> on_error,
+    std::function<void() /*noexcept*/> on_done) {
   auto context = std::make_unique<HandleContext>();
   context->on_error = std::move(on_error);
   context->on_done = std::move(on_done);
@@ -372,30 +432,32 @@ void ThreadedCurlEventLoop::handle_message(std::unique_lock<std::mutex> &lock,
   }
 
   CURL *handle = message.easy_handle;
-  auto *context = static_cast<HandleContext *>(get_user_data(curl_, handle));
 
   // `request` is done.  If we got a response, then call the response
   // handler.  If an error occurred, then call the error handler.
-  // First, remove the handle from the curl "multi" handle and restore the
-  // original user data, if any.
-  log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
-  set_user_data(curl_, handle, context->user_data);
-  const CURLcode result = message.data.result;
+  // First, remove the handle from the curl "multi" handle, and from our
+  // bookkeeping, and restore the original user data, if any.
+  auto [context, result] = remove_handle(lock, handles_.find(handle));
+  if (const Error *error = result.if_error()) {
+    logger_->log_error(*error);  // TODO: what if this throws?
+  }
+
+  const CURLcode curl_result = message.data.result;
   // Unlock for the duration of the user-specified callback. This allows the
   // callbacks to send more requests (which won't happen, but it'd be senseless
   // to forbid).
   // This is safe because all another thread can do is enqueue another CURL* to
-  // be processed by this thread later. The CURLM* will not be modified
-  // concurrently.
-  // Also, both callbacks are `nothrow`, so we don't have to worry about
-  // jumping out of the unlocked section.
+  // be processed by this thread later. There will be no concurrent
+  // modifications through any CURL* or CURLM*.
+  // Also, both callbacks are `noexcept`, so we don't have to worry about
+  // jumping out of this unlocked section.
+  // TODO: nope, they aren't noexcept
   lock.unlock();
-  if (result != CURLE_OK) {
-    context->on_error(result);
+  if (curl_result != CURLE_OK) {
+    context->on_error(curl_result);
   } else {
     context->on_done();
   }
-  delete context;  // Don't need a lock on this, either.
   lock.lock();
 }
 
@@ -408,7 +470,6 @@ class CurlImpl {
   CurlLibrary &curl_;
   const std::shared_ptr<CurlEventLoop> event_loop_;
   const std::shared_ptr<Logger> logger_;
-  std::unordered_set<CURL *> handles_;
 
   struct Request {
     CurlLibrary *curl = nullptr;
@@ -448,7 +509,6 @@ class CurlImpl {
   };
 
   CURLcode log_on_error(CURLcode result);
-  CURLMcode log_on_error(CURLMcode result);
 
   static std::size_t on_read_header(char *data, std::size_t, std::size_t length,
                                     void *user_data);
@@ -522,13 +582,7 @@ CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger,
                    CurlLibrary &curl)
     : curl_(curl), event_loop_(event_loop), logger_(logger) {}
 
-CurlImpl::~CurlImpl() {
-  // TODO: There's a race here. :(
-  // We need to event_loop_->remove_handle(handle) for handle in handles_
-  // but the event loop is still running.
-  // TODO: Also, how do we ensure, when using the nginx event loop, that
-  // requests get drained for a little bit? Look into that...
-}
+CurlImpl::~CurlImpl() {}
 
 Expected<void> CurlImpl::post(const HTTPClient::URL &url,
                               HeadersSetter set_headers, std::string body,
@@ -609,7 +663,6 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
 
     delete request;
     curl_.easy_cleanup(handle);
-    handles_.erase(handle);
   };
 
   auto event_loop_on_done = [this, handle = handle.get()]() noexcept {
@@ -630,7 +683,6 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
 
     delete request;
     curl_.easy_cleanup(handle);
-    handles_.erase(handle);
   };
 
   auto result = event_loop_->add_handle(handle.get(), event_loop_on_error,
@@ -638,7 +690,6 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   if (!result) {
     return result;
   }
-  handles_.insert(handle.get());
 
   headers.release();
   handle.release();
@@ -707,14 +758,6 @@ CURLcode CurlImpl::log_on_error(CURLcode result) {
   if (result != CURLE_OK) {
     logger_->log_error(
         Error{Error::CURL_HTTP_CLIENT_ERROR, curl_.easy_strerror(result)});
-  }
-  return result;
-}
-
-CURLMcode CurlImpl::log_on_error(CURLMcode result) {
-  if (result != CURLM_OK) {
-    logger_->log_error(
-        Error{Error::CURL_HTTP_CLIENT_ERROR, curl_.multi_strerror(result)});
   }
   return result;
 }

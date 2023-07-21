@@ -106,16 +106,16 @@ class CurlEventLoop {
   // `handle`'s private data pointer. This restriction is to afford
   // implementations of `CurlEventLoop` with limited state.
   virtual Expected<void> add_handle(
-      CURL *handle, std::function<void(CURLcode) noexcept> on_error,
-      std::function<void() noexcept> on_done) = 0;
+      CURL *handle, std::function<void(CURLcode) /*noexcept*/> on_error,
+      std::function<void() /*noexcept*/> on_done) = 0;
 
   // Remove the specified request `handle` from the event loop. Return an
   // error if one occurs.
   virtual Expected<void> remove_handle(CURL *handle) = 0;
 
   // Destroy this object. Any request handle that was previously added to the
-  // event loop via `add_handle` and that hasn't completed must first be
-  // removed via `remove_handle` by the caller.
+  // event loop via `add_handle` will be removed as if by a call to
+  // `remove_handle`.
   virtual ~CurlEventLoop() = default;
 
   // Wait until there are no more outstanding requests, or until the specified
@@ -132,15 +132,30 @@ class Curl : public HTTPClient {
  public:
   using ThreadGenerator = std::function<std::thread(std::function<void()> &&)>;
 
-  explicit Curl(const std::shared_ptr<Logger> &);
-  Curl(const std::shared_ptr<Logger> &, CurlLibrary &);
+  // Create a `Curl` instance that:
+  //
+  // - uses the specified `logger` to log diagnostics,
+  // - uses the optionally specified `library` to access libcurl functions,
+  //   or uses a default library if one is not specified,
+  // - uses the optionally specified `event_loop` to dispatch curl handles, or
+  //   uses a default event loop if one is not specified,
+  // - and uses the optionally specified `make_thread` to spawn the event loop
+  //   thread if the default even loop is to be used, or uses a default thread
+  //   creation function if one is not specified.
+  //
+  // If `event_loop` is null, then the resulting `Curl` instance's member
+  // functions return an error and have no other effect. The behavior is
+  // undefined if `logger` is null or if `make_thread` contains no target.
+  explicit Curl(const std::shared_ptr<Logger> &logger);
+  Curl(const std::shared_ptr<Logger> &, CurlLibrary &library);
   Curl(const std::shared_ptr<Logger> &,
        const std::shared_ptr<CurlEventLoop> &event_loop);
+  Curl(const std::shared_ptr<Logger> &, const std::shared_ptr<CurlEventLoop> &,
+       CurlLibrary &);
   Curl(const std::shared_ptr<Logger> &,
-       const std::shared_ptr<CurlEventLoop> &event_loop, CurlLibrary &);
-  Curl(const std::shared_ptr<Logger> &logger,
        const Curl::ThreadGenerator &make_thread, CurlLibrary &);
-  ~Curl();
+
+  ~Curl() override;
 
   Curl(const Curl &) = delete;
 
