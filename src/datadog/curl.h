@@ -95,6 +95,7 @@ class CurlEventLoop {
   // The caller is responsible for freeing the `handle`. `handle` will be
   // removed from the event loop before one of `on_error` or `on_done` is
   // invoked. To remove the `handle` sooner, call `remove_handle`.
+  // TODO: mention destructor of the event loop.
   //
   // Note that a `CurlEventLoop` implementation might use the private data
   // pointer property (`CURLINFO_PRIVATE`) of `handle` between when

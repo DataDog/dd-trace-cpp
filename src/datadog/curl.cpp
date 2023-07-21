@@ -321,14 +321,10 @@ void ThreadedCurlEventLoop::run() {
   // We're shutting down.
   while (!handles_.empty()) {
     // TODO: break up remove_handle, this is too weird.
-    // TODO: there's a leak here, too. handle's user data is not deleted.
-    const auto iter = handles_.begin();
-    CURL *const handle = *iter;
-    const auto [context, result] = remove_handle(lock, iter);
+    const auto [context, result] = remove_handle(lock, handles_.begin());
     if (const Error *error = result.if_error()) {
       logger_->log_error(*error);
     }
-    curl_.easy_cleanup(handle);
   }
   log_on_error(curl_.multi_cleanup(multi_handle_));
   curl_.global_cleanup();
@@ -410,6 +406,7 @@ Expected<void> ThreadedCurlEventLoop::add_handle(
     return Error{Error::CURL_REQUEST_SETUP_FAILED, std::move(message)};
   }
 
+  log_on_error(curl_.multi_wakeup(multi_handle_));
   return nullopt;
 }
 
@@ -472,6 +469,7 @@ class CurlImpl {
   const std::shared_ptr<Logger> logger_;
 
   struct Request {
+    CURL *handle = nullptr;
     CurlLibrary *curl = nullptr;
     curl_slist *request_headers = nullptr;
     std::string request_body;
@@ -594,60 +592,48 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
                  "failed to start."};
   }
 
-  auto request = std::make_unique<Request>();
-
+  auto request = std::make_shared<Request>();
   request->curl = &curl_;
   request->request_body = std::move(body);
   request->on_response = std::move(on_response);
   request->on_error = std::move(on_error);
-
-  auto cleanup_handle = [&](auto handle) { curl_.easy_cleanup(handle); };
-  std::unique_ptr<CURL, decltype(cleanup_handle)> handle{
-      curl_.easy_init(), std::move(cleanup_handle)};
+  CURL *handle = request->handle = curl_.easy_init();
 
   if (!handle) {
     return Error{Error::CURL_REQUEST_SETUP_FAILED,
                  "unable to initialize a curl handle for request sending"};
   }
 
-  throw_on_error(curl_.easy_setopt_private(handle.get(), request.get()));
+  throw_on_error(curl_.easy_setopt_errorbuffer(handle, request->error_buffer));
+  throw_on_error(curl_.easy_setopt_post(handle, 1));
   throw_on_error(
-      curl_.easy_setopt_errorbuffer(handle.get(), request->error_buffer));
-  throw_on_error(curl_.easy_setopt_post(handle.get(), 1));
-  throw_on_error(curl_.easy_setopt_postfieldsize(handle.get(),
-                                                 request->request_body.size()));
+      curl_.easy_setopt_postfieldsize(handle, request->request_body.size()));
   throw_on_error(
-      curl_.easy_setopt_postfields(handle.get(), request->request_body.data()));
-  throw_on_error(
-      curl_.easy_setopt_headerfunction(handle.get(), &on_read_header));
-  throw_on_error(curl_.easy_setopt_headerdata(handle.get(), request.get()));
-  throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
-  throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
+      curl_.easy_setopt_postfields(handle, request->request_body.data()));
+  throw_on_error(curl_.easy_setopt_headerfunction(handle, &on_read_header));
+  throw_on_error(curl_.easy_setopt_headerdata(handle, request.get()));
+  throw_on_error(curl_.easy_setopt_writefunction(handle, &on_read_body));
+  throw_on_error(curl_.easy_setopt_writedata(handle, request.get()));
   if (url.scheme == "unix" || url.scheme == "http+unix" ||
       url.scheme == "https+unix") {
-    throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
-                                                      url.authority.c_str()));
+    throw_on_error(
+        curl_.easy_setopt_unix_socket_path(handle, url.authority.c_str()));
     // The authority section of the URL is ignored when a unix domain socket is
     // to be used.
-    throw_on_error(curl_.easy_setopt_url(
-        handle.get(), ("http://localhost" + url.path).c_str()));
+    throw_on_error(
+        curl_.easy_setopt_url(handle, ("http://localhost" + url.path).c_str()));
   } else {
     throw_on_error(curl_.easy_setopt_url(
-        handle.get(), (url.scheme + "://" + url.authority + url.path).c_str()));
+        handle, (url.scheme + "://" + url.authority + url.path).c_str()));
   }
 
   HeaderWriter writer{curl_};
   set_headers(writer);
-  auto cleanup_list = [&](auto list) { curl_.slist_free_all(list); };
-  std::unique_ptr<curl_slist, decltype(cleanup_list)> headers{
-      writer.release(), std::move(cleanup_list)};
-  request->request_headers = headers.get();
+  request->request_headers = writer.release();
   throw_on_error(
-      curl_.easy_setopt_httpheader(handle.get(), request->request_headers));
+      curl_.easy_setopt_httpheader(handle, request->request_headers));
 
-  auto event_loop_on_error = [this,
-                              handle = handle.get()](CURLcode result) noexcept {
-    auto request = static_cast<Request *>(get_user_data(curl_, handle));
+  auto event_loop_on_error = [this, request](CURLcode result) noexcept {
     std::string error_message;
     error_message += "Error sending request with libcurl (";
     error_message += curl_.easy_strerror(result);
@@ -660,18 +646,14 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
       logger_->log_error(
           Error{Error::HTTP_CLIENT_ON_ERROR_HANDLER_EXCEPTION, error.what()});
     }
-
-    delete request;
-    curl_.easy_cleanup(handle);
   };
 
-  auto event_loop_on_done = [this, handle = handle.get()]() noexcept {
+  auto event_loop_on_done = [this, request]() noexcept {
     long status;
-    if (log_on_error(curl_.easy_getinfo_response_code(handle, &status)) !=
-        CURLE_OK) {
+    if (log_on_error(curl_.easy_getinfo_response_code(request->handle,
+                                                      &status)) != CURLE_OK) {
       status = -1;
     }
-    auto request = static_cast<Request *>(get_user_data(curl_, handle));
     HeaderReader reader(&request->response_headers_lower);
     try {
       request->on_response(static_cast<int>(status), reader,
@@ -680,20 +662,13 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
       logger_->log_error(
           Error{Error::HTTP_CLIENT_ON_DONE_HANDLER_EXCEPTION, error.what()});
     }
-
-    delete request;
-    curl_.easy_cleanup(handle);
   };
 
-  auto result = event_loop_->add_handle(handle.get(), event_loop_on_error,
-                                        event_loop_on_done);
+  auto result =
+      event_loop_->add_handle(handle, event_loop_on_error, event_loop_on_done);
   if (!result) {
     return result;
   }
-
-  headers.release();
-  handle.release();
-  request.release();
 
   return nullopt;
 } catch (CURLcode error) {
@@ -762,7 +737,13 @@ CURLcode CurlImpl::log_on_error(CURLcode result) {
   return result;
 }
 
-CurlImpl::Request::~Request() { curl->slist_free_all(request_headers); }
+CurlImpl::Request::~Request() {
+  if (handle) {
+    assert(curl);
+    curl->slist_free_all(request_headers);
+    curl->easy_cleanup(handle);
+  }
+}
 
 CurlImpl::HeaderWriter::HeaderWriter(CurlLibrary &curl) : curl_(curl) {}
 
