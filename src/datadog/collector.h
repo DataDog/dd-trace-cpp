@@ -16,6 +16,7 @@
 #include "expected.h"
 #include "json_fwd.hpp"
 #include "optional.h"
+#include "span.h"
 
 namespace datadog {
 namespace tracing {
@@ -27,11 +28,18 @@ class Collector {
  public:
   // Submit ownership of the specified `spans` to the collector.  If the
   // collector delivers a response relevant to trace sampling, reconfigure the
-  // sampler using the specified `response_handler`.  Return an error if one
-  // occurs.
+  // sampler using the specified `response_handler`. Use the optionally
+  // specified `debug_parent` to perform debug tracing. If `debug_parent` is
+  // not specific or does not contain a value, then do not perform debug
+  // tracing. Return an error if one occurs.
   virtual Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) = 0;
+  
+  virtual Expected<void> send(
+      std::vector<std::unique_ptr<SpanData>>&& spans,
+      const std::shared_ptr<TraceSampler>& response_handler,
+      Optional<Span>&& debug_parent);
 
   // Return a JSON representation of this object's configuration. The JSON
   // representation is an object with the following properties:
