@@ -1,5 +1,6 @@
 #include "trace_segment.h"
 
+#include <algorithm>
 #include <cassert>
 #include <string>
 #include <unordered_map>

@@ -71,6 +71,8 @@ class Span {
   // associated with the specified `trace_segment`, that uses the specified
   // `generate_span_id` to generate IDs of child spans, and that uses the
   // specified `clock` to determine start and end times.
+  // TODO: How do we get the debug span here? `Span *debug_parent`?
+  // TODO: But then where is _our_ debug span stored?
   Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
        const std::function<std::uint64_t()>& generate_span_id,
        const Clock& clock);

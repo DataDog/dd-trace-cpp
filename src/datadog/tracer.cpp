@@ -252,7 +252,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 
   if (config.debug.enabled) {
-    // TODO
+    // TODO: Create a debug tracer.
   }
 
   if (config.log_on_startup) {
@@ -273,7 +273,9 @@ Span Tracer::create_span() { return create_span(SpanConfig{}); }
 
 Span Tracer::create_span(const SpanConfig& config) {
   Optional<Span> debug_span;
-  // TODO
+  // TODO:
+  // If we have a debug tracer, create the debug root span here and set some
+  // tags on it.
 
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
