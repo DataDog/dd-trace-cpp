@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iostream>  // TODO: no
 
 #include "datadog_agent.h"
 #include "dict_reader.h"
@@ -471,10 +472,11 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   Optional<Span> debug_span;
   if (debug_tracer_) {
+    std::cerr << "IT'S HAPPENING AUUUUGHHHH!!!!!!!!!!!!\n";  // TODO: no
     SpanConfig debug_config;
     debug_config.start = span_data->start;
     debug_config.name = "trace_segment";
-    debug_span.emplace(debug_tracer_->create_span());
+    debug_span.emplace(debug_tracer_->create_span(debug_config));
 
     debug_span->set_tag("metatrace.extract.TODO", "put stuff here");
   }
