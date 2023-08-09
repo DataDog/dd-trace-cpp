@@ -283,6 +283,7 @@ std::shared_ptr<Tracer> Tracer::make_debug_tracer() const {
   FinalizedTraceSamplerConfig::Rule keep_all;
   keep_all.sample_rate = Rate::one();
   debug_config.trace_sampler.rules.emplace_back(std::move(keep_all));
+  debug_config.trace_sampler.max_per_second = 9999999; // TODO: large
 
   debug_config.injection_styles =
       debug_config.extraction_styles = {PropagationStyle::NONE};
