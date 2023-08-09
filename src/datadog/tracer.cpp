@@ -286,8 +286,8 @@ std::shared_ptr<Tracer> Tracer::make_debug_tracer() const {
   debug_config.injection_styles =
       debug_config.extraction_styles = {PropagationStyle::NONE};
   debug_config.report_hostname = hostname_.has_value();
-  debug_config.logger = logger_;  // TODO: how can we distinguish?
-  debug_config.log_on_startup = false;
+  debug_config.logger = logger_;       // TODO: how can we distinguish?
+  debug_config.log_on_startup = true;  // TODO: false
   debug_config.trace_id_128_bit = true;
 
   return std::make_shared<Tracer>(debug_config);
@@ -306,6 +306,13 @@ Span Tracer::create_span(const SpanConfig& config) {
   }
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
+
+  // TODO: no
+  logger_->log_error([&](std::ostream& log) {
+    log << "create_span was called! I chose a trace ID whose lower bits are "
+        << span_data->trace_id.low;
+  });
+  // end TODO
 
   Optional<Span> debug_span;
   if (debug_tracer_) {
