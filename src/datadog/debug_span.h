@@ -5,8 +5,12 @@
 #include "optional.h"
 #include "span.h"
 
+#include <cassert>
+
 namespace datadog {
 namespace tracing {
+
+// TODO: Move implementations to cpp file.
 
 class DebugSpan {
   Optional<Span> child_;
@@ -16,6 +20,12 @@ class DebugSpan {
   // and store the child in this object. If `parent` does not contain a value,
   // then do nothing.
   explicit DebugSpan(const Optional<Span>& parent) {
+    if (parent) {
+      child_.emplace(parent->create_child());
+    }
+  }
+
+  explicit DebugSpan(const Span* parent) {
     if (parent) {
       child_.emplace(parent->create_child());
     }

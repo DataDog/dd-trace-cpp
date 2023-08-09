@@ -65,17 +65,17 @@ class Span {
   std::function<std::uint64_t()> generate_span_id_;
   Clock clock_;
   Optional<std::chrono::steady_clock::time_point> end_time_;
+  std::unique_ptr<Span> debug_span_;
 
  public:
   // Create a span whose properties are stored in the specified `data`, that is
   // associated with the specified `trace_segment`, that uses the specified
   // `generate_span_id` to generate IDs of child spans, and that uses the
   // specified `clock` to determine start and end times.
-  // TODO: How do we get the debug span here? `Span *debug_parent`?
-  // TODO: But then where is _our_ debug span stored?
   Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
        const std::function<std::uint64_t()>& generate_span_id,
-       const Clock& clock);
+       const Clock& clock,
+       Span *debug_parent = nullptr);
   Span(const Span&) = delete;
   Span(Span&&) = default;
   Span& operator=(Span&&) = delete;

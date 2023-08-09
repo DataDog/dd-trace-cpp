@@ -79,6 +79,9 @@ class Tracer {
   // Return a JSON object describing this Tracer's configuration. It is the same
   // JSON object that was logged when this Tracer was created.
   nlohmann::json config_json() const;
+
+ private:
+  std::shared_ptr<Tracer> make_debug_tracer() const;
 };
 
 }  // namespace tracing

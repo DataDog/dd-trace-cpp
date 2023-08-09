@@ -163,6 +163,7 @@ int main() {
   dd::TracerConfig config;
   config.defaults.service = "dd-trace-cpp-http-server-example-server";
   config.defaults.service_type = "server";
+  config.debug.enabled = true;
 
   // `finalize_config` validates `config` and applies any settings from
   // environment variables, such as `DD_AGENT_HOST`.

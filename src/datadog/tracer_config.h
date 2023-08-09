@@ -24,6 +24,7 @@ namespace tracing {
 class Collector;
 class Logger;
 class SpanSampler;
+class Tracer;
 class TraceSampler;
 
 struct TracerConfig {
@@ -117,6 +118,7 @@ struct TracerConfig {
 class FinalizedTracerConfig {
   friend Expected<FinalizedTracerConfig> finalize_config(
       const TracerConfig& config);
+  friend class Tracer; // for debug tracing
   FinalizedTracerConfig() = default;
 
  public:
