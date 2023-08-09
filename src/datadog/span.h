@@ -71,7 +71,8 @@ class Span {
   // Create a span whose properties are stored in the specified `data`, that is
   // associated with the specified `trace_segment`, that uses the specified
   // `generate_span_id` to generate IDs of child spans, and that uses the
-  // specified `clock` to determine start and end times.
+  // specified `clock` to determine start and end times. TODO: document
+  // debug_parent
   Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
        const std::function<std::uint64_t()>& generate_span_id,
        const Clock& clock, Span* debug_parent = nullptr);

@@ -72,9 +72,7 @@ class TraceSegment {
   Optional<std::string> additional_datadog_w3c_tracestate_;
   bool awaiting_delegated_sampling_decision_ = false;
 
-  // TODO: come up with better names for these
-  Optional<Span> debug_segment_span_;
-  Optional<Span> debug_lifetime_span_;
+  Optional<Span> debug_span_;
 
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,

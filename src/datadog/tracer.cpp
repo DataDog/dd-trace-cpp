@@ -467,7 +467,15 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     sampling_decision = decision;
   }
 
-  Optional<Span> debug_span;  // TODO
+  Optional<Span> debug_span;
+  if (debug_tracer_) {
+    SpanConfig debug_config;
+    debug_config.start = span_data->start;
+    debug_config.name = "trace_segment";
+    debug_span.emplace(debug_tracer_->create_span());
+
+    debug_span->set_tag("metatrace.extract.TODO", "put stuff here");
+  }
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(

@@ -111,7 +111,7 @@ TraceSegment::TraceSegment(
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)),
-      debug_segment_span_(std::move(debug_span)) {
+      debug_span_(std::move(debug_span)) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);
