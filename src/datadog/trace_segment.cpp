@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iostream>  // TODO: no
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -118,6 +119,8 @@ TraceSegment::TraceSegment(
   assert(span_sampler_);
   assert(defaults_);
 
+  std::cerr << "SEGMENT [" << std::to_string(local_root->trace_id.low)
+            << "] CREATED\n";  // TODO: no
   register_span(std::move(local_root));
 }
 
@@ -141,6 +144,8 @@ void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
   spans_.emplace_back(std::move(span));
+  std::cerr << "SEGMENT [" << std::to_string(spans_.front()->trace_id.low)
+            << "] REGISTER " << spans_.back()->span_id << '\n';  // TODO: no
 }
 
 void TraceSegment::span_finished() {
@@ -148,10 +153,15 @@ void TraceSegment::span_finished() {
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
     assert(num_finished_spans_ <= spans_.size());
+    std::cerr << "SEGMENT [" << std::to_string(spans_.front()->trace_id.low)
+              << "] FINISH " << num_finished_spans_ << '/' << spans_.size()
+              << '\n';  // TODO: no
     if (num_finished_spans_ < spans_.size()) {
       return;
     }
   }
+  std::cerr << "SEGMENT [" << std::to_string(spans_.front()->trace_id.low)
+            << "] DONE\n";  // TODO: no
   // We don't need the lock anymore.  There's nobody left to call our methods.
   // On the other hand, there's nobody left to contend for the mutex, so it
   // doesn't make any difference.
