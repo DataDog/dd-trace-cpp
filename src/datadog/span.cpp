@@ -17,8 +17,7 @@ namespace tracing {
 
 Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
            const std::function<std::uint64_t()>& generate_span_id,
-           const Clock& clock,
-           Span *debug_parent)
+           const Clock& clock, Span* debug_parent)
     : trace_segment_(trace_segment),
       data_(data),
       generate_span_id_(generate_span_id),
@@ -72,7 +71,8 @@ Span Span::create_child(const SpanConfig& config) const {
 
   const auto span_data_ptr = span_data.get();
   trace_segment_->register_span(std::move(span_data));
-  return Span(span_data_ptr, trace_segment_, generate_span_id_, clock_, debug_span_.get());
+  return Span(span_data_ptr, trace_segment_, generate_span_id_, clock_,
+              debug_span_.get());
 }
 
 Span Span::create_child() const { return create_child(SpanConfig{}); }
@@ -126,9 +126,8 @@ void Span::set_tag(StringView name, StringView value) {
   });
 
   if (tags::is_internal(name)) {
-    debug.apply([&](Span& span) {
-      span.set_tag("metatrace.tag_internal", name);
-    });
+    debug.apply(
+        [&](Span& span) { span.set_tag("metatrace.tag_internal", name); });
     return;
   }
 
@@ -136,7 +135,7 @@ void Span::set_tag(StringView name, StringView value) {
   const auto found = data_->tags.find(name_str);
   if (found != data_->tags.end()) {
     debug.apply([&](Span& span) {
-        span.set_tag("metatrace.tag.previous_value", found->second);
+      span.set_tag("metatrace.tag.previous_value", found->second);
     });
     assign(found->second, value);
   } else {
@@ -152,9 +151,8 @@ void Span::remove_tag(StringView name) {
   });
 
   if (tags::is_internal(name)) {
-    debug.apply([&](Span& span) {
-      span.set_tag("metatrace.tag.internal", name);
-    });
+    debug.apply(
+        [&](Span& span) { span.set_tag("metatrace.tag.internal", name); });
     return;
   }
 
@@ -162,7 +160,7 @@ void Span::remove_tag(StringView name) {
   const auto found = data_->tags.find(name_str);
   if (found != data_->tags.end()) {
     debug.apply([&](Span& span) {
-        span.set_tag("metatrace.tag.previous_value", found->second);
+      span.set_tag("metatrace.tag.previous_value", found->second);
     });
     data_->tags.erase(found);
   }
@@ -201,9 +199,10 @@ void Span::set_resource_name(StringView resource) {
 void Span::set_error(bool is_error) {
   DebugSpan debug{debug_span_.get()};
   debug.apply([&, this](Span& span) {
-      span.set_name("set_error");
-      span.set_tag("metatrace.error.previous_value", data_->error ? "true" : "false");
-      span.set_tag("metatrace.error.proposed_value", is_error ? "true" : "false");
+    span.set_name("set_error");
+    span.set_tag("metatrace.error.previous_value",
+                 data_->error ? "true" : "false");
+    span.set_tag("metatrace.error.proposed_value", is_error ? "true" : "false");
   });
 
   data_->error = is_error;
@@ -218,12 +217,13 @@ void Span::set_error_message(StringView message) {
 
   DebugSpan debug{debug_span_.get()};
   debug.apply([&, this](Span& span) {
-      span.set_name("set_error_message");
-      span.set_tag("metatrace.error.previous_value", data_->error ? "true" : "false");
-      span.set_tag("metatrace.error.message.proposed_value", message);
-      if (found != data_->tags.end()) {
-        span.set_tag("metatrace.error.message.previous_value", found->second);
-      }
+    span.set_name("set_error_message");
+    span.set_tag("metatrace.error.previous_value",
+                 data_->error ? "true" : "false");
+    span.set_tag("metatrace.error.message.proposed_value", message);
+    if (found != data_->tags.end()) {
+      span.set_tag("metatrace.error.message.previous_value", found->second);
+    }
   });
 
   data_->error = true;
@@ -239,12 +239,13 @@ void Span::set_error_type(StringView type) {
 
   DebugSpan debug{debug_span_.get()};
   debug.apply([&, this](Span& span) {
-      span.set_name("set_error_type");
-      span.set_tag("metatrace.error.previous_value", data_->error ? "true" : "false");
-      span.set_tag("metatrace.error.type.proposed_value", type);
-      if (found != data_->tags.end()) {
-        span.set_tag("metatrace.error.type.previous_value", found->second);
-      }
+    span.set_name("set_error_type");
+    span.set_tag("metatrace.error.previous_value",
+                 data_->error ? "true" : "false");
+    span.set_tag("metatrace.error.type.proposed_value", type);
+    if (found != data_->tags.end()) {
+      span.set_tag("metatrace.error.type.previous_value", found->second);
+    }
   });
 
   data_->error = true;
@@ -260,12 +261,13 @@ void Span::set_error_stack(StringView stack) {
 
   DebugSpan debug{debug_span_.get()};
   debug.apply([&, this](Span& span) {
-      span.set_name("set_error_stack");
-      span.set_tag("metatrace.error.previous_value", data_->error ? "true" : "false");
-      span.set_tag("metatrace.error.stack.proposed_value", stack);
-      if (found != data_->tags.end()) {
-        span.set_tag("metatrace.error.stack.previous_value", found->second);
-      }
+    span.set_name("set_error_stack");
+    span.set_tag("metatrace.error.previous_value",
+                 data_->error ? "true" : "false");
+    span.set_tag("metatrace.error.stack.proposed_value", stack);
+    if (found != data_->tags.end()) {
+      span.set_tag("metatrace.error.stack.previous_value", found->second);
+    }
   });
 
   data_->error = true;
@@ -279,9 +281,9 @@ void Span::set_error_stack(StringView stack) {
 void Span::set_name(StringView value) {
   DebugSpan debug{debug_span_.get()};
   debug.apply([&, this](Span& span) {
-      span.set_name("set_name");
-      span.set_tag("metatrace.name.proposed_value", value);
-      span.set_tag("metatrace.name.previous_value", data_->name);
+    span.set_name("set_name");
+    span.set_tag("metatrace.name.proposed_value", value);
+    span.set_tag("metatrace.name.previous_value", data_->name);
   });
 
   assign(data_->name, value);
@@ -290,14 +292,30 @@ void Span::set_name(StringView value) {
 void Span::set_end_time(std::chrono::steady_clock::time_point end_time) {
   DebugSpan debug{debug_span_.get()};
   debug.apply([&, this](Span& span) {
-      span.set_name("set_end_time");
-      span.set_tag("metatrace.end_time.proposed_value", std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(end_time.time_since_epoch()).count()));
-      span.set_tag("metatrace.duration.proposed_value", std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time().tick).count()));
-      if (end_time_) {
-        span.set_tag("metatrace.end_time.previous_value", std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_->time_since_epoch()).count()));
-        span.set_tag("metatrace.duration.previous_value", std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(*end_time_ - start_time().tick).count()));
-      }
-      span.set_end_time(end_time);
+    span.set_name("set_end_time");
+    span.set_tag(
+        "metatrace.end_time.proposed_value",
+        std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           end_time.time_since_epoch())
+                           .count()));
+    span.set_tag(
+        "metatrace.duration.proposed_value",
+        std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           end_time - start_time().tick)
+                           .count()));
+    if (end_time_) {
+      span.set_tag(
+          "metatrace.end_time.previous_value",
+          std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                             end_time_->time_since_epoch())
+                             .count()));
+      span.set_tag(
+          "metatrace.duration.previous_value",
+          std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                             *end_time_ - start_time().tick)
+                             .count()));
+    }
+    span.set_end_time(end_time);
   });
 
   end_time_ = end_time;

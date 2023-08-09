@@ -270,26 +270,27 @@ nlohmann::json Tracer::config_json() const {
 }
 
 std::shared_ptr<Tracer> Tracer::make_debug_tracer() const {
-    // TODO: remotely turning this on and off would be nice
-    FinalizedTracerConfig debug_config;
+  // TODO: remotely turning this on and off would be nice
+  FinalizedTracerConfig debug_config;
 
-    debug_config.defaults.environment = defaults_->environment;
-    debug_config.defaults.service = defaults_->service;
-    debug_config.defaults.tags.emplace("metatrace.service", defaults_->service);
+  debug_config.defaults.environment = defaults_->environment;
+  debug_config.defaults.service = defaults_->service;
+  debug_config.defaults.tags.emplace("metatrace.service", defaults_->service);
 
-    debug_config.collector = collector_; // TODO: telemetry API?
+  debug_config.collector = collector_;  // TODO: telemetry API?
 
-    FinalizedTraceSamplerConfig::Rule keep_all;
-    keep_all.sample_rate = Rate::one();
-    debug_config.trace_sampler.rules.emplace_back(std::move(keep_all));
+  FinalizedTraceSamplerConfig::Rule keep_all;
+  keep_all.sample_rate = Rate::one();
+  debug_config.trace_sampler.rules.emplace_back(std::move(keep_all));
 
-    debug_config.injection_styles = debug_config.extraction_styles = {PropagationStyle::NONE};
-    debug_config.report_hostname = hostname_.has_value();
-    debug_config.logger = logger_; // TODO: how can we distinguish?
-    debug_config.log_on_startup = false;
-    debug_config.trace_id_128_bit = true;
+  debug_config.injection_styles =
+      debug_config.extraction_styles = {PropagationStyle::NONE};
+  debug_config.report_hostname = hostname_.has_value();
+  debug_config.logger = logger_;  // TODO: how can we distinguish?
+  debug_config.log_on_startup = false;
+  debug_config.trace_id_128_bit = true;
 
-    return std::make_shared<Tracer>(debug_config);
+  return std::make_shared<Tracer>(debug_config);
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }
@@ -317,13 +318,15 @@ Span Tracer::create_span(const SpanConfig& config) {
       debug_span->set_tag("metatrace.span_config.service", *config.service);
     }
     if (config.service_type) {
-      debug_span->set_tag("metatrace.span_config.service_type", *config.service_type);
+      debug_span->set_tag("metatrace.span_config.service_type",
+                          *config.service_type);
     }
     if (config.version) {
       debug_span->set_tag("metatrace.span_config.version", *config.version);
     }
     if (config.environment) {
-      debug_span->set_tag("metatrace.span_config.environment", *config.environment);
+      debug_span->set_tag("metatrace.span_config.environment",
+                          *config.environment);
     }
     if (config.name) {
       debug_span->set_tag("metatrace.span_config.name", *config.name);
@@ -332,7 +335,8 @@ Span Tracer::create_span(const SpanConfig& config) {
       debug_span->set_tag("metatrace.span_config.resource", *config.resource);
     }
     if (!config.tags.empty()) {
-      debug_span->set_tag("metatrace.span_config.tags", nlohmann::json(config.tags).dump());
+      debug_span->set_tag("metatrace.span_config.tags",
+                          nlohmann::json(config.tags).dump());
     }
   }
 

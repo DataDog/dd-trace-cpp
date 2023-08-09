@@ -2,10 +2,10 @@
 
 // TODO
 
+#include <cassert>
+
 #include "optional.h"
 #include "span.h"
-
-#include <cassert>
 
 namespace datadog {
 namespace tracing {
