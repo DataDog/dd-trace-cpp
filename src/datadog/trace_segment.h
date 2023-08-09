@@ -111,6 +111,11 @@ class TraceSegment {
   // Increment the number of finished spans.  If that number is equal to the
   // number of registered spans, send all of the spans to the `Collector`.
   void span_finished();
+  // If debug tracing is enabled for this trace segment, then return a pointer
+  // to the debug span that represents the lifetime of and subsequent processing
+  // by the collector for this trace segment. If debug tracing is not enabled,
+  // then return `nullptr`;
+  Span* debug_span();
 
   // Set the sampling decision to be a local, manual decision with the specified
   // sampling `priority`.  Overwrite any previous sampling decision.

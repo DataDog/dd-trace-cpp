@@ -75,7 +75,7 @@ class Span {
   // debug_parent
   Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
        const std::function<std::uint64_t()>& generate_span_id,
-       const Clock& clock, Span* debug_parent = nullptr);
+       const Clock& clock, Span* debug_parent);
   Span(const Span&) = delete;
   Span(Span&&) = default;
   Span& operator=(Span&&) = delete;

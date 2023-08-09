@@ -225,6 +225,10 @@ void TraceSegment::span_finished() {
   }
 }
 
+Span* TraceSegment::debug_span() {
+  return debug_span_ ? &*debug_span_ : nullptr;
+}
+
 void TraceSegment::override_sampling_priority(int priority) {
   SamplingDecision decision;
   decision.priority = priority;

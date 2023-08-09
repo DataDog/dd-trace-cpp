@@ -274,7 +274,7 @@ std::shared_ptr<Tracer> Tracer::make_debug_tracer() const {
   FinalizedTracerConfig debug_config;
 
   debug_config.defaults.environment = defaults_->environment;
-  debug_config.defaults.service = defaults_->service;
+  debug_config.defaults.service = "dd-trace-cpp-debug";
   debug_config.defaults.tags.emplace("metatrace.service", defaults_->service);
 
   debug_config.collector = collector_;  // TODO: telemetry API?
@@ -349,8 +349,8 @@ Span Tracer::create_span(const SpanConfig& config) {
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data),
       std::move(debug_span));
   Span span{span_data_ptr, segment,
-            [generator = generator_]() { return generator->span_id(); },
-            clock_};
+            [generator = generator_]() { return generator->span_id(); }, clock_,
+            segment->debug_span()};
   return span;
 }
 
@@ -486,8 +486,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       std::move(additional_datadog_w3c_tracestate), std::move(span_data),
       std::move(debug_span));
   Span span{span_data_ptr, segment,
-            [generator = generator_]() { return generator->span_id(); },
-            clock_};
+            [generator = generator_]() { return generator->span_id(); }, clock_,
+            segment->debug_span()};
   return span;
 }
 
