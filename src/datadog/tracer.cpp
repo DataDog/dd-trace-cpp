@@ -290,6 +290,8 @@ std::shared_ptr<Tracer> Tracer::make_debug_tracer() const {
   debug_config.log_on_startup = true;  // TODO: false
   debug_config.trace_id_128_bit = true;
 
+  debug_config.debug.enabled = false;  // no infinite recursion
+
   return std::make_shared<Tracer>(debug_config);
 }
 
@@ -307,19 +309,12 @@ Span Tracer::create_span(const SpanConfig& config) {
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
 
-  // TODO: no
-  logger_->log_error([&](std::ostream& log) {
-    log << "create_span was called! I chose a trace ID whose lower bits are "
-        << span_data->trace_id.low;
-  });
-  // end TODO
-
   Optional<Span> debug_span;
   if (debug_tracer_) {
     SpanConfig debug_config;
     debug_config.start = span_data->start;
     debug_config.name = "trace_segment";
-    debug_span.emplace(debug_tracer_->create_span());
+    debug_span.emplace(debug_tracer_->create_span(debug_config));
 
     if (config.service) {
       debug_span->set_tag("metatrace.span_config.service", *config.service);

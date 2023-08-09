@@ -134,6 +134,7 @@ int main() {
   dd::TracerConfig config;
   config.defaults.service = "dd-trace-cpp-example";
   config.defaults.environment = "dev";
+  config.debug.enabled = true;
 
   auto validated = dd::finalize_config(config);
   if (auto *error = validated.if_error()) {

@@ -30,7 +30,15 @@ Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
   if (debug_parent) {
     SpanConfig config;
     config.start = start_time();
-    config.tags["span_id"] = std::to_string(id());
+    config.name = "span";
+    config.tags.emplace("metatrace.span.id", std::to_string(id()));
+    config.tags.emplace("metatrace.span.service", service_name());
+    config.tags.emplace("metatrace.span.name", name());
+    config.tags.emplace("metatrace.span.resource", resource_name());
+    if (const auto parent = parent_id()) {
+      config.tags.emplace("metatrace.span.parent_id", std::to_string(*parent));
+    }
+
     debug_span_ = std::make_unique<Span>(debug_parent->create_child(config));
   }
 }
@@ -53,21 +61,11 @@ Span::~Span() {
 }
 
 Span Span::create_child(const SpanConfig& config) const {
-  DebugSpan debug{debug_span_.get()};
-
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(trace_segment_->defaults(), config, clock_);
   span_data->trace_id = data_->trace_id;
   span_data->parent_id = data_->span_id;
   span_data->span_id = generate_span_id_();
-
-  debug.apply([&](Span& span) {
-    span.set_name("create_child");
-    span.set_tag("metatrace.span.id", std::to_string(span_data->span_id));
-    span.set_tag("metatrace.span.service", span_data->service);
-    span.set_tag("metatrace.span.name", span_data->name);
-    span.set_tag("metatrace.span.resource", span_data->resource);
-  });
 
   const auto span_data_ptr = span_data.get();
   trace_segment_->register_span(std::move(span_data));
