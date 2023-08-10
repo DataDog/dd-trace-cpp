@@ -18,6 +18,7 @@
 namespace datadog {
 namespace tracing {
 
+class Span;
 struct SpanConfig;
 struct SpanDefaults;
 
@@ -48,14 +49,16 @@ struct SpanData {
 
 // Append to the specified `destination` the MessagePack representation of the
 // specified `span`.
-Expected<void> msgpack_encode(std::string& destination, const SpanData& span);
+Expected<void> msgpack_encode(std::string& destination, const SpanData& span,
+                              const Span* debug_parent);
 
 // Append to the specified `destination` the MessagePack representation of an
 // array containing each of the specified `spans`.  The behavior is undefined
 // if any span is `nullptr`.
 Expected<void> msgpack_encode(
     std::string& destination,
-    const std::vector<std::unique_ptr<SpanData>>& spans);
+    const std::vector<std::unique_ptr<SpanData>>& spans,
+    const Span* debug_parent);
 
 }  // namespace tracing
 }  // namespace datadog

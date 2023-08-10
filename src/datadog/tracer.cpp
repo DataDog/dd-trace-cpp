@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <iostream>  // TODO: no
 
 #include "datadog_agent.h"
 #include "dict_reader.h"
@@ -283,7 +282,7 @@ std::shared_ptr<Tracer> Tracer::make_debug_tracer() const {
   FinalizedTraceSamplerConfig::Rule keep_all;
   keep_all.sample_rate = Rate::one();
   debug_config.trace_sampler.rules.emplace_back(std::move(keep_all));
-  debug_config.trace_sampler.max_per_second = 9999999; // TODO: large
+  debug_config.trace_sampler.max_per_second = 9999999;  // TODO: large
 
   debug_config.injection_styles =
       debug_config.extraction_styles = {PropagationStyle::NONE};
@@ -294,7 +293,17 @@ std::shared_ptr<Tracer> Tracer::make_debug_tracer() const {
 
   debug_config.debug.enabled = false;  // no infinite recursion
 
-  return std::make_shared<Tracer>(debug_config);
+  auto debug_tracer = std::make_shared<Tracer>(debug_config);
+
+  // If our collector is a `DatadogAgent` instance, then when the collector
+  // receives traces with debug segments, it will want to create a debug trace
+  // corresponding to its "flush" operation. For this, it needs a tracer. Use
+  // this tracer.
+  if (auto* agent = dynamic_cast<DatadogAgent*>(collector_.get())) {
+    agent->install_debug_tracer(debug_tracer);
+  }
+
+  return debug_tracer;
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }
@@ -473,7 +482,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   Optional<Span> debug_span;
   if (debug_tracer_) {
-    std::cerr << "IT'S HAPPENING AUUUUGHHHH!!!!!!!!!!!!\n";  // TODO: no
     SpanConfig debug_config;
     debug_config.start = span_data->start;
     debug_config.name = "trace_segment";

@@ -16,13 +16,12 @@ services:
 
     # The C++ HTTP server to which we added Datadog tracing
     server:
-        build:
-            context: ./server
-            dockerfile: ./Dockerfile
+        image: datadog/docker-library:dd-trace-cpp-ci
         environment:
-            # This will override any value of `datadog::tracing::TracerConfig`'s
-            # `.agent.url` in `server.cpp`.
             - DD_AGENT_HOST=datadog-agent
+        volumes:
+            - ../../:/mnt/repo
+        command: "/bin/bash -c 'cd /mnt/repo && bin/cmake-build && cd .build && make install >/dev/null && ldconfig && c++ --std=c++17 -Wall -Wextra -pedantic -Werror -Og -o /tmp/server ../examples/http-server/server/server.cpp -ldd_trace_cpp && /tmp/server'"
         depends_on:
             - datadog-agent
 
@@ -35,6 +34,7 @@ services:
         environment:
             - DD_AGENT_HOST=datadog-agent
             - DD_SERVICE=dd-trace-cpp-http-server-example-database
+        stop_signal: SIGKILL
         depends_on:
             - datadog-agent
 
@@ -42,7 +42,8 @@ services:
     datadog-agent:
         image: datadog/agent
         volumes:
-            - '/var/run/docker.sock:/var/run/docker.sock:ro'
+            # - '/var/run/docker.sock:/var/run/docker.sock:ro'
+            - '/run/user/1000/docker.sock:/var/run/docker.sock:ro'
             - '/proc/:/host/proc/:ro'
             - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
         environment:

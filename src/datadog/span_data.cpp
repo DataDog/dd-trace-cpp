@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstddef>
 
+#include "debug_span.h"
 #include "error.h"
 #include "msgpack.h"
 #include "span_config.h"
@@ -65,7 +66,10 @@ void SpanData::apply_config(const SpanDefaults& defaults,
   }
 }
 
-Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
+Expected<void> msgpack_encode(std::string& destination, const SpanData& span,
+                              const Span* debug_parent) {
+  DebugSpan debug{debug_parent};
+  const auto size_before = destination.size();
   // clang-format off
   msgpack::pack_map(
       destination,
@@ -125,17 +129,28 @@ Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
        });
   // clang-format on
 
+  const auto size_after = destination.size();
+  debug.apply([&](Span& debug_span) {
+    debug_span.set_name("encode.span");
+    debug_span.set_tag("metatrace.trace_id", std::to_string(span.trace_id.low));
+    debug_span.set_tag("metatrace.span_id", std::to_string(span.span_id));
+    debug_span.set_tag("metatrace.span.encoded_size",
+                       std::to_string(size_after - size_before));
+  });
+
   return nullopt;
 }
 
 Expected<void> msgpack_encode(
     std::string& destination,
-    const std::vector<std::unique_ptr<SpanData>>& spans) {
-  return msgpack::pack_array(destination, spans,
-                             [](auto& destination, const auto& span_ptr) {
-                               assert(span_ptr);
-                               return msgpack_encode(destination, *span_ptr);
-                             });
+    const std::vector<std::unique_ptr<SpanData>>& spans,
+    const Span* debug_parent) {
+  return msgpack::pack_array(
+      destination, spans,
+      [&](std::string& destination, const std::unique_ptr<SpanData>& span) {
+        assert(span);
+        return msgpack_encode(destination, *span, debug_parent);
+      });
 }
 
 }  // namespace tracing

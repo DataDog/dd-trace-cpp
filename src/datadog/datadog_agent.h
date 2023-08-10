@@ -21,6 +21,7 @@ namespace tracing {
 class FinalizedDatadogAgentConfig;
 class Logger;
 struct SpanData;
+class Tracer;
 class TraceSampler;
 
 class DatadogAgent : public Collector {
@@ -28,6 +29,9 @@ class DatadogAgent : public Collector {
   struct TraceChunk {
     std::vector<std::unique_ptr<SpanData>> spans;
     std::shared_ptr<TraceSampler> response_handler;
+    Optional<Span> debug_parent;
+    Optional<Span> debug_enqueued;
+    Optional<Span> debug_span;
   };
 
  private:
@@ -40,11 +44,12 @@ class DatadogAgent : public Collector {
   std::shared_ptr<EventScheduler> event_scheduler_;
   EventScheduler::Cancel cancel_scheduled_flush_;
   std::chrono::steady_clock::duration flush_interval_;
+  std::weak_ptr<Tracer> debug_tracer_;
 
   void flush();
 
  public:
-  DatadogAgent(const FinalizedDatadogAgentConfig&, const Clock& clock,
+  DatadogAgent(const FinalizedDatadogAgentConfig&, const Clock&,
                const std::shared_ptr<Logger>&);
   ~DatadogAgent();
 
@@ -52,7 +57,13 @@ class DatadogAgent : public Collector {
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) override;
 
+  Expected<void> send(std::vector<std::unique_ptr<SpanData>>&& spans,
+                      const std::shared_ptr<TraceSampler>& response_handler,
+                      Optional<Span>&& debug_parent) override;
+
   nlohmann::json config_json() const override;
+
+  void install_debug_tracer(const std::weak_ptr<Tracer>&);
 };
 
 }  // namespace tracing

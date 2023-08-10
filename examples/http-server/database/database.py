@@ -24,7 +24,6 @@ The database initially contains the following table:
 """
 
 import flask
-import gevent
 from gevent.pywsgi import WSGIServer
 import signal
 import sqlite3
@@ -70,8 +69,6 @@ def execute():
 
 
 if __name__ == '__main__':
-    gevent.signal_handler(signal.SIGTERM, sys.exit)
-
     with sqlite3.connect(DB_FILE_PATH) as db:
         db.execute('''
         create table if not exists Note(

@@ -39,6 +39,8 @@ class DebugSpan {
       visit(*child_);
     }
   }
+
+  const Span* get() const { return child_ ? &*child_ : nullptr; }
 };
 
 }  // namespace tracing
