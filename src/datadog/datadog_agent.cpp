@@ -272,7 +272,11 @@ void DatadogAgent::flush() {
         config.name = "flush";
         config.start = start;
         // TODO: anything else?
-        debug_span.emplace(debug_tracer_.lock()->create_span(config));
+        if (const auto tracer = debug_tracer_.lock()) {
+          debug_span.emplace(tracer->create_span(config));
+        } else {
+          continue;
+        }
       }
 
       SpanConfig config;
