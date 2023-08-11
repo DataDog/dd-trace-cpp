@@ -310,6 +310,17 @@ std::shared_ptr<Tracer> Tracer::make_debug_tracer() const {
 Span Tracer::create_span() { return create_span(SpanConfig{}); }
 
 Span Tracer::create_span(const SpanConfig& config) {
+  Optional<Span> debug_span;
+  if (debug_tracer_) {
+    SpanConfig debug_config;
+    debug_config.name = "trace_segment";
+    debug_span.emplace(debug_tracer_->create_span(debug_config));
+  }
+  return create_span(config, std::move(debug_span));
+}
+
+Span Tracer::create_span(const SpanConfig& config,
+                         Optional<Span>&& debug_span) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
   std::vector<std::pair<std::string, std::string>> trace_tags;
@@ -321,38 +332,32 @@ Span Tracer::create_span(const SpanConfig& config) {
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
 
-  Optional<Span> debug_span;
-  if (debug_tracer_) {
-    SpanConfig debug_config;
-    debug_config.start = span_data->start;
-    debug_config.name = "trace_segment";
-    debug_span.emplace(debug_tracer_->create_span(debug_config));
-
+  DebugSpan debug{debug_span};
+  debug.apply([&](Span& span) {
+    span.set_name("create");
     if (config.service) {
-      debug_span->set_tag("metatrace.span_config.service", *config.service);
+      span.set_tag("metatrace.span_config.service", *config.service);
     }
     if (config.service_type) {
-      debug_span->set_tag("metatrace.span_config.service_type",
-                          *config.service_type);
+      span.set_tag("metatrace.span_config.service_type", *config.service_type);
     }
     if (config.version) {
-      debug_span->set_tag("metatrace.span_config.version", *config.version);
+      span.set_tag("metatrace.span_config.version", *config.version);
     }
     if (config.environment) {
-      debug_span->set_tag("metatrace.span_config.environment",
-                          *config.environment);
+      span.set_tag("metatrace.span_config.environment", *config.environment);
     }
     if (config.name) {
-      debug_span->set_tag("metatrace.span_config.name", *config.name);
+      span.set_tag("metatrace.span_config.name", *config.name);
     }
     if (config.resource) {
-      debug_span->set_tag("metatrace.span_config.resource", *config.resource);
+      span.set_tag("metatrace.span_config.resource", *config.resource);
     }
     if (!config.tags.empty()) {
-      debug_span->set_tag("metatrace.span_config.tags",
-                          nlohmann::json(config.tags).dump());
+      span.set_tag("metatrace.span_config.tags",
+                   nlohmann::json(config.tags).dump());
     }
-  }
+  });
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
@@ -374,14 +379,19 @@ Expected<Span> Tracer::extract_span(const DictReader& reader) {
 
 Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
-  assert(!extraction_styles_.empty());
-
   Optional<Span> debug_span;
   if (debug_tracer_) {
     SpanConfig debug_config;
     debug_config.name = "trace_segment";
     debug_span.emplace(debug_tracer_->create_span(debug_config));
   }
+  return extract_span(reader, config, std::move(debug_span));
+}
+
+Expected<Span> Tracer::extract_span(const DictReader& reader,
+                                    const SpanConfig& config,
+                                    Optional<Span>&& debug_span) {
+  assert(!extraction_styles_.empty());
 
   DebugSpan debug_extract{debug_span};
   const DictReader* r = &reader;
@@ -440,6 +450,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     }
     auto data = extract(*r, span_data->tags, *logger_);
     if (auto* error = data.if_error()) {
+      debug_extract.apply(
+          [&](Span& span) { span.set_error_message(error->message); });
       return std::move(*error);
     }
     extracted = *data;
@@ -551,9 +563,16 @@ Expected<Span> Tracer::extract_or_create_span(const DictReader& reader) {
 
 Expected<Span> Tracer::extract_or_create_span(const DictReader& reader,
                                               const SpanConfig& config) {
-  auto maybe_span = extract_span(reader, config);
+  Optional<Span> debug_span;
+  if (debug_tracer_) {
+    SpanConfig debug_config;
+    debug_config.name = "trace_segment";
+    debug_span.emplace(debug_tracer_->create_span(debug_config));
+  }
+
+  auto maybe_span = extract_span(reader, config, std::move(debug_span));
   if (!maybe_span && maybe_span.error().code == Error::NO_SPAN_TO_EXTRACT) {
-    return create_span(config);
+    return create_span(config, std::move(debug_span));
   }
   return maybe_span;
 }

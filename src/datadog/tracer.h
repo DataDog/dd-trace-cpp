@@ -82,6 +82,12 @@ class Tracer {
 
  private:
   std::shared_ptr<Tracer> make_debug_tracer() const;
+
+  Span create_span(const SpanConfig& config, Optional<Span>&& debug_span);
+
+  Expected<Span> extract_span(const DictReader& reader,
+                              const SpanConfig& config,
+                              Optional<Span>&& debug_span);
 };
 
 }  // namespace tracing
