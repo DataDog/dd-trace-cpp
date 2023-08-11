@@ -4,6 +4,7 @@
 #include <cassert>
 
 #include "datadog_agent.h"
+#include "debug_span.h"
 #include "dict_reader.h"
 #include "environment.h"
 #include "extracted_data.h"
@@ -375,8 +376,49 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
   assert(!extraction_styles_.empty());
 
+  Optional<Span> debug_span;
+  if (debug_tracer_) {
+    SpanConfig debug_config;
+    debug_config.name = "trace_segment";
+    debug_span.emplace(debug_tracer_->create_span(debug_config));
+  }
+
+  DebugSpan debug_extract{debug_span};
+  const DictReader* r = &reader;
+  struct DebugReader : public DictReader {
+    const DictReader* reader;
+    Span* debug;
+
+    Optional<StringView> lookup(StringView key) const override {
+      auto result = reader->lookup(key);
+      std::string tag_name = "metatrace.propagation.";
+      if (result) {
+        append(tag_name, ".header.");
+        append(tag_name, key);
+        debug->set_tag(tag_name, *result);
+      } else {
+        append(tag_name, ".missing_header.");
+        append(tag_name, key);
+        debug->set_tag(tag_name, "");
+      }
+      return result;
+    }
+    void visit(const std::function<void(StringView key, StringView value)>&
+                   visitor) const override {
+      reader->visit(visitor);
+    }
+  } debug_reader;
+  debug_extract.apply([&](Span& span) {
+    span.set_name("extract_span");
+    span.set_tag("metatrace.propagation.extraction_styles",
+                 to_json(extraction_styles_).dump());
+    debug_reader.reader = &reader;
+    debug_reader.debug = &span;
+    r = &debug_reader;
+  });
+
   auto span_data = std::make_unique<SpanData>();
-  ExtractedData extracted_data;
+  ExtractedData extracted;
 
   for (const auto style : extraction_styles_) {
     using Extractor = decltype(&extract_datadog);  // function pointer
@@ -393,25 +435,21 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         break;
       default:
         assert(style == PropagationStyle::NONE);
-        extracted_data = ExtractedData{};
+        extracted = ExtractedData{};
         continue;
     }
-    auto data = extract(reader, span_data->tags, *logger_);
+    auto data = extract(*r, span_data->tags, *logger_);
     if (auto* error = data.if_error()) {
       return std::move(*error);
     }
-    extracted_data = *data;
+    extracted = *data;
     // If the extractor produced a non-null trace ID, then we consider this
     // extraction style the one "chosen" for this trace.
     // Otherwise, we loop around to the next configured extraction style.
-    if (extracted_data.trace_id) {
+    if (extracted.trace_id) {
       break;
     }
   }
-
-  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
-         additional_w3c_tracestate, additional_datadog_w3c_tracestate] =
-      extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -427,52 +465,64 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   //     - if origin is _not_ set, then it's an error
   // - trace ID and parent ID means we're extracting a child span
 
-  if (!trace_id && !parent_id) {
-    return Error{Error::NO_SPAN_TO_EXTRACT,
-                 "There's neither a trace ID nor a parent span ID to extract."};
-  }
-  if (!trace_id) {
-    std::string message;
-    message +=
-        "There's no trace ID to extract, but there is a parent span ID: ";
-    message += std::to_string(*parent_id);
-    return Error{Error::MISSING_TRACE_ID, std::move(message)};
-  }
-  if (!parent_id && !origin) {
-    std::string message;
-    message +=
-        "There's no parent span ID to extract, but there is a trace ID: ";
-    message += "[hexadecimal = ";
-    message += trace_id->hex_padded();
-    if (trace_id->high == 0) {
-      message += ", decimal = ";
-      message += std::to_string(trace_id->low);
+  const auto enforce_policies = [&]() -> Expected<void> {
+    if (!extracted.trace_id && !extracted.parent_id) {
+      return Error{
+          Error::NO_SPAN_TO_EXTRACT,
+          "There's neither a trace ID nor a parent span ID to extract."};
     }
-    message += ']';
-    return Error{Error::MISSING_PARENT_SPAN_ID, std::move(message)};
+    if (!extracted.trace_id) {
+      std::string message;
+      message +=
+          "There's no trace ID to extract, but there is a parent span ID: ";
+      message += std::to_string(*extracted.parent_id);
+      return Error{Error::MISSING_TRACE_ID, std::move(message)};
+    }
+    if (!extracted.parent_id && !extracted.origin) {
+      std::string message;
+      message +=
+          "There's no parent span ID to extract, but there is a trace ID: ";
+      message += "[hexadecimal = ";
+      message += extracted.trace_id->hex_padded();
+      if (extracted.trace_id->high == 0) {
+        message += ", decimal = ";
+        message += std::to_string(extracted.trace_id->low);
+      }
+      message += ']';
+      return Error{Error::MISSING_PARENT_SPAN_ID, std::move(message)};
+    }
+
+    return nullopt;
+  };
+
+  auto policy_result = enforce_policies();
+  if (Error* error = policy_result.if_error()) {
+    debug_extract.apply(
+        [&](Span& span) { span.set_error_message(error->message); });
+    return std::move(*error);
   }
 
-  if (!parent_id) {
+  if (!extracted.parent_id) {
     // We have a trace ID, but not parent ID.  We're meant to be the root, and
     // whoever called us already created a trace ID for us (to correlate with
     // whatever they're doing).
-    parent_id = 0;
+    extracted.parent_id = 0;
   }
 
   // We're done extracting fields.  Now create the span.
   // This is similar to what we do in `create_span`.
-  assert(parent_id);
-  assert(trace_id);
+  assert(extracted.parent_id);
+  assert(extracted.trace_id);
 
   span_data->apply_config(*defaults_, config, clock_);
   span_data->span_id = generator_->span_id();
-  span_data->trace_id = *trace_id;
-  span_data->parent_id = *parent_id;
+  span_data->trace_id = *extracted.trace_id;
+  span_data->parent_id = *extracted.parent_id;
 
   Optional<SamplingDecision> sampling_decision;
-  if (sampling_priority) {
+  if (extracted.sampling_priority) {
     SamplingDecision decision;
-    decision.priority = *sampling_priority;
+    decision.priority = *extracted.sampling_priority;
     // `decision.mechanism` is null.  We might be able to infer it once we
     // extract `trace_tags`, but we would have no use for it, so we won't.
     decision.origin = SamplingDecision::Origin::EXTRACTED;
@@ -480,24 +530,15 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     sampling_decision = decision;
   }
 
-  Optional<Span> debug_span;
-  if (debug_tracer_) {
-    SpanConfig debug_config;
-    debug_config.start = span_data->start;
-    debug_config.name = "trace_segment";
-    debug_span.emplace(debug_tracer_->create_span(debug_config));
-
-    debug_span->set_tag("metatrace.extract.TODO", "put stuff here");
-  }
-
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
-      injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
-      std::move(trace_tags), std::move(sampling_decision),
-      std::move(additional_w3c_tracestate),
-      std::move(additional_datadog_w3c_tracestate), std::move(span_data),
-      std::move(debug_span));
+      injection_styles_, hostname_, std::move(extracted.origin),
+      tags_header_max_size_, std::move(extracted.trace_tags),
+      std::move(sampling_decision),
+      std::move(extracted.additional_w3c_tracestate),
+      std::move(extracted.additional_datadog_w3c_tracestate),
+      std::move(span_data), std::move(debug_span));
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); }, clock_,
             segment->debug_span()};

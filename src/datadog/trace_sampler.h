@@ -99,6 +99,7 @@ namespace tracing {
 
 struct CollectorResponse;
 struct SamplingDecision;
+class Span;
 struct SpanData;
 
 class TraceSampler {
@@ -115,6 +116,7 @@ class TraceSampler {
   TraceSampler(const FinalizedTraceSamplerConfig& config, const Clock& clock);
 
   // Return a sampling decision for the specified root span.
+  SamplingDecision decide(const SpanData&, Span* debug_parent);
   SamplingDecision decide(const SpanData&);
 
   // Update this sampler's Agent-provided sample rates using the specified

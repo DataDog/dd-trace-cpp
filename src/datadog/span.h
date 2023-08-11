@@ -153,9 +153,12 @@ class Span {
   // Associate a call stack with the error that occurred during the extent of
   // this span.  This also has the effect of calling `set_error(true)`.
   void set_error_stack(StringView);
-  // Set end time of this span.  Doing so will override the default behavior of
-  // using the current time in the destructor.
+  // Set the end time of this span to the optionally specified time point.
+  // Doing so will override the default behavior of using the current time in
+  // the destructor.  If a time point is not specified, then the current time
+  // will be used instead.
   void set_end_time(std::chrono::steady_clock::time_point);
+  void set_end_time();
 
   // Write information about this span and its trace into the specified `writer`
   // for purposes of trace propagation.

@@ -6,6 +6,7 @@
 #include <limits>
 
 #include "collector_response.h"
+#include "debug_span.h"
 #include "json.hpp"
 #include "sampling_decision.h"
 #include "sampling_priority.h"
@@ -20,6 +21,34 @@ TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config,
     : rules_(config.rules),
       limiter_(clock, config.max_per_second),
       limiter_max_per_second_(config.max_per_second) {}
+
+SamplingDecision TraceSampler::decide(const SpanData& span,
+                                      Span* debug_parent) {
+  DebugSpan debug{debug_parent};
+  SamplingDecision decision = decide(span);
+
+  debug.apply([&](Span& span) {
+    span.set_end_time();
+    span.set_name("trace_sampler.decide");
+    span.set_tag("metatrace.sampling.priority",
+                 std::to_string(decision.priority));
+    if (decision.mechanism) {
+      span.set_tag("metatrace.sampling.mechanism",
+                   std::to_string(*decision.mechanism));
+    }
+    if (decision.configured_rate) {
+      span.set_tag("metatrace.sampling.configured_rate",
+                   std::to_string(*decision.configured_rate));
+    }
+    if (decision.limiter_effective_rate) {
+      span.set_tag("metatrace.sampling.limiter_effective_rate",
+                   std::to_string(*decision.limiter_effective_rate));
+    }
+    span.set_tag("metatrace.sampling.origin", to_string(decision.origin));
+  });
+
+  return decision;
+}
 
 SamplingDecision TraceSampler::decide(const SpanData& span) {
   SamplingDecision decision;

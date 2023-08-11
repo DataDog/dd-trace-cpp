@@ -9,6 +9,7 @@
 
 #include "collector.h"
 #include "collector_response.h"
+#include "debug_span.h"
 #include "dict_writer.h"
 #include "error.h"
 #include "hex.h"
@@ -143,7 +144,7 @@ void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
   spans_.emplace_back(std::move(span));
 }
 
-void TraceSegment::span_finished() {
+void TraceSegment::span_finished(Span* debug_parent) {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
@@ -155,12 +156,18 @@ void TraceSegment::span_finished() {
   // We don't need the lock anymore.  There's nobody left to call our methods.
   // On the other hand, there's nobody left to contend for the mutex, so it
   // doesn't make any difference.
-  make_sampling_decision_if_null();
+  DebugSpan debug{debug_parent};
+  debug.apply([](Span& span) { span.set_name("finalize_segment"); });
+  make_sampling_decision_if_null(debug.get());
   assert(sampling_decision_);
 
   // All of our spans are finished.  Run the span sampler, finalize the spans,
   // and then send the spans to the collector.
   if (sampling_decision_->priority <= 0) {
+    DebugSpan span_sampling{debug.get()};
+    span_sampling.apply([](Span& span) {  // TODO
+      span.set_name("span_sampling");
+    });
     // Span sampling happens when the trace is dropped.
     for (const auto& span_ptr : spans_) {
       SpanData& span = *span_ptr;
@@ -185,39 +192,48 @@ void TraceSegment::span_finished() {
 
   const SamplingDecision& decision = *sampling_decision_;
 
-  auto& local_root = *spans_.front();
-  local_root.tags.insert(trace_tags_.begin(), trace_tags_.end());
-  local_root.numeric_tags[tags::internal::sampling_priority] =
-      decision.priority;
-  if (hostname_) {
-    local_root.tags[tags::internal::hostname] = *hostname_;
-  }
-  if (decision.origin == SamplingDecision::Origin::LOCAL) {
-    if (decision.mechanism == int(SamplingMechanism::AGENT_RATE) ||
-        decision.mechanism == int(SamplingMechanism::DEFAULT)) {
-      local_root.numeric_tags[tags::internal::agent_sample_rate] =
-          *decision.configured_rate;
-    } else if (decision.mechanism == int(SamplingMechanism::RULE)) {
-      local_root.numeric_tags[tags::internal::rule_sample_rate] =
-          *decision.configured_rate;
-      if (decision.limiter_effective_rate) {
-        local_root.numeric_tags[tags::internal::rule_limiter_sample_rate] =
-            *decision.limiter_effective_rate;
+  {
+    DebugSpan finalize_tags{debug.get()};
+    finalize_tags.apply([](Span& span) {  // TODO
+      span.set_name("finalize_tags");
+    });
+
+    auto& local_root = *spans_.front();
+    local_root.tags.insert(trace_tags_.begin(), trace_tags_.end());
+    local_root.numeric_tags[tags::internal::sampling_priority] =
+        decision.priority;
+    if (hostname_) {
+      local_root.tags[tags::internal::hostname] = *hostname_;
+    }
+    if (decision.origin == SamplingDecision::Origin::LOCAL) {
+      if (decision.mechanism == int(SamplingMechanism::AGENT_RATE) ||
+          decision.mechanism == int(SamplingMechanism::DEFAULT)) {
+        local_root.numeric_tags[tags::internal::agent_sample_rate] =
+            *decision.configured_rate;
+      } else if (decision.mechanism == int(SamplingMechanism::RULE)) {
+        local_root.numeric_tags[tags::internal::rule_sample_rate] =
+            *decision.configured_rate;
+        if (decision.limiter_effective_rate) {
+          local_root.numeric_tags[tags::internal::rule_limiter_sample_rate] =
+              *decision.limiter_effective_rate;
+        }
       }
     }
-  }
 
-  // Some tags are repeated on all spans.
-  for (const auto& span_ptr : spans_) {
-    SpanData& span = *span_ptr;
-    if (origin_) {
-      span.tags[tags::internal::origin] = *origin_;
+    // Some tags are repeated on all spans.
+    for (const auto& span_ptr : spans_) {
+      SpanData& span = *span_ptr;
+      if (origin_) {
+        span.tags[tags::internal::origin] = *origin_;
+      }
+      span.numeric_tags[tags::internal::process_id] = Cache::process_id;
+      span.tags[tags::internal::language] = "cpp";
+      span.tags[tags::internal::runtime_id] = Cache::runtime_id;
     }
-    span.numeric_tags[tags::internal::process_id] = Cache::process_id;
-    span.tags[tags::internal::language] = "cpp";
-    span.tags[tags::internal::runtime_id] = Cache::runtime_id;
   }
 
+  DebugSpan send{debug.get()};
+  send.apply([](Span& span) { span.set_name("send_to_collector"); });
   const auto result = collector_->send(std::move(spans_), trace_sampler_,
                                        std::move(debug_span_));
   if (auto* error = result.if_error()) {
@@ -241,7 +257,7 @@ void TraceSegment::override_sampling_priority(int priority) {
   update_decision_maker_trace_tag();
 }
 
-void TraceSegment::make_sampling_decision_if_null() {
+void TraceSegment::make_sampling_decision_if_null(Span* debug_parent) {
   // Depending on the context, `mutex_` might need already to be locked.
 
   if (sampling_decision_) {
@@ -249,8 +265,10 @@ void TraceSegment::make_sampling_decision_if_null() {
   }
 
   const SpanData& local_root = *spans_.front();
-  sampling_decision_ = trace_sampler_->decide(local_root);
+  sampling_decision_ = trace_sampler_->decide(local_root, debug_parent);
 
+  DebugSpan debug{debug_parent};
+  debug.apply([](Span& span) { span.set_name("update_decision_maker_tag"); });
   update_decision_maker_trace_tag();
 }
 
@@ -281,12 +299,15 @@ void TraceSegment::update_decision_maker_trace_tag() {
   }
 }
 
-void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
+void TraceSegment::inject(DictWriter& writer, const SpanData& span,
+                          Span* debug_parent) {
   // If the only injection style is `NONE`, then don't do anything.
   if (injection_styles_.size() == 1 &&
       injection_styles_[0] == PropagationStyle::NONE) {
     return;
   }
+
+  DebugSpan debug{debug_parent};
 
   // The sampling priority can change (it can be overridden on another thread),
   // and trace tags might change when that happens ("_dd.p.dm").
@@ -296,47 +317,65 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
   std::vector<std::pair<std::string, std::string>> trace_tags;
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    make_sampling_decision_if_null();
+    make_sampling_decision_if_null(debug.get());
     assert(sampling_decision_);
     sampling_priority = sampling_decision_->priority;
     trace_tags = trace_tags_;
   }
 
+  DictWriter* w = &writer;
+  struct DebugWriter : public DictWriter {
+    Span* debug;
+    DictWriter* writer;
+    void set(StringView key, StringView value) override {
+      writer->set(key, value);
+      std::string tag_name;
+      append(tag_name, "metatrace.propagation.header.");
+      append(tag_name, key);
+      debug->set_tag(tag_name, value);
+    }
+  } debug_writer;
+  debug.apply([&](Span& span) {
+    span.set_name("span.inject");
+    debug_writer.debug = &span;
+    debug_writer.writer = &writer;
+    w = &debug_writer;
+  });
+
   for (const auto style : injection_styles_) {
     switch (style) {
       case PropagationStyle::DATADOG:
-        writer.set("x-datadog-trace-id", std::to_string(span.trace_id.low));
-        writer.set("x-datadog-parent-id", std::to_string(span.span_id));
-        writer.set("x-datadog-sampling-priority",
-                   std::to_string(sampling_priority));
+        w->set("x-datadog-trace-id", std::to_string(span.trace_id.low));
+        w->set("x-datadog-parent-id", std::to_string(span.span_id));
+        w->set("x-datadog-sampling-priority",
+               std::to_string(sampling_priority));
         if (origin_) {
-          writer.set("x-datadog-origin", *origin_);
+          w->set("x-datadog-origin", *origin_);
         }
-        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+        inject_trace_tags(*w, trace_tags, tags_header_max_size_,
                           spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::B3:
         if (span.trace_id.high) {
-          writer.set("x-b3-traceid", span.trace_id.hex_padded());
+          w->set("x-b3-traceid", span.trace_id.hex_padded());
         } else {
-          writer.set("x-b3-traceid", hex_padded(span.trace_id.low));
+          w->set("x-b3-traceid", hex_padded(span.trace_id.low));
         }
-        writer.set("x-b3-spanid", hex_padded(span.span_id));
-        writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
+        w->set("x-b3-spanid", hex_padded(span.span_id));
+        w->set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
         if (origin_) {
-          writer.set("x-datadog-origin", *origin_);
+          w->set("x-datadog-origin", *origin_);
         }
-        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+        inject_trace_tags(*w, trace_tags, tags_header_max_size_,
                           spans_.front()->tags, *logger_);
         break;
       case PropagationStyle::W3C:
-        writer.set(
-            "traceparent",
-            encode_traceparent(span.trace_id, span.span_id, sampling_priority));
-        writer.set("tracestate",
-                   encode_tracestate(sampling_priority, origin_, trace_tags,
-                                     additional_datadog_w3c_tracestate_,
-                                     additional_w3c_tracestate_));
+        w->set("traceparent", encode_traceparent(span.trace_id, span.span_id,
+                                                 sampling_priority));
+        w->set("tracestate",
+               encode_tracestate(sampling_priority, origin_, trace_tags,
+                                 additional_datadog_w3c_tracestate_,
+                                 additional_w3c_tracestate_));
         break;
       default:
         assert(style == PropagationStyle::NONE);

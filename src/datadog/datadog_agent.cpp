@@ -298,6 +298,10 @@ void DatadogAgent::flush() {
       logger_->log_error(*error);
       return;
     }
+    debug_encode.apply([&](Span& span) {
+      span.set_tag("metatrace.chunks.encoded_size",
+                   std::to_string(body.size()));
+    });
   }
 
   // One HTTP request to the Agent could possibly involve trace chunks from

@@ -4,6 +4,8 @@
 // keep/drop sampling decision (for either trace sampling or span sampling) and
 // contains supporting information about the reason for the decision.
 
+#include <string>
+
 #include "optional.h"
 #include "rate.h"
 #include "sampling_mechanism.h"
@@ -44,6 +46,8 @@ struct SamplingDecision {
   // The provenance of this decision.
   Origin origin;
 };
+
+std::string to_string(SamplingDecision::Origin);
 
 }  // namespace tracing
 }  // namespace datadog

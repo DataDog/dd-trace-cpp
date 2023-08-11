@@ -17,6 +17,8 @@ services:
     # The C++ HTTP server to which we added Datadog tracing
     server:
         image: datadog/docker-library:dd-trace-cpp-ci
+        ports:
+            - "127.0.0.1:8080:80"
         environment:
             - DD_AGENT_HOST=datadog-agent
         volumes:
@@ -24,6 +26,10 @@ services:
         command: "/bin/bash -c 'cd /mnt/repo && bin/cmake-build && cd .build && make install >/dev/null && ldconfig && c++ --std=c++17 -Wall -Wextra -pedantic -Werror -Og -o /tmp/server ../examples/http-server/server/server.cpp -ldd_trace_cpp && /tmp/server'"
         depends_on:
             - datadog-agent
+        cap_add:
+            - SYS_PTRACE
+        security_opt:
+            - seccomp:unconfined
 
     # A Python HTTP server that acts as a database backed by SQLite.
     # It also has Datadog tracing.

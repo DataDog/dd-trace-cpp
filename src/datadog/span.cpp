@@ -49,15 +49,17 @@ Span::~Span() {
     return;
   }
 
-  if (end_time_) {
-    data_->duration = *end_time_ - data_->start.tick;
-  } else {
-    const auto now = clock_();
-    data_->duration = now - data_->start;
+  if (!end_time_) {
+    end_time_ = clock_().tick;
+  }
+  data_->duration = *end_time_ - data_->start.tick;
+
+  if (debug_span_) {
+    debug_span_->set_end_time(*end_time_);
   }
 
   // TODO: debug span
-  trace_segment_->span_finished();
+  trace_segment_->span_finished(debug_span_.get());
 }
 
 Span Span::create_child(const SpanConfig& config) const {
@@ -76,8 +78,7 @@ Span Span::create_child(const SpanConfig& config) const {
 Span Span::create_child() const { return create_child(SpanConfig{}); }
 
 void Span::inject(DictWriter& writer) const {
-  // TODO: debug span
-  trace_segment_->inject(writer, *data_);
+  trace_segment_->inject(writer, *data_, debug_span_.get());
 }
 
 std::uint64_t Span::id() const { return data_->span_id; }
@@ -318,6 +319,8 @@ void Span::set_end_time(std::chrono::steady_clock::time_point end_time) {
 
   end_time_ = end_time;
 }
+
+void Span::set_end_time() { set_end_time(clock_().tick); }
 
 TraceSegment& Span::trace_segment() { return *trace_segment_; }
 

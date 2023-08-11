@@ -99,7 +99,8 @@ class TraceSegment {
 
   // Inject trace context for the specified `span` into the specified `writer`.
   // This function is the implementation of `Span::inject`.
-  void inject(DictWriter& writer, const SpanData& span);
+  void inject(DictWriter& writer, const SpanData& span,
+              Span* debug_parent = nullptr);
 
   // These are for sampling delegation, not for trace propagation.
   // TODO: Sampling delegation is not yet implemented.
@@ -110,7 +111,7 @@ class TraceSegment {
   void register_span(std::unique_ptr<SpanData> span);
   // Increment the number of finished spans.  If that number is equal to the
   // number of registered spans, send all of the spans to the `Collector`.
-  void span_finished();
+  void span_finished(Span* debug_parent);
   // If debug tracing is enabled for this trace segment, then return a pointer
   // to the debug span that represents the lifetime of and subsequent processing
   // by the collector for this trace segment. If debug tracing is not enabled,
@@ -124,7 +125,7 @@ class TraceSegment {
  private:
   // If `sampling_decision_` is not null, use `trace_sampler_` to make a
   // sampling decision and assign it to `sampling_decision_`.
-  void make_sampling_decision_if_null();
+  void make_sampling_decision_if_null(Span* debug_parent);
   // Set or remove the `tags::internal::decision_maker` trace tag in
   // `trace_tags_` according to either information extracted from trace context
   // or from a local sampling decision.
