@@ -21,6 +21,7 @@ services:
             - "127.0.0.1:8080:80"
         environment:
             - DD_AGENT_HOST=datadog-agent
+            - DD_TRACE_DEBUG_TRACES=true
         volumes:
             - ../../:/mnt/repo
         command: "/bin/bash -c 'cd /mnt/repo && bin/cmake-build && cd .build && make install >/dev/null && ldconfig && c++ --std=c++17 -Wall -Wextra -pedantic -Werror -Og -o /tmp/server ../examples/http-server/server/server.cpp -ldd_trace_cpp && /tmp/server'"

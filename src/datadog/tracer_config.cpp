@@ -20,12 +20,6 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-bool falsy(StringView text) {
-  auto lower = std::string{text};
-  to_lower(lower);
-  return lower == "0" || lower == "false" || lower == "no";
-}
-
 // List items are separated by an optional comma (",") and any amount of
 // whitespace.
 // Leading and trailing whitespace is ignored.

@@ -370,6 +370,10 @@ Span Tracer::create_span(const SpanConfig& config,
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); }, clock_,
             segment->debug_span()};
+  if (Span* debug_span = segment->debug_span()) {
+    debug_span->set_tag("metatrace.trace_id",
+                        std::to_string(span_data_ptr->trace_id.low));
+  }
   return span;
 }
 
@@ -554,6 +558,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); }, clock_,
             segment->debug_span()};
+  if (Span* debug_span = segment->debug_span()) {
+    debug_span->set_tag("metatrace.trace_id",
+                        std::to_string(span_data_ptr->trace_id.low));
+  }
   return span;
 }
 

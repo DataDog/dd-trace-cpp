@@ -39,5 +39,16 @@ bool starts_with(StringView subject, StringView prefix);
 // Convert the specified `text` to lower case in-place.
 void to_lower(std::string& text);
 
+// Return whether the specified `text` is a false-indicating value. This is used
+// when parsing environment variables.
+// A string is "falsy" if it is case-insensitively equal to any of:
+//
+// - "0" (the digit zero)
+// - "false"
+// - "no"
+//
+// Any other value is _not_ "falsy."
+bool falsy(StringView text);
+
 }  // namespace tracing
 }  // namespace datadog

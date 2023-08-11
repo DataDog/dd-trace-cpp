@@ -11,6 +11,8 @@ namespace tracing {
 
 struct TracerDebugConfig {
   // `enabled` indicates whether debug traces are to be created.
+  // This value is overridden by the `DD_TRACE_DEBUG_TRACES` environment
+  // variable.
   bool enabled = false;
   // `service` is the service name for spans within debug traces.
   std::string service = "dd-trace-cpp-debug";

@@ -113,5 +113,11 @@ void to_lower(std::string& text) {
                  [](unsigned char ch) { return std::tolower(ch); });
 }
 
+bool falsy(StringView text) {
+  auto lower = std::string{text};
+  to_lower(lower);
+  return lower == "0" || lower == "false" || lower == "no";
+}
+
 }  // namespace tracing
 }  // namespace datadog

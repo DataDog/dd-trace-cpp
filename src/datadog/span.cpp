@@ -31,6 +31,7 @@ Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
     SpanConfig config;
     config.start = start_time();
     config.name = "span";
+    config.tags.emplace("metatrace.trace_id", std::to_string(trace_id().low));
     config.tags.emplace("metatrace.span.id", std::to_string(id()));
     config.tags.emplace("metatrace.span.service", service_name());
     config.tags.emplace("metatrace.span.name", name());
