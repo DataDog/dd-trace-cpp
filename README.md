@@ -107,3 +107,5 @@ See the [contributing guidelines](CONTRIBUTING.md).
 
 [1]: https://cmake.org/
 [2]: https://datadog.github.io/dd-trace-cpp-coverage
+
+NOOP
