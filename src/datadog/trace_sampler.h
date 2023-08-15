@@ -4,7 +4,7 @@
 // traces that originate in this process will be sent to Datadog.
 //
 // `TraceSampler` is not instantiated directly, but is instead configured via
-// `TracerConfig::span_sampler`.
+// `TracerConfig::trace_sampler`.
 //
 // When a span is extracted from an outside context (i.e.
 // `Tracer::extract_span`), then the trace sampling decision is included in the

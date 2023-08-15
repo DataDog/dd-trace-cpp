@@ -72,7 +72,7 @@ inline const char* const variable_names[] = {
 StringView name(Variable variable);
 
 // Return the value of the specified environment `variable`, or return
-// `std::nullptr` if that variable is not set in the environment.
+// `nullopt` if that variable is not set in the environment.
 Optional<StringView> lookup(Variable variable);
 
 nlohmann::json to_json();
