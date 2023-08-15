@@ -160,7 +160,7 @@ class Span {
   void inject(DictWriter& writer) const;
 
   // Return a reference to this span's trace segment.  The trace segment has
-  // member functions that effect the trace as a whole, such as
+  // member functions that affect the trace as a whole, such as
   // `TraceSegment::override_sampling_priority`.
   TraceSegment& trace_segment();
   const TraceSegment& trace_segment() const;
