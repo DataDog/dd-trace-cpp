@@ -11,8 +11,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(dd_trace_cpp-benchmark
-    benchmark.cpp
+    benchmark_globber.cpp
+    benchmark_tinycc.cpp
     hasher.cpp
+    main.cpp
 )
 
 # Google Benchmark is included as a git submodule.

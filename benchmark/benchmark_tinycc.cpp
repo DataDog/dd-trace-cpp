@@ -59,5 +59,3 @@ void BM_TraceTinyCCSource(benchmark::State& state) {
 BENCHMARK(BM_TraceTinyCCSource);
 
 } // namespace
-
-BENCHMARK_MAIN();
