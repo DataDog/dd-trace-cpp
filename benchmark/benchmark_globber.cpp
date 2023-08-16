@@ -19,7 +19,33 @@ struct NullLogger : public dd::Logger {
 };
 
 // TODO: document
-void withOrWithoutGlobbing(benchmark::State& state, const std::vector<dd::TraceSamplerConfig::Rule>& rules) {
+void spanRuleWithOrWithoutGlobbing(benchmark::State& state, const std::vector<dd::SpanSamplerConfig::Rule>& rules) {
+  dd::TracerConfig config;
+  config.defaults.service = "benchmark";
+  config.logger = std::make_shared<NullLogger>();
+  config.collector = std::make_shared<dd::NullCollector>();
+  config.trace_sampler.sample_rate = 0; // drop all traces, so that we use span sampling
+  config.span_sampler.rules = rules;
+  const auto valid_config = dd::finalize_config(config);
+  dd::Tracer tracer{*valid_config};
+
+  std::vector<dd::Span> spans;
+  const int n = 1000;
+  spans.reserve(1000);
+
+  for (auto _ : state) {
+    dd::SpanConfig config;
+    config.name = "aaaaaaaaaaaaaaaa";
+    spans.push_back(tracer.create_span(config));
+    for (int i = 0; i < n; ++i) {
+      spans.push_back(spans.back().create_child(config));
+    }
+    spans.clear();
+  }
+}
+
+// TODO: document
+void traceRuleWithOrWithoutGlobbing(benchmark::State& state, const std::vector<dd::TraceSamplerConfig::Rule>& rules) {
   dd::TracerConfig config;
   config.defaults.service = "benchmark";
   config.logger = std::make_shared<NullLogger>();
@@ -36,22 +62,40 @@ void withOrWithoutGlobbing(benchmark::State& state, const std::vector<dd::TraceS
 }
 
 // TODO: document
-void BM_WithGlobbing(benchmark::State& state) {
+void BM_TraceRuleWithGlobbing(benchmark::State& state) {
   std::vector<dd::TraceSamplerConfig::Rule> rules;
   dd::TraceSamplerConfig::Rule rule;
   rule.name = "a*a*a";
   rules.push_back(rule);
 
-  withOrWithoutGlobbing(state, rules);
+  traceRuleWithOrWithoutGlobbing(state, rules);
 }
-BENCHMARK(BM_WithGlobbing);
+BENCHMARK(BM_TraceRuleWithGlobbing);
 
 // TODO: document
-void BM_WithoutGlobbing(benchmark::State& state) {
+void BM_TraceRuleWithoutGlobbing(benchmark::State& state) {
   const std::vector<dd::TraceSamplerConfig::Rule> no_rules{};
-  withOrWithoutGlobbing(state, no_rules);
+  traceRuleWithOrWithoutGlobbing(state, no_rules);
 }
-BENCHMARK(BM_WithoutGlobbing);
+BENCHMARK(BM_TraceRuleWithoutGlobbing);
+
+// TODO: document
+void BM_SpanRuleWithGlobbing(benchmark::State& state) {
+  std::vector<dd::SpanSamplerConfig::Rule> rules;
+  dd::SpanSamplerConfig::Rule rule;
+  rule.name = "a*a*a";
+  rules.push_back(rule);
+
+  spanRuleWithOrWithoutGlobbing(state, rules);
+}
+BENCHMARK(BM_SpanRuleWithGlobbing);
+
+// TODO: document
+void BM_SpanRuleWithoutGlobbing(benchmark::State& state) {
+  const std::vector<dd::SpanSamplerConfig::Rule> no_rules{};
+  spanRuleWithOrWithoutGlobbing(state, no_rules);
+}
+BENCHMARK(BM_SpanRuleWithoutGlobbing);
 
 } // namespace
 
