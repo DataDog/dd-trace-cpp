@@ -1,12 +1,11 @@
 #include <benchmark/benchmark.h>
-
 #include <datadog/collector.h>
-#include <datadog/json.hpp>
 #include <datadog/logger.h>
 #include <datadog/span_data.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <datadog/json.hpp>
 #include <memory>
 
 #include "hasher.h"
@@ -35,9 +34,7 @@ struct SerializingCollector : public dd::Collector {
   }
 
   nlohmann::json config_json() const override {
-    return nlohmann::json::object({
-        {"type", "SerializingCollector"}
-    });
+    return nlohmann::json::object({{"type", "SerializingCollector"}});
   }
 };
 
@@ -58,4 +55,4 @@ void BM_TraceTinyCCSource(benchmark::State& state) {
 }
 BENCHMARK(BM_TraceTinyCCSource);
 
-} // namespace
+}  // namespace

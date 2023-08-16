@@ -1,5 +1,4 @@
 #include <benchmark/benchmark.h>
-
 #include <datadog/logger.h>
 #include <datadog/null_collector.h>
 #include <datadog/span_config.h>
@@ -19,12 +18,15 @@ struct NullLogger : public dd::Logger {
 };
 
 // TODO: document
-void spanRuleWithOrWithoutGlobbing(benchmark::State& state, const std::vector<dd::SpanSamplerConfig::Rule>& rules) {
+void spanRuleWithOrWithoutGlobbing(
+    benchmark::State& state,
+    const std::vector<dd::SpanSamplerConfig::Rule>& rules) {
   dd::TracerConfig config;
   config.defaults.service = "benchmark";
   config.logger = std::make_shared<NullLogger>();
   config.collector = std::make_shared<dd::NullCollector>();
-  config.trace_sampler.sample_rate = 0; // drop all traces, so that we use span sampling
+  config.trace_sampler.sample_rate =
+      0;  // drop all traces, so that we use span sampling
   config.span_sampler.rules = rules;
   const auto valid_config = dd::finalize_config(config);
   dd::Tracer tracer{*valid_config};
@@ -45,7 +47,9 @@ void spanRuleWithOrWithoutGlobbing(benchmark::State& state, const std::vector<dd
 }
 
 // TODO: document
-void traceRuleWithOrWithoutGlobbing(benchmark::State& state, const std::vector<dd::TraceSamplerConfig::Rule>& rules) {
+void traceRuleWithOrWithoutGlobbing(
+    benchmark::State& state,
+    const std::vector<dd::TraceSamplerConfig::Rule>& rules) {
   dd::TracerConfig config;
   config.defaults.service = "benchmark";
   config.logger = std::make_shared<NullLogger>();
@@ -97,5 +101,4 @@ void BM_SpanRuleWithoutGlobbing(benchmark::State& state) {
 }
 BENCHMARK(BM_SpanRuleWithoutGlobbing);
 
-} // namespace
-
+}  // namespace
