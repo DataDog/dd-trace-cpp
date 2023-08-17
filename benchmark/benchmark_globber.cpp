@@ -20,7 +20,7 @@ struct NullLogger : public dd::Logger {
 // TODO: document
 void spanRuleWithOrWithoutGlobbing(
     benchmark::State& state,
-    const std::vector<dd::SpanSamplerConfig::Rule>& rules) {
+    const std::vector<dd::SpanSamplerConfig::Rule>& rules, int span_count) {
   dd::TracerConfig config;
   config.defaults.service = "benchmark";
   config.logger = std::make_shared<NullLogger>();
@@ -32,14 +32,13 @@ void spanRuleWithOrWithoutGlobbing(
   dd::Tracer tracer{*valid_config};
 
   std::vector<dd::Span> spans;
-  const int n = 1000;
-  spans.reserve(1000);
+  spans.reserve(span_count);
 
   for (auto _ : state) {
     dd::SpanConfig config;
     config.name = "aaaaaaaaaaaaaaaa";
     spans.push_back(tracer.create_span(config));
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < span_count; ++i) {
       spans.push_back(spans.back().create_child(config));
     }
     spans.clear();
@@ -84,21 +83,80 @@ void BM_TraceRuleWithoutGlobbing(benchmark::State& state) {
 BENCHMARK(BM_TraceRuleWithoutGlobbing);
 
 // TODO: document
-void BM_SpanRuleWithGlobbing(benchmark::State& state) {
+void BM_SpanRuleWithGlobbing1000SpansTricky(benchmark::State& state) {
   std::vector<dd::SpanSamplerConfig::Rule> rules;
   dd::SpanSamplerConfig::Rule rule;
   rule.name = "a*a*a";
   rules.push_back(rule);
 
-  spanRuleWithOrWithoutGlobbing(state, rules);
+  spanRuleWithOrWithoutGlobbing(state, rules, 1000);
 }
-BENCHMARK(BM_SpanRuleWithGlobbing);
+BENCHMARK(BM_SpanRuleWithGlobbing1000SpansTricky);
 
 // TODO: document
-void BM_SpanRuleWithoutGlobbing(benchmark::State& state) {
+void BM_SpanRuleWithoutGlobbing1000Spans(benchmark::State& state) {
   const std::vector<dd::SpanSamplerConfig::Rule> no_rules{};
-  spanRuleWithOrWithoutGlobbing(state, no_rules);
+  spanRuleWithOrWithoutGlobbing(state, no_rules, 1000);
 }
-BENCHMARK(BM_SpanRuleWithoutGlobbing);
+BENCHMARK(BM_SpanRuleWithoutGlobbing1000Spans);
+
+// TODO: document
+void BM_SpanRuleWithGlobbing100SpansTricky(benchmark::State& state) {
+  std::vector<dd::SpanSamplerConfig::Rule> rules;
+  dd::SpanSamplerConfig::Rule rule;
+  rule.name = "a*a*a";
+  rules.push_back(rule);
+
+  spanRuleWithOrWithoutGlobbing(state, rules, 100);
+}
+BENCHMARK(BM_SpanRuleWithGlobbing100SpansTricky);
+
+// TODO: document
+void BM_SpanRuleWithoutGlobbing100Spans(benchmark::State& state) {
+  const std::vector<dd::SpanSamplerConfig::Rule> no_rules{};
+  spanRuleWithOrWithoutGlobbing(state, no_rules, 100);
+}
+BENCHMARK(BM_SpanRuleWithoutGlobbing100Spans);
+
+// TODO: document
+void BM_SpanRuleWithGlobbing100SpansEasy(benchmark::State& state) {
+  std::vector<dd::SpanSamplerConfig::Rule> rules;
+  dd::SpanSamplerConfig::Rule rule;
+  rule.name = "aaaaaaaaaaaaaaaa";
+  rules.push_back(rule);
+
+  spanRuleWithOrWithoutGlobbing(state, rules, 100);
+}
+BENCHMARK(BM_SpanRuleWithGlobbing100SpansEasy);
+
+// TODO: document
+void BM_10SpanRulesWithGlobbing100SpansEasy(benchmark::State& state) {
+  std::vector<dd::SpanSamplerConfig::Rule> rules;
+  dd::SpanSamplerConfig::Rule rule;
+  for (int i = 0; i < 99; ++i) {
+    rule.name = "aaaaaaaaaaaaaaax";
+    rules.push_back(rule);
+  }
+  rule.name = "aaaaaaaaaaaaaaaa";
+  rules.push_back(rule);
+
+  spanRuleWithOrWithoutGlobbing(state, rules, 100);
+}
+BENCHMARK(BM_10SpanRulesWithGlobbing100SpansEasy);
+
+// TODO: document
+void BM_10TrivialSpanRulesWithGlobbing100SpansEasy(benchmark::State& state) {
+  std::vector<dd::SpanSamplerConfig::Rule> rules;
+  dd::SpanSamplerConfig::Rule rule;
+  for (int i = 0; i < 100; ++i) {
+    rule.name = "x";
+    rule.service = "x";
+    rule.resource = "x";
+    rules.push_back(rule);
+  }
+
+  spanRuleWithOrWithoutGlobbing(state, rules, 100);
+}
+BENCHMARK(BM_10TrivialSpanRulesWithGlobbing100SpansEasy);
 
 }  // namespace
