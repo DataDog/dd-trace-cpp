@@ -1,3 +1,5 @@
+Here are some topics that were discussed during the design of this library.
+
 - Which version of C++ do we require?
 - Which C core libraries do we produce binaries for?
     - glibc
