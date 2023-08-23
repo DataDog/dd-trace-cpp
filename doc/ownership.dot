@@ -6,16 +6,18 @@
 # relationship, e.g. "Tracer holds a shared_ptr to SpanSampler," or
 # "Span holds a raw pointer to SpanData."
 #
+# Vertices labeled with a 🔒 are protected by a mutex.
+#
 digraph {
     rankdir=LR;
-    
+
     Tracer -> "Collector 🔒" [label=" shared", fontsize=8];
     Tracer -> "SpanSampler 🔒" [label=" shared", fontsize=8];
     Tracer -> "TraceSampler 🔒" [label=" shared", fontsize=8];
-    
+
     Span -> "TraceSegment 🔒" [label=" shared", fontsize=8];
     Span -> SpanData [label=< <B> raw</B> >, fontsize=8];
-    
+
     "TraceSegment 🔒" -> SpanData [label=< <B> unique</B> >, fontsize=8];
     "TraceSegment 🔒" -> "Collector 🔒" [label=" shared", fontsize=8];
     "TraceSegment 🔒" -> "SpanSampler 🔒" [label=" shared", fontsize=8];
