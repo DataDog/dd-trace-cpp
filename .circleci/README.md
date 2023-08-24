@@ -6,6 +6,8 @@ This directory contains the [configuration](config.yml) for this project's
 The following jobs are defined:
 - `format` checks that the C++ source is formatted per `clang-format-14
   --style=file`.
+- `shellcheck` checks that [shellcheck][5] accepts all of the scripts in
+  [bin/](../bin).
 - `build-bazel` builds the library using [bazel][1].
   - Based on the `toolchain` parameter, the build will use either g++ or
     clang++.
@@ -19,3 +21,4 @@ The following jobs are defined:
 [2]: https://cmake.org/
 [3]: https://github.com/google/sanitizers
 [4]: https://app.circleci.com/pipelines/github/DataDog/dd-trace-cpp
+[5]: https://www.shellcheck.net/

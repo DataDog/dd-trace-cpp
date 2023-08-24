@@ -1,5 +1,3 @@
-Check out the latest [testing code coverage report][1].
-
 Logical Component Relationships
 -------------------------------
 - Vertices are components.
@@ -9,10 +7,6 @@ Logical Component Relationships
 - Components containing a padlock are protected by a mutex.
 
 ![diagram](ownership.svg)
-
-Code Component Relationships
-----------------------------
-![another diagram](includes.svg)
 
 Objects
 -------

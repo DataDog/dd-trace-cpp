@@ -3,7 +3,7 @@
 set -e
 
 desired="$1"
-pattern='^v[0-9]\+\.[0-9]\.[0-9]\+$'
+pattern='^v[0-9]\+\.[0-9]\+\.[0-9]\+$'
 if echo "$desired" | grep -v "$pattern" >/dev/null 2>&1; then
     >&2 echo "Specified version \"$desired\" does not match the grep pattern $pattern"
     exit 1
