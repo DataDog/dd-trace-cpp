@@ -72,8 +72,6 @@ TEST_CASE("CollectorResponse") {
 
     {
       http_client->response_status = 200;
-      http_client->response_body.str("");
-      http_client->response_body.clear();
       Tracer tracer{*finalized};
       auto span = tracer.create_span();
       (void)span;
@@ -118,6 +116,7 @@ TEST_CASE("CollectorResponse") {
     // Don't echo error messages.
     logger->echo = nullptr;
 
+    // Datadog Agent only returns 200 on success.
     auto status = GENERATE(range(201, 600));
     {
       http_client->response_status = status;

@@ -217,8 +217,9 @@ void DatadogAgent::flush() {
                                         std::string response_body) {
     if (response_status != 200) {
       logger->log_error([&](auto& stream) {
-        stream << "Unexpected response status from Datadog Agent"
-               << response_status << " with body (starts on next line):\n"
+        stream << "Unexpected response status " << response_status
+               << " in Datadog Agent response with body of length "
+               << response_body.size() << " (starts on next line):\n"
                << response_body;
       });
       return;
