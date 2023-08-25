@@ -229,7 +229,7 @@ void DatadogAgent::flush() {
       logger->log_error([](auto& stream) {
         stream
             << "Datadog Agent returned response without a body."
-               "This tracer might be sending batches of traces too frequently";
+               " This tracer might be sending batches of traces too frequently";
       });
       return;
     }
