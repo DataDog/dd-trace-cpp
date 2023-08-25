@@ -164,7 +164,7 @@ created.
 `class Tracer` is what users configure, and it is how `Span`s are extracted from
 trace context or created as a trace's root. See [tracer.h][9].
 
-`Tracer` has two methods:
+`Tracer` has two member functions:
 
 - `create_span(...)`
 - `extract_span(...)`
@@ -224,10 +224,81 @@ uses the HTTP client to send a POST request to the Datadog Agent's
 [/v0.4/traces][21] endpoint. It's all callback-based.
 
 ### HTTPClient
-TODO
+`class HTTPClient` is an interface for sending HTTP requests. It's defined in
+[http_client.h][15].
+
+The only kind of HTTP request that the library needs to make, currently, is a
+POST to the Datadog Agent's traces endpoint. `HTTPClient` has one member
+function for each HTTP method needed — so, currently just the one:
+```c++
+virtual Expected<void> post(const URL& url, HeadersSetter set_headers,
+                            std::string body, ResponseHandler on_response,
+                            ErrorHandler on_error) = 0;
+```
+It's callback-based. `post` returns almost immediately. It invokes `set_headers`
+before returning, in order to get the HTTP request headers. The request `body`
+is moved elsewhere for later processing. One of `on_response` or `on_error` will
+eventually be called, depending on whether a response was received or if an
+error occurred before a response was received. If something goes wrong setting
+up the request, then `post` returns an error. If `post` returns an error, then
+neither of `on_response` nor `on_error` will be called.
+
+`HTTPClient` also has another member function:
+```c++
+virtual void drain(std::chrono::steady_clock::time_point deadline) = 0;
+```
+`drain` waits for any in-flight requests to finish, blocking up until no later
+than `deadline`. It's used to ensure "clean shutdown." Without it, on average
+the last one second of traces would be lost on shutdown. Implementations of
+`HTTPClient` that don't have a dedicated thread need not support `drain`; in
+those cases, `drain` returns immediately.
+
+The default implementation of `HTTPClient` is [class Curl : public
+HTTPClient][18], which uses libcurl's [multi interface][20] together with a
+dedicated thread as an event loop.
+
+`class Curl` is also used within NGINX in Datadog's NGINX module,
+[nginx-datadog][22]. This is explicitly [discouraged][23] in NGINX's developer
+documentation, but libcurl-with-a-thread is widely used within NGINX modules
+regardless. One improvement that I am exploring is to use libcurl's
+"[multi_socket][24]" mode, which allows libcurl to utilize someone else's event
+loop, obviating the need for another thread. libcurl can then be made to use
+NGINX's event loop, as is done in [an example library][25].
+
+For now, though, nginx-datadog uses the threaded `class Curl`.
+
+[Envoy's Datadog tracing integration][26] uses a different implementation,
+[class AgentHTTPClient : public HTTPClient, ...][27], which uses Envoy's
+built-in HTTP facilities. libcurl is not involved at all.
 
 ### EventScheduler
-TODO
+As of this writing, `class DatadogAgent` flushes batches of finished trace
+segments to the Datadog Agent once every two second [by default][28].
+
+It does this by scheduling a recurring event with an `EventScheduler`, which is
+an interface defined in [event_scheduler.h][16].
+
+`EventScheduler` has one member function:
+```c++
+virtual Cancel schedule_recurring_event(
+    std::chrono::steady_clock::duration interval,
+    std::function<void()> callback) = 0;
+```
+Every `interval`, the scheduler will invoke `callback`, starting an initial
+`interval` after `schedule_recurring_event` is called. The caller can invoke the
+returned `Cancel` to prevent subsequent invocations of `callback`.
+
+The default implementation of `EventScheduler` is [class ThreadedEventScheduler
+: public EventScheduler][19], which uses a dedicated thread for executing
+scheduled events at the correct time. It was a fun piece of code to write.
+
+Datadog's NGINX module, [nginx-datadog][22] uses a different implementation,
+[class NgxEventScheduler : public EventScheduler][29], which uses NGINX's own
+event loop instead of a dedicated thread.
+
+[Envoy's Datadog tracing integration][26] also uses a different implementation,
+[class EventScheduler : public EventScheduler][30], which uses Envoy's built-in
+event dispatch facilities.
 
 ### Configuration
 TODO
@@ -281,3 +352,12 @@ TODO
 [19]: ../src/datadog/threaded_event_scheduler.h
 [20]: https://curl.se/libcurl/c/libcurl-multi.html
 [21]: https://github.com/DataDog/datadog-agent/blob/9d57c10a9eeb3916e661d35dbd23c6e36395a99d/pkg/trace/api/version.go#L22
+[22]: https://github.com/DataDog/nginx-datadog
+[23]: https://nginx.org/en/docs/dev/development_guide.html#http_requests_to_ext
+[24]: https://curl.se/libcurl/c/curl_multi_socket_action.html
+[25]: https://github.com/dgoffredo/nginx-curl
+[26]: https://github.com/envoyproxy/envoy/tree/main/source/extensions/tracers/datadog#datadog-tracer
+[27]: https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/agent_http_client.h
+[28]: https://github.com/DataDog/dd-trace-cpp/blob/ca155b3da65c2dc235cf64a28f8e0d8fdab3700c/src/datadog/datadog_agent_config.h#L50-L51
+[29]: https://github.com/DataDog/nginx-datadog/blob/master/src/ngx_event_scheduler.h
+[30]: https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/event_scheduler.h
