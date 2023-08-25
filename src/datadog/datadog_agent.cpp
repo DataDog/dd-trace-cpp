@@ -215,11 +215,21 @@ void DatadogAgent::flush() {
                       logger = logger_](int response_status,
                                         const DictReader& /*response_headers*/,
                                         std::string response_body) {
-    if (response_status < 200 || response_status >= 300) {
+    if (response_status != 200) {
       logger->log_error([&](auto& stream) {
         stream << "Unexpected response status " << response_status
-               << " with body (starts on next line):\n"
+               << " in Datadog Agent response with body of length "
+               << response_body.size() << " (starts on next line):\n"
                << response_body;
+      });
+      return;
+    }
+
+    if (response_body.empty()) {
+      logger->log_error([](auto& stream) {
+        stream
+            << "Datadog Agent returned response without a body."
+               " This tracer might be sending batches of traces too frequently";
       });
       return;
     }

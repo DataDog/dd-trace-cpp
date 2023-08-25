@@ -66,6 +66,21 @@ TEST_CASE("CollectorResponse") {
     REQUIRE(logger->error_count() == 0);
   }
 
+  SECTION("HTTP success with empty body") {
+    // Don't echo error messages.
+    logger->echo = nullptr;
+
+    {
+      http_client->response_status = 200;
+      Tracer tracer{*finalized};
+      auto span = tracer.create_span();
+      (void)span;
+    }
+
+    REQUIRE(event_scheduler->cancelled);
+    REQUIRE(logger->error_count() == 1);
+  }
+
   SECTION("invalid responses") {
     // Don't echo error messages.
     logger->echo = nullptr;
@@ -101,7 +116,8 @@ TEST_CASE("CollectorResponse") {
     // Don't echo error messages.
     logger->echo = nullptr;
 
-    auto status = GENERATE(range(300, 600));
+    // Datadog Agent only returns 200 on success.
+    auto status = GENERATE(range(201, 600));
     {
       http_client->response_status = status;
       Tracer tracer{*finalized};
