@@ -301,7 +301,55 @@ event loop instead of a dedicated thread.
 event dispatch facilities.
 
 ### Configuration
-TODO
+There's a good [blog post][32] by [Alexis King][31] where she makes the case for
+encoding configuration validation into the type system. Forbid invalid states by
+making configurable components accept a different type than that which is used
+to specify configuration.
+
+This is not a new idea. It's been used, for example, to "taint" strings that
+originate as program inputs. Then you can't accidentally pass user-influenced
+inputs to, say, `std::system`, because `std::system` takes a `const char*`, not
+a `class UserTaintedString`. There's still ample opportunity to cast away the
+taint and sneak it into some string building operation, but at least `class
+UserTaintedString` gives hope that a static analysis tool could be used to fill
+in some gaps in human code review.
+
+This library adopts that approach for configuration. The configuration of `class
+Tracer` is `class TracerConfig`, but in order to construct a `Tracer` you must
+first convert the `TracerConfig` into a `FinalizedTracerConfig` by calling
+`finalize_config`. If there is anything wrong with the `TracerConfig` or with
+environment variables that would override it, `finalize_config` will return an
+`Error` instead of a `FinalizedTracerConfig`. In that case, you can't create a
+`Tracer` at all.
+
+This technique applies to multiple components:
+
+| Component | Unvalidated | Validated | Parser |
+| --------------- | ----------- | --------- | ----------------- |
+| `Tracer` | `TracerConfig` | `FinalizedTracerConfig` | `finalize_config` in [tracer_config.h][10] |
+| `DatadogAgent` | `DatadogAgentConfig` | `FinalizedDatadogAgentConfig` |  `finalize_config` in [datadog_agent_config.h][17] |
+| `TraceSampler` | `TraceSamplerConfig` | `FinalizedTraceSamplerConfig` |  `finalize_config` in [trace_sampler_config.h][33] |
+| `SpanSampler` | `SpanSamplerConfig` | `FinalizedSpanSamplerConfig` |  `finalize_config` in [span_sampler_config.h][34] |
+| multiple | `double` | `Rate` | `Rate::from` in [rate.h][35] |
+
+An alternative approach, that Caleb espouses, is to accept invalid configuration
+quietly. When invalid configuration is detected, the library could substitute a
+reasonable default and then send notice of the configuration issue to Datadog,
+e.g. as a hidden span tag. That information would then be available to Support
+should the customer raise an issue due to a difference in behavior between what
+they see and what they think they configured.
+
+This library uses the stricter approach. The downside is that a user of the
+library has to decide what to do when even the slightest part of the
+configuration or environment is deemed invalid.
+
+One other convention of the library is that `FinalizedFooConfig` (for some
+`Foo`) is never a data member of the configured component class. That is,
+`FinalizedTracerConfig` is not stored in `Tracer`. Instead, a constructor might
+individually copy the finalized config's data members. This is to prevent
+eventual intermixing between the "configuration representation" and the "runtime
+representation." In part, `finalize_config` already mitigates the problem.
+Abstaining from storing the finalized config as a data member is a step further.
 
 ### Error Handling
 TODO
@@ -361,3 +409,8 @@ TODO
 [28]: https://github.com/DataDog/dd-trace-cpp/blob/ca155b3da65c2dc235cf64a28f8e0d8fdab3700c/src/datadog/datadog_agent_config.h#L50-L51
 [29]: https://github.com/DataDog/nginx-datadog/blob/master/src/ngx_event_scheduler.h
 [30]: https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/event_scheduler.h
+[31]: https://lexi-lambda.github.io/about.html
+[32]: https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/
+[33]: ../src/datadog/trace_sampler_config.h
+[34]: ../src/datadog/span_sampler_config.h
+[35]: ../src/datadog/rate.h
