@@ -337,7 +337,10 @@ quietly. When invalid configuration is detected, the library could substitute a
 reasonable default and then send notice of the configuration issue to Datadog,
 e.g. as a hidden span tag. That information would then be available to Support
 should the customer raise an issue due to a difference in behavior between what
-they see and what they think they configured.
+they see and what they think they configured. This approach is also resilient to
+dynamic configuration changes. Rather than a "bad config update" causing tracing
+to cease completely, instead tracing could continue to operate in the defaulted
+mode.
 
 This library uses the stricter approach. The downside is that a user of the
 library has to decide what to do when even the slightest part of the
