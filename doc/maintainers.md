@@ -509,7 +509,124 @@ so I specialized `Expected<void>`. `Expected<void>` is implemented in terms of
 `std::optional<Error>`, but inverts the value of `explicit operator bool`.
 
 ### Logging
-TODO
+Can we write a tracing library that does not do any logging by itself? The
+previous section describes how errors are reported by the library, and no
+logging is involved there. Why not leave it up to the client to decide whether
+to note error conditions in the log or to proceed silently?
+
+The problem is that the default implementations of [HTTPClient][15] ([Curl][18])
+and [EventScheduler][16] ([ThreadedEventScheduler][19]) do some of their work on
+background threads, where error conditions may occur without having a "caller"
+to notify, and where execution will proceed despite the error. In those cases,
+should the library squelch the error?
+
+One option is for these async components to accept an `on_error(Error)` callback
+that will be invoked whenever an error occurs on the background thread that
+would not otherwise be reported to client code. What would a client library do
+in `on_error`? I think that it would either do nothing or log the error. So, an
+`on_error` callback for use in background threads is the same as a logging
+interface.
+
+It's tempting to omit a logging interface, leaving it to clients to decide
+whether and how to log. Why have logging _and_ error reporting when you can have
+just error reporting?
+
+We could do that. Here are three reasons why this library has a logging interface
+anyway:
+
+1. Logging a `Tracer`'s configuration when it's initialized is a helpful
+   diagnostic tool. A logging interface allows `Tracer` to do this explicitly,
+   as opposed to counting on client code to log `Tracer::config_json()` itself.
+   A client library can still suppress the startup message in its implementation
+   of the logging interface, but this is more opt-out than opt-in.
+2. Along the same lines, reporting errors that occur on a background thread by
+   invoking a logging interface allows for the library's default behavior to be
+   to print an error message to a log, as opposed to having an `on_error`
+   callback that a client library might choose to log within.
+3. A logging interface allows warnings to be logged, notifying a user of a
+   potentially problematic, but valid, configuration. Sometimes these warnings
+   are a matter of taste, and sometimes they are required by the specification
+   of the feature being configured. Logging is not the only way to handle this —
+   imagine if the return value of `finalize_config` included a list of warnings.
+   But, as with the previous two points, a logging interface allows for the
+   default behavior to be a logged message.
+
+On the other hand, the primary clients of this library are NGINX and Envoy,
+where Datadog engineers have a say in how the library is used. So, the
+distinction is probably not so important.
+
+The logging interface is `class Logger`, defined in [logger.h][41].
+
+The design of `class Logger` is informed by three constraints:
+
+1. Most "warn," "info," "debug," and "trace" severity logging is noise. It is
+   more an artifact of feature development than it is a helpful event with which
+   issues can be diagnosed. The logger should have few severity levels, or
+   ideally only one.
+2. Logging libraries that obscure a conditional branch via the use of
+   preprocessor macros are difficult to understand. Reverse engineering a
+   composition of preprocessor macros is hard, and is not justified by the
+   syntactic convenience that the macros provide.
+3. When client code decides that a message will not be logged, the library
+   should minimize the amount of computation that is done — as close to nothing
+   as is feasible.
+
+(1) and (3) work well together.
+
+On account of (1), `Logger` has only two "severities": "error" and "startup."
+`log_startup` is called once by a `Tracer` when it is initialized. `log_error`
+is called in all other logging circumstances.
+
+On account of (3), `Logger` must do as little work as possible when an
+implementer decides that a logging function should not log. If this library were
+to build diagnostic messages in all cases, and then pass them to the `Logger`,
+then the cost of building the message would be paid even when the `Logger`
+decides not to log. On account of (2), the library cannot define a `DD_LOG`
+macro that hides an `if (logger.severity > ...)` branch. As a matter of taste, I
+don't want the library to be littered with such branches explicitly.
+
+The compromise is to have `Logger::log_error` and `Logger::log_startup` accept a
+[std::function][44] that, if invoked, does the work of building the diagnostic
+message. When a `Logger` implementation decides not to log, the only cost paid
+at the call site is the construction of the `std::function` and the underlying
+capturing lambda expression with which it was likely initialized. The signature
+of the `std::function`, aliased as `Logger::LogFunc`, is `void(std::ostream&)`.
+I don't know whether this results in a real runtime savings in the not-logging
+case, but it seems likely.
+
+`Logger` also has two convenience overloads of `log_error`: one that takes a
+`const Error&` and one that takes a `StringView`.
+
+The `const Error&` overload reveals a contradiction in the design. If an `Error`
+is produced in a context where its only destiny is to be passed to
+`Logger::log_error(const Error&)`, then the cost of building `Error::message`
+will always be paid, in violation of constraint (3). One way to avoid this would
+be to have versions of the `Error`-returning operations that instead accept a
+`Logger&` and use `Logger::log_error(Logger::LogFunc)` directly. I think that
+the present state of things is acceptable and that such a change is not
+warranted.
+
+The default implementation of `Logger` is `CerrLogger`, defined in
+[cerr_logger.h][42]. `CerrLogger` logs to [std::cerr][43] in both `log_error`
+and `log_startup`.
+
+The `Logger` used by a `Tracer` is configured via `std::shared_ptr<Logger>
+TracerConfig::logger`, defined in [tracer_config.h][10].
+
+Finally, constraint (1) is still a matter of debate. Support representatives
+have expressed frustration with this library's, and its predecessor's, lack of a
+"debug mode" that logs the reason for every decision made throughout the
+processing of a trace. This issue deserves revisiting. Here are some potential
+approaches:
+
+- Introduce a "debug mode" that sends fine-grained internal information to
+  Datadog, rather than to a log, either as hidden tags on the trace or via a
+  different data channel, such as the [Telemetry API][45].
+- Introduce a "trace the tracer" mode that generates additional traces that
+  represent operations performed by the tracer. This technique was prototyped in
+  the [david.goffredo/traception][46] branch.
+- Add a `Logger::log_debug` function that optionally prints fine-grained tracing
+  information to the log, in violation of constraint (1).
 
 Operations
 ----------
@@ -573,3 +690,9 @@ TODO
 [38]: https://en.cppreference.com/w/cpp/utility/expected
 [39]: https://en.cppreference.com/w/cpp/utility/variant/get_if
 [40]: https://en.cppreference.com/w/cpp/language/value_category
+[41]: ../src/datadog/logger.h
+[42]: ../src/datadog/cerr_logger.h
+[43]: https://en.cppreference.com/w/cpp/io/cerr
+[44]: https://en.cppreference.com/w/cpp/utility/functional/function
+[45]: https://github.com/DataDog/datadog-agent/blob/796ccb9e92326c85b51f519291e86eb5bc950180/pkg/trace/api/endpoints.go#L97
+[46]: https://github.com/DataDog/dd-trace-cpp/tree/david.goffredo/traception
