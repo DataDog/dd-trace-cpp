@@ -355,10 +355,278 @@ representation." In part, `finalize_config` already mitigates the problem.
 Abstaining from storing the finalized config as a data member is a step further.
 
 ### Error Handling
-TODO
+Most error scenarios within this library are individually enumerated by `enum
+Error::Code`, defined in [error.h][36].
+
+As of this writing, some of the error codes are emitted in more than one place,
+but most of them are emitted in only one place, as is illustrated by the
+following incomprehensible command shell pipeline:
+```
+david@ein:~/src/dd-trace-cpp/src/datadog$ sed -n 's/^\s*\(\w\+\)\s*=\s*[0-9]\+,\?\s*$/{Error::\1/p' error.h | paste -d '|' -s | xargs git grep -P | sed -n 's/.*Error::\(\w\+\),.*/\1/p' | sort | uniq -c | sort -rn
+      3 MESSAGEPACK_ENCODE_FAILURE
+      2 MAX_PER_SECOND_OUT_OF_RANGE
+      2 INVALID_INTEGER
+      2 INVALID_DOUBLE
+      2 CURL_REQUEST_SETUP_FAILED
+      2 CURL_HTTP_CLIENT_ERROR
+      1 ZERO_TRACE_ID
+      1 URL_UNSUPPORTED_SCHEME
+      1 URL_UNIX_DOMAIN_SOCKET_PATH_NOT_ABSOLUTE
+      1 URL_MISSING_SEPARATOR
+      1 UNKNOWN_PROPAGATION_STYLE
+      1 TRACE_SAMPLING_RULES_WRONG_TYPE
+      1 TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY
+      1 TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE
+      1 TRACE_SAMPLING_RULES_INVALID_JSON
+      1 TAG_MISSING_SEPARATOR
+      1 SPAN_SAMPLING_RULES_WRONG_TYPE
+      1 SPAN_SAMPLING_RULES_UNKNOWN_PROPERTY
+      1 SPAN_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE
+      1 SPAN_SAMPLING_RULES_MAX_PER_SECOND_WRONG_TYPE
+      1 SPAN_SAMPLING_RULES_INVALID_JSON
+      1 SPAN_SAMPLING_RULES_FILE_IO
+      1 SERVICE_NAME_REQUIRED
+      1 RULE_WRONG_TYPE
+      1 RULE_TAG_WRONG_TYPE
+      1 RULE_PROPERTY_WRONG_TYPE
+      1 RATE_OUT_OF_RANGE
+      1 OUT_OF_RANGE_INTEGER
+      1 NO_SPAN_TO_EXTRACT
+      1 MISSING_TRACE_ID
+      1 MISSING_SPAN_INJECTION_STYLE
+      1 MISSING_SPAN_EXTRACTION_STYLE
+      1 MISSING_PARENT_SPAN_ID
+      1 MALFORMED_TRACE_TAGS
+      1 DUPLICATE_PROPAGATION_STYLE
+      1 DATADOG_AGENT_NULL_HTTP_CLIENT
+      1 DATADOG_AGENT_INVALID_FLUSH_INTERVAL
+      1 CURL_REQUEST_FAILURE
+      1 CURL_HTTP_CLIENT_SETUP_FAILED
+      1 CURL_HTTP_CLIENT_NOT_RUNNING
+```
+The integer values of the enumerated `Error::Code`s are intended to be
+permanent. Given an error message from a log mentioning an error code 24, one
+can look at the source code for the matching `Error::Code`
+(`TAG_MISSING_SEPARATOR`) and then find all of the possible source origins for
+that error. At first this seems like a poor substitute for including the source
+file and line in the error message, but I suspect that this compromise is
+better.
+
+In addition to an error code, each error condition is associated with a
+contextual diagnostic message. The diagnostic is not only a description of the
+error, but also contains runtime context that might help a user or a maintainer
+identify the underlying issue. For example, a message for
+`TAG_MISSING_SEPARATOR` might include the text that was being parsed, or mention
+the name of the relevant environment variable.
+
+The `Error::Code code` and `std::string message` are combined in a `struct
+Error`, which is the error type used by this library.
+
+`struct Error` has a convenience member function, `Error with_prefix(StringView)
+const`, that allows context to be added to an error. It's analogous to
+`catch`ing one exception and then `throw`ing another, e.g.
+```c++
+Expected<Cat> adopt_cat(AnimalShelter& shelter) {
+  Expected<Cat> result = shelter.adopt(Animals::CAT, 1);
+  if (Error *error = result.if_error()) {
+    return error->with_prefix("While trying to adopt from AnimalShelter: ");
+  }
+  return result;
+}
+```
+
+`struct Error` is most often used in conjunction with the `Expected` class
+template, which is defined in [expected.h][37].
+
+`template <typename T> class Expected` is either a `T` or an `Error`. It is a
+wrapper around `std::variant<T, Error>`. It's inspired by C++23's
+[std::expected][38], but the two are not compatible.
+
+Functions in this library that intend to return a "`Value`," but that might
+instead fail with an `Error`, return an `Expected<Value>`.
+
+This library never reports errors by throwing an exception. However, the library
+will allow exceptions, such as `std::bad_alloc` and `std::bad_variant_access`,
+to pass through it, and does sometimes use exceptions internally. The intention
+is that a client of this library does not need to write `catch`. An alternative
+design would be to use exceptions for their intended purpose. We decided that,
+for a tracing library embedded in proxies, the ergonomics of error values are a
+better fit than exceptions.
+
+`Expected` supports two syntaxes of use. The first is [std::get_if][39]-style
+unpacking with the `if_error` member function:
+```c++
+Expected<Salad> lunch = go_buy_lunch();
+if (Error *error = lunch.if_error()) {
+  return error->with_prefix("Probably getting a hotdog instead: ");
+}
+eat_salad(*lunch); // or, lunch.value()
+```
+`if_error` returns a pointer to the `Error` if there is one, otherwise it
+returns `nullptr`. The body of a conditional statement such as `if` or `while`
+is allowed to contain a variable definition. If the conditional statement
+contains a variable definition, then the truth value of the resulting variable
+is used as the condition. So, if there is _not_ an error, then `if_error`
+returns `nullptr`, and so the declared `Error*` is `nullptr`, which is false for
+the purposes of conditionals, and so in that case the body (block) of the
+conditional statement is skipped.
+
+`if_error` cannot be called on an [rvalue][40], because allowing this makes it
+far too easy to obtain a pointer to a destroyed object. I wrote the component
+and nonetheless made this mistake repeatedly. So, the rvalue-flavored overload
+of `Expected::if_error` is `delete`d.
+
+The other syntax of use supported by `Expected` is the traditional
+check-and-accessor pattern:
+```c++
+Expected<Salad> lunch = go_buy_lunch();
+if (!lunch) {
+  return lunch.error().with_prefix("Probably getting halal instead: ");
+}
+eat_salad(*lunch); // or, lunch.value()
+```
+
+`Expected` defines `explicit operator bool`, which is `true` if the `Expected`
+contains a non-`Error`, and `false` if the `Expected` contains an `Error`. There
+is also `has_value()`, which returns the same thing.
+
+Then the `Error` can be obtained via `error()`, or the non-`Error` can be
+obtained via `value()` or `operator*()`.
+
+Why bother with `if_error`? Because I like it! I'm a sucker for structured
+bindings and pattern matching.
+
+`template <typename T> class Expected` has one specialization: `Expected<void>`.
+`Expected<void>` is "either an `Error` or nothing." It's used to convey the
+result of an operation that might fail but that doesn't yield a value when it
+succeeds. It behaves in the same way as `Expected<T>`, except that `value()` and
+`operator*()` are not defined.
+
+At first I instead used `std::optional<Error>` directly. The problem there was
+that `explicit operator bool` has the opposite meaning as it does in
+`Expected<T>`. I wanted error handling code to be the same in the two cases, and
+so I specialized `Expected<void>`. `Expected<void>` is implemented in terms of
+`std::optional<Error>`, but inverts the value of `explicit operator bool`.
 
 ### Logging
-TODO
+Can we write a tracing library that does not do any logging by itself? The
+previous section describes how errors are reported by the library, and no
+logging is involved there. Why not leave it up to the client to decide whether
+to note error conditions in the log or to proceed silently?
+
+The problem is that the default implementations of [HTTPClient][15] ([Curl][18])
+and [EventScheduler][16] ([ThreadedEventScheduler][19]) do some of their work on
+background threads, where error conditions may occur without having a "caller"
+to notify, and where execution will proceed despite the error. In those cases,
+should the library squelch the error?
+
+One option is for these async components to accept an `on_error(Error)` callback
+that will be invoked whenever an error occurs on the background thread that
+would not otherwise be reported to client code. What would a client library do
+in `on_error`? I think that it would either do nothing or log the error. So, an
+`on_error` callback for use in background threads is the same as a logging
+interface.
+
+It's tempting to omit a logging interface, leaving it to clients to decide
+whether and how to log. Why have logging _and_ error reporting when you can have
+just error reporting?
+
+We could do that. Here are three reasons why this library has a logging interface
+anyway:
+
+1. Logging a `Tracer`'s configuration when it's initialized is a helpful
+   diagnostic tool. A logging interface allows `Tracer` to do this explicitly,
+   as opposed to counting on client code to log `Tracer::config_json()` itself.
+   A client library can still suppress the startup message in its implementation
+   of the logging interface, but this is more opt-out than opt-in.
+2. Along the same lines, reporting errors that occur on a background thread by
+   invoking a logging interface allows for the library's default behavior to be
+   to print an error message to a log, as opposed to having an `on_error`
+   callback that a client library might choose to log within.
+3. A logging interface allows warnings to be logged, notifying a user of a
+   potentially problematic, but valid, configuration. Sometimes these warnings
+   are a matter of taste, and sometimes they are required by the specification
+   of the feature being configured. Logging is not the only way to handle this —
+   imagine if the return value of `finalize_config` included a list of warnings.
+   But, as with the previous two points, a logging interface allows for the
+   default behavior to be a logged message.
+
+On the other hand, the primary clients of this library are NGINX and Envoy,
+where Datadog engineers have a say in how the library is used. So, the
+distinction is probably not so important.
+
+The logging interface is `class Logger`, defined in [logger.h][41].
+
+The design of `class Logger` is informed by three constraints:
+
+1. Most "warn," "info," "debug," and "trace" severity logging is noise. It is
+   more an artifact of feature development than it is a helpful event with which
+   issues can be diagnosed. The logger should have few severity levels, or
+   ideally only one.
+2. Logging libraries that obscure a conditional branch via the use of
+   preprocessor macros are difficult to understand. Reverse engineering a
+   composition of preprocessor macros is hard, and is not justified by the
+   syntactic convenience that the macros provide.
+3. When client code decides that a message will not be logged, the library
+   should minimize the amount of computation that is done — as close to nothing
+   as is feasible.
+
+(1) and (3) work well together.
+
+On account of (1), `Logger` has only two "severities": "error" and "startup."
+`log_startup` is called once by a `Tracer` when it is initialized. `log_error`
+is called in all other logging circumstances.
+
+On account of (3), `Logger` must do as little work as possible when an
+implementer decides that a logging function should not log. If this library were
+to build diagnostic messages in all cases, and then pass them to the `Logger`,
+then the cost of building the message would be paid even when the `Logger`
+decides not to log. On account of (2), the library cannot define a `DD_LOG`
+macro that hides an `if (logger.severity > ...)` branch. As a matter of taste, I
+don't want the library to be littered with such branches explicitly.
+
+The compromise is to have `Logger::log_error` and `Logger::log_startup` accept a
+[std::function][44] that, if invoked, does the work of building the diagnostic
+message. When a `Logger` implementation decides not to log, the only cost paid
+at the call site is the construction of the `std::function` and the underlying
+capturing lambda expression with which it was likely initialized. The signature
+of the `std::function`, aliased as `Logger::LogFunc`, is `void(std::ostream&)`.
+I don't know whether this results in a real runtime savings in the not-logging
+case, but it seems likely.
+
+`Logger` also has two convenience overloads of `log_error`: one that takes a
+`const Error&` and one that takes a `StringView`.
+
+The `const Error&` overload reveals a contradiction in the design. If an `Error`
+is produced in a context where its only destiny is to be passed to
+`Logger::log_error(const Error&)`, then the cost of building `Error::message`
+will always be paid, in violation of constraint (3). One way to avoid this would
+be to have versions of the `Error`-returning operations that instead accept a
+`Logger&` and use `Logger::log_error(Logger::LogFunc)` directly. I think that
+the present state of things is acceptable and that such a change is not
+warranted.
+
+The default implementation of `Logger` is `CerrLogger`, defined in
+[cerr_logger.h][42]. `CerrLogger` logs to [std::cerr][43] in both `log_error`
+and `log_startup`.
+
+The `Logger` used by a `Tracer` is configured via `std::shared_ptr<Logger>
+TracerConfig::logger`, defined in [tracer_config.h][10].
+
+Finally, constraint (1) is still a matter of debate. Support representatives
+have expressed frustration with this library's, and its predecessor's, lack of a
+"debug mode" that logs the reason for every decision made throughout the
+processing of a trace. This issue deserves revisiting. Here are some potential
+approaches:
+
+- Introduce a "debug mode" that sends fine-grained internal information to
+  Datadog, rather than to a log, either as hidden tags on the trace or via a
+  different data channel, such as the [Telemetry API][45].
+- Introduce a "trace the tracer" mode that generates additional traces that
+  represent operations performed by the tracer. This technique was prototyped in
+  the [david.goffredo/traception][46] branch.
+- Add a `Logger::log_debug` function that optionally prints fine-grained tracing
+  information to the log, in violation of constraint (1).
 
 Operations
 ----------
@@ -417,3 +685,14 @@ TODO
 [33]: ../src/datadog/trace_sampler_config.h
 [34]: ../src/datadog/span_sampler_config.h
 [35]: ../src/datadog/rate.h
+[36]: ../src/datadog/error.h
+[37]: ../src/datadog/expected.h
+[38]: https://en.cppreference.com/w/cpp/utility/expected
+[39]: https://en.cppreference.com/w/cpp/utility/variant/get_if
+[40]: https://en.cppreference.com/w/cpp/language/value_category
+[41]: ../src/datadog/logger.h
+[42]: ../src/datadog/cerr_logger.h
+[43]: https://en.cppreference.com/w/cpp/io/cerr
+[44]: https://en.cppreference.com/w/cpp/utility/functional/function
+[45]: https://github.com/DataDog/datadog-agent/blob/796ccb9e92326c85b51f519291e86eb5bc950180/pkg/trace/api/endpoints.go#L97
+[46]: https://github.com/DataDog/dd-trace-cpp/tree/david.goffredo/traception
