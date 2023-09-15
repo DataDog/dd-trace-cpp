@@ -3,6 +3,9 @@
 
 from ubuntu:22.04
 
+# Expose predefined platform ARGs
+arg TARGETARCH
+
 # Don't issue blocking prompts during installation (sometimes an installer
 # prompts for the current time zone).
 env DEBIAN_FRONTEND=noninteractive
@@ -20,7 +23,7 @@ run apt-get update && apt-get install --yes software-properties-common && \
 
 # bazelisk, a launcher for bazel. `bazelisk --help` will cause the latest
 # version to be downloaded.
-run wget -O/usr/local/bin/bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.15.0/bazelisk-linux-amd64 \
+run wget -O/usr/local/bin/bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.15.0/bazelisk-linux-$TARGETARCH \
     && chmod +x /usr/local/bin/bazelisk \
     && bazelisk --help
 
