@@ -25,17 +25,17 @@ add_compile_options(-Wno-error=free-nonheap-object)
 # <https://stackoverflow.com/questions/52416362>.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_compile_options(-Wno-error=unused-lambda-capture)
-endif()
 
-# If we're building with clang, then use the libc++ version of the standard
-# library instead of libstdc++. Better coverage of build configurations.
-#
-# But there's one exception: libfuzzer is built with libstdc++ on Ubuntu,
-# and so won't link to libc++. So, if any of the FUZZ_* variables are set,
-# keep to libstdc++ (the default on most systems).
-if ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (NOT ${FUZZ_W3C_PROPAGATION}))
-    add_compile_options(-stdlib=libc++)
-    add_link_options(-stdlib=libc++)
+    # If we're building with clang, then use the libc++ version of the standard
+    # library instead of libstdc++. Better coverage of build configurations.
+    #
+    # But there's one exception: libfuzzer is built with libstdc++ on Ubuntu,
+    # and so won't link to libc++. So, if any of the FUZZ_* variables are set,
+    # keep to libstdc++ (the default on most systems).
+    if (NOT ${FUZZ_W3C_PROPAGATION})
+      add_compile_options(-stdlib=libc++)
+      add_link_options(-stdlib=libc++)
+    endif ()
 endif()
 
 include(ProcessorCount)
@@ -75,6 +75,11 @@ ExternalProject_Add(curl
   BUILD_COMMAND make -j${MAKE_JOB_COUNT}
   INSTALL_COMMAND make install
 )
+
+if (APPLE)
+  find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+  find_library(SYSTEMCONFIGURATION_LIBRARY SystemConfiguration)
+endif ()
 
 if (MSVC)
     add_compile_options(/W4 /WX)
@@ -200,7 +205,15 @@ include_directories(${CMAKE_BINARY_DIR}/include)
 
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp-objects PUBLIC ${CMAKE_BINARY_DIR}/lib/libcurl.a PUBLIC Threads::Threads ${COVERAGE_LIBRARIES})
+target_link_libraries(dd_trace_cpp-objects 
+  PUBLIC 
+    ${CMAKE_BINARY_DIR}/lib/libcurl.a 
+  PUBLIC 
+    Threads::Threads 
+    ${COVERAGE_LIBRARIES} 
+    ${COREFOUNDATION_LIBRARY}
+    ${SYSTEMCONFIGURATION_LIBRARY}
+)
 
 # Produce both shared and static versions of the library.
 add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
