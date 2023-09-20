@@ -1,7 +1,16 @@
 version: 2.1
 
-jobs:
+executors:
+  docker-amd64:
+    docker:
+      - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: xlarge
+  docker-arm64:
+    docker:
+      - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: arm.xlarge
 
+jobs:
   format:
     docker:
     - image: "datadog/docker-library:dd-trace-cpp-ci"
@@ -22,9 +31,9 @@ jobs:
     parameters:
       toolchain:
         type: string
-    docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci"
-    resource_class: xlarge
+      arch:
+        type: string
+    executor: docker-<< parameters.arch >>
     environment:
       MAKE_JOB_COUNT: 8
     steps:
@@ -37,18 +46,17 @@ jobs:
         type: string
       sanitize:
         type: string
-    docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci"
-    resource_class: xlarge
+      arch:
+        type: string
+    executor: docker-<< parameters.arch >>
     environment:
       MAKE_JOB_COUNT: 8
       # See <https://github.com/llvm/llvm-project/issues/59432>.
       ASAN_OPTIONS: alloc_dealloc_mismatch=0
     steps:
     - checkout
-    - run: mkdir .build
-    - run: cd .build && ../bin/with-toolchain << parameters.toolchain >> cmake .. -DBUILD_TESTING=1 -DSANITIZE=<< parameters.sanitize >>
-    - run: cd .build && make -j $MAKE_JOB_COUNT VERBOSE=1
+    - run: bin/with-toolchain << parameters.toolchain >> cmake . -B .build -DBUILD_TESTING=1 -DSANITIZE=<< parameters.sanitize >>
+    - run: cmake --build .build -j ${MAKE_JOB_COUNT} -v
     - run: cd .build && test/tests
 
   coverage:
@@ -75,8 +83,10 @@ workflows:
           parameters:
             toolchain: ["gnu", "llvm"]
             sanitize: ["on", "off"]
+            arch: ["amd64", "arm64"]
     - build-bazel:
         matrix:
           parameters:
+            arch: ["amd64", "arm64"]
             toolchain: ["gnu", "llvm"]
     - coverage
