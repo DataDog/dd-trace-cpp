@@ -31,9 +31,9 @@ jobs:
     parameters:
       toolchain:
         type: string
-    docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci"
-    resource_class: xlarge
+      arch:
+        type: string
+    executor: docker-<< parameters.arch >>
     environment:
       MAKE_JOB_COUNT: 8
     steps:
@@ -87,5 +87,6 @@ workflows:
     - build-bazel:
         matrix:
           parameters:
+            arch: ["amd64", "arm64"]
             toolchain: ["gnu", "llvm"]
     - coverage

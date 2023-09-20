@@ -3,7 +3,8 @@
 
 from ubuntu:22.04
 
-# Expose predefined platform ARGs
+# Expose Docker's predefined platform ARGs
+# For more information: <https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope>
 arg TARGETARCH
 
 # Don't issue blocking prompts during installation (sometimes an installer
