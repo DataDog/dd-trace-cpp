@@ -40,6 +40,7 @@
 #include <ostream>
 #include <sstream>
 #include <stack>
+#include <string>
 #include <system_error>
 
 #include "httplib.h"
@@ -309,6 +310,11 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
   }
 
   const std::string_view raw = begin->second;
+
+// NOTE(@dmehala): clang does not std::from_chars with floating numbers
+#ifdef __clang__
+  double seconds = std::stod(std::string{raw});
+#else
   double seconds;
   const auto result = std::from_chars(raw.begin(), raw.end(), seconds);
   if (result.ec == std::errc::invalid_argument || result.ec == std::errc::result_out_of_range ||
@@ -320,6 +326,7 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
     response.set_content(message, "text/plain");
     return;
   }
+#endif
 
   using namespace std::chrono;
   std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));

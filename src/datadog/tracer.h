@@ -39,6 +39,7 @@ class Tracer {
   std::vector<PropagationStyle> extraction_styles_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
+  bool delegate_sampling_decision_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:

@@ -81,6 +81,7 @@ class TraceSegment {
                const Optional<std::string>& hostname,
                Optional<std::string> origin, std::size_t tags_header_max_size,
                std::vector<std::pair<std::string, std::string>> trace_tags,
+               bool delegate_sampling_decision,
                Optional<SamplingDecision> sampling_decision,
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
@@ -97,10 +98,9 @@ class TraceSegment {
   // This function is the implementation of `Span::inject`.
   void inject(DictWriter& writer, const SpanData& span);
 
-  // These are for sampling delegation, not for trace propagation.
-  // TODO: Sampling delegation is not yet implemented.
+  // Inject/Extract trace context for sampling delegation.
   Expected<void> extract(const DictReader& reader);
-  void inject(DictWriter& writer) const;
+  void inject(DictWriter& writer);
 
   // Take ownership of the specified `span`.
   void register_span(std::unique_ptr<SpanData> span);
@@ -113,7 +113,7 @@ class TraceSegment {
   void override_sampling_priority(int priority);
 
  private:
-  // If `sampling_decision_` is not null, use `trace_sampler_` to make a
+  // If `sampling_decision_` is null, use `trace_sampler_` to make a
   // sampling decision and assign it to `sampling_decision_`.
   void make_sampling_decision_if_null();
   // Set or remove the `tags::internal::decision_maker` trace tag in

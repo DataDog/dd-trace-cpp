@@ -27,6 +27,9 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+constexpr StringView DD_SAMPLING_DELEGATION_HEADER =
+    "x-datadog-delegate-trace-sampling";
+
 // Parse the high 64 bits of a trace ID from the specified `value`. If `value`
 // is correctly formatted, then return the resulting bits. If `value` is
 // incorrectly formatted then return `nullopt`.
@@ -41,6 +44,15 @@ Optional<std::uint64_t> parse_trace_id_high(const std::string& value) {
   }
 
   return nullopt;
+}
+
+Expected<SamplingDecision::Origin> parse_sampling_delegation_header(
+    StringView value) {
+  if (value == "delegate") return SamplingDecision::Origin::DELEGATED;
+
+  std::string msg("Unknown trace sampling delegation value: ");
+  msg += std::string{value};
+  return Error{Error::Code::INCONSISTENT_EXTRACTION_STYLES, msg};
 }
 
 // Decode the specified `trace_tags` and integrate them into the specified
@@ -128,19 +140,41 @@ Expected<ExtractedData> extract_datadog(
   }
   result.parent_id = *parent_id;
 
-  const StringView sampling_priority_header = "x-datadog-sampling-priority";
-  if (auto found = headers.lookup(sampling_priority_header)) {
-    auto sampling_priority = parse_int(*found, 10);
-    if (auto* error = sampling_priority.if_error()) {
-      std::string prefix;
-      prefix += "Could not extract Datadog-style sampling priority from ";
-      append(prefix, sampling_priority_header);
+  if (auto sampling_delegation_header =
+          headers.lookup(DD_SAMPLING_DELEGATION_HEADER)) {
+    auto sampling_delegation =
+        parse_sampling_delegation_header(*sampling_delegation_header);
+    if (auto* error = sampling_delegation.if_error()) {
+      std::string prefix(
+          "Could not extract Datadog-style sampling delegation request from ");
+      append(prefix, DD_SAMPLING_DELEGATION_HEADER);
       prefix += ": ";
-      append(prefix, *found);
-      prefix += ' ';
-      return error->with_prefix(prefix);
+      append(prefix, *sampling_delegation_header);
+      prefix += " ";
+
+      // NOTE(@dmehala): log the error to be aware it exists.
+      // As mentionned in the RFC in any case sampling delegation should still
+      // be performed.
+      logger.log_error(error->with_prefix(prefix));
     }
-    result.sampling_priority = *sampling_priority;
+
+    result.delegate_sampling_decision = true;
+  } else {
+    const StringView sampling_priority_header = "x-datadog-sampling-priority";
+    if (auto found = headers.lookup(sampling_priority_header)) {
+      auto sampling_priority = parse_int(*found, 10);
+      if (auto* error = sampling_priority.if_error()) {
+        std::string prefix;
+        prefix += "Could not extract Datadog-style sampling priority from ";
+        append(prefix, sampling_priority_header);
+        prefix += ": ";
+        append(prefix, *found);
+        prefix += ' ';
+        return error->with_prefix(prefix);
+      }
+
+      result.sampling_priority = *sampling_priority;
+    }
   }
 
   auto origin = headers.lookup("x-datadog-origin");
@@ -252,7 +286,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       hostname_(config.report_hostname ? get_hostname() : nullopt),
-      tags_header_max_size_(config.tags_header_size) {
+      tags_header_max_size_(config.tags_header_size),
+      delegate_sampling_decision_(config.trace_delegate_sampling_decision) {
   if (auto* collector =
           std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
     collector_ = *collector;
@@ -295,8 +330,8 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, nullopt /* origin */, tags_header_max_size_,
-      std::move(trace_tags), nullopt /* sampling_decision */,
-      nullopt /* additional_w3c_tracestate */,
+      std::move(trace_tags), delegate_sampling_decision_,
+      nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
@@ -346,9 +381,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     }
   }
 
-  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
-         additional_w3c_tracestate, additional_datadog_w3c_tracestate] =
-      extracted_data;
+  // NOTE(@dmehala): defeat the purpose of the struct. remove following line.
+  auto& [trace_id, parent_id, origin, trace_tags, delegate_sampling_decision,
+         sampling_priority, additional_w3c_tracestate,
+         additional_datadog_w3c_tracestate] = extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -445,21 +481,19 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   Optional<SamplingDecision> sampling_decision;
   if (sampling_priority) {
-    SamplingDecision decision;
-    decision.priority = *sampling_priority;
+    sampling_decision = SamplingDecision{};
+    sampling_decision->priority = *sampling_priority;
     // `decision.mechanism` is null.  We might be able to infer it once we
     // extract `trace_tags`, but we would have no use for it, so we won't.
-    decision.origin = SamplingDecision::Origin::EXTRACTED;
-
-    sampling_decision = decision;
+    sampling_decision->origin = SamplingDecision::Origin::EXTRACTED;
   }
 
   const auto span_data_ptr = span_data.get();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, trace_sampler_, span_sampler_, defaults_,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
-      std::move(trace_tags), std::move(sampling_decision),
-      std::move(additional_w3c_tracestate),
+      std::move(trace_tags), delegate_sampling_decision,
+      std::move(sampling_decision), std::move(additional_w3c_tracestate),
       std::move(additional_datadog_w3c_tracestate), std::move(span_data));
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },

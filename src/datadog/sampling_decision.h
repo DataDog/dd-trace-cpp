@@ -12,7 +12,7 @@ namespace datadog {
 namespace tracing {
 
 struct SamplingDecision {
-  enum class Origin {
+  enum class Origin : char {
     // There was already a sampling decision associated with this trace when we
     // extracted the local root span from somewhere else (i.e.
     // `Tracer::extract_span`).

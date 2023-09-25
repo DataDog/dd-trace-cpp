@@ -49,6 +49,11 @@ struct TracerConfig {
   // variable.
   bool report_traces = true;
 
+  // `enable_sampling_delegation` instructs the tracer to delegate sampling
+  // decisions when possible.
+  // NOTE(@dmehala): do we really want to expose a setting?
+  bool enable_sampling_delegation = false;
+
   // `trace_sampler` configures trace sampling.  Trace sampling determines which
   // traces are sent to Datadog.  See `trace_sampler_config.h`.
   TraceSamplerConfig trace_sampler;
@@ -129,6 +134,7 @@ class FinalizedTracerConfig {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
+  bool trace_delegate_sampling_decision;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

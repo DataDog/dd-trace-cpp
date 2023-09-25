@@ -8,9 +8,11 @@
 
 #include "collector.h"
 #include "collector_response.h"
+#include "dict_reader.h"
 #include "dict_writer.h"
 #include "error.h"
 #include "hex.h"
+#include "json.hpp"
 #include "logger.h"
 #include "optional.h"
 #include "platform_util.h"
@@ -25,6 +27,9 @@
 namespace datadog {
 namespace tracing {
 namespace {
+
+constexpr StringView DD_SAMPLING_DELEGATION_RESPONSE_HEADER =
+    "x-datadog-trace-sampling-decision";
 
 struct Cache {
   static int process_id;
@@ -78,6 +83,22 @@ void inject_trace_tags(
   }
 }
 
+Expected<SamplingDecision> parse_sampling_delegation_response(
+    StringView response) {
+  try {
+    auto json = nlohmann::json::parse(response);
+
+    SamplingDecision sampling_decision;
+    sampling_decision.origin = SamplingDecision::Origin::DELEGATED;
+    sampling_decision.priority = json["priority"];
+    sampling_decision.mechanism = json["mechanism"];
+
+    return sampling_decision;
+  } catch (...) {
+    return Error{Error::Code::OTHER, "Could not parse"};
+  }
+}
+
 }  // namespace
 
 TraceSegment::TraceSegment(
@@ -90,6 +111,7 @@ TraceSegment::TraceSegment(
     const Optional<std::string>& hostname, Optional<std::string> origin,
     std::size_t tags_header_max_size,
     std::vector<std::pair<std::string, std::string>> trace_tags,
+    bool delegate_sampling_decision,
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
@@ -108,7 +130,8 @@ TraceSegment::TraceSegment(
       sampling_decision_(std::move(sampling_decision)),
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
-          std::move(additional_datadog_w3c_tracestate)) {
+          std::move(additional_datadog_w3c_tracestate)),
+      awaiting_delegated_sampling_decision_(delegate_sampling_decision) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);
@@ -304,6 +327,9 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
         }
+        if (awaiting_delegated_sampling_decision_) {
+          writer.set("x-datadog-delegate-trace-sampling", "delegate");
+        }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
                           spans_.front()->tags, *logger_);
         break;
@@ -335,6 +361,42 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         break;
     }
   }
+}
+
+Expected<void> TraceSegment::extract(const DictReader& headers) {
+  if (auto sampling_delegation_response =
+          headers.lookup(DD_SAMPLING_DELEGATION_RESPONSE_HEADER)) {
+    auto sampling_decision =
+        parse_sampling_delegation_response(*sampling_delegation_response);
+    if (!sampling_decision) {
+      return sampling_decision.error();
+    }
+
+    // std::swap(sampling_decision_, *sampling_decision);
+    sampling_decision_ = *sampling_decision;
+    awaiting_delegated_sampling_decision_ = false;
+  }
+
+  return {};
+}
+
+void TraceSegment::inject(DictWriter& writer) {
+  int sampling_priority;
+  int sampling_mechanism;
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    make_sampling_decision_if_null();
+    assert(sampling_decision_);
+    sampling_priority = sampling_decision_->priority;
+    sampling_mechanism = *sampling_decision_->mechanism;
+  }
+
+  nlohmann::json j;
+  j["priority"] = sampling_priority;
+  j["mechanism"] = sampling_mechanism;
+
+  writer.set(DD_SAMPLING_DELEGATION_RESPONSE_HEADER, j.dump());
 }
 
 }  // namespace tracing

@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.24)
 project(dd-trace-cpp)
 
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
-option(BUILD_HASHER_EXAMPLE "Build the example program examples/hasher" OFF)
+option(BUILD_EXAMPLES "Build examples program" OFF)
 option(BUILD_TESTING "Build the unit tests (test/)" OFF)
 option(SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
 option(FUZZ_W3C_PROPAGATION "Build a fuzzer for W3C propagation" OFF)
@@ -205,12 +205,12 @@ include_directories(${CMAKE_BINARY_DIR}/include)
 
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp-objects 
-  PUBLIC 
-    ${CMAKE_BINARY_DIR}/lib/libcurl.a 
-  PUBLIC 
-    Threads::Threads 
-    ${COVERAGE_LIBRARIES} 
+target_link_libraries(dd_trace_cpp-objects
+  PUBLIC
+    ${CMAKE_BINARY_DIR}/lib/libcurl.a
+  PUBLIC
+    Threads::Threads
+    ${COVERAGE_LIBRARIES}
     ${COREFOUNDATION_LIBRARY}
     ${SYSTEMCONFIGURATION_LIBRARY}
 )
@@ -236,7 +236,9 @@ if(BUILD_TESTING)
 endif()
 
 # Each example has its own build flag.
-add_subdirectory(examples)
+if(BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 if(BUILD_BENCHMARK)
   add_subdirectory(benchmark)

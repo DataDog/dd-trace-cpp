@@ -437,6 +437,16 @@ TEST_CASE("span extraction") {
          456,
          2},
         {__LINE__,
+         "datadog style with delegate header",
+         {PropagationStyle::DATADOG},
+         {{"x-datadog-trace-id", "123"},
+          {"x-datadog-parent-id", "456"},
+          {"x-datadog-delegate-trace-sampling", "delegate"},
+          {"x-datadog-sampling-priority", "3"}},
+         TraceID(123),
+         456,
+         nullopt},
+        {__LINE__,
          "datadog style without sampling priority",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-parent-id", "456"}},
@@ -1017,7 +1027,7 @@ TEST_CASE("128-bit trace IDs") {
   // Use a clock that always returns a hard-coded `TimePoint`.
   // May 6, 2010 14:45:13 America/New_York
   const std::time_t flash_crash = 1273171513;
-  const Clock clock = [flash_crash]() {
+  const Clock clock = [] {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(flash_crash);
     return result;
