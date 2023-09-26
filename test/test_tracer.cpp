@@ -999,6 +999,31 @@ TEST_CASE("span extraction") {
       }
     }
   }
+
+  SECTION("inject an extracted span which delegates sampling") {
+    config.enable_sampling_delegation = false;
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+
+    std::unordered_map<std::string, std::string> headers{
+        {"x-datadog-trace-id", "123"},
+        {"x-datadog-parent-id", "456"},
+        {"x-datadog-sampling-priority", "2"},
+        {"x-datadog-delegate-trace-sampling", "delegate"}};
+
+    MockDictReader reader{headers};
+    auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+    REQUIRE(!span->trace_segment().sampling_decision());
+
+    MockDictWriter writer;
+    span->inject(writer);
+
+    auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+    REQUIRE(found != writer.items.cend());
+    REQUIRE(found->second == "delegate");
+  }
 }
 
 TEST_CASE("report hostname") {

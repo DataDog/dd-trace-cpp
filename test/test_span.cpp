@@ -17,6 +17,7 @@
 #include <functional>
 #include <string>
 
+#include "catch.hpp"
 #include "matchers.h"
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
@@ -392,6 +393,7 @@ TEST_CASE("injection") {
     REQUIRE(headers.at("x-datadog-trace-id") == "42");
     REQUIRE(headers.at("x-datadog-parent-id") == "42");
     REQUIRE(headers.at("x-datadog-sampling-priority") == "3");
+    REQUIRE(headers.count("x-datadog-delegate-trace-sampling") == 0);
     REQUIRE(headers.at("x-b3-traceid") == "000000000000002a");
     REQUIRE(headers.at("x-b3-spanid") == "000000000000002a");
     REQUIRE(headers.at("x-b3-sampled") == "1");
@@ -748,4 +750,24 @@ TEST_CASE("128-bit trace ID injection") {
   found = writer.items.find("x-b3-traceid");
   REQUIRE(found != writer.items.end());
   REQUIRE(found->second == "deadbeefdeadbeefcafebabecafebabe");
+}
+
+TEST_CASE("sampling delegation injection") {
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.enable_sampling_delegation = true;
+  config.logger = std::make_shared<MockLogger>();
+  config.collector = std::make_shared<NullCollector>();
+
+  const auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+
+  Tracer tracer{*finalized};
+  auto span = tracer.create_span();
+  MockDictWriter writer;
+  span.inject(writer);
+
+  auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+  REQUIRE(found != writer.items.cend());
+  REQUIRE(found->second == "delegate");
 }
