@@ -18,6 +18,7 @@
 #include "optional.h"
 #include "span.h"
 #include "tracer_config.h"
+#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
@@ -30,6 +31,7 @@ class SpanSampler;
 class Tracer {
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
+  std::shared_ptr<TracerTelemetry> tracer_telemetry_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const IDGenerator> generator_;

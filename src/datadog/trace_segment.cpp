@@ -83,6 +83,7 @@ void inject_trace_tags(
 TraceSegment::TraceSegment(
     const std::shared_ptr<Logger>& logger,
     const std::shared_ptr<Collector>& collector,
+    const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
     const std::shared_ptr<TraceSampler>& trace_sampler,
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
@@ -96,6 +97,7 @@ TraceSegment::TraceSegment(
     std::unique_ptr<SpanData> local_root)
     : logger_(logger),
       collector_(collector),
+      tracer_telemetry_(tracer_telemetry),
       trace_sampler_(trace_sampler),
       span_sampler_(span_sampler),
       defaults_(defaults),
@@ -111,9 +113,13 @@ TraceSegment::TraceSegment(
           std::move(additional_datadog_w3c_tracestate)) {
   assert(logger_);
   assert(collector_);
+  assert(tracer_telemetry_);
   assert(trace_sampler_);
   assert(span_sampler_);
   assert(defaults_);
+
+  tracer_telemetry_->traces_started().inc();
+  tracer_telemetry_->active_traces().inc();
 
   register_span(std::move(local_root));
 }
@@ -135,12 +141,18 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
+  tracer_telemetry_->spans_started().inc();
+  tracer_telemetry_->active_spans().inc();
+
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
   spans_.emplace_back(std::move(span));
 }
 
 void TraceSegment::span_finished() {
+  tracer_telemetry_->spans_finished().inc();
+  tracer_telemetry_->active_spans().dec();
+
   {
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
@@ -220,6 +232,9 @@ void TraceSegment::span_finished() {
     logger_->log_error(
         error->with_prefix("Error sending spans to collector: "));
   }
+
+  tracer_telemetry_->traces_finished().inc();
+  tracer_telemetry_->active_traces().dec();
 }
 
 void TraceSegment::override_sampling_priority(int priority) {

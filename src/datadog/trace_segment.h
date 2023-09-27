@@ -36,6 +36,7 @@
 #include "optional.h"
 #include "propagation_style.h"
 #include "sampling_decision.h"
+#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
@@ -54,6 +55,7 @@ class TraceSegment {
 
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
+  std::shared_ptr<TracerTelemetry> tracer_telemetry_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
 
@@ -74,6 +76,7 @@ class TraceSegment {
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
                const std::shared_ptr<Collector>& collector,
+               const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,

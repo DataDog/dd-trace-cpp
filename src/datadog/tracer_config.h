@@ -13,6 +13,7 @@
 #include "error.h"
 #include "expected.h"
 #include "propagation_style.h"
+#include "random.h"
 #include "span_defaults.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
@@ -129,6 +130,8 @@ class FinalizedTracerConfig {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
+
+  std::string runtime_id = uuid();
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
