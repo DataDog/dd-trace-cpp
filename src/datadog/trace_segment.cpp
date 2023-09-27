@@ -364,6 +364,8 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
 }
 
 Expected<void> TraceSegment::extract(const DictReader& headers) {
+  if (!awaiting_delegated_sampling_decision_) return {};
+
   if (auto sampling_delegation_response =
           headers.lookup(DD_SAMPLING_DELEGATION_RESPONSE_HEADER)) {
     auto sampling_decision =
@@ -375,26 +377,31 @@ Expected<void> TraceSegment::extract(const DictReader& headers) {
     // std::swap(sampling_decision_, *sampling_decision);
     sampling_decision_ = *sampling_decision;
     awaiting_delegated_sampling_decision_ = false;
+
+    if (spans_.front()->parent_id == 0) {
+      trace_tags_.emplace_back(tags::internal::sampling_decider, "0");
+    }
   }
 
   return {};
 }
 
 void TraceSegment::inject(DictWriter& writer) {
-  int sampling_priority;
-  int sampling_mechanism;
+  nlohmann::json j;
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
     make_sampling_decision_if_null();
     assert(sampling_decision_);
-    sampling_priority = sampling_decision_->priority;
-    sampling_mechanism = *sampling_decision_->mechanism;
+    j["priority"] = sampling_decision_->priority;
+    j["mechanism"] = *sampling_decision_->mechanism;
   }
 
-  nlohmann::json j;
-  j["priority"] = sampling_priority;
-  j["mechanism"] = sampling_mechanism;
+  // NOTE(@dmehala): No sampling decision received so we just made one.
+  if (awaiting_delegated_sampling_decision_) {
+    awaiting_delegated_sampling_decision_ = false;
+    trace_tags_.emplace_back(tags::internal::sampling_decider, "1");
+  }
 
   writer.set(DD_SAMPLING_DELEGATION_RESPONSE_HEADER, j.dump());
 }

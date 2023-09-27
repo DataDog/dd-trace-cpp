@@ -1,2 +1,2 @@
 add_subdirectory(hasher)
-add_subdirectory(http-server/server)
+add_subdirectory(http-server)

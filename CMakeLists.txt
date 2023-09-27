@@ -124,7 +124,6 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp
     src/datadog/tag_propagation.cpp
-    src/datadog/tags.cpp
     src/datadog/threaded_event_scheduler.cpp
     src/datadog/tracer_config.cpp
     src/datadog/tracer.cpp
