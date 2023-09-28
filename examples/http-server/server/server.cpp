@@ -156,9 +156,9 @@ int main() {
   // created. We finish it by popping it off of the span stack.
   server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
-    auto& span = context->spans.top();
+
     helper::HeaderWriter writer(response.headers);
-    span.trace_segment().inject(writer);
+    context->spans.top().trace_segment().inject(writer);
 
     context->spans.pop();
     return httplib::Server::HandlerResponse::Unhandled;
@@ -170,14 +170,13 @@ int main() {
   // span stack.
   server.set_post_request_handler([](const httplib::Request& request, httplib::Response& response) {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
-    auto& span = context->spans.top();
-    span.set_tag("http.status_code", std::to_string(response.status));
+    context->spans.top().set_tag("http.status_code", std::to_string(response.status));
     context->spans.pop();
   });
 
   // Run the HTTP server.
   std::signal(SIGTERM, hard_stop);
-  server.listen("0.0.0.0", 8080);
+  server.listen("0.0.0.0", 80);
 }
 
 // When the request begins, create a `RequestTracingContext` and set it as the

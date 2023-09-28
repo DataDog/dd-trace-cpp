@@ -381,7 +381,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     }
   }
 
-  // NOTE(@dmehala): defeat the purpose of the struct. remove following line.
+  // NOTE(@dmehala): defeat the purpose of the struct. remove following line?
   auto& [trace_id, parent_id, origin, trace_tags, delegate_sampling_decision,
          sampling_priority, additional_w3c_tracestate,
          additional_datadog_w3c_tracestate] = extracted_data;
@@ -481,11 +481,13 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   Optional<SamplingDecision> sampling_decision;
   if (sampling_priority) {
-    sampling_decision = SamplingDecision{};
-    sampling_decision->priority = *sampling_priority;
+    SamplingDecision decision;
+    decision.priority = *sampling_priority;
     // `decision.mechanism` is null.  We might be able to infer it once we
     // extract `trace_tags`, but we would have no use for it, so we won't.
-    sampling_decision->origin = SamplingDecision::Origin::EXTRACTED;
+    decision.origin = SamplingDecision::Origin::EXTRACTED;
+
+    sampling_decision = decision;
   }
 
   const auto span_data_ptr = span_data.get();
