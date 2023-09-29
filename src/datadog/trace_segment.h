@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "expected.h"
+#include "metrics.h"
 #include "optional.h"
 #include "propagation_style.h"
 #include "sampling_decision.h"

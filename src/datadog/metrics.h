@@ -1,37 +1,43 @@
 #pragma once
 
 #include <atomic>
-
-#include "json_fwd.hpp"
-#include "string_view.h"
+#include <string>
+#include <vector>
 
 namespace datadog {
 namespace tracing {
 
 class Metric {
-  std::string name_;
-  std::string type_;
+  const std::string name_;
+  const std::string type_;
+  const std::vector<std::string> tags_;
   bool common_;
-  protected:
+
+ protected:
   std::atomic<uint64_t> value_ = 0;
-  Metric(std::string name, std::string type, bool common);
+  Metric(const std::string name, std::string type,
+         const std::vector<std::string> tags, bool common);
+
  public:
-  std::string name();
-  std::string type();
+  const std::string name();
+  const std::string type();
+  const std::vector<std::string> tags();
   bool common();
   uint64_t value();
 };
 
 class CounterMetric : public Metric {
  public:
-  CounterMetric(std::string name, bool common);
+  CounterMetric(const std::string name, const std::vector<std::string> tags,
+                bool common);
   void inc();
   void add(uint64_t amount);
 };
 
 class GaugeMetric : public Metric {
  public:
-  GaugeMetric(std::string name, bool common);
+  GaugeMetric(const std::string name, const std::vector<std::string> tags,
+              bool common);
   void set(uint64_t value);
   void inc();
   void add(uint64_t amount);

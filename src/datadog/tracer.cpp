@@ -293,6 +293,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   span_data->parent_id = 0;
 
   const auto span_data_ptr = span_data.get();
+  tracer_telemetry_->metrics().tracer.trace_segments_created_new.inc();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_, trace_sampler_, span_sampler_,
       defaults_, injection_styles_, hostname_, nullopt /* origin */,
@@ -456,6 +457,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   const auto span_data_ptr = span_data.get();
+  tracer_telemetry_->metrics().tracer.trace_segments_created_continued.inc();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_, trace_sampler_, span_sampler_,
       defaults_, injection_styles_, hostname_, std::move(origin),

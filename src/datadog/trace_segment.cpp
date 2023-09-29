@@ -118,9 +118,6 @@ TraceSegment::TraceSegment(
   assert(span_sampler_);
   assert(defaults_);
 
-  tracer_telemetry_->traces_started().inc();
-  tracer_telemetry_->active_traces().inc();
-
   register_span(std::move(local_root));
 }
 
@@ -141,8 +138,7 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
-  tracer_telemetry_->spans_started().inc();
-  tracer_telemetry_->active_spans().inc();
+  tracer_telemetry_->metrics().tracer.spans_created.inc();
 
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
@@ -150,10 +146,8 @@ void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
 }
 
 void TraceSegment::span_finished() {
-  tracer_telemetry_->spans_finished().inc();
-  tracer_telemetry_->active_spans().dec();
-
   {
+    tracer_telemetry_->metrics().tracer.spans_finished.inc();
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
     assert(num_finished_spans_ <= spans_.size());
@@ -233,8 +227,7 @@ void TraceSegment::span_finished() {
         error->with_prefix("Error sending spans to collector: "));
   }
 
-  tracer_telemetry_->traces_finished().inc();
-  tracer_telemetry_->active_traces().dec();
+  tracer_telemetry_->metrics().tracer.trace_segments_closed.inc();
 }
 
 void TraceSegment::override_sampling_priority(int priority) {

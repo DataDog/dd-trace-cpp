@@ -14,6 +14,7 @@
 #include "collector.h"
 #include "event_scheduler.h"
 #include "http_client.h"
+#include "metrics.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {
@@ -42,7 +43,7 @@ class DatadogAgent : public Collector {
   std::shared_ptr<HTTPClient> http_client_;
   std::shared_ptr<EventScheduler> event_scheduler_;
   EventScheduler::Cancel cancel_scheduled_flush_;
-  EventScheduler::Cancel cancel_heartbeat_timer_;
+  EventScheduler::Cancel cancel_telemetry_timer_;
   std::chrono::steady_clock::duration flush_interval_;
 
   void flush();

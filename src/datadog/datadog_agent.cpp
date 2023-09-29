@@ -144,16 +144,18 @@ DatadogAgent::DatadogAgent(
       event_scheduler_(config.event_scheduler),
       cancel_scheduled_flush_(event_scheduler_->schedule_recurring_event(
           config.flush_interval, [this]() { flush(); })),
-      cancel_heartbeat_timer_(event_scheduler_->schedule_recurring_event(
-            std::chrono::seconds(10), [this, n=0]() mutable {
+      cancel_telemetry_timer_(event_scheduler_->schedule_recurring_event(
+          std::chrono::seconds(10),
+          [this, n = 0]() mutable {
             n++;
-            tracer_telemetry_->captureMetrics();
-            if (n%6 == 0) {
-            sendHeartbeatAndTelemetry();
+            tracer_telemetry_->capture_metrics();
+            if (n % 6 == 0) {
+              sendHeartbeatAndTelemetry();
             }
-            })),
+          })),
       flush_interval_(config.flush_interval) {
   assert(logger_);
+  assert(tracer_telemetry_);
   sendAppStarted();
 }
 
@@ -161,6 +163,7 @@ DatadogAgent::~DatadogAgent() {
   const auto deadline = clock_().tick + std::chrono::seconds(2);
   cancel_scheduled_flush_();
   flush();
+  cancel_telemetry_timer_();
   http_client_->drain(deadline);
 }
 
@@ -230,10 +233,21 @@ void DatadogAgent::flush() {
 
   // This is the callback for the HTTP response.  It's invoked
   // asynchronously.
-  auto on_response = [samplers = std::move(response_handlers),
+  auto on_response = [this, samplers = std::move(response_handlers),
                       logger = logger_](int response_status,
                                         const DictReader& /*response_headers*/,
                                         std::string response_body) {
+    if (response_status >= 500) {
+      tracer_telemetry_->metrics().trace_api.responses_5xx.inc();
+    } else if (response_status >= 400) {
+      tracer_telemetry_->metrics().trace_api.responses_4xx.inc();
+    } else if (response_status >= 300) {
+      tracer_telemetry_->metrics().trace_api.responses_3xx.inc();
+    } else if (response_status >= 200) {
+      tracer_telemetry_->metrics().trace_api.responses_2xx.inc();
+    } else if (response_status >= 100) {
+      tracer_telemetry_->metrics().trace_api.responses_1xx.inc();
+    }
     if (response_status != 200) {
       logger->log_error([&](auto& stream) {
         stream << "Unexpected response status " << response_status
@@ -269,12 +283,13 @@ void DatadogAgent::flush() {
   // This is the callback for if something goes wrong sending the
   // request or retrieving the response.  It's invoked
   // asynchronously.
-  auto on_error = [logger = logger_](Error error) {
+  auto on_error = [this, logger = logger_](Error error) {
+    tracer_telemetry_->metrics().trace_api.errors_network.inc();
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for submitting traces: "));
   };
 
-  tracer_telemetry_->trace_api_requests().inc();
+  tracer_telemetry_->metrics().trace_api.requests.inc();
   auto post_result = http_client_->post(
       traces_endpoint_, std::move(set_request_headers), std::move(body),
       std::move(on_response), std::move(on_error));
@@ -284,7 +299,7 @@ void DatadogAgent::flush() {
 }
 
 void DatadogAgent::sendAppStarted() {
-  auto payload = tracer_telemetry_->appStarted();
+  auto payload = tracer_telemetry_->app_started();
   auto set_request_headers = [&](DictWriter& headers) {
     headers.set("Content-Type", "application/json");
   };
@@ -295,19 +310,18 @@ void DatadogAgent::sendAppStarted() {
                                         std::string response_body) {
     if (response_status < 200 || response_status >= 300) {
       logger->log_error([&](auto& stream) {
-          stream << "Unexpected telemetry response status " << response_status
-          << " with body (starts on next line):\n"
-          << response_body;
-          });
+        stream << "Unexpected telemetry response status " << response_status
+               << " with body (starts on next line):\n"
+               << response_body;
+      });
       return;
     } else {
       logger->log_error([&](auto& stream) {
-          stream << "Successful telemetry submission with response status " << response_status
-          << " and body (starts on next line):\n"
-          << response_body;
-          });
+        stream << "Successful telemetry submission with response status "
+               << response_status << " and body (starts on next line):\n"
+               << response_body;
+      });
     }
-
   };
 
   // Callback for unsuccessful HTTP request.
@@ -325,7 +339,7 @@ void DatadogAgent::sendAppStarted() {
 }
 
 void DatadogAgent::sendHeartbeatAndTelemetry() {
-  auto payload = tracer_telemetry_->heartbeatAndTelemetry();
+  auto payload = tracer_telemetry_->heartbeat_and_telemetry();
   auto set_request_headers = [&](DictWriter& headers) {
     headers.set("Content-Type", "application/json");
   };
@@ -336,19 +350,18 @@ void DatadogAgent::sendHeartbeatAndTelemetry() {
                                         std::string response_body) {
     if (response_status < 200 || response_status >= 300) {
       logger->log_error([&](auto& stream) {
-          stream << "Unexpected telemetry response status " << response_status
-          << " with body (starts on next line):\n"
-          << response_body;
-          });
+        stream << "Unexpected telemetry response status " << response_status
+               << " with body (starts on next line):\n"
+               << response_body;
+      });
       return;
     } else {
       logger->log_error([&](auto& stream) {
-          stream << "Successful telemetry submission with response status " << response_status
-          << " and body (starts on next line):\n"
-          << response_body;
-          });
+        stream << "Successful telemetry submission with response status "
+               << response_status << " and body (starts on next line):\n"
+               << response_body;
+      });
     }
-
   };
 
   // Callback for unsuccessful HTTP request.

@@ -11,36 +11,54 @@ class TracerTelemetry {
   Clock clock_;
   FinalizedTracerConfig config_;
   uint64_t seq_id = 0;
-  std::vector<std::pair<std::reference_wrapper<CounterMetric>, std::vector<std::pair<time_t, uint64_t>>>> counter_metrics_;
-  std::vector<std::pair<std::reference_wrapper<GaugeMetric>, std::vector<std::pair<time_t, uint64_t>>>> gauge_metrics_;
   using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
-  std::vector<std::pair<std::reference_wrapper<Metric>, MetricSnapshot>> metrics_;
+  std::vector<std::pair<std::reference_wrapper<Metric>, MetricSnapshot>>
+      metrics_snapshots_;
 
-  CounterMetric traces_started_ = {"traces_started", true};
-  CounterMetric traces_finished_ = {"traces_finished", true};
-  GaugeMetric active_traces_ = {"active_traces", true};
+  struct {
+    struct {
+      CounterMetric spans_created = {
+          "spans_created", {"integration_name:datadog"}, true};
+      CounterMetric spans_finished = {
+          "spans_finished", {"integration_name:datadog"}, true};
 
-  CounterMetric spans_started_ = {"spans_started", true};
-  CounterMetric spans_finished_ = {"spans_finished", true};
-  GaugeMetric active_spans_ = {"active_spans", true};
+      CounterMetric trace_segments_created_new = {
+          "trace_segments_created", {"new_continued:new"}, true};
+      CounterMetric trace_segments_created_continued = {
+          "trace_segments_created", {"new_continued:continued"}, true};
+      CounterMetric trace_segments_closed = {
+          "trace_segments_closed", {"integration_name:datadog"}, true};
+    } tracer;
+    struct {
+      CounterMetric requests = {"trace_api.requests", {}, true};
 
-  CounterMetric trace_api_requests_ = {"trace_api.requests", true};
+      CounterMetric responses_1xx = {
+          "trace_api.responses", {"status_code:1xx"}, true};
+      CounterMetric responses_2xx = {
+          "trace_api.responses", {"status_code:2xx"}, true};
+      CounterMetric responses_3xx = {
+          "trace_api.responses", {"status_code:3xx"}, true};
+      CounterMetric responses_4xx = {
+          "trace_api.responses", {"status_code:4xx"}, true};
+      CounterMetric responses_5xx = {
+          "trace_api.responses", {"status_code:5xx"}, true};
+
+      CounterMetric errors_timeout = {
+          "trace_api.errors", {"type:timeout"}, true};
+      CounterMetric errors_network = {
+          "trace_api.errors", {"type:network"}, true};
+      CounterMetric errors_status_code = {
+          "trace_api.errors", {"type:status_code"}, true};
+
+    } trace_api;
+  } metrics_;
 
  public:
   TracerTelemetry(const Clock& clock, const FinalizedTracerConfig& config);
-  std::string appStarted();
-  void captureMetrics();
-  std::string heartbeatAndTelemetry();
-
-  CounterMetric& traces_started() { return traces_started_; };
-  CounterMetric& traces_finished() { return traces_finished_; };
-  GaugeMetric& active_traces() { return active_traces_; };
-
-  CounterMetric& spans_started() { return spans_started_; };
-  CounterMetric& spans_finished() { return spans_finished_; };
-  GaugeMetric& active_spans() { return active_spans_; };
-
-  CounterMetric& trace_api_requests() { return trace_api_requests_; };
+  auto& metrics() { return metrics_; };
+  std::string app_started();
+  void capture_metrics();
+  std::string heartbeat_and_telemetry();
 };
 
 }  // namespace tracing
