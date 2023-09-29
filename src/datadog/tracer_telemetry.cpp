@@ -93,7 +93,11 @@ void TracerTelemetry::capture_metrics() {
                          clock_().wall.time_since_epoch())
                          .count();
   for (auto& m : metrics_snapshots_) {
-    m.second.emplace_back(timepoint, m.first.get().value());
+    auto value = m.first.get().value();
+    if (value == 0) {
+      continue;
+    }
+    m.second.emplace_back(timepoint, value);
   }
 
   for (auto& m : metrics_snapshots_) {
@@ -118,14 +122,18 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
   for (auto& m : metrics_snapshots_) {
     auto& metric = m.first.get();
     auto& points = m.second;
+    if (points.empty()) {
+      continue;
+    }
+
     metrics.emplace_back(nlohmann::json::object({
         {"metric", metric.name()},
+        {"tags", metric.tags()},
         {"type", metric.type()},
         {"interval", 60},
         {"points", points},
         {"common", metric.common()},
     }));
-    m.second.clear();
   }
 
   auto generate_metrics = nlohmann::json::object({
