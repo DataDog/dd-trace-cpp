@@ -268,7 +268,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   FinalizedTracerConfig result;
 
   result.defaults = config.defaults;
-  result.trace_delegate_sampling_decision = false;
 
   if (auto service_env = lookup(environment::DD_SERVICE)) {
     assign(result.defaults.service, *service_env);

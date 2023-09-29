@@ -160,6 +160,8 @@ Expected<ExtractedData> extract_datadog(
 
     result.delegate_sampling_decision = true;
   } else {
+    result.delegate_sampling_decision = false;
+
     const StringView sampling_priority_header = "x-datadog-sampling-priority";
     if (auto found = headers.lookup(sampling_priority_header)) {
       auto sampling_priority = parse_int(*found, 10);
