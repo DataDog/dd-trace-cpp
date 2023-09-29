@@ -47,6 +47,7 @@ class DatadogAgent : public Collector {
   std::chrono::steady_clock::duration flush_interval_;
 
   void flush();
+  void send_heartbeat_and_telemetry();
 
  public:
   DatadogAgent(const FinalizedDatadogAgentConfig&,
@@ -57,8 +58,8 @@ class DatadogAgent : public Collector {
   Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) override;
-  void sendAppStarted();
-  void sendHeartbeatAndTelemetry();
+
+  void send_app_started(nlohmann::json&& tracer_config);
 
   nlohmann::json config_json() const override;
 };

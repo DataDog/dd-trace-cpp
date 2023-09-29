@@ -150,13 +150,12 @@ DatadogAgent::DatadogAgent(
             n++;
             tracer_telemetry_->capture_metrics();
             if (n % 6 == 0) {
-              sendHeartbeatAndTelemetry();
+              send_heartbeat_and_telemetry();
             }
           })),
       flush_interval_(config.flush_interval) {
   assert(logger_);
   assert(tracer_telemetry_);
-  sendAppStarted();
 }
 
 DatadogAgent::~DatadogAgent() {
@@ -298,8 +297,8 @@ void DatadogAgent::flush() {
   }
 }
 
-void DatadogAgent::sendAppStarted() {
-  auto payload = tracer_telemetry_->app_started();
+void DatadogAgent::send_app_started(nlohmann::json&& tracer_config) {
+  auto payload = tracer_telemetry_->app_started(std::move(tracer_config));
   auto set_request_headers = [&](DictWriter& headers) {
     headers.set("Content-Type", "application/json");
   };
@@ -312,13 +311,6 @@ void DatadogAgent::sendAppStarted() {
       logger->log_error([&](auto& stream) {
         stream << "Unexpected telemetry response status " << response_status
                << " with body (starts on next line):\n"
-               << response_body;
-      });
-      return;
-    } else {
-      logger->log_error([&](auto& stream) {
-        stream << "Successful telemetry submission with response status "
-               << response_status << " and body (starts on next line):\n"
                << response_body;
       });
     }
@@ -338,7 +330,7 @@ void DatadogAgent::sendAppStarted() {
   }
 }
 
-void DatadogAgent::sendHeartbeatAndTelemetry() {
+void DatadogAgent::send_heartbeat_and_telemetry() {
   auto payload = tracer_telemetry_->heartbeat_and_telemetry();
   auto set_request_headers = [&](DictWriter& headers) {
     headers.set("Content-Type", "application/json");
@@ -352,13 +344,6 @@ void DatadogAgent::sendHeartbeatAndTelemetry() {
       logger->log_error([&](auto& stream) {
         stream << "Unexpected telemetry response status " << response_status
                << " with body (starts on next line):\n"
-               << response_body;
-      });
-      return;
-    } else {
-      logger->log_error([&](auto& stream) {
-        stream << "Successful telemetry submission with response status "
-               << response_status << " and body (starts on next line):\n"
                << response_body;
       });
     }

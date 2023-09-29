@@ -140,6 +140,7 @@ TEST_CASE("CollectorResponse") {
       (void)span;
     }
     REQUIRE(event_scheduler->cancelled);
+    CAPTURE(logger->entries);
     REQUIRE(logger->error_count() == 1);
     REQUIRE(logger->first_error().code == error.code);
   }
@@ -156,6 +157,7 @@ TEST_CASE("CollectorResponse") {
       (void)span;
     }
     REQUIRE(event_scheduler->cancelled);
+    // REVIEW: this fails since the addition of telemetry
     REQUIRE(logger->error_count() == 1);
     REQUIRE(logger->first_error().code == error.code);
   }

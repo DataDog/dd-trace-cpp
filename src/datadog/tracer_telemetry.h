@@ -1,15 +1,21 @@
 #pragma once
+#include <memory>
 #include <vector>
 
 #include "clock.h"
+#include "json_fwd.hpp"
 #include "metrics.h"
-#include "tracer_config.h"
 
 namespace datadog {
 namespace tracing {
+
+class Logger;
+class SpanDefaults;
+
 class TracerTelemetry {
   Clock clock_;
-  FinalizedTracerConfig config_;
+  std::shared_ptr<Logger> logger_;
+  std::shared_ptr<const SpanDefaults> span_defaults_;
   uint64_t seq_id = 0;
   using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
   // This uses a reference_wrapper so references to internal metric values can
@@ -56,9 +62,10 @@ class TracerTelemetry {
   } metrics_;
 
  public:
-  TracerTelemetry(const Clock& clock, const FinalizedTracerConfig& config);
+  TracerTelemetry(const Clock& clock, const std::shared_ptr<Logger>& logger,
+                  const std::shared_ptr<const SpanDefaults>& span_defaults);
   auto& metrics() { return metrics_; };
-  std::string app_started();
+  std::string app_started(nlohmann::json&& tracer_config);
   void capture_metrics();
   std::string heartbeat_and_telemetry();
 };

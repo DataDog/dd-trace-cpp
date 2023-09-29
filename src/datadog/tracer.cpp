@@ -243,13 +243,14 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
                const Clock& clock)
     : logger_(config.logger),
       collector_(/* see constructor body */),
-      tracer_telemetry_(std::make_shared<TracerTelemetry>(clock, config)),
+      defaults_(std::make_shared<SpanDefaults>(config.defaults)),
+      tracer_telemetry_(
+          std::make_shared<TracerTelemetry>(clock, logger_, defaults_)),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock)),
       span_sampler_(std::make_shared<SpanSampler>(config.span_sampler, clock)),
       generator_(generator),
       clock_(clock),
-      defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       hostname_(config.report_hostname ? get_hostname() : nullopt),
@@ -260,14 +261,15 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   } else {
     auto& agent_config =
         std::get<FinalizedDatadogAgentConfig>(config.collector);
-    collector_ = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
+    auto agent = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
                                                 clock, config.logger);
+    collector_ = agent;
+    agent->send_app_started(config_json());
   }
 
   if (config.log_on_startup) {
-    auto json = config_json();
-    logger_->log_startup([&json](std::ostream& log) {
-      log << "DATADOG TRACER CONFIGURATION - " << json;
+    logger_->log_startup([this](std::ostream& log) {
+      log << "DATADOG TRACER CONFIGURATION - " << config_json();
     });
   }
 }
