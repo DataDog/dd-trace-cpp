@@ -184,7 +184,7 @@ TEST_CASE("TracerConfig::defaults") {
   }
 
   SECTION("DD_TRACE_DELEGATE_SAMPLING") {
-    SECTION("disable by default") {
+    SECTION("is disabled by default") {
       config.defaults.version = "v1";
       config.defaults.service = "required";
       auto finalized = finalize_config(config);
@@ -192,7 +192,7 @@ TEST_CASE("TracerConfig::defaults") {
       REQUIRE(finalized->trace_delegate_sampling_decision == false);
     }
 
-    SECTION("override default") {
+    SECTION("setting is overridden by environment variable") {
       const EnvGuard guard{"DD_TRACE_DELEGATE_SAMPLING", "1"};
       config.defaults.version = "v1";
       config.defaults.service = "required";
