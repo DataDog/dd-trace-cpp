@@ -17,6 +17,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_definitions(-DDD_TRACE_CPP_VERSION=dmehala)
+  add_compile_definitions(DD_TRACE_CPP_VERSION="dmehala")
+endif ()
+
 # This warning has a false positive. See
 # <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108088>.
 add_compile_options(-Wno-error=free-nonheap-object)
@@ -123,6 +128,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/span_matcher.cpp
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp
+    src/datadog/tags.cpp
     src/datadog/tag_propagation.cpp
     src/datadog/threaded_event_scheduler.cpp
     src/datadog/tracer_config.cpp

@@ -35,11 +35,13 @@
 #include <charconv>
 #include <csignal>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <iterator>
 #include <ostream>
 #include <sstream>
 #include <stack>
+#include <stdexcept>
 #include <string>
 #include <system_error>
 
@@ -157,7 +159,7 @@ int main() {
   server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
-    helper::HeaderWriter writer(response.headers);
+    tracingutil::HeaderWriter writer(response.headers);
     context->spans.top().trace_segment().inject(writer);
 
     context->spans.pop();
@@ -204,7 +206,7 @@ void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tr
   config.name = "handle.request";
   config.start = context->request_start;
 
-  helper::HeaderReader reader{request.headers};
+  tracingutil::HeaderReader reader{request.headers};
   auto maybe_span = tracer.extract_or_create_span(reader, config);
   if (dd::Error* error = maybe_span.if_error()) {
     std::cerr << "While extracting trace context from request: " << *error << '\n';
@@ -258,27 +260,21 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
     return;
   }
 
-  const std::string_view raw = begin->second;
+  const std::string raw = begin->second;
 
-// NOTE(@dmehala): clang does not support std::from_chars with floating numbers
-#ifdef __clang__
-  double seconds = std::stod(std::string{raw});
-#else
-  double seconds;
-  const auto result = std::from_chars(raw.begin(), raw.end(), seconds);
-  if (result.ec == std::errc::invalid_argument || result.ec == std::errc::result_out_of_range ||
-      result.ptr != raw.end() || seconds < 0) {
+  try {
+    double seconds = std::stod(raw);
+    if (seconds < 0) throw std::exception();
+
+    using namespace std::chrono;
+    std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));
+  } catch (...) {
     response.status = 400;  // "bad request"
     const std::string message =
         "\"seconds\" query parameter must be a non-negative number in the range of an IEEE754 double.\n";
     span.set_error_message(message);
     response.set_content(message, "text/plain");
-    return;
   }
-#endif
-
-  using namespace std::chrono;
-  std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));
 }
 
 // `traced_get` is a wrapper around `httplib::Client::Get` that also creates a
@@ -293,7 +289,7 @@ httplib::Result traced_get(httplib::Client& client, const std::string& endpoint,
   span.set_resource_name("GET " + endpoint);
   // Could add tags here...
 
-  helper::HeaderWriter writer{headers};
+  tracingutil::HeaderWriter writer{headers};
   span.inject(writer);
 
   return client.Get(endpoint, params, headers);

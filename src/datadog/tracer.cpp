@@ -383,7 +383,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     }
   }
 
-  // NOTE(@dmehala): defeat the purpose of the struct. remove following line?
   auto& [trace_id, parent_id, origin, trace_tags, delegate_sampling_decision,
          sampling_priority, additional_w3c_tracestate,
          additional_datadog_w3c_tracestate] = extracted_data;

@@ -2,7 +2,7 @@
 #include "datadog/dict_writer.h"
 #include "httplib.h"
 
-namespace helper {
+namespace tracingutil {
 // `HeaderWriter` adapts dd-trace-cpp's writer interface to the HTTP headers
 // object used by this app's HTTP library.
 //
@@ -57,4 +57,4 @@ class HeaderReader : public datadog::tracing::DictReader {
     return buffer_;
   }
 };
-}  // namespace helper
+}  // namespace tracingutil

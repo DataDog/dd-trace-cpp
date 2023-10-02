@@ -94,8 +94,10 @@ Expected<SamplingDecision> parse_sampling_delegation_response(
     sampling_decision.mechanism = json["mechanism"];
 
     return sampling_decision;
-  } catch (...) {
-    return Error{Error::Code::OTHER, "Could not parse"};
+  } catch (const std::exception& e) {
+    std::string msg{"Unable to parse sampling delegation response: "};
+    msg += e.what();
+    return Error{Error::Code::TRACE_SAMPLING_RULES_INVALID_JSON, msg};
   }
 }
 
@@ -374,10 +376,11 @@ Expected<void> TraceSegment::extract(const DictReader& headers) {
       return sampling_decision.error();
     }
 
-    // std::swap(sampling_decision_, *sampling_decision);
     sampling_decision_ = *sampling_decision;
     awaiting_delegated_sampling_decision_ = false;
 
+    // Successfully delegated the sampling decision, set the sampling decider
+    // tag only if it is the root span, to distinguish the root form the decider
     if (spans_.front()->parent_id == 0) {
       trace_tags_.emplace_back(tags::internal::sampling_decider, "0");
     }

@@ -51,7 +51,6 @@ struct TracerConfig {
 
   // `enable_sampling_delegation` instructs the tracer to delegate sampling
   // decisions when possible.
-  // NOTE(@dmehala): do we really want to expose a setting?
   bool enable_sampling_delegation = false;
 
   // `trace_sampler` configures trace sampling.  Trace sampling determines which

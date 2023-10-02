@@ -52,25 +52,23 @@ int main() {
 
     httplib::Error er;
     httplib::Request forward_request(req);
+    forward_request.path = req.target;
 
-    // TODO: suggest to use lambda instead of functors.
-    // span.inject([&headers = forward_request.headers](std::string_view key,
-    //                                                  std::string_view value)
-    //                                                  {
-    //   headers.emplace(key, value);
-    // });
-
-    helper::HeaderWriter writer(forward_request.headers);
+    tracingutil::HeaderWriter writer(forward_request.headers);
     span.inject(writer);
 
-    forward_request.path = req.target;
     upstream_client.send(forward_request, res, er);
     if (er != httplib::Error::Success) {
       res.status = 500;
       span.set_error_message(httplib::to_string(er));
+      std::cerr << "Error occurred while proxying request: " << req.target
+                << "\n";
     } else {
-      helper::HeaderReader reader(res.headers);
-      span.trace_segment().extract(reader);
+      tracingutil::HeaderReader reader(res.headers);
+      auto error = span.trace_segment().extract(reader);
+      if (error) {
+        std::cerr << error.error() << "\n";
+      }
     }
 
     span.set_tag("http.status_code", std::to_string(res.status));
@@ -84,6 +82,7 @@ int main() {
   server.Patch(".*", forward_handler);
   server.Delete(".*", forward_handler);
 
+  std::cout << "Proxy is running on port " << 80 << "\n";
   server.listen("0.0.0.0", 80);
 
   return 0;
