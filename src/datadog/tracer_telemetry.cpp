@@ -1,7 +1,5 @@
 #include "tracer_telemetry.h"
 
-#include <iostream>
-
 #include "json.hpp"
 #include "logger.h"
 #include "platform_util.h"
@@ -48,9 +46,6 @@ std::string TracerTelemetry::app_started() {
                            clock_().wall.time_since_epoch())
                            .count();
   std::string hostname = get_hostname().value_or("hostname-unavailable");
-  config_.logger->log_error([&](auto& stream) {
-    stream << "app-started: hostname=" << hostname << " seq_id=" << seq_id;
-  });
 
   seq_id++;
   auto payload =
@@ -98,13 +93,6 @@ void TracerTelemetry::capture_metrics() {
       continue;
     }
     m.second.emplace_back(timepoint, value);
-  }
-
-  for (auto& m : metrics_snapshots_) {
-    std::cout << "metrics: " << m.first.get().name() << std::endl;
-    for (auto& v : m.second) {
-      std::cout << v.first << " " << v.second << std::endl;
-    }
   }
 }
 
@@ -172,8 +160,6 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
                           })},
           })
           .dump();
-  config_.logger->log_error(
-      [&](auto& stream) { stream << "telemetry payload: " << payload; });
   return payload;
 }
 
