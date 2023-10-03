@@ -16,6 +16,7 @@ class TracerTelemetry {
   Clock clock_;
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<const SpanDefaults> span_defaults_;
+  std::string hostname_;
   uint64_t seq_id = 0;
   using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
   // This uses a reference_wrapper so references to internal metric values can

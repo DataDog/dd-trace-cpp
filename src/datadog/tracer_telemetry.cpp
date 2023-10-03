@@ -12,7 +12,10 @@ namespace tracing {
 TracerTelemetry::TracerTelemetry(
     const Clock& clock, const std::shared_ptr<Logger>& logger,
     const std::shared_ptr<const SpanDefaults>& span_defaults)
-    : clock_(clock), logger_(logger), span_defaults_(span_defaults) {
+    : clock_(clock),
+      logger_(logger),
+      span_defaults_(span_defaults),
+      hostname_(get_hostname().value_or("hostname-unavailable")) {
   metrics_snapshots_.emplace_back(metrics_.tracer.spans_created,
                                   MetricSnapshot{});
   metrics_snapshots_.emplace_back(metrics_.tracer.spans_finished,
@@ -47,7 +50,7 @@ std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {
   time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
                            clock_().wall.time_since_epoch())
                            .count();
-  
+
   seq_id++;
   auto payload =
       nlohmann::json::object(
@@ -68,8 +71,7 @@ std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {
                })},
               // TODO: host information (os, os_version, kernel, etc)
               {"host", nlohmann::json::object({
-                           {"hostname",
-                            get_hostname().value_or("hostname-unavailable")},
+                           {"hostname", hostname_},
                        })},
               {"payload",
                nlohmann::json::object({
@@ -109,8 +111,6 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
   time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
                            clock_().wall.time_since_epoch())
                            .count();
-  std::string hostname = get_hostname().value_or("hostname-unavailable");
-
   auto heartbeat = nlohmann::json::object({
       {"request_type", "app-heartbeat"},
   });
@@ -161,7 +161,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
                })},
               // TODO: host information (hostname, os, os_version, kernel, etc)
               {"host", nlohmann::json::object({
-                           {"hostname", hostname},
+                           {"hostname", hostname_},
                        })},
               {"payload", nlohmann::json::array({
                               heartbeat,
