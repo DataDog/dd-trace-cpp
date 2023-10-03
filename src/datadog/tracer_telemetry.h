@@ -12,9 +12,11 @@ class TracerTelemetry {
   FinalizedTracerConfig config_;
   uint64_t seq_id = 0;
   using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
+  // This uses a reference_wrapper so references to internal metric values can
+  // be captured, and be iterated trivially when the values need to be
+  // snapshotted and published in telemetry messages.
   std::vector<std::pair<std::reference_wrapper<Metric>, MetricSnapshot>>
       metrics_snapshots_;
-
   struct {
     struct {
       CounterMetric spans_created = {
