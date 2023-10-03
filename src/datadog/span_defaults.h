@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "json_fwd.hpp"
+#include "random.h"
 
 namespace datadog {
 namespace tracing {
@@ -19,6 +20,7 @@ struct SpanDefaults {
   std::string version = "";
   std::string name = "";
   std::unordered_map<std::string, std::string> tags;
+  std::string runtime_id = uuid();
 };
 
 nlohmann::json to_json(const SpanDefaults&);

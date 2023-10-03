@@ -16,6 +16,7 @@
 #include "platform_util.h"
 #include "random.h"
 #include "span_data.h"
+#include "span_defaults.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
 #include "tags.h"
@@ -28,12 +29,8 @@ namespace {
 
 struct Cache {
   static int process_id;
-  static std::string runtime_id;
 
-  static void recalculate_values() {
-    process_id = get_process_id();
-    runtime_id = uuid();
-  }
+  static void recalculate_values() { process_id = get_process_id(); }
 
   Cache() {
     recalculate_values();
@@ -42,7 +39,6 @@ struct Cache {
 };
 
 int Cache::process_id;
-std::string Cache::runtime_id;
 
 // `cache_singleton` exists solely to invoke `Cache`'s constructor.
 // All data members are static, so use e.g. `Cache::process_id` instead of
@@ -218,7 +214,7 @@ void TraceSegment::span_finished() {
     }
     span.numeric_tags[tags::internal::process_id] = Cache::process_id;
     span.tags[tags::internal::language] = "cpp";
-    span.tags[tags::internal::runtime_id] = Cache::runtime_id;
+    span.tags[tags::internal::runtime_id] = defaults_->runtime_id;
   }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);
