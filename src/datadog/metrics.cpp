@@ -12,7 +12,7 @@ const std::string Metric::name() { return name_; }
 const std::string Metric::type() { return type_; }
 const std::vector<std::string> Metric::tags() { return tags_; }
 bool Metric::common() { return common_; }
-uint64_t Metric::value() { return value_; }
+uint64_t Metric::value() { return value_.exchange(0); }
 
 CounterMetric::CounterMetric(const std::string name,
                              const std::vector<std::string> tags, bool common)

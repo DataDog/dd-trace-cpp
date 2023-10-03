@@ -100,9 +100,6 @@ void TracerTelemetry::capture_metrics() {
                          .count();
   for (auto& m : metrics_snapshots_) {
     auto value = m.first.get().value();
-    if (value == 0) {
-      continue;
-    }
     m.second.emplace_back(timepoint, value);
   }
 }
