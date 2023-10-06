@@ -10,40 +10,43 @@ namespace datadog {
 namespace tracing {
 
 TracerTelemetry::TracerTelemetry(
-    const Clock& clock, const std::shared_ptr<Logger>& logger,
+    bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
     const std::shared_ptr<const SpanDefaults>& span_defaults)
-    : clock_(clock),
+    : enabled_(enabled),
+      clock_(clock),
       logger_(logger),
       span_defaults_(span_defaults),
       hostname_(get_hostname().value_or("hostname-unavailable")) {
-  metrics_snapshots_.emplace_back(metrics_.tracer.spans_created,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.spans_finished,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_created_new,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(
-      metrics_.tracer.trace_segments_created_continued, MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_closed,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.requests,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_1xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_2xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_3xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_4xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_5xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_timeout,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_network,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
-                                  MetricSnapshot{});
+  if (enabled_) {
+    metrics_snapshots_.emplace_back(metrics_.tracer.spans_created,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.tracer.spans_finished,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_created_new,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(
+        metrics_.tracer.trace_segments_created_continued, MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_closed,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.requests,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_1xx,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_2xx,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_3xx,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_4xx,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_5xx,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_timeout,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_network,
+                                    MetricSnapshot{});
+    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
+                                    MetricSnapshot{});
+  }
 }
 
 std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {

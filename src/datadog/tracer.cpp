@@ -244,8 +244,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     : logger_(config.logger),
       collector_(/* see constructor body */),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
-      tracer_telemetry_(
-          std::make_shared<TracerTelemetry>(clock, logger_, defaults_)),
+      tracer_telemetry_(std::make_shared<TracerTelemetry>(
+          config.report_telemetry, clock, logger_, defaults_)),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock)),
       span_sampler_(std::make_shared<SpanSampler>(config.span_sampler, clock)),
@@ -264,7 +264,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     auto agent = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
                                                 clock, config.logger);
     collector_ = agent;
-    agent->send_app_started(config_json());
+    if (tracer_telemetry_->enabled()) {
+      agent->send_app_started(config_json());
+    }
   }
 
   if (config.log_on_startup) {

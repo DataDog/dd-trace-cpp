@@ -50,6 +50,13 @@ struct TracerConfig {
   // variable.
   bool report_traces = true;
 
+  // `report_telemetry` indicates whether telemetry about the tracer will be
+  // sent to a collector (`true`) or discarded on completion (`false`).  If
+  // `report_telemetry` is `false`, then this feature is disabled.
+  // `report_telemetry` is overridden by the
+  // `DD_INSTRUMENTATION_TELEMETRY_ENABLED` environment variable.
+  bool report_telemetry = true;
+
   // `trace_sampler` configures trace sampling.  Trace sampling determines which
   // traces are sent to Datadog.  See `trace_sampler_config.h`.
   TraceSamplerConfig trace_sampler;
@@ -130,6 +137,7 @@ class FinalizedTracerConfig {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
+  bool report_telemetry;
 
   std::string runtime_id = uuid();
 };

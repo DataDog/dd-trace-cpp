@@ -13,6 +13,7 @@ class Logger;
 class SpanDefaults;
 
 class TracerTelemetry {
+  bool enabled_ = false;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<const SpanDefaults> span_defaults_;
@@ -63,8 +64,10 @@ class TracerTelemetry {
   } metrics_;
 
  public:
-  TracerTelemetry(const Clock& clock, const std::shared_ptr<Logger>& logger,
+  TracerTelemetry(bool enabled, const Clock& clock,
+                  const std::shared_ptr<Logger>& logger,
                   const std::shared_ptr<const SpanDefaults>& span_defaults);
+  bool enabled() { return enabled_; };
   auto& metrics() { return metrics_; };
   std::string app_started(nlohmann::json&& tracer_config);
   void capture_metrics();

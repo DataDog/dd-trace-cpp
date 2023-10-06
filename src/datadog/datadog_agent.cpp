@@ -144,18 +144,19 @@ DatadogAgent::DatadogAgent(
       event_scheduler_(config.event_scheduler),
       cancel_scheduled_flush_(event_scheduler_->schedule_recurring_event(
           config.flush_interval, [this]() { flush(); })),
-      cancel_telemetry_timer_(event_scheduler_->schedule_recurring_event(
-          std::chrono::seconds(10),
-          [this, n = 0]() mutable {
-            n++;
-            tracer_telemetry_->capture_metrics();
-            if (n % 6 == 0) {
-              send_heartbeat_and_telemetry();
-            }
-          })),
       flush_interval_(config.flush_interval) {
   assert(logger_);
   assert(tracer_telemetry_);
+  if (tracer_telemetry_->enabled()) {
+    cancel_telemetry_timer_ = event_scheduler_->schedule_recurring_event(
+        std::chrono::seconds(10), [this, n = 0]() mutable {
+          n++;
+          tracer_telemetry_->capture_metrics();
+          if (n % 6 == 0) {
+            send_heartbeat_and_telemetry();
+          }
+        });
+  }
 }
 
 DatadogAgent::~DatadogAgent() {
