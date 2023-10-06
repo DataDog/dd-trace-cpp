@@ -34,6 +34,7 @@ class Metric {
   const std::vector<std::string> tags();
   bool common();
   uint64_t value();
+  uint64_t capture_and_reset_value();
 };
 
 class CounterMetric : public Metric {

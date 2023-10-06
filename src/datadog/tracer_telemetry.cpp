@@ -102,7 +102,7 @@ void TracerTelemetry::capture_metrics() {
                          clock_().wall.time_since_epoch())
                          .count();
   for (auto& m : metrics_snapshots_) {
-    auto value = m.first.get().value();
+    auto value = m.first.get().capture_and_reset_value();
     m.second.emplace_back(timepoint, value);
   }
 }
