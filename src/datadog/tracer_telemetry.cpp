@@ -103,6 +103,9 @@ void TracerTelemetry::capture_metrics() {
                          .count();
   for (auto& m : metrics_snapshots_) {
     auto value = m.first.get().capture_and_reset_value();
+    if (value == 0) {
+      continue;
+    }
     m.second.emplace_back(timepoint, value);
   }
 }
@@ -111,35 +114,40 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
   time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
                            clock_().wall.time_since_epoch())
                            .count();
+  auto batch_payloads = nlohmann::json::array();
+
   auto heartbeat = nlohmann::json::object({
       {"request_type", "app-heartbeat"},
   });
+  batch_payloads.emplace_back(std::move(heartbeat));
 
   auto metrics = nlohmann::json::array();
   for (auto& m : metrics_snapshots_) {
     auto& metric = m.first.get();
     auto& points = m.second;
-    if (points.empty()) {
-      continue;
+    if (!points.empty()) {
+      metrics.emplace_back(nlohmann::json::object({
+          {"metric", metric.name()},
+          {"tags", metric.tags()},
+          {"type", metric.type()},
+          {"interval", 60},
+          {"points", points},
+          {"common", metric.common()},
+      }));
     }
-
-    metrics.emplace_back(nlohmann::json::object({
-        {"metric", metric.name()},
-        {"tags", metric.tags()},
-        {"type", metric.type()},
-        {"interval", 60},
-        {"points", points},
-        {"common", metric.common()},
-    }));
+    points.clear();
   }
 
-  auto generate_metrics = nlohmann::json::object({
-      {"request_type", "generate-metrics"},
-      {"payload", nlohmann::json::object({
-                      {"namespace", "tracers"},
-                      {"series", metrics},
-                  })},
-  });
+  if (!metrics.empty()) {
+    auto generate_metrics = nlohmann::json::object({
+        {"request_type", "generate-metrics"},
+        {"payload", nlohmann::json::object({
+                        {"namespace", "tracers"},
+                        {"series", metrics},
+                    })},
+    });
+    batch_payloads.emplace_back(std::move(generate_metrics));
+  }
 
   seq_id++;
   auto payload =
@@ -163,10 +171,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
               {"host", nlohmann::json::object({
                            {"hostname", hostname_},
                        })},
-              {"payload", nlohmann::json::array({
-                              heartbeat,
-                              generate_metrics,
-                          })},
+              {"payload", batch_payloads},
           })
           .dump();
   return payload;
