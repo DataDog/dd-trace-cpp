@@ -63,7 +63,7 @@ std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {
               {"request_type", "app-started"},
               {"tracer_time", tracer_time},
               {"runtime_id", span_defaults_->runtime_id},
-              {"debug", true},
+              {"debug", debug_},
               {"application",
                nlohmann::json::object({
                    {"service_name", span_defaults_->service},
@@ -150,7 +150,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
               {"request_type", "message-batch"},
               {"tracer_time", tracer_time},
               {"runtime_id", span_defaults_->runtime_id},
-              {"debug", true},
+              {"debug", debug_},
               {"application",
                nlohmann::json::object({
                    {"service_name", span_defaults_->service},

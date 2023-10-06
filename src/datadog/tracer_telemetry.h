@@ -14,6 +14,7 @@ class SpanDefaults;
 
 class TracerTelemetry {
   bool enabled_ = false;
+  bool debug_ = false;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<const SpanDefaults> span_defaults_;
