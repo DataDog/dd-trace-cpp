@@ -109,11 +109,11 @@ TraceSegment::TraceSegment(
     const std::shared_ptr<TraceSampler>& trace_sampler,
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
+    const InjectionOptions& injection_options,
     const std::vector<PropagationStyle>& injection_styles,
     const Optional<std::string>& hostname, Optional<std::string> origin,
     std::size_t tags_header_max_size,
     std::vector<std::pair<std::string, std::string>> trace_tags,
-    bool delegate_sampling_decision,
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
@@ -123,6 +123,7 @@ TraceSegment::TraceSegment(
       trace_sampler_(trace_sampler),
       span_sampler_(span_sampler),
       defaults_(defaults),
+      injection_options_(injection_options),
       injection_styles_(injection_styles),
       hostname_(hostname),
       origin_(std::move(origin)),
@@ -133,7 +134,7 @@ TraceSegment::TraceSegment(
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)),
-      awaiting_delegated_sampling_decision_(delegate_sampling_decision) {
+      expecting_delegated_sampling_decision_(false) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);
@@ -298,12 +299,19 @@ void TraceSegment::update_decision_maker_trace_tag() {
   }
 }
 
-void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
+bool TraceSegment::inject(DictWriter& writer, const SpanData& span) {
+  return inject(writer, span, injection_options_);
+}
+
+bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
+                          const InjectionOptions& opts) {
   // If the only injection style is `NONE`, then don't do anything.
   if (injection_styles_.size() == 1 &&
       injection_styles_[0] == PropagationStyle::NONE) {
-    return;
+    return false;
   }
+
+  bool expecting_response = false;
 
   // The sampling priority can change (it can be overridden on another thread),
   // and trace tags might change when that happens ("_dd.p.dm").
@@ -329,7 +337,9 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
         }
-        if (awaiting_delegated_sampling_decision_) {
+        if (opts.delegate_sampling_decision) {
+          expecting_response = true;
+          expecting_delegated_sampling_decision_ = true;
           writer.set("x-datadog-delegate-trace-sampling", "delegate");
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
@@ -363,35 +373,14 @@ void TraceSegment::inject(DictWriter& writer, const SpanData& span) {
         break;
     }
   }
+
+  return expecting_response;
 }
 
-Expected<void> TraceSegment::extract(const DictReader& headers) {
-  if (!awaiting_delegated_sampling_decision_) return {};
+void TraceSegment::write_sampling_delegation_response(DictWriter& writer) {
+  if (!injection_options_.delegate_sampling_decision) return;
 
-  if (auto sampling_delegation_response =
-          headers.lookup(DD_SAMPLING_DELEGATION_RESPONSE_HEADER)) {
-    auto sampling_decision =
-        parse_sampling_delegation_response(*sampling_delegation_response);
-    if (!sampling_decision) {
-      return sampling_decision.error();
-    }
-
-    sampling_decision_ = *sampling_decision;
-    awaiting_delegated_sampling_decision_ = false;
-
-    // Successfully delegated the sampling decision, set the sampling decider
-    // tag only if it is the root span, to distinguish the root form the decider
-    if (spans_.front()->parent_id == 0) {
-      trace_tags_.emplace_back(tags::internal::sampling_decider, "0");
-    }
-  }
-
-  return {};
-}
-
-void TraceSegment::inject(DictWriter& writer) {
   nlohmann::json j;
-
   {
     std::lock_guard<std::mutex> lock(mutex_);
     make_sampling_decision_if_null();
@@ -400,13 +389,40 @@ void TraceSegment::inject(DictWriter& writer) {
     j["mechanism"] = *sampling_decision_->mechanism;
   }
 
-  // NOTE(@dmehala): No sampling decision received so we just made one.
-  if (awaiting_delegated_sampling_decision_) {
-    awaiting_delegated_sampling_decision_ = false;
+  if (expecting_delegated_sampling_decision_) {
+    expecting_delegated_sampling_decision_ = false;
     trace_tags_.emplace_back(tags::internal::sampling_decider, "1");
   }
 
   writer.set(DD_SAMPLING_DELEGATION_RESPONSE_HEADER, j.dump());
+  return;
+}
+
+Expected<void> TraceSegment::read_sampling_delegation_response(
+    const DictReader& headers) {
+  if (auto sampling_delegation_response =
+          headers.lookup(DD_SAMPLING_DELEGATION_RESPONSE_HEADER)) {
+    auto sampling_decision =
+        parse_sampling_delegation_response(*sampling_delegation_response);
+    if (!sampling_decision) {
+      return sampling_decision.error();
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      sampling_decision_ = *sampling_decision;
+      expecting_delegated_sampling_decision_ = false;
+
+      // Successfully delegated the sampling decision, set the sampling decider
+      // tag only if it is the root span, to distinguish the root from the
+      // decider
+      if (spans_.front()->parent_id == 0) {
+        trace_tags_.emplace_back(tags::internal::sampling_decider, "0");
+      }
+    }
+  }
+
+  return {};
 }
 
 }  // namespace tracing

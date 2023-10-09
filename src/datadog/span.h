@@ -46,6 +46,8 @@
 #include <memory>
 
 #include "clock.h"
+#include "datadog/dict_reader.h"
+#include "datadog/trace_segment.h"
 #include "error.h"
 #include "optional.h"
 #include "string_view.h"
@@ -65,6 +67,7 @@ class Span {
   std::function<std::uint64_t()> generate_span_id_;
   Clock clock_;
   Optional<std::chrono::steady_clock::time_point> end_time_;
+  mutable bool expecting_delegated_sampling_decision_;
 
  public:
   // Create a span whose properties are stored in the specified `data`, that is
@@ -158,6 +161,10 @@ class Span {
   // Write information about this span and its trace into the specified `writer`
   // for purposes of trace propagation.
   void inject(DictWriter& writer) const;
+  void inject(DictWriter& writer, const InjectionOptions& opts) const;
+
+  void write_sampling_delegation_response(DictWriter& writer) const;
+  Expected<void> read_sampling_delegation_response(const DictReader& reader);
 
   // Return a reference to this span's trace segment.  The trace segment has
   // member functions that affect the trace as a whole, such as

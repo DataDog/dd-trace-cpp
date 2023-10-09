@@ -9,8 +9,8 @@
 #include "datadog/span.h"
 #include "datadog/span_config.h"
 #include "datadog/trace_segment.h"
-#include "httplib-helper.hpp"
 #include "httplib.h"
+#include "tracingutil.hpp"
 
 namespace dd = datadog::tracing;
 
@@ -65,9 +65,9 @@ int main() {
                 << "\n";
     } else {
       tracingutil::HeaderReader reader(res.headers);
-      auto error = span.trace_segment().extract(reader);
-      if (error) {
-        std::cerr << error.error() << "\n";
+      auto status = span.read_sampling_delegation_response(reader);
+      if (auto error = status.if_error()) {
+        std::cerr << error << "\n";
       }
     }
 

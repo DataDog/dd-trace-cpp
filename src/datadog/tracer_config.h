@@ -133,7 +133,7 @@ class FinalizedTracerConfig {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
-  bool trace_delegate_sampling_decision;
+  bool enable_sampling_delegation;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

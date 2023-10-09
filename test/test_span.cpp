@@ -18,6 +18,7 @@
 #include <string>
 
 #include "catch.hpp"
+#include "datadog/sampling_mechanism.h"
 #include "matchers.h"
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
@@ -755,19 +756,101 @@ TEST_CASE("128-bit trace ID injection") {
 TEST_CASE("sampling delegation injection") {
   TracerConfig config;
   config.defaults.service = "testsvc";
-  config.enable_sampling_delegation = true;
   config.logger = std::make_shared<MockLogger>();
   config.collector = std::make_shared<NullCollector>();
 
-  const auto finalized = finalize_config(config);
-  REQUIRE(finalized);
+  SECTION("configuration") {
+    config.enable_sampling_delegation = true;
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
 
-  Tracer tracer{*finalized};
-  auto span = tracer.create_span();
-  MockDictWriter writer;
-  span.inject(writer);
+    Tracer tracer{*finalized};
 
-  auto found = writer.items.find("x-datadog-delegate-trace-sampling");
-  REQUIRE(found != writer.items.cend());
-  REQUIRE(found->second == "delegate");
+    SECTION("enable_sampling_delegation inject header") {
+      auto span = tracer.create_span();
+      MockDictWriter writer;
+      span.inject(writer);
+
+      auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+      REQUIRE(found != writer.items.cend());
+      REQUIRE(found->second == "delegate");
+    }
+
+    SECTION("injection option override sampling delegation configuration") {
+      const InjectionOptions opts{/* delegate_sampling_decision=*/false};
+      auto span = tracer.create_span();
+      MockDictWriter writer;
+      span.inject(writer, opts);
+
+      REQUIRE(0 == writer.items.count("x-datadog-delegate-trace-sampling"));
+    }
+  }
+
+  SECTION("injection options") {
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    Tracer tracer{*finalized};
+    MockDictWriter writer;
+    InjectionOptions opts;
+
+    opts.delegate_sampling_decision = true;
+    auto span = tracer.create_span();
+    span.inject(writer, opts);
+
+    auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+    REQUIRE(found != writer.items.cend());
+    REQUIRE(found->second == "delegate");
+  }
+
+  SECTION("e2e") {
+    config.enable_sampling_delegation = true;
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    Tracer tracer{*finalized};
+
+    auto root_span = tracer.create_span();
+
+    MockDictWriter writer;
+    root_span.inject(writer);
+    auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+    REQUIRE(found != writer.items.cend());
+    REQUIRE(found->second == "delegate");
+
+    MockDictReader reader(writer.items);
+    auto sub_span = tracer.extract_span(reader);
+    REQUIRE(!sub_span->trace_segment().sampling_decision());
+
+    MockDictWriter response_writer;
+    sub_span->write_sampling_delegation_response(response_writer);
+    REQUIRE(1 ==
+            response_writer.items.count("x-datadog-trace-sampling-decision"));
+
+    MockDictReader response_reader(response_writer.items);
+    SECTION("default") {
+      REQUIRE(root_span.read_sampling_delegation_response(response_reader));
+
+      auto root_sampling_decision =
+          root_span.trace_segment().sampling_decision();
+      REQUIRE(root_sampling_decision);
+      REQUIRE(root_sampling_decision->origin ==
+              SamplingDecision::Origin::DELEGATED);
+      REQUIRE(root_sampling_decision->priority ==
+              sub_span->trace_segment().sampling_decision()->priority);
+    }
+
+    SECTION("manual sampling override") {
+      root_span.trace_segment().override_sampling_priority(-1);
+      REQUIRE(root_span.read_sampling_delegation_response(response_reader));
+
+      auto root_sampling_decision =
+          root_span.trace_segment().sampling_decision();
+      REQUIRE(root_sampling_decision);
+      REQUIRE(root_sampling_decision->origin ==
+              SamplingDecision::Origin::LOCAL);
+      REQUIRE(root_sampling_decision->mechanism ==
+              static_cast<int>(SamplingMechanism::MANUAL));
+    }
+  }
 }

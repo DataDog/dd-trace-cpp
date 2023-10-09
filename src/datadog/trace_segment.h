@@ -49,6 +49,10 @@ struct SpanDefaults;
 class SpanSampler;
 class TraceSampler;
 
+struct InjectionOptions final {
+  bool delegate_sampling_decision;
+};
+
 class TraceSegment {
   mutable std::mutex mutex_;
 
@@ -58,6 +62,7 @@ class TraceSegment {
   std::shared_ptr<SpanSampler> span_sampler_;
 
   std::shared_ptr<const SpanDefaults> defaults_;
+  InjectionOptions injection_options_;
   const std::vector<PropagationStyle> injection_styles_;
   const Optional<std::string> hostname_;
   const Optional<std::string> origin_;
@@ -69,7 +74,7 @@ class TraceSegment {
   Optional<SamplingDecision> sampling_decision_;
   Optional<std::string> additional_w3c_tracestate_;
   Optional<std::string> additional_datadog_w3c_tracestate_;
-  bool awaiting_delegated_sampling_decision_ = false;
+  bool expecting_delegated_sampling_decision_;
 
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
@@ -77,11 +82,11 @@ class TraceSegment {
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
+               const InjectionOptions& injection_options,
                const std::vector<PropagationStyle>& injection_styles,
                const Optional<std::string>& hostname,
                Optional<std::string> origin, std::size_t tags_header_max_size,
                std::vector<std::pair<std::string, std::string>> trace_tags,
-               bool delegate_sampling_decision,
                Optional<SamplingDecision> sampling_decision,
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
@@ -96,11 +101,13 @@ class TraceSegment {
 
   // Inject trace context for the specified `span` into the specified `writer`.
   // This function is the implementation of `Span::inject`.
-  void inject(DictWriter& writer, const SpanData& span);
+  bool inject(DictWriter& writer, const SpanData& span);
+  bool inject(DictWriter& writer, const SpanData& span,
+              const InjectionOptions& opts);
 
-  // Inject/Extract trace context for sampling delegation.
-  Expected<void> extract(const DictReader& reader);
-  void inject(DictWriter& writer);
+  // Read/Write sampling delegation.
+  void write_sampling_delegation_response(DictWriter& writer);
+  Expected<void> read_sampling_delegation_response(const DictReader& reader);
 
   // Take ownership of the specified `span`.
   void register_span(std::unique_ptr<SpanData> span);

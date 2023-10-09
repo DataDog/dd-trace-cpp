@@ -3,6 +3,7 @@
 #include <cassert>
 #include <string>
 
+#include "datadog/sampling_mechanism.h"
 #include "dict_writer.h"
 #include "optional.h"
 #include "span_config.h"
@@ -20,7 +21,8 @@ Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
     : trace_segment_(trace_segment),
       data_(data),
       generate_span_id_(generate_span_id),
-      clock_(clock) {
+      clock_(clock),
+      expecting_delegated_sampling_decision_(false) {
   assert(trace_segment_);
   assert(data_);
   assert(generate_span_id_);
@@ -58,7 +60,37 @@ Span Span::create_child(const SpanConfig& config) const {
 Span Span::create_child() const { return create_child(SpanConfig{}); }
 
 void Span::inject(DictWriter& writer) const {
-  trace_segment_->inject(writer, *data_);
+  expecting_delegated_sampling_decision_ =
+      trace_segment_->inject(writer, *data_);
+}
+
+void Span::inject(DictWriter& writer, const InjectionOptions& opts) const {
+  expecting_delegated_sampling_decision_ =
+      trace_segment_->inject(writer, *data_, opts);
+}
+
+void Span::write_sampling_delegation_response(DictWriter& writer) const {
+  trace_segment_->write_sampling_delegation_response(writer);
+  expecting_delegated_sampling_decision_ = false;
+}
+
+Expected<void> Span::read_sampling_delegation_response(
+    const DictReader& reader) {
+  if (!expecting_delegated_sampling_decision_) return {};
+
+  if (auto sampling_decision = trace_segment_->sampling_decision()) {
+    if (sampling_decision->origin == SamplingDecision::Origin::LOCAL &&
+        sampling_decision->mechanism ==
+            static_cast<int>(SamplingMechanism::MANUAL))
+      return {};
+  }
+
+  auto status = trace_segment_->read_sampling_delegation_response(reader);
+  if (!status.if_error()) {
+    expecting_delegated_sampling_decision_ = false;
+  }
+
+  return status;
 }
 
 std::uint64_t Span::id() const { return data_->span_id; }

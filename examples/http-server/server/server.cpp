@@ -45,8 +45,8 @@
 #include <string>
 #include <system_error>
 
-#include "httplib-helper.hpp"
 #include "httplib.h"
+#include "tracingutil.hpp"
 
 // Alias the datadog namespace for brevity.
 namespace dd = datadog::tracing;
@@ -160,7 +160,7 @@ int main() {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
     tracingutil::HeaderWriter writer(response.headers);
-    context->spans.top().trace_segment().inject(writer);
+    context->spans.top().write_sampling_delegation_response(writer);
 
     context->spans.pop();
     return httplib::Server::HandlerResponse::Unhandled;
