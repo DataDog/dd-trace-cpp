@@ -48,6 +48,7 @@ class DatadogAgent : public Collector {
 
   void flush();
   void send_heartbeat_and_telemetry();
+  void send_app_closing();
 
  public:
   DatadogAgent(const FinalizedDatadogAgentConfig&,

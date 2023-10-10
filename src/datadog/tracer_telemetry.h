@@ -73,6 +73,7 @@ class TracerTelemetry {
   std::string app_started(nlohmann::json&& tracer_config);
   void capture_metrics();
   std::string heartbeat_and_telemetry();
+  std::string app_closing();
 };
 
 }  // namespace tracing

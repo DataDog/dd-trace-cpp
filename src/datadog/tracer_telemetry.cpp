@@ -93,7 +93,6 @@ std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {
                })})},
           })
           .dump();
-
   return payload;
 }
 
@@ -120,6 +119,73 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
       {"request_type", "app-heartbeat"},
   });
   batch_payloads.emplace_back(std::move(heartbeat));
+
+  auto metrics = nlohmann::json::array();
+  for (auto& m : metrics_snapshots_) {
+    auto& metric = m.first.get();
+    auto& points = m.second;
+    if (!points.empty()) {
+      metrics.emplace_back(nlohmann::json::object({
+          {"metric", metric.name()},
+          {"tags", metric.tags()},
+          {"type", metric.type()},
+          {"interval", 60},
+          {"points", points},
+          {"common", metric.common()},
+      }));
+    }
+    points.clear();
+  }
+
+  if (!metrics.empty()) {
+    auto generate_metrics = nlohmann::json::object({
+        {"request_type", "generate-metrics"},
+        {"payload", nlohmann::json::object({
+                        {"namespace", "tracers"},
+                        {"series", metrics},
+                    })},
+    });
+    batch_payloads.emplace_back(std::move(generate_metrics));
+  }
+
+  seq_id++;
+  auto payload =
+      nlohmann::json::object(
+          {
+              {"api_version", "v2"},
+              {"seq_id", seq_id},
+              {"request_type", "message-batch"},
+              {"tracer_time", tracer_time},
+              {"runtime_id", span_defaults_->runtime_id},
+              {"debug", debug_},
+              {"application",
+               nlohmann::json::object({
+                   {"service_name", span_defaults_->service},
+                   {"env", span_defaults_->environment},
+                   {"tracer_version", tracer_version_string},
+                   {"language_name", "cpp"},
+                   {"language_version", std::to_string(__cplusplus)},
+               })},
+              // TODO: host information (hostname, os, os_version, kernel, etc)
+              {"host", nlohmann::json::object({
+                           {"hostname", hostname_},
+                       })},
+              {"payload", batch_payloads},
+          })
+          .dump();
+  return payload;
+}
+
+std::string TracerTelemetry::app_closing() {
+  time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
+                           clock_().wall.time_since_epoch())
+                           .count();
+  auto batch_payloads = nlohmann::json::array();
+
+  auto app_closing = nlohmann::json::object({
+      {"request_type", "app-closing"},
+  });
+  batch_payloads.emplace_back(std::move(app_closing));
 
   auto metrics = nlohmann::json::array();
   for (auto& m : metrics_snapshots_) {

@@ -163,7 +163,11 @@ DatadogAgent::~DatadogAgent() {
   const auto deadline = clock_().tick + std::chrono::seconds(2);
   cancel_scheduled_flush_();
   flush();
-  cancel_telemetry_timer_();
+  if (tracer_telemetry_->enabled()) {
+    cancel_telemetry_timer_();
+    tracer_telemetry_->capture_metrics();
+    send_app_closing();
+  }
   http_client_->drain(deadline);
 }
 
@@ -333,6 +337,39 @@ void DatadogAgent::send_app_started(nlohmann::json&& tracer_config) {
 
 void DatadogAgent::send_heartbeat_and_telemetry() {
   auto payload = tracer_telemetry_->heartbeat_and_telemetry();
+  auto set_request_headers = [&](DictWriter& headers) {
+    headers.set("Content-Type", "application/json");
+  };
+
+  // Callback for a successful HTTP request, to examine HTTP status.
+  auto on_response = [logger = logger_](int response_status,
+                                        const DictReader& /*response_headers*/,
+                                        std::string response_body) {
+    if (response_status < 200 || response_status >= 300) {
+      logger->log_error([&](auto& stream) {
+        stream << "Unexpected telemetry response status " << response_status
+               << " with body (starts on next line):\n"
+               << response_body;
+      });
+    }
+  };
+
+  // Callback for unsuccessful HTTP request.
+  auto on_error = [logger = logger_](Error error) {
+    logger->log_error(error.with_prefix(
+        "Error occurred during HTTP request for telemetry: "));
+  };
+
+  auto post_result = http_client_->post(
+      telemetry_endpoint_, std::move(set_request_headers), std::move(payload),
+      std::move(on_response), std::move(on_error));
+  if (auto* error = post_result.if_error()) {
+    logger_->log_error(*error);
+  }
+}
+
+void DatadogAgent::send_app_closing() {
+  auto payload = tracer_telemetry_->app_closing();
   auto set_request_headers = [&](DictWriter& headers) {
     headers.set("Content-Type", "application/json");
   };
