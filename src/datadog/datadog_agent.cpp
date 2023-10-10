@@ -148,6 +148,9 @@ DatadogAgent::DatadogAgent(
   assert(logger_);
   assert(tracer_telemetry_);
   if (tracer_telemetry_->enabled()) {
+    // Only schedule this if telemetry is enabled.
+    // Every 10 seconds, have the tracer telemetry capture the metrics values.
+    // Every 60 seconds, also report those values to the datadog agent.
     cancel_telemetry_timer_ = event_scheduler_->schedule_recurring_event(
         std::chrono::seconds(10), [this, n = 0]() mutable {
           n++;
@@ -164,8 +167,11 @@ DatadogAgent::~DatadogAgent() {
   cancel_scheduled_flush_();
   flush();
   if (tracer_telemetry_->enabled()) {
+    // This action only needs to occur if tracer telemetry is enabled.
     cancel_telemetry_timer_();
     tracer_telemetry_->capture_metrics();
+    // The app-closing message is bundled with a message containing the final
+    // metric values.
     send_app_closing();
   }
   http_client_->drain(deadline);

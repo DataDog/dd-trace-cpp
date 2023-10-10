@@ -18,6 +18,9 @@ TracerTelemetry::TracerTelemetry(
       span_defaults_(span_defaults),
       hostname_(get_hostname().value_or("hostname-unavailable")) {
   if (enabled_) {
+    // Register all the metrics that we're tracking by adding them to the
+    // metrics_snapshots_ container. This allows for simpler iteration logic
+    // when using the values in `generate-metrics` messages.
     metrics_snapshots_.emplace_back(metrics_.tracer.spans_created,
                                     MetricSnapshot{});
     metrics_snapshots_.emplace_back(metrics_.tracer.spans_finished,
