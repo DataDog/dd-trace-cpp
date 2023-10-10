@@ -10,7 +10,7 @@ namespace datadog {
 namespace tracing {
 
 class Logger;
-class SpanDefaults;
+struct SpanDefaults;
 
 class TracerTelemetry {
   bool enabled_ = false;
