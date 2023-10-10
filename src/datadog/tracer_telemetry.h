@@ -1,5 +1,30 @@
 #pragma once
-#include <memory>
+
+// This component provides a class, TracerTelemetry, that is used to collect
+// data from the activity of the tracer implementation, and encode messages that
+// can be submitted to the Datadog Agent.
+//
+// Counter metrics are updated in other parts of the tracers, with the values
+// being managed by this class.
+//
+// The messages that TracerTelemetry produces are
+// - `app-started`
+// - `message-batch`
+// - `app-heartbeat`
+// - `generate-metrics`
+// - `app-closing`
+//
+// `app-started` messages are sent as part of initializing the tracer.
+//
+// At 60 second intervals, a `message-batch` message is sent containing an
+// `app-heartbeat` message, and if metrics have changed during that interval, a
+// `generate-metrics` message is also included in the batch.
+//
+// `app-closing` messages are sent as part of terminating the tracer. These are
+// sent as a `message-batch` message , and if metrics have changed since the
+// last `app-heartbeat` event, a `generate-metrics` message is also included in
+// the batch.
+//
 #include <vector>
 
 #include "clock.h"
@@ -20,12 +45,16 @@ class TracerTelemetry {
   std::shared_ptr<const SpanDefaults> span_defaults_;
   std::string hostname_;
   uint64_t seq_id = 0;
+  // Each metric has an associated MetricSnapshot that contains the data points,
+  // represented as a timestamp and the value of that metric.
   using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
   // This uses a reference_wrapper so references to internal metric values can
   // be captured, and be iterated trivially when the values need to be
   // snapshotted and published in telemetry messages.
   std::vector<std::pair<std::reference_wrapper<Metric>, MetricSnapshot>>
       metrics_snapshots_;
+  // This structure contains all the metrics that are exposed by tracer
+  // telemetry.
   struct {
     struct {
       CounterMetric spans_created = {
@@ -69,10 +98,21 @@ class TracerTelemetry {
                   const std::shared_ptr<Logger>& logger,
                   const std::shared_ptr<const SpanDefaults>& span_defaults);
   bool enabled() { return enabled_; };
+  // Provides access to the telemetry metrics for updating the values.
+  // This value should not be stored.
   auto& metrics() { return metrics_; };
+  // Constructs an `app-started` message using information provided when
+  // constructed and the tracer_config value passed in.
   std::string app_started(nlohmann::json&& tracer_config);
+  // This is used to take a snapshot of the current state of metrics and collect
+  // timestamped "points" of values. These values are later submitted in
+  // `generate-metrics` messages.
   void capture_metrics();
+  // Constructs a messsage-batch containing `app-heartbeat`, and if metrics have
+  // been modified, a `generate-metrics` message.
   std::string heartbeat_and_telemetry();
+  // Constructs a message-batch containing `app-closing`, and if metrics have
+  // been modified, a `generate-metrics` message.
   std::string app_closing();
 };
 
