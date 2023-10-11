@@ -45,6 +45,10 @@ class DatadogAgent : public Collector {
   EventScheduler::Cancel cancel_scheduled_flush_;
   EventScheduler::Cancel cancel_telemetry_timer_;
   std::chrono::steady_clock::duration flush_interval_;
+  // Callbacks for submitting telemetry data
+  HTTPClient::HeadersSetter telemetry_set_request_headers_;
+  HTTPClient::ResponseHandler telemetry_on_response_;
+  HTTPClient::ErrorHandler telemetry_on_error_;
 
   void flush();
   void send_heartbeat_and_telemetry();
