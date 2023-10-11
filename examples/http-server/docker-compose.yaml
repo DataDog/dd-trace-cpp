@@ -6,7 +6,7 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
-        command: /dd-trace-cpp/dist/bin/proxy-example
+        command: /dd-trace-cpp/dist/bin/http-proxy-example
         ports:
             - "127.0.0.1:8000:80"
         environment:
