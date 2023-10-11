@@ -46,7 +46,7 @@
 #include <system_error>
 
 #include "httplib.h"
-#include "tracingutil.hpp"
+#include "tracingutil.h"
 
 // Alias the datadog namespace for brevity.
 namespace dd = datadog::tracing;

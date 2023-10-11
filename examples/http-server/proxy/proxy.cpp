@@ -10,7 +10,7 @@
 #include "datadog/span_config.h"
 #include "datadog/trace_segment.h"
 #include "httplib.h"
-#include "tracingutil.hpp"
+#include "tracingutil.h"
 
 namespace dd = datadog::tracing;
 
