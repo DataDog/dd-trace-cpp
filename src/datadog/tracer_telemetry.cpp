@@ -1,6 +1,5 @@
 #include "tracer_telemetry.h"
 
-#include "json.hpp"
 #include "logger.h"
 #include "platform_util.h"
 #include "span_defaults.h"
@@ -52,51 +51,49 @@ TracerTelemetry::TracerTelemetry(
   }
 }
 
-std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {
+nlohmann::json TracerTelemetry::generate_telemetry_body(
+    std::string request_type) {
   time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
                            clock_().wall.time_since_epoch())
                            .count();
-
-  seq_id++;
-  auto payload =
-      nlohmann::json::object(
-          {
-              {"api_version", "v2"},
-              {"seq_id", seq_id},
-              {"request_type", "app-started"},
-              {"tracer_time", tracer_time},
-              {"runtime_id", span_defaults_->runtime_id},
-              {"debug", debug_},
-              {"application",
-               nlohmann::json::object({
-                   {"service_name", span_defaults_->service},
-                   {"env", span_defaults_->environment},
-                   {"tracer_version", tracer_version_string},
-                   {"language_name", "cpp"},
-                   {"language_version", std::to_string(__cplusplus)},
+  seq_id_++;
+  return nlohmann::json::object({
+      {"api_version", "v2"},
+      {"seq_id", seq_id_},
+      {"request_type", request_type},
+      {"tracer_time", tracer_time},
+      {"runtime_id", span_defaults_->runtime_id},
+      {"debug", debug_},
+      {"application", nlohmann::json::object({
+                          {"service_name", span_defaults_->service},
+                          {"env", span_defaults_->environment},
+                          {"tracer_version", tracer_version_string},
+                          {"language_name", "cpp"},
+                          {"language_version", std::to_string(__cplusplus)},
+                      })},
+      // TODO: host information (os, os_version, kernel, etc)
+      {"host", nlohmann::json::object({
+                   {"hostname", hostname_},
                })},
-              // TODO: host information (os, os_version, kernel, etc)
-              {"host", nlohmann::json::object({
-                           {"hostname", hostname_},
-                       })},
-              {"payload",
-               nlohmann::json::object({
-                   {"configuration", nlohmann::json::array({
-                                         // TODO: environment variables or
-                                         // finalized config details
-                                     })},
+  });
+}
 
-               })},
-              // TODO: Until we figure out "configuration", above, include a
-              // JSON dump of the tracer configuration as "additional_payload".
-              {"additional_payload",
-               nlohmann::json::array({nlohmann::json::object({
-                   {"name", "tracer_config_json"},
-                   {"value", tracer_config.dump()},
-               })})},
-          })
-          .dump();
-  return payload;
+std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {
+  auto telemetry_body = generate_telemetry_body("app-started");
+  // TODO: environment variables or finalized config details
+  telemetry_body["payload"] = nlohmann::json::object({
+      {"configuration", nlohmann::json::array({})},
+
+  });
+  // TODO: Until we figure out "configuration", above, include a
+  // JSON dump of the tracer configuration as "additional_payload".
+  telemetry_body["additional_payload"] =
+      nlohmann::json::array({nlohmann::json::object({
+          {"name", "tracer_config_json"},
+          {"value", tracer_config.dump()},
+      })});
+  auto app_started_payload = telemetry_body.dump();
+  return app_started_payload;
 }
 
 void TracerTelemetry::capture_metrics() {
@@ -113,9 +110,6 @@ void TracerTelemetry::capture_metrics() {
 }
 
 std::string TracerTelemetry::heartbeat_and_telemetry() {
-  time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
-                           clock_().wall.time_since_epoch())
-                           .count();
   auto batch_payloads = nlohmann::json::array();
 
   auto heartbeat = nlohmann::json::object({
@@ -151,38 +145,13 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
     batch_payloads.emplace_back(std::move(generate_metrics));
   }
 
-  seq_id++;
-  auto payload =
-      nlohmann::json::object(
-          {
-              {"api_version", "v2"},
-              {"seq_id", seq_id},
-              {"request_type", "message-batch"},
-              {"tracer_time", tracer_time},
-              {"runtime_id", span_defaults_->runtime_id},
-              {"debug", debug_},
-              {"application",
-               nlohmann::json::object({
-                   {"service_name", span_defaults_->service},
-                   {"env", span_defaults_->environment},
-                   {"tracer_version", tracer_version_string},
-                   {"language_name", "cpp"},
-                   {"language_version", std::to_string(__cplusplus)},
-               })},
-              // TODO: host information (hostname, os, os_version, kernel, etc)
-              {"host", nlohmann::json::object({
-                           {"hostname", hostname_},
-                       })},
-              {"payload", batch_payloads},
-          })
-          .dump();
-  return payload;
+  auto telemetry_body = generate_telemetry_body("message-batch");
+  telemetry_body["payload"] = batch_payloads;
+  auto message_batch_payload = telemetry_body.dump();
+  return message_batch_payload;
 }
 
 std::string TracerTelemetry::app_closing() {
-  time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
-                           clock_().wall.time_since_epoch())
-                           .count();
   auto batch_payloads = nlohmann::json::array();
 
   auto app_closing = nlohmann::json::object({
@@ -218,32 +187,10 @@ std::string TracerTelemetry::app_closing() {
     batch_payloads.emplace_back(std::move(generate_metrics));
   }
 
-  seq_id++;
-  auto payload =
-      nlohmann::json::object(
-          {
-              {"api_version", "v2"},
-              {"seq_id", seq_id},
-              {"request_type", "message-batch"},
-              {"tracer_time", tracer_time},
-              {"runtime_id", span_defaults_->runtime_id},
-              {"debug", debug_},
-              {"application",
-               nlohmann::json::object({
-                   {"service_name", span_defaults_->service},
-                   {"env", span_defaults_->environment},
-                   {"tracer_version", tracer_version_string},
-                   {"language_name", "cpp"},
-                   {"language_version", std::to_string(__cplusplus)},
-               })},
-              // TODO: host information (hostname, os, os_version, kernel, etc)
-              {"host", nlohmann::json::object({
-                           {"hostname", hostname_},
-                       })},
-              {"payload", batch_payloads},
-          })
-          .dump();
-  return payload;
+  auto telemetry_body = generate_telemetry_body("message-batch");
+  telemetry_body["payload"] = batch_payloads;
+  auto message_batch_payload = telemetry_body.dump();
+  return message_batch_payload;
 }
 
 }  // namespace tracing

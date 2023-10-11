@@ -28,7 +28,7 @@
 #include <vector>
 
 #include "clock.h"
-#include "json_fwd.hpp"
+#include "json.hpp"
 #include "metrics.h"
 
 namespace datadog {
@@ -44,7 +44,7 @@ class TracerTelemetry {
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<const SpanDefaults> span_defaults_;
   std::string hostname_;
-  uint64_t seq_id = 0;
+  uint64_t seq_id_ = 0;
   // Each metric has an associated MetricSnapshot that contains the data points,
   // represented as a timestamp and the value of that metric.
   using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
@@ -92,6 +92,8 @@ class TracerTelemetry {
 
     } trace_api;
   } metrics_;
+
+  nlohmann::json generate_telemetry_body(std::string request_type);
 
  public:
   TracerTelemetry(bool enabled, const Clock& clock,
