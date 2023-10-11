@@ -3,11 +3,12 @@
 #include "httplib.h"
 
 namespace tracingutil {
-// `HeaderWriter` adapts dd-trace-cpp's writer interface to the HTTP headers
-// object used by this app's HTTP library.
-//
-// dd-trace-cpp uses this to inject trace context into outgoing HTTP request
-// headers.
+// `HeaderWriter` and `HeaderReader` adapt dd-trace-cpp's writer and reader
+// interfaces, respectively, to the HTTP headers object used by this app's HTTP
+// library.
+
+// dd-trace-cpp uses `HeaderWriter` to inject trace context into outgoing HTTP
+// request headers.
 class HeaderWriter final : public datadog::tracing::DictWriter {
   httplib::Headers& headers_;
 
@@ -19,6 +20,8 @@ class HeaderWriter final : public datadog::tracing::DictWriter {
   }
 };
 
+// dd-trace-cpp uses `HeaderReader` to extract trace context from incoming HTTP
+// request headers.
 class HeaderReader : public datadog::tracing::DictReader {
   const httplib::Headers& headers_;
   mutable std::string buffer_;
