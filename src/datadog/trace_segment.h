@@ -102,8 +102,12 @@ class TraceSegment {
   bool inject(DictWriter& writer, const SpanData& span,
               const InjectionOptions& opts);
 
-  // Read/Write sampling delegation.
+  // Inject the trace sampling decision into the specified `writer`, if
+  // appropriate.
   void write_sampling_delegation_response(DictWriter& writer);
+
+  // Extract a trace sampling decision from the specified `reader` if it has
+  // one, and use the resulting decision, if appropriate.
   Expected<void> read_sampling_delegation_response(const DictReader& reader);
 
   // Take ownership of the specified `span`.
