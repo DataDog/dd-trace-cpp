@@ -64,32 +64,17 @@ void Span::inject(DictWriter& writer) const {
       trace_segment_->inject(writer, *data_);
 }
 
-void Span::inject(DictWriter& writer, const InjectionOptions& opts) const {
+void Span::inject(DictWriter& writer, const InjectionOptions& options) const {
   expecting_delegated_sampling_decision_ =
-      trace_segment_->inject(writer, *data_, opts);
-}
-
-void Span::write_sampling_delegation_response(DictWriter& writer) const {
-  trace_segment_->write_sampling_delegation_response(writer);
+      trace_segment_->inject(writer, *data_, options);
 }
 
 Expected<void> Span::read_sampling_delegation_response(
     const DictReader& reader) {
   if (!expecting_delegated_sampling_decision_) return {};
 
-  if (auto sampling_decision = trace_segment_->sampling_decision()) {
-    if (sampling_decision->origin == SamplingDecision::Origin::LOCAL &&
-        sampling_decision->mechanism ==
-            static_cast<int>(SamplingMechanism::MANUAL))
-      return {};
-  }
-
-  auto status = trace_segment_->read_sampling_delegation_response(reader);
-  if (!status.if_error()) {
-    expecting_delegated_sampling_decision_ = false;
-  }
-
-  return status;
+  expecting_delegated_sampling_decision_ = false;
+  return trace_segment_->read_sampling_delegation_response(reader);
 }
 
 std::uint64_t Span::id() const { return data_->span_id; }

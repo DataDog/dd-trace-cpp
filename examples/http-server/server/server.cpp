@@ -160,7 +160,7 @@ int main() {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
     tracingutil::HeaderWriter writer(response.headers);
-    context->spans.top().write_sampling_delegation_response(writer);
+    context->spans.top().trace_segment().write_sampling_delegation_response(writer);
 
     context->spans.pop();
     return httplib::Server::HandlerResponse::Unhandled;

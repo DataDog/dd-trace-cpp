@@ -35,11 +35,11 @@ class Tracer {
   std::shared_ptr<const IDGenerator> generator_;
   Clock clock_;
   std::shared_ptr<const SpanDefaults> defaults_;
-  InjectionOptions injection_options_;
   std::vector<PropagationStyle> injection_styles_;
   std::vector<PropagationStyle> extraction_styles_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
+  bool sampling_delegation_enabled_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:

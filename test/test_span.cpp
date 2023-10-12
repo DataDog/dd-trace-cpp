@@ -4,6 +4,7 @@
 
 #include <datadog/clock.h>
 #include <datadog/hex.h>
+#include <datadog/injection_options.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>
 #include <datadog/span.h>
@@ -777,10 +778,10 @@ TEST_CASE("sampling delegation injection") {
     }
 
     SECTION("injection option override sampling delegation configuration") {
-      const InjectionOptions opts{/* delegate_sampling_decision=*/false};
+      const InjectionOptions options{/* delegate_sampling_decision=*/false};
       auto span = tracer.create_span();
       MockDictWriter writer;
-      span.inject(writer, opts);
+      span.inject(writer, options);
 
       REQUIRE(0 == writer.items.count("x-datadog-delegate-trace-sampling"));
     }
@@ -792,18 +793,18 @@ TEST_CASE("sampling delegation injection") {
 
     Tracer tracer{*finalized};
     MockDictWriter writer;
-    InjectionOptions opts;
+    InjectionOptions options;
 
-    opts.delegate_sampling_decision = true;
+    options.delegate_sampling_decision = true;
     auto span = tracer.create_span();
-    span.inject(writer, opts);
+    span.inject(writer, options);
 
     auto found = writer.items.find("x-datadog-delegate-trace-sampling");
     REQUIRE(found != writer.items.cend());
     REQUIRE(found->second == "delegate");
   }
 
-  SECTION("e2e") {
+  SECTION("end-to-end") {
     config.enable_sampling_delegation = true;
     const auto finalized = finalize_config(config);
     REQUIRE(finalized);
@@ -823,7 +824,8 @@ TEST_CASE("sampling delegation injection") {
     REQUIRE(!sub_span->trace_segment().sampling_decision());
 
     MockDictWriter response_writer;
-    sub_span->write_sampling_delegation_response(response_writer);
+    sub_span->trace_segment().write_sampling_delegation_response(
+        response_writer);
     REQUIRE(1 ==
             response_writer.items.count("x-datadog-trace-sampling-decision"));
 
@@ -831,6 +833,8 @@ TEST_CASE("sampling delegation injection") {
     SECTION("default") {
       REQUIRE(root_span.read_sampling_delegation_response(response_reader));
 
+      // If no manual sampling override was made locally, then expect that the
+      // decision read above will be the one applied.
       auto root_sampling_decision =
           root_span.trace_segment().sampling_decision();
       REQUIRE(root_sampling_decision);
@@ -844,6 +848,8 @@ TEST_CASE("sampling delegation injection") {
       root_span.trace_segment().override_sampling_priority(-1);
       REQUIRE(root_span.read_sampling_delegation_response(response_reader));
 
+      // If `override_sampling_priority` was called on this segment, then any
+      // decision read above will not replace the override.
       auto root_sampling_decision =
           root_span.trace_segment().sampling_decision();
       REQUIRE(root_sampling_decision);

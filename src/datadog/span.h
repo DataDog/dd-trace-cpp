@@ -160,11 +160,15 @@ class Span {
   void set_end_time(std::chrono::steady_clock::time_point);
 
   // Write information about this span and its trace into the specified `writer`
-  // for purposes of trace propagation.
+  // using all of the configured injection propagation styles.
   void inject(DictWriter& writer) const;
-  void inject(DictWriter& writer, const InjectionOptions& opts) const;
+  void inject(DictWriter& writer, const InjectionOptions& options) const;
 
-  void write_sampling_delegation_response(DictWriter& writer) const;
+  // If this span is expecting a sampling decision that it previously delegated,
+  // then extract a sampling decision from the specified `reader`. Return an
+  // error if a sampling decision is present in `reader` but is invalid. Return
+  // success otherwise. The trace segment associated with this span might adopt
+  // the sampling decision from `reader`.
   Expected<void> read_sampling_delegation_response(const DictReader& reader);
 
   // Return a reference to this span's trace segment.  The trace segment has

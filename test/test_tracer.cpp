@@ -1000,8 +1000,8 @@ TEST_CASE("span extraction") {
     }
   }
 
-  SECTION("inject an extracted span which delegates sampling") {
-    config.enable_sampling_delegation = false;
+  SECTION("inject an extracted span that delegated sampling") {
+    config.enable_sampling_delegation = GENERATE(true, false);
     auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
@@ -1020,9 +1020,19 @@ TEST_CASE("span extraction") {
     MockDictWriter writer;
     span->inject(writer);
 
-    auto found = writer.items.find("x-datadog-delegate-trace-sampling");
-    REQUIRE(found != writer.items.cend());
-    REQUIRE(found->second == "delegate");
+    CAPTURE(writer.items);
+    if (config.enable_sampling_delegation) {
+      // If sampling delegation is enabled, then expect the delegation header to
+      // have been injected.
+      auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+      REQUIRE(found != writer.items.end());
+      REQUIRE(found->second == "delegate");
+    } else {
+      // Even though `span` was extracted from context that requested sampling
+      // delegation, delegation is not enabled for this tracer, so expect that
+      // the delegation header was not injected.
+      REQUIRE(writer.items.count("x-datadog-delegate-trace-sampling") == 0);
+    }
   }
 }
 
@@ -1209,4 +1219,208 @@ TEST_CASE(
   REQUIRE(found != span.tags.end());
   REQUIRE(found->second ==
           test_case.expected_error_prefix + test_case.tid_tag_value);
+}
+
+TEST_CASE("_dd.is_sampling_decider") {
+  // This test involves three tracers: "service1", "service2", and "service3".
+  // Each calls the next, and each produces two spans: "local_root" and "child".
+  //
+  //     [service1] -> [service2] -> [service3]
+  //     delegate       delegate       either
+  //
+  // Sampling delegation is enabled for service1 and for service2.
+  // Regardless of whether sampling delegation is enabled for service3, the
+  // following are expected:
+  //
+  // - service1's local root span will contain the tag
+  //   "_dd.is_sampling_decider:0", because while it is the root span, it did
+  //   not make the sampling decision.
+  // - service2's local root span will not contain the "dd_.is_sampling_decider"
+  //   tag, because it did not make the sampling decision and was not the root
+  //   span.
+  // - service3's local root span will contain the tag "_dd.sampling_decider:1",
+  //   because regardless of whether sampling delegation was enabled for it, it
+  //   made the sampling decision, and it is not the root span.
+  // - any span that is not a local root span will not contain the tag
+  //   "_dd.is_sampling_decider", because that tag is only ever set on the local
+  //   root span if it is set at all.
+  //
+  // Further, if we configure service3 to keep all of its traces, then the
+  // sampling decision conveyed by all of service1, service2, and service3 will
+  // be "keep" due to "rule".
+  bool service3_delegation_enabled = GENERATE(true, false);
+
+  const auto collector = std::make_shared<MockCollector>();
+  const auto logger = std::make_shared<MockLogger>();
+
+  TracerConfig config1;
+  config1.collector = collector;
+  config1.logger = logger;
+  config1.defaults.service = "service1";
+  config1.enable_sampling_delegation = true;
+
+  TracerConfig config2;
+  config2.collector = collector;
+  config2.logger = logger;
+  config2.defaults.service = "service2";
+  config2.enable_sampling_delegation = true;
+
+  TracerConfig config3;
+  config3.collector = collector;
+  config3.logger = logger;
+  config3.defaults.service = "service3";
+  config3.enable_sampling_delegation = service3_delegation_enabled;
+  config3.trace_sampler.sample_rate = 1;  // keep all traces
+  CAPTURE(config3.enable_sampling_delegation);
+
+  auto valid_config = finalize_config(config1);
+  REQUIRE(valid_config);
+  Tracer tracer1{*valid_config};
+
+  valid_config = finalize_config(config2);
+  REQUIRE(valid_config);
+  Tracer tracer2{*valid_config};
+
+  valid_config = finalize_config(config3);
+  Tracer tracer3{*valid_config};
+
+  // The spans will communicate forwards using the propagation writer and
+  // reader (trace context propagation).
+  MockDictWriter propagation_writer;
+  MockDictReader propagation_reader{propagation_writer.items};
+
+  // The spans will communicate backwards using the delegation writer and reader
+  // (delegation responses).
+  MockDictWriter delegation_writer;
+  MockDictReader delegation_reader{delegation_writer.items};
+
+  // The following nested blocks provide scopes for each of the services.
+  // service1.local_root:
+  {
+    SpanConfig span_config;
+    span_config.name = "local_root";
+    Span global_root = tracer1.create_span(span_config);
+
+    {  // service1.child
+      span_config.name = "child";
+      Span service1_child = global_root.create_child(span_config);
+
+      service1_child.inject(propagation_writer);
+
+      {  // service2.local_root:
+        span_config.name = "local_root";
+        Expected<Span> service2_local_root =
+            tracer2.extract_span(propagation_reader, span_config);
+        REQUIRE(service2_local_root);
+        {  // service2.child:
+          span_config.name = "child";
+          Span service2_child = service2_local_root->create_child(span_config);
+
+          propagation_writer.items.clear();
+          service2_child.inject(propagation_writer);
+
+          {  // service3.local_root:
+            span_config.name = "local_root";
+            Expected<Span> service3_local_root =
+                tracer3.extract_span(propagation_reader, span_config);
+            REQUIRE(service3_local_root);
+
+            {  // service3.child:
+              span_config.name = "child";
+              Span service3_child =
+                  service3_local_root->create_child(span_config);
+            }
+            service3_local_root->trace_segment()
+                .write_sampling_delegation_response(delegation_writer);
+          }
+
+          service2_child.read_sampling_delegation_response(delegation_reader);
+        }
+        delegation_writer.items.clear();
+        service2_local_root->trace_segment().write_sampling_delegation_response(
+            delegation_writer);
+      }
+      service1_child.read_sampling_delegation_response(delegation_reader);
+    }
+    delegation_writer.items.clear();
+    global_root.trace_segment().write_sampling_delegation_response(
+        delegation_writer);
+  }
+
+  // service1 (the root service) was the most recent thing to
+  // `write_sampling_delegation_response`, and service1 has no delegation
+  // response to deliver, so expect that there are no corresponding response
+  // headers.
+  {
+    CAPTURE(delegation_writer.items);
+    REQUIRE(delegation_writer.items.empty());
+  }
+
+  // three segments, each having two spans
+  REQUIRE(collector->span_count() == 3 * 2);
+
+  const double expected_sampling_priority = double(SamplingPriority::USER_KEEP);
+  // "dm" as in the "_dd.p.dm" tag
+  const std::string expected_dm =
+      "-" + std::to_string(int(SamplingMechanism::RULE));
+
+  // Check everything described in the comment at the top of this `TEST_CASE`.
+  for (const auto& chunk : collector->chunks) {
+    for (const auto& span_ptr : chunk) {
+      REQUIRE(span_ptr);
+      const SpanData& span = *span_ptr;
+      CAPTURE(span.service);
+      CAPTURE(span.name);
+      CAPTURE(span.tags);
+      CAPTURE(span.numeric_tags);
+
+      if (span.service == "service1" && span.name == "local_root") {
+        REQUIRE(span.tags.count(tags::internal::sampling_decider) == 1);
+        REQUIRE(span.tags.at(tags::internal::sampling_decider) == "0");
+        REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) ==
+                1);
+        REQUIRE(span.numeric_tags.at(tags::internal::sampling_priority) ==
+                expected_sampling_priority);
+        REQUIRE(span.tags.count(tags::internal::decision_maker) == 1);
+        REQUIRE(span.tags.at(tags::internal::decision_maker) == expected_dm);
+        continue;
+      }
+      if (span.service == "service1" && span.name == "child") {
+        REQUIRE(span.tags.count(tags::internal::sampling_decider) == 0);
+        continue;
+      }
+      REQUIRE(span.service != "service1");
+      if (span.service == "service2" && span.name == "local_root") {
+        REQUIRE(span.tags.count(tags::internal::sampling_decider) == 0);
+        REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) ==
+                1);
+        REQUIRE(span.numeric_tags.at(tags::internal::sampling_priority) ==
+                expected_sampling_priority);
+        REQUIRE(span.tags.count(tags::internal::decision_maker) == 1);
+        REQUIRE(span.tags.at(tags::internal::decision_maker) == expected_dm);
+        continue;
+      }
+      if (span.service == "service2" && span.name == "child") {
+        REQUIRE(span.tags.count(tags::internal::sampling_decider) == 0);
+        continue;
+      }
+      REQUIRE(span.service != "service2");
+      if (span.service == "service3" && span.name == "local_root") {
+        REQUIRE(span.tags.count(tags::internal::sampling_decider) == 1);
+        REQUIRE(span.tags.at(tags::internal::sampling_decider) == "1");
+        REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) ==
+                1);
+        REQUIRE(span.numeric_tags.at(tags::internal::sampling_priority) ==
+                expected_sampling_priority);
+        REQUIRE(span.tags.count(tags::internal::decision_maker) == 1);
+        REQUIRE(span.tags.at(tags::internal::decision_maker) == expected_dm);
+        continue;
+      }
+      if (span.service == "service3" && span.name == "child") {
+        REQUIRE(span.tags.count(tags::internal::sampling_decider) == 0);
+        continue;
+      }
+      REQUIRE(span.service != "service3");
+    }
+  }
 }
