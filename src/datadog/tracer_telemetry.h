@@ -47,14 +47,6 @@ class TracerTelemetry {
   RuntimeID runtime_id_;
   std::string hostname_;
   uint64_t seq_id_ = 0;
-  // Each metric has an associated MetricSnapshot that contains the data points,
-  // represented as a timestamp and the value of that metric.
-  using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
-  // This uses a reference_wrapper so references to internal metric values can
-  // be captured, and be iterated trivially when the values need to be
-  // snapshotted and published in telemetry messages.
-  std::vector<std::pair<std::reference_wrapper<Metric>, MetricSnapshot>>
-      metrics_snapshots_;
   // This structure contains all the metrics that are exposed by tracer
   // telemetry.
   struct {
@@ -94,6 +86,14 @@ class TracerTelemetry {
 
     } trace_api;
   } metrics_;
+  // Each metric has an associated MetricSnapshot that contains the data points,
+  // represented as a timestamp and the value of that metric.
+  using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
+  // This uses a reference_wrapper so references to internal metric values can
+  // be captured, and be iterated trivially when the values need to be
+  // snapshotted and published in telemetry messages.
+  std::vector<std::pair<std::reference_wrapper<Metric>, MetricSnapshot>>
+      metrics_snapshots_;
 
   nlohmann::json generate_telemetry_body(std::string request_type);
 
