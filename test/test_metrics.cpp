@@ -19,9 +19,9 @@ TEST_CASE("Counter metrics") {
 
 TEST_CASE("Gauge metrics") {
   GaugeMetric metric = {"test.gauge.metric", {"testing-testing:123"}, true};
-
+  metric.set(40);
   metric.inc();
-  metric.add(50);
+  metric.add(10);
   metric.sub(8);
   metric.dec();
   REQUIRE(metric.value() == 42);
