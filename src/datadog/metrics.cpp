@@ -5,24 +5,24 @@
 namespace datadog {
 namespace tracing {
 
-Metric::Metric(const std::string name, std::string type,
-               const std::vector<std::string> tags, bool common)
+Metric::Metric(std::string name, std::string type,
+               std::vector<std::string> tags, bool common)
     : name_(name), type_(type), tags_(tags), common_(common) {}
-const std::string Metric::name() { return name_; }
-const std::string Metric::type() { return type_; }
-const std::vector<std::string> Metric::tags() { return tags_; }
+std::string Metric::name() { return name_; }
+std::string Metric::type() { return type_; }
+std::vector<std::string> Metric::tags() { return tags_; }
 bool Metric::common() { return common_; }
 uint64_t Metric::value() { return value_; }
 uint64_t Metric::capture_and_reset_value() { return value_.exchange(0); }
 
-CounterMetric::CounterMetric(const std::string name,
-                             const std::vector<std::string> tags, bool common)
+CounterMetric::CounterMetric(std::string name, std::vector<std::string> tags,
+                             bool common)
     : Metric(name, "count", tags, common) {}
 void CounterMetric::inc() { add(1); }
 void CounterMetric::add(uint64_t amount) { value_ += amount; }
 
-GaugeMetric::GaugeMetric(const std::string name,
-                         const std::vector<std::string> tags, bool common)
+GaugeMetric::GaugeMetric(std::string name, std::vector<std::string> tags,
+                         bool common)
     : Metric(name, "gauge", tags, common) {}
 void GaugeMetric::set(uint64_t value) { value_ = value; }
 void GaugeMetric::inc() { add(1); }

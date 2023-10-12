@@ -17,11 +17,11 @@ class Metric {
   // The name of the metric that will be published. A transformation occurs
   // based on the name and whether it is "common" or "language-specific" when it
   // is recorded.
-  const std::string name_;
+  std::string name_;
   // The type of the metric. This will currently be count or gauge.
-  const std::string type_;
+  std::string type_;
   // Tags associated with this specific instance of the metric.
-  const std::vector<std::string> tags_;
+  std::vector<std::string> tags_;
   // This affects the transformation of the metric name, where it can be a
   // common telemetry metric, or a language-specific metric that is prefixed
   // with the language name.
@@ -29,15 +29,15 @@ class Metric {
 
  protected:
   std::atomic<uint64_t> value_ = 0;
-  Metric(const std::string name, std::string type,
-         const std::vector<std::string> tags, bool common);
+  Metric(std::string name, std::string type, std::vector<std::string> tags,
+         bool common);
 
  public:
   // Accessors for name, type, tags, common and capture_and_reset_value are used
   // when producing the JSON message for reporting metrics.
-  const std::string name();
-  const std::string type();
-  const std::vector<std::string> tags();
+  std::string name();
+  std::string type();
+  std::vector<std::string> tags();
   bool common();
   uint64_t value();
   uint64_t capture_and_reset_value();
@@ -47,8 +47,7 @@ class Metric {
 // number of actions, or incrementing the current number of actions by 1.
 class CounterMetric : public Metric {
  public:
-  CounterMetric(const std::string name, const std::vector<std::string> tags,
-                bool common);
+  CounterMetric(std::string name, std::vector<std::string> tags, bool common);
   void inc();
   void add(uint64_t amount);
 };
@@ -58,8 +57,7 @@ class CounterMetric : public Metric {
 // state by 1.
 class GaugeMetric : public Metric {
  public:
-  GaugeMetric(const std::string name, const std::vector<std::string> tags,
-              bool common);
+  GaugeMetric(std::string name, std::vector<std::string> tags, bool common);
   void set(uint64_t value);
   void inc();
   void add(uint64_t amount);
