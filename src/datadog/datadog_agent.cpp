@@ -265,20 +265,20 @@ void DatadogAgent::flush() {
 
   // This is the callback for the HTTP response.  It's invoked
   // asynchronously.
-  auto on_response = [this, samplers = std::move(response_handlers),
+  auto on_response = [telemetry = tracer_telemetry_, samplers = std::move(response_handlers),
                       logger = logger_](int response_status,
                                         const DictReader& /*response_headers*/,
                                         std::string response_body) {
     if (response_status >= 500) {
-      tracer_telemetry_->metrics().trace_api.responses_5xx.inc();
+      telemetry->metrics().trace_api.responses_5xx.inc();
     } else if (response_status >= 400) {
-      tracer_telemetry_->metrics().trace_api.responses_4xx.inc();
+      telemetry->metrics().trace_api.responses_4xx.inc();
     } else if (response_status >= 300) {
-      tracer_telemetry_->metrics().trace_api.responses_3xx.inc();
+      telemetry->metrics().trace_api.responses_3xx.inc();
     } else if (response_status >= 200) {
-      tracer_telemetry_->metrics().trace_api.responses_2xx.inc();
+      telemetry->metrics().trace_api.responses_2xx.inc();
     } else if (response_status >= 100) {
-      tracer_telemetry_->metrics().trace_api.responses_1xx.inc();
+      telemetry->metrics().trace_api.responses_1xx.inc();
     }
     if (response_status != 200) {
       logger->log_error([&](auto& stream) {
@@ -315,8 +315,8 @@ void DatadogAgent::flush() {
   // This is the callback for if something goes wrong sending the
   // request or retrieving the response.  It's invoked
   // asynchronously.
-  auto on_error = [this, logger = logger_](Error error) {
-    tracer_telemetry_->metrics().trace_api.errors_network.inc();
+  auto on_error = [telemetry = tracer_telemetry_, logger = logger_](Error error) {
+    telemetry->metrics().trace_api.errors_network.inc();
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for submitting traces: "));
   };
