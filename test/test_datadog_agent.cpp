@@ -22,6 +22,10 @@ TEST_CASE("CollectorResponse") {
   config.logger = logger;
   config.agent.event_scheduler = event_scheduler;
   config.agent.http_client = http_client;
+  // Tests currently only cover sending traces to the agent.
+  // Submiting telemetry performs essentially the same steps, but may be added
+  // in the future.
+  config.report_telemetry = false;
   auto finalized = finalize_config(config);
   REQUIRE(finalized);
 

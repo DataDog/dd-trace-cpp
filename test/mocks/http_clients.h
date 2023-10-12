@@ -39,12 +39,9 @@ struct MockHTTPClient : public HTTPClient {
   ResponseHandler on_response_;
   ErrorHandler on_error_;
 
-  Expected<void> post(const URL& url, HeadersSetter set_headers,
+  Expected<void> post(const URL& /* url */, HeadersSetter set_headers,
                       std::string /*body*/, ResponseHandler on_response,
                       ErrorHandler on_error) override {
-    if (url.path != "/v0.4/traces") {
-      return {};
-    }
     std::lock_guard<std::mutex> lock{mutex_};
     if (!post_error) {
       on_response_ = on_response;
