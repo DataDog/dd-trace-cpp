@@ -1,5 +1,6 @@
 #include <datadog/tracer.h>
 
+#include <csignal>
 #include <iostream>
 #include <optional>
 #include <string_view>
@@ -13,6 +14,10 @@
 #include "tracingutil.h"
 
 namespace dd = datadog::tracing;
+
+// `hard_stop` is installed as a signal handler for `SIGTERM`.
+// For some reason, the default handler was not being called.
+void hard_stop(int /*signal*/) { std::exit(0); }
 
 int main() {
   // Set up the Datadog tracer.  See `src/datadog/tracer_config.h`.
@@ -82,8 +87,10 @@ int main() {
   server.Patch(".*", forward_handler);
   server.Delete(".*", forward_handler);
 
-  std::cout << "Proxy is running on port " << 80 << "\n";
-  server.listen("0.0.0.0", 80);
+  std::signal(SIGTERM, hard_stop);
+  const int port = 80;
+  std::cout << "Proxy is running on port " << port << "\n";
+  server.listen("0.0.0.0", port);
 
   return 0;
 }
