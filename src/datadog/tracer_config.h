@@ -110,7 +110,11 @@ struct TracerConfig {
   // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
   bool trace_id_128_bit = false;
 
-  // TODO: document
+  // `runtime_id` denotes the current run of the application in which the tracer
+  // is embedded. If `runtime_id` is not specified, then it defaults to a
+  // pseudo-randomly generated value. A server that contains multiple tracers,
+  // such as those in the worker threads/processes of a reverse proxy, might
+  // specify the same `runtime_id` for all tracer instances in the same run.
   Optional<RuntimeID> runtime_id;
 };
 
