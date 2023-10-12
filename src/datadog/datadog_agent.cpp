@@ -265,7 +265,8 @@ void DatadogAgent::flush() {
 
   // This is the callback for the HTTP response.  It's invoked
   // asynchronously.
-  auto on_response = [telemetry = tracer_telemetry_, samplers = std::move(response_handlers),
+  auto on_response = [telemetry = tracer_telemetry_,
+                      samplers = std::move(response_handlers),
                       logger = logger_](int response_status,
                                         const DictReader& /*response_headers*/,
                                         std::string response_body) {
@@ -315,7 +316,8 @@ void DatadogAgent::flush() {
   // This is the callback for if something goes wrong sending the
   // request or retrieving the response.  It's invoked
   // asynchronously.
-  auto on_error = [telemetry = tracer_telemetry_, logger = logger_](Error error) {
+  auto on_error = [telemetry = tracer_telemetry_,
+                   logger = logger_](Error error) {
     telemetry->metrics().trace_api.errors_network.inc();
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for submitting traces: "));
@@ -326,7 +328,8 @@ void DatadogAgent::flush() {
       traces_endpoint_, std::move(set_request_headers), std::move(body),
       std::move(on_response), std::move(on_error));
   if (auto* error = post_result.if_error()) {
-    logger_->log_error(*error);
+    logger_->log_error(
+        error->with_prefix("Unexpected error submitting traces: "));
   }
 }
 
@@ -336,7 +339,8 @@ void DatadogAgent::send_app_started(nlohmann::json&& tracer_config) {
       telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
       telemetry_on_response_, telemetry_on_error_);
   if (auto* error = post_result.if_error()) {
-    logger_->log_error(*error);
+    logger_->log_error(
+        error->with_prefix("Unexpected error submitting telemetry: "));
   }
 }
 
@@ -346,7 +350,8 @@ void DatadogAgent::send_heartbeat_and_telemetry() {
       telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
       telemetry_on_response_, telemetry_on_error_);
   if (auto* error = post_result.if_error()) {
-    logger_->log_error(*error);
+    logger_->log_error(
+        error->with_prefix("Unexpected error submitting traces: "));
   }
 }
 
@@ -356,7 +361,8 @@ void DatadogAgent::send_app_closing() {
       telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
       telemetry_on_response_, telemetry_on_error_);
   if (auto* error = post_result.if_error()) {
-    logger_->log_error(*error);
+    logger_->log_error(
+        error->with_prefix("Unexpected error submitting traces: "));
   }
 }
 
