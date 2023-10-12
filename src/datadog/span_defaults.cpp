@@ -22,7 +22,6 @@ nlohmann::json to_json(const SpanDefaults& defaults) {
   TO_JSON(version);
   TO_JSON(name);
   TO_JSON(tags);
-  TO_JSON(runtime_id);
 #undef TO_JSON
   return result;
 }

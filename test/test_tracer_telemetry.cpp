@@ -23,7 +23,8 @@ TEST_CASE("Tracer telemetry") {
   auto span_defaults = std::make_shared<SpanDefaults>();
   span_defaults->service = "testsvc";
   span_defaults->environment = "test";
-  TracerTelemetry tracer_telemetry = {true, clock, logger, span_defaults};
+  TracerTelemetry tracer_telemetry = {true, clock, logger, span_defaults,
+                                      RuntimeID::generate()};
 
   SECTION("generates app-started message") {
     auto app_started_message =

@@ -359,6 +359,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     result.trace_id_128_bit = config.trace_id_128_bit;
   }
 
+  result.runtime_id = config.runtime_id;
+
   return result;
 }
 

@@ -61,6 +61,7 @@ class TraceSegment {
   std::shared_ptr<SpanSampler> span_sampler_;
 
   std::shared_ptr<const SpanDefaults> defaults_;
+  RuntimeID runtime_id_;
   const std::vector<PropagationStyle> injection_styles_;
   const Optional<std::string> hostname_;
   const Optional<std::string> origin_;
@@ -81,6 +82,7 @@ class TraceSegment {
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
+               const RuntimeID& runtime_id,
                const std::vector<PropagationStyle>& injection_styles,
                const Optional<std::string>& hostname,
                Optional<std::string> origin, std::size_t tags_header_max_size,

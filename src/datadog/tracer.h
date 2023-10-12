@@ -32,6 +32,7 @@ class Tracer {
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<const SpanDefaults> defaults_;
+  RuntimeID runtime_id_;
   std::shared_ptr<TracerTelemetry> tracer_telemetry_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;

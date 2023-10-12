@@ -83,6 +83,7 @@ TraceSegment::TraceSegment(
     const std::shared_ptr<TraceSampler>& trace_sampler,
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
+    const RuntimeID& runtime_id,
     const std::vector<PropagationStyle>& injection_styles,
     const Optional<std::string>& hostname, Optional<std::string> origin,
     std::size_t tags_header_max_size,
@@ -97,6 +98,7 @@ TraceSegment::TraceSegment(
       trace_sampler_(trace_sampler),
       span_sampler_(span_sampler),
       defaults_(defaults),
+      runtime_id_(runtime_id),
       injection_styles_(injection_styles),
       hostname_(hostname),
       origin_(std::move(origin)),
@@ -214,7 +216,7 @@ void TraceSegment::span_finished() {
     }
     span.numeric_tags[tags::internal::process_id] = Cache::process_id;
     span.tags[tags::internal::language] = "cpp";
-    span.tags[tags::internal::runtime_id] = defaults_->runtime_id;
+    span.tags[tags::internal::runtime_id] = runtime_id_.string();
   }
 
   const auto result = collector_->send(std::move(spans_), trace_sampler_);

@@ -199,8 +199,8 @@ Expected<ExtractedData> extract_b3(
 
 nlohmann::json make_config_json(
     StringView tracer_version_string, const Collector& collector,
-    const SpanDefaults& defaults, const TraceSampler& trace_sampler,
-    const SpanSampler& span_sampler,
+    const SpanDefaults& defaults, const RuntimeID& runtime_id,
+    const TraceSampler& trace_sampler, const SpanSampler& span_sampler,
     const std::vector<PropagationStyle>& injection_styles,
     const std::vector<PropagationStyle>& extraction_styles,
     const Optional<std::string>& hostname, std::size_t tags_header_max_size) {
@@ -208,6 +208,7 @@ nlohmann::json make_config_json(
   auto config = nlohmann::json::object({
     {"version", tracer_version_string},
     {"defaults", to_json(defaults)},
+    {"runtime_id", runtime_id.string()},
     {"collector", collector.config_json()},
     {"trace_sampler", trace_sampler.config_json()},
     {"span_sampler", span_sampler.config_json()},
@@ -244,8 +245,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     : logger_(config.logger),
       collector_(/* see constructor body */),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
+      runtime_id_(config.runtime_id ? *config.runtime_id
+                                    : RuntimeID::generate()),
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
-          config.report_telemetry, clock, logger_, defaults_)),
+          config.report_telemetry, clock, logger_, defaults_, runtime_id_)),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock)),
       span_sampler_(std::make_shared<SpanSampler>(config.span_sampler, clock)),
@@ -278,8 +281,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 
 nlohmann::json Tracer::config_json() const {
   return make_config_json(tracer_version_string, *collector_, *defaults_,
-                          *trace_sampler_, *span_sampler_, injection_styles_,
-                          extraction_styles_, hostname_, tags_header_max_size_);
+                          runtime_id_, *trace_sampler_, *span_sampler_,
+                          injection_styles_, extraction_styles_, hostname_,
+                          tags_header_max_size_);
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }
@@ -300,8 +304,8 @@ Span Tracer::create_span(const SpanConfig& config) {
   tracer_telemetry_->metrics().tracer.trace_segments_created_new.inc();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_, trace_sampler_, span_sampler_,
-      defaults_, injection_styles_, hostname_, nullopt /* origin */,
-      tags_header_max_size_, std::move(trace_tags),
+      defaults_, runtime_id_, injection_styles_, hostname_,
+      nullopt /* origin */, tags_header_max_size_, std::move(trace_tags),
       nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment,
@@ -464,7 +468,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   tracer_telemetry_->metrics().tracer.trace_segments_created_continued.inc();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_, trace_sampler_, span_sampler_,
-      defaults_, injection_styles_, hostname_, std::move(origin),
+      defaults_, runtime_id_, injection_styles_, hostname_, std::move(origin),
       tags_header_max_size_, std::move(trace_tags),
       std::move(sampling_decision), std::move(additional_w3c_tracestate),
       std::move(additional_datadog_w3c_tracestate), std::move(span_data));

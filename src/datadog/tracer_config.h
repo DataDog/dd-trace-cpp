@@ -13,7 +13,7 @@
 #include "error.h"
 #include "expected.h"
 #include "propagation_style.h"
-#include "random.h"
+#include "runtime_id.h"
 #include "span_defaults.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
@@ -109,6 +109,9 @@ struct TracerConfig {
   // tracer will generate 64-bit trace IDs. `trace_id_128_bit` is overridden by
   // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
   bool trace_id_128_bit = false;
+
+  // TODO: document
+  Optional<RuntimeID> runtime_id;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -138,8 +141,7 @@ class FinalizedTracerConfig {
   bool log_on_startup;
   bool trace_id_128_bit;
   bool report_telemetry;
-
-  std::string runtime_id = uuid();
+  Optional<RuntimeID> runtime_id;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
