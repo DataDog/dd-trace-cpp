@@ -71,7 +71,6 @@ void Span::inject(DictWriter& writer, const InjectionOptions& opts) const {
 
 void Span::write_sampling_delegation_response(DictWriter& writer) const {
   trace_segment_->write_sampling_delegation_response(writer);
-  expecting_delegated_sampling_decision_ = false;
 }
 
 Expected<void> Span::read_sampling_delegation_response(

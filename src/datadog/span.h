@@ -56,6 +56,7 @@
 namespace datadog {
 namespace tracing {
 
+struct InjectionOptions;
 class DictWriter;
 struct SpanConfig;
 struct SpanData;

@@ -60,6 +60,7 @@ cc_library(
     "src/datadog/hex.h",
     "src/datadog/http_client.h",
     "src/datadog/id_generator.h",
+    "src/datadog/injection_options.h",
     "src/datadog/json.hpp",
     "src/datadog/json_fwd.hpp",
     "src/datadog/limiter.h",

@@ -167,6 +167,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/hex.h
   src/datadog/http_client.h
   src/datadog/id_generator.h
+  src/datadog/injection_options.h
   src/datadog/json_fwd.hpp
   src/datadog/json.hpp
   src/datadog/limiter.h

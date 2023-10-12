@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "expected.h"
+#include "injection_options.h"
 #include "optional.h"
 #include "propagation_style.h"
 #include "sampling_decision.h"
@@ -48,10 +49,6 @@ struct SpanData;
 struct SpanDefaults;
 class SpanSampler;
 class TraceSampler;
-
-struct InjectionOptions final {
-  bool delegate_sampling_decision;
-};
 
 class TraceSegment {
   mutable std::mutex mutex_;
