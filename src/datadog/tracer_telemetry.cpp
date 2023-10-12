@@ -55,9 +55,9 @@ TracerTelemetry::TracerTelemetry(
 
 nlohmann::json TracerTelemetry::generate_telemetry_body(
     std::string request_type) {
-  time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
-                           clock_().wall.time_since_epoch())
-                           .count();
+  std::time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
+                                clock_().wall.time_since_epoch())
+                                .count();
   seq_id_++;
   return nlohmann::json::object({
       {"api_version", "v2"},
@@ -99,9 +99,9 @@ std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {
 }
 
 void TracerTelemetry::capture_metrics() {
-  time_t timepoint = std::chrono::duration_cast<std::chrono::seconds>(
-                         clock_().wall.time_since_epoch())
-                         .count();
+  std::time_t timepoint = std::chrono::duration_cast<std::chrono::seconds>(
+                              clock_().wall.time_since_epoch())
+                              .count();
   for (auto& m : metrics_snapshots_) {
     auto value = m.first.get().capture_and_reset_value();
     if (value == 0) {

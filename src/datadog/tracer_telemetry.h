@@ -88,7 +88,7 @@ class TracerTelemetry {
   } metrics_;
   // Each metric has an associated MetricSnapshot that contains the data points,
   // represented as a timestamp and the value of that metric.
-  using MetricSnapshot = std::vector<std::pair<time_t, uint64_t>>;
+  using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
   // This uses a reference_wrapper so references to internal metric values can
   // be captured, and be iterated trivially when the values need to be
   // snapshotted and published in telemetry messages.
