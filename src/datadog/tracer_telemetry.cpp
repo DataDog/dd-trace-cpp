@@ -124,14 +124,26 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
     auto& metric = m.first.get();
     auto& points = m.second;
     if (!points.empty()) {
-      metrics.emplace_back(nlohmann::json::object({
-          {"metric", metric.name()},
-          {"tags", metric.tags()},
-          {"type", metric.type()},
-          {"interval", 60},
-          {"points", points},
-          {"common", metric.common()},
-      }));
+      auto type = metric.type();
+      if (type == "count") {
+        metrics.emplace_back(nlohmann::json::object({
+            {"metric", metric.name()},
+            {"tags", metric.tags()},
+            {"type", metric.type()},
+            {"points", points},
+            {"common", metric.common()},
+        }));
+      } else if (type == "gauge") {
+        // gauge metrics have a interval
+        metrics.emplace_back(nlohmann::json::object({
+            {"metric", metric.name()},
+            {"tags", metric.tags()},
+            {"type", metric.type()},
+            {"interval", 10},
+            {"points", points},
+            {"common", metric.common()},
+        }));
+      }
     }
     points.clear();
   }
