@@ -59,6 +59,7 @@ class CurlLibrary {
   virtual CURLcode easy_setopt_url(CURL *handle, const char *url);
   virtual CURLcode easy_setopt_writedata(CURL *handle, void *data);
   virtual CURLcode easy_setopt_writefunction(CURL *handle, WriteCallback);
+  virtual CURLcode easy_setopt_timeout(CURL *handle, long timeout_ms);
   virtual const char *easy_strerror(CURLcode error);
   virtual void global_cleanup();
   virtual CURLcode global_init(long flags);
@@ -97,7 +98,7 @@ class Curl : public HTTPClient {
                       std::string body, ResponseHandler on_response,
                       ErrorHandler on_error) override;
 
-  void drain(std::chrono::steady_clock::time_point deadline) override;
+  void drain() override;
 
   nlohmann::json config_json() const override;
 };

@@ -25,6 +25,8 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+constexpr long k_default_timeout_ms = 2000;
+
 // `libcurl` is the default implementation: it calls `curl_*` functions under
 // the hood.
 CurlLibrary libcurl;
@@ -93,6 +95,10 @@ CURLcode CurlLibrary::easy_setopt_writedata(CURL *handle, void *data) {
 CURLcode CurlLibrary::easy_setopt_writefunction(CURL *handle,
                                                 WriteCallback on_write) {
   return curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, on_write);
+}
+
+CURLcode CurlLibrary::easy_setopt_timeout(CURL *handle, long timeout_ms) {
+  return curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, timeout_ms);
 }
 
 const char *CurlLibrary::easy_strerror(CURLcode error) {
@@ -229,7 +235,7 @@ class CurlImpl {
                       std::string body, ResponseHandler on_response,
                       ErrorHandler on_error);
 
-  void drain(std::chrono::steady_clock::time_point deadline);
+  void drain();
 };
 
 namespace {
@@ -260,9 +266,7 @@ Expected<void> Curl::post(const URL &url, HeadersSetter set_headers,
   return impl_->post(url, set_headers, body, on_response, on_error);
 }
 
-void Curl::drain(std::chrono::steady_clock::time_point deadline) {
-  impl_->drain(deadline);
-}
+void Curl::drain() { impl_->drain(); }
 
 nlohmann::json Curl::config_json() const {
   return nlohmann::json::object({{"type", "datadog::tracing::Curl"}});
@@ -311,6 +315,9 @@ CurlImpl::~CurlImpl() {
   }
   log_on_error(curl_.multi_wakeup(multi_handle_));
   event_loop_.join();
+
+  log_on_error(curl_.multi_cleanup(multi_handle_));
+  curl_.global_cleanup();
 }
 
 Expected<void> CurlImpl::post(const HTTPClient::URL &url,
@@ -323,9 +330,16 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
                  "failed to start."};
   }
 
+  HeaderWriter writer{curl_};
+  set_headers(writer);
+  auto cleanup_list = [&](auto list) { curl_.slist_free_all(list); };
+  std::unique_ptr<curl_slist, decltype(cleanup_list)> headers{
+      writer.release(), std::move(cleanup_list)};
+
   auto request = std::make_unique<Request>();
 
   request->curl = &curl_;
+  request->request_headers = headers.get();
   request->request_body = std::move(body);
   request->on_response = std::move(on_response);
   request->on_error = std::move(on_error);
@@ -339,6 +353,8 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
                  "unable to initialize a curl handle for request sending"};
   }
 
+  throw_on_error(
+      curl_.easy_setopt_httpheader(handle.get(), request->request_headers));
   throw_on_error(curl_.easy_setopt_private(handle.get(), request.get()));
   throw_on_error(
       curl_.easy_setopt_errorbuffer(handle.get(), request->error_buffer));
@@ -352,6 +368,7 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   throw_on_error(curl_.easy_setopt_headerdata(handle.get(), request.get()));
   throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
   throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
+  throw_on_error(curl_.easy_setopt_timeout(handle.get(), k_default_timeout_ms));
   if (url.scheme == "unix" || url.scheme == "http+unix" ||
       url.scheme == "https+unix") {
     throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
@@ -365,25 +382,17 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
         handle.get(), (url.scheme + "://" + url.authority + url.path).c_str()));
   }
 
-  HeaderWriter writer{curl_};
-  set_headers(writer);
-  auto cleanup_list = [&](auto list) { curl_.slist_free_all(list); };
-  std::unique_ptr<curl_slist, decltype(cleanup_list)> headers{
-      writer.release(), std::move(cleanup_list)};
-  request->request_headers = headers.get();
-  throw_on_error(
-      curl_.easy_setopt_httpheader(handle.get(), request->request_headers));
-
   std::list<CURL *> node;
   node.push_back(handle.get());
   {
     std::lock_guard<std::mutex> lock(mutex_);
     new_handles_.splice(new_handles_.end(), node);
 
-    headers.release();
-    handle.release();
-    request.release();
+    (void)headers.release();
+    (void)handle.release();
+    (void)request.release();
   }
+
   log_on_error(curl_.multi_wakeup(multi_handle_));
 
   return nullopt;
@@ -391,9 +400,9 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   return Error{Error::CURL_REQUEST_SETUP_FAILED, curl_.easy_strerror(error)};
 }
 
-void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
+void CurlImpl::drain() {
   std::unique_lock<std::mutex> lock(mutex_);
-  no_requests_.wait_until(lock, deadline, [this]() {
+  no_requests_.wait(lock, [this]() {
     return num_active_handles_ == 0 && new_handles_.empty();
   });
 }
@@ -464,6 +473,7 @@ CURLMcode CurlImpl::log_on_error(CURLMcode result) {
 void CurlImpl::run() {
   int num_messages_remaining;
   CURLMsg *message;
+  const int max_wait_milliseconds = 1000;
   std::unique_lock<std::mutex> lock(mutex_);
 
   for (;;) {
@@ -478,8 +488,6 @@ void CurlImpl::run() {
                                             &num_messages_remaining))) {
       handle_message(*message);
     }
-
-    const int max_wait_milliseconds = 10 * 1000;
     lock.unlock();
     log_on_error(curl_.multi_poll(multi_handle_, nullptr, 0,
                                   max_wait_milliseconds, nullptr));
@@ -510,8 +518,6 @@ void CurlImpl::run() {
   }
 
   request_handles_.clear();
-  log_on_error(curl_.multi_cleanup(multi_handle_));
-  curl_.global_cleanup();
 }
 
 void CurlImpl::handle_message(const CURLMsg &message) {
