@@ -51,7 +51,7 @@ class HTTPClient {
 
   // Wait until there are no more outstanding requests, or until the specified
   // `deadline`.
-  virtual void drain(std::chrono::steady_clock::time_point deadline) = 0;
+  virtual void drain() = 0;
 
   // Return a JSON representation of this object's configuration. The JSON
   // representation is an object with the following properties:

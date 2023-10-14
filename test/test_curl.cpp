@@ -69,6 +69,12 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
     on_write_ = on_write;
     return CURLE_OK;
   }
+
+  CURLcode easy_setopt_timeout(CURL *, long) override {
+    // TBD?
+    return CURLE_OK;
+  }
+
   CURLMcode multi_add_handle(CURLM *, CURL *easy_handle) override {
     added_handle_ = easy_handle;
     return CURLM_OK;
@@ -188,7 +194,7 @@ TEST_CASE("parse response headers and body") {
         [&](const Error &error) { post_error = error; });
 
     REQUIRE(result);
-    client->drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
+    client->drain();
     if (exception) {
       std::rethrow_exception(exception);
     }
@@ -399,7 +405,7 @@ TEST_CASE("handles are always cleaned up") {
         [&](const Error &error) { post_error = error; });
 
     REQUIRE(result);
-    client->drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
+    client->drain();
     if (exception) {
       std::rethrow_exception(exception);
     }
@@ -416,7 +422,7 @@ TEST_CASE("handles are always cleaned up") {
                      [&](const Error &error) { post_error = error; });
 
     REQUIRE(result);
-    client->drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
+    client->drain();
     REQUIRE(post_error);
   }
 

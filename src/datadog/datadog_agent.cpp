@@ -185,7 +185,6 @@ DatadogAgent::DatadogAgent(
 }
 
 DatadogAgent::~DatadogAgent() {
-  const auto deadline = clock_().tick + std::chrono::seconds(2);
   cancel_scheduled_flush_();
   flush();
   if (tracer_telemetry_->enabled()) {
@@ -196,7 +195,7 @@ DatadogAgent::~DatadogAgent() {
     // metric values.
     send_app_closing();
   }
-  http_client_->drain(deadline);
+  http_client_->drain();
 }
 
 Expected<void> DatadogAgent::send(

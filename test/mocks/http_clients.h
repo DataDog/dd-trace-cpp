@@ -51,7 +51,7 @@ struct MockHTTPClient : public HTTPClient {
     return post_error;
   }
 
-  void drain(std::chrono::steady_clock::time_point /*deadline*/) override {
+  void drain() override {
     std::lock_guard<std::mutex> lock{mutex_};
     if (response_error && on_error_) {
       on_error_(*response_error);
