@@ -54,6 +54,8 @@ urlencode() {
   printf '\n'
 }
 
+cd "$tracer_dir"
+
 commit_time_iso=$(git show -s --format=%cI)
 commit_hash_short=$(git rev-parse HEAD | head -c 7)
 commit_branch=$(git branch --show-current)
@@ -75,7 +77,6 @@ report_name=$(printf '%s-%s-%s-%s-%s\n' \
         "$coverage_funcs" \
         "$branch_encoded")
 
-cd "$tracer_dir"
 mv .coverage/report "$temp_dir/dd-trace-cpp-coverage/$report_name"
 
 cd "$temp_dir/dd-trace-cpp-coverage"
