@@ -38,17 +38,12 @@ git fetch --depth=1 --filter=blob:none origin "$branch"
 git sparse-checkout set dummy/
 git checkout "$branch"
 
-# $ urlencode "wouldn't want this/that in a file name"
-# wouldn%27t%20want%20this%2fthat%20in%20a%20file%20name
-urlencode() {
+hex_encode() {
   string=$1
   while [ -n "$string" ]; do
     tail=${string#?}
     head=${string%"$tail"}
-    case $head in
-      [-._~0-9A-Za-z]) printf %c "$head";;
-      *) printf '%%%02x' "'$head"
-    esac
+    printf '%02x' "'$head"
     string=$tail
   done
   printf '\n'
@@ -59,7 +54,7 @@ cd "$tracer_dir"
 commit_time_iso=$(git show -s --format=%cI)
 commit_hash_short=$(git rev-parse HEAD | head -c 7)
 commit_branch=$(git branch --show-current)
-branch_encoded=$(urlencode "$commit_branch")
+branch_encoded=$(hex_encode "$commit_branch")
 commit_time_iso=$(date "--date=$commit_time_iso" --iso-8601=ns --utc | \
         sed -e 's/,/./g' -e 's/......+00:00$/Z/')
 coverage_lines=$(grep -A 3 Lines .coverage/report/index.html | \
