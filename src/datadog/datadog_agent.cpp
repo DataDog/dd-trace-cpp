@@ -340,7 +340,7 @@ void DatadogAgent::send_app_started(nlohmann::json&& tracer_config) {
       telemetry_on_response_, telemetry_on_error_);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(
-        error->with_prefix("Unexpected error submitting telemetry: "));
+        error->with_prefix("Unexpected error submitting telemetry app-started event: "));
   }
 }
 
@@ -351,7 +351,7 @@ void DatadogAgent::send_heartbeat_and_telemetry() {
       telemetry_on_response_, telemetry_on_error_);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(
-        error->with_prefix("Unexpected error submitting traces: "));
+        error->with_prefix("Unexpected error submitting telemetry app-heartbeat event: "));
   }
 }
 
@@ -362,7 +362,7 @@ void DatadogAgent::send_app_closing() {
       telemetry_on_response_, telemetry_on_error_);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(
-        error->with_prefix("Unexpected error submitting traces: "));
+        error->with_prefix("Unexpected error submitting telemetry app-closing event: "));
   }
 }
 
