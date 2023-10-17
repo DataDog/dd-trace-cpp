@@ -13,6 +13,7 @@
 #include "error.h"
 #include "expected.h"
 #include "propagation_style.h"
+#include "runtime_id.h"
 #include "span_defaults.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
@@ -48,6 +49,13 @@ struct TracerConfig {
   // `report_traces` is overridden by the `DD_TRACE_ENABLED` environment
   // variable.
   bool report_traces = true;
+
+  // `report_telemetry` indicates whether telemetry about the tracer will be
+  // sent to a collector (`true`) or discarded on completion (`false`).  If
+  // `report_telemetry` is `false`, then this feature is disabled.
+  // `report_telemetry` is overridden by the
+  // `DD_INSTRUMENTATION_TELEMETRY_ENABLED` environment variable.
+  bool report_telemetry = true;
 
   // `trace_sampler` configures trace sampling.  Trace sampling determines which
   // traces are sent to Datadog.  See `trace_sampler_config.h`.
@@ -101,6 +109,13 @@ struct TracerConfig {
   // tracer will generate 64-bit trace IDs. `trace_id_128_bit` is overridden by
   // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
   bool trace_id_128_bit = false;
+
+  // `runtime_id` denotes the current run of the application in which the tracer
+  // is embedded. If `runtime_id` is not specified, then it defaults to a
+  // pseudo-randomly generated value. A server that contains multiple tracers,
+  // such as those in the worker threads/processes of a reverse proxy, might
+  // specify the same `runtime_id` for all tracer instances in the same run.
+  Optional<RuntimeID> runtime_id;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -129,6 +144,8 @@ class FinalizedTracerConfig {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
+  bool report_telemetry;
+  Optional<RuntimeID> runtime_id;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

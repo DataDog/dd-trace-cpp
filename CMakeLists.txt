@@ -110,6 +110,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
+    src/datadog/metrics.cpp
     src/datadog/msgpack.cpp
     src/datadog/null_collector.cpp
     src/datadog/parse_util.cpp
@@ -117,6 +118,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp
     src/datadog/rate.cpp
+    src/datadog/runtime_id.cpp
     src/datadog/span.cpp
     src/datadog/span_data.cpp
     src/datadog/span_defaults.cpp
@@ -127,6 +129,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/tags.cpp
     src/datadog/threaded_event_scheduler.cpp
     src/datadog/tracer_config.cpp
+    src/datadog/tracer_telemetry.cpp
     src/datadog/tracer.cpp
     src/datadog/trace_id.cpp
     src/datadog/trace_sampler_config.cpp
@@ -165,6 +168,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/json.hpp
   src/datadog/limiter.h
   src/datadog/logger.h
+  src/datadog/metrics.h
   src/datadog/msgpack.h
   src/datadog/null_collector.h
   src/datadog/optional.h
@@ -173,6 +177,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/propagation_style.h
   src/datadog/random.h
   src/datadog/rate.h
+  src/datadog/runtime_id.h
   src/datadog/sampling_decision.h
   src/datadog/sampling_mechanism.h
   src/datadog/sampling_priority.h
@@ -189,6 +194,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/tags.h
   src/datadog/threaded_event_scheduler.h
   src/datadog/tracer_config.h
+  src/datadog/tracer_telemetry.h
   src/datadog/tracer.h
   src/datadog/trace_id.h
   src/datadog/trace_sampler_config.h
@@ -205,12 +211,12 @@ include_directories(${CMAKE_BINARY_DIR}/include)
 
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
-target_link_libraries(dd_trace_cpp-objects 
-  PUBLIC 
-    ${CMAKE_BINARY_DIR}/lib/libcurl.a 
-  PUBLIC 
-    Threads::Threads 
-    ${COVERAGE_LIBRARIES} 
+target_link_libraries(dd_trace_cpp-objects
+  PUBLIC
+    ${CMAKE_BINARY_DIR}/lib/libcurl.a
+  PUBLIC
+    Threads::Threads
+    ${COVERAGE_LIBRARIES}
     ${COREFOUNDATION_LIBRARY}
     ${SYSTEMCONFIGURATION_LIBRARY}
 )

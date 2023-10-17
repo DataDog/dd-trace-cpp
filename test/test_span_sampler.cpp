@@ -307,7 +307,8 @@ TEST_CASE("span rule limiter") {
 
   auto finalized = finalize_config(config);
   REQUIRE(finalized);
-  Tracer tracer{*finalized};
+  auto clock = [frozen_time = default_clock()]() { return frozen_time; };
+  Tracer tracer{*finalized, clock};
 
   for (std::size_t i = 0; i < test_case.num_spans; ++i) {
     auto span = tracer.create_span();
@@ -326,10 +327,5 @@ TEST_CASE("span rule limiter") {
     }
   }
 
-  // The `TestCase` that expects 100 span allowed once failed because 101 were
-  // allowed.  I'm not sure how that works, but we are using a real clock and
-  // different machines run these cases at different rates, so let's build in a
-  // fudge factor.
-  REQUIRE(count_of_sampled_spans >= test_case.expected_count - 10);
-  REQUIRE(count_of_sampled_spans <= test_case.expected_count + 10);
+  REQUIRE(count_of_sampled_spans == test_case.expected_count);
 }

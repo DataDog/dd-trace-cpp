@@ -22,11 +22,18 @@ namespace tracing {
 namespace {
 
 const StringView traces_api_path = "/v0.4/traces";
+const StringView telemetry_v2_path = "/telemetry/proxy/api/v2/apmtelemetry";
 
 HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
   auto traces_url = agent_url;
   append(traces_url.path, traces_api_path);
   return traces_url;
+}
+
+HTTPClient::URL telemetry_endpoint(const HTTPClient::URL& agent_url) {
+  auto telemetry_v2_url = agent_url;
+  append(telemetry_v2_url.path, telemetry_v2_path);
+  return telemetry_v2_url;
 }
 
 Expected<void> msgpack_encode(
@@ -124,24 +131,71 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 
 }  // namespace
 
-DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
-                           const Clock& clock,
-                           const std::shared_ptr<Logger>& logger)
-    : clock_(clock),
+DatadogAgent::DatadogAgent(
+    const FinalizedDatadogAgentConfig& config,
+    const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
+    const Clock& clock, const std::shared_ptr<Logger>& logger)
+    : tracer_telemetry_(tracer_telemetry),
+      clock_(clock),
       logger_(logger),
       traces_endpoint_(traces_endpoint(config.url)),
+      telemetry_endpoint_(telemetry_endpoint(config.url)),
       http_client_(config.http_client),
       event_scheduler_(config.event_scheduler),
       cancel_scheduled_flush_(event_scheduler_->schedule_recurring_event(
           config.flush_interval, [this]() { flush(); })),
       flush_interval_(config.flush_interval) {
   assert(logger_);
+  assert(tracer_telemetry_);
+  if (tracer_telemetry_->enabled()) {
+    // Only schedule this if telemetry is enabled.
+    // Every 10 seconds, have the tracer telemetry capture the metrics values.
+    // Every 60 seconds, also report those values to the datadog agent.
+    cancel_telemetry_timer_ = event_scheduler_->schedule_recurring_event(
+        std::chrono::seconds(10), [this, n = 0]() mutable {
+          n++;
+          tracer_telemetry_->capture_metrics();
+          if (n % 6 == 0) {
+            send_heartbeat_and_telemetry();
+          }
+        });
+    // Callback for setting telemetry request headers.
+    telemetry_set_request_headers_ = [](DictWriter& headers) {
+      headers.set("Content-Type", "application/json");
+    };
+    // Callback for successful telemetry HTTP requests, to examine HTTP status.
+    telemetry_on_response_ = [logger = logger_](
+                                 int response_status,
+                                 const DictReader& /*response_headers*/,
+                                 std::string response_body) {
+      if (response_status < 200 || response_status >= 300) {
+        logger->log_error([&](auto& stream) {
+          stream << "Unexpected telemetry response status " << response_status
+                 << " with body (starts on next line):\n"
+                 << response_body;
+        });
+      }
+    };
+    // Callback for unsuccessful telemetry HTTP requests.
+    telemetry_on_error_ = [logger = logger_](Error error) {
+      logger->log_error(error.with_prefix(
+          "Error occurred during HTTP request for telemetry: "));
+    };
+  }
 }
 
 DatadogAgent::~DatadogAgent() {
   const auto deadline = clock_().tick + std::chrono::seconds(2);
   cancel_scheduled_flush_();
   flush();
+  if (tracer_telemetry_->enabled()) {
+    // This action only needs to occur if tracer telemetry is enabled.
+    cancel_telemetry_timer_();
+    tracer_telemetry_->capture_metrics();
+    // The app-closing message is bundled with a message containing the final
+    // metric values.
+    send_app_closing();
+  }
   http_client_->drain(deadline);
 }
 
@@ -154,7 +208,6 @@ Expected<void> DatadogAgent::send(
 }
 
 nlohmann::json DatadogAgent::config_json() const {
-  const auto& url = traces_endpoint_;  // brevity
   const auto flush_interval_milliseconds =
       std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_)
           .count();
@@ -163,7 +216,8 @@ nlohmann::json DatadogAgent::config_json() const {
   return nlohmann::json::object({
     {"type", "datadog::tracing::DatadogAgent"},
     {"config", nlohmann::json::object({
-      {"url", (url.scheme + "://" + url.authority + url.path)},
+      {"traces_url", (traces_endpoint_.scheme + "://" + traces_endpoint_.authority + traces_endpoint_.path)},
+      {"telemetry_url", (telemetry_endpoint_.scheme + "://" + telemetry_endpoint_.authority + telemetry_endpoint_.path)},
       {"flush_interval_milliseconds", flush_interval_milliseconds},
       {"http_client", http_client_->config_json()},
       {"event_scheduler", event_scheduler_->config_json()},
@@ -211,10 +265,22 @@ void DatadogAgent::flush() {
 
   // This is the callback for the HTTP response.  It's invoked
   // asynchronously.
-  auto on_response = [samplers = std::move(response_handlers),
+  auto on_response = [telemetry = tracer_telemetry_,
+                      samplers = std::move(response_handlers),
                       logger = logger_](int response_status,
                                         const DictReader& /*response_headers*/,
                                         std::string response_body) {
+    if (response_status >= 500) {
+      telemetry->metrics().trace_api.responses_5xx.inc();
+    } else if (response_status >= 400) {
+      telemetry->metrics().trace_api.responses_4xx.inc();
+    } else if (response_status >= 300) {
+      telemetry->metrics().trace_api.responses_3xx.inc();
+    } else if (response_status >= 200) {
+      telemetry->metrics().trace_api.responses_2xx.inc();
+    } else if (response_status >= 100) {
+      telemetry->metrics().trace_api.responses_1xx.inc();
+    }
     if (response_status != 200) {
       logger->log_error([&](auto& stream) {
         stream << "Unexpected response status " << response_status
@@ -250,16 +316,53 @@ void DatadogAgent::flush() {
   // This is the callback for if something goes wrong sending the
   // request or retrieving the response.  It's invoked
   // asynchronously.
-  auto on_error = [logger = logger_](Error error) {
-    logger->log_error(
-        error.with_prefix("Error occurred during HTTP request: "));
+  auto on_error = [telemetry = tracer_telemetry_,
+                   logger = logger_](Error error) {
+    telemetry->metrics().trace_api.errors_network.inc();
+    logger->log_error(error.with_prefix(
+        "Error occurred during HTTP request for submitting traces: "));
   };
 
+  tracer_telemetry_->metrics().trace_api.requests.inc();
   auto post_result = http_client_->post(
       traces_endpoint_, std::move(set_request_headers), std::move(body),
       std::move(on_response), std::move(on_error));
   if (auto* error = post_result.if_error()) {
-    logger_->log_error(*error);
+    logger_->log_error(
+        error->with_prefix("Unexpected error submitting traces: "));
+  }
+}
+
+void DatadogAgent::send_app_started(nlohmann::json&& tracer_config) {
+  auto payload = tracer_telemetry_->app_started(std::move(tracer_config));
+  auto post_result = http_client_->post(
+      telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
+      telemetry_on_response_, telemetry_on_error_);
+  if (auto* error = post_result.if_error()) {
+    logger_->log_error(error->with_prefix(
+        "Unexpected error submitting telemetry app-started event: "));
+  }
+}
+
+void DatadogAgent::send_heartbeat_and_telemetry() {
+  auto payload = tracer_telemetry_->heartbeat_and_telemetry();
+  auto post_result = http_client_->post(
+      telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
+      telemetry_on_response_, telemetry_on_error_);
+  if (auto* error = post_result.if_error()) {
+    logger_->log_error(error->with_prefix(
+        "Unexpected error submitting telemetry app-heartbeat event: "));
+  }
+}
+
+void DatadogAgent::send_app_closing() {
+  auto payload = tracer_telemetry_->app_closing();
+  auto post_result = http_client_->post(
+      telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
+      telemetry_on_response_, telemetry_on_error_);
+  if (auto* error = post_result.if_error()) {
+    logger_->log_error(error->with_prefix(
+        "Unexpected error submitting telemetry app-closing event: "));
   }
 }
 

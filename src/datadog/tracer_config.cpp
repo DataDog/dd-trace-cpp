@@ -323,6 +323,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     result.collector = config.collector;
   }
 
+  bool report_telemetry = config.report_telemetry;
+  if (auto enabled_env =
+          lookup(environment::DD_INSTRUMENTATION_TELEMETRY_ENABLED)) {
+    report_telemetry = !falsy(*enabled_env);
+  }
+  result.report_telemetry = report_telemetry;
+
   if (auto trace_sampler_config = finalize_config(config.trace_sampler)) {
     result.trace_sampler = std::move(*trace_sampler_config);
   } else {
@@ -351,6 +358,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   } else {
     result.trace_id_128_bit = config.trace_id_128_bit;
   }
+
+  result.runtime_id = config.runtime_id;
 
   return result;
 }

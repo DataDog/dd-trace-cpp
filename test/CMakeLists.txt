@@ -22,6 +22,7 @@ add_executable(tests
     test_datadog_agent.cpp
     test_glob.cpp
     test_limiter.cpp
+    test_metrics.cpp
     test_msgpack.cpp
     test_parse_util.cpp
     test_smoke.cpp
@@ -30,6 +31,7 @@ add_executable(tests
     test_trace_id.cpp
     test_trace_segment.cpp
     test_tracer_config.cpp
+    test_tracer_telemetry.cpp
     test_tracer.cpp
     test_trace_sampler.cpp
 )
