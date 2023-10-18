@@ -69,7 +69,7 @@ nlohmann::json TracerTelemetry::generate_telemetry_body(
       {"application", nlohmann::json::object({
                           {"service_name", span_defaults_->service},
                           {"env", span_defaults_->environment},
-                          {"tracer_version", tracer_version_string},
+                          {"tracer_version", tracer_version},
                           {"language_name", "cpp"},
                           {"language_version", std::to_string(__cplusplus)},
                       })},
