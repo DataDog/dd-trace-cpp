@@ -208,7 +208,7 @@ class CurlImpl {
   };
 
   void run();
-  void handle_message(const CURLMsg &);
+  void handle_message(const CURLMsg &, std::unique_lock<std::mutex> &);
   CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
 
@@ -476,7 +476,7 @@ void CurlImpl::run() {
     // us to handle.  Handle any pending messages.
     while ((message = curl_.multi_info_read(multi_handle_,
                                             &num_messages_remaining))) {
-      handle_message(*message);
+      handle_message(*message, lock);
     }
 
     const int max_wait_milliseconds = 10 * 1000;
@@ -514,7 +514,8 @@ void CurlImpl::run() {
   curl_.global_cleanup();
 }
 
-void CurlImpl::handle_message(const CURLMsg &message) {
+void CurlImpl::handle_message(const CURLMsg &message,
+                              std::unique_lock<std::mutex> &lock) {
   if (message.msg != CURLMSG_DONE) {
     return;
   }
@@ -536,8 +537,10 @@ void CurlImpl::handle_message(const CURLMsg &message) {
     error_message += curl_.easy_strerror(result);
     error_message += "): ";
     error_message += request.error_buffer;
+    lock.unlock();
     request.on_error(
         Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
+    lock.lock();
   } else {
     long status;
     if (log_on_error(curl_.easy_getinfo_response_code(request_handle,
@@ -545,8 +548,10 @@ void CurlImpl::handle_message(const CURLMsg &message) {
       status = -1;
     }
     HeaderReader reader(&request.response_headers_lower);
+    lock.unlock();
     request.on_response(static_cast<int>(status), reader,
                         std::move(request.response_body));
+    lock.lock();
   }
 
   log_on_error(curl_.multi_remove_handle(multi_handle_, request_handle));
