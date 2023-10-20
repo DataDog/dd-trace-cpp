@@ -14,7 +14,7 @@ using namespace datadog::tracing;
 
 TEST_CASE("Tracer telemetry") {
   const std::time_t mock_time = 1672484400;
-  const Clock clock = [mock_time]() {
+  const Clock clock = []() {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(mock_time);
     return result;
