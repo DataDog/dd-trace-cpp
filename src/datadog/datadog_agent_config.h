@@ -54,6 +54,9 @@ struct DatadogAgentConfig {
   int request_timeout_milliseconds = 2000;
   // Maximum amount of time the process is allowed to wait before shutting down.
   int shutdown_timeout_milliseconds = 2000;
+  // How often, in seconds, to query the Datadog Agent for remote configuration
+  // updates.
+  int remote_configuration_poll_interval_seconds = 5;
 
   static Expected<HTTPClient::URL> parse(StringView);
 };
@@ -65,13 +68,14 @@ class FinalizedDatadogAgentConfig {
   FinalizedDatadogAgentConfig() = default;
 
  public:
+  Clock clock;
   std::shared_ptr<HTTPClient> http_client;
   std::shared_ptr<EventScheduler> event_scheduler;
   HTTPClient::URL url;
   std::chrono::steady_clock::duration flush_interval;
   std::chrono::steady_clock::duration request_timeout;
   std::chrono::steady_clock::duration shutdown_timeout;
-  Clock clock;
+  std::chrono::steady_clock::duration remote_configuration_poll_interval;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(

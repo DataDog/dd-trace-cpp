@@ -58,5 +58,9 @@ inline void assign(std::string& destination, StringView text) {
   destination.assign(text.data(), text.size());
 }
 
+inline bool contains(StringView text, StringView pattern) {
+  return text.find(pattern) != text.npos;
+}
+
 }  // namespace tracing
 }  // namespace datadog

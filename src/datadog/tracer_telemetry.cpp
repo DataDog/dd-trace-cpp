@@ -8,15 +8,13 @@
 namespace datadog {
 namespace tracing {
 
-TracerTelemetry::TracerTelemetry(
-    bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
-    const std::shared_ptr<const SpanDefaults>& span_defaults,
-    const RuntimeID& runtime_id)
+TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
+                                 const std::shared_ptr<Logger>& logger,
+                                 const TracerId& tracer_id)
     : enabled_(enabled),
       clock_(clock),
       logger_(logger),
-      span_defaults_(span_defaults),
-      runtime_id_(runtime_id),
+      tracer_id_(tracer_id),
       hostname_(get_hostname().value_or("hostname-unavailable")) {
   if (enabled_) {
     // Register all the metrics that we're tracking by adding them to the
@@ -64,11 +62,11 @@ nlohmann::json TracerTelemetry::generate_telemetry_body(
       {"seq_id", seq_id_},
       {"request_type", request_type},
       {"tracer_time", tracer_time},
-      {"runtime_id", runtime_id_.string()},
+      {"runtime_id", tracer_id_.runtime_id.string()},
       {"debug", debug_},
       {"application", nlohmann::json::object({
-                          {"service_name", span_defaults_->service},
-                          {"env", span_defaults_->environment},
+                          {"service_name", tracer_id_.service},
+                          {"env", tracer_id_.environment},
                           {"tracer_version", tracer_version},
                           {"language_name", "cpp"},
                           {"language_version", std::to_string(__cplusplus)},
