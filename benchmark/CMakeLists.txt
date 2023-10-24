@@ -23,3 +23,9 @@ set(BENCHMARK_ENABLE_TESTING OFF)
 add_subdirectory(google-benchmark)
 
 target_link_libraries(dd_trace_cpp-benchmark benchmark::benchmark dd_trace_cpp-static)
+
+# add_executable(base64-benchmark
+#   base64.cpp
+# )
+#
+# target_link_libraries(base64-benchmark benchmark::benchmark dd_trace_cpp-static)

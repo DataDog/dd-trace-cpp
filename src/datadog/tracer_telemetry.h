@@ -31,6 +31,7 @@
 #include "json.hpp"
 #include "metrics.h"
 #include "runtime_id.h"
+#include "tracer_id.h"
 
 namespace datadog {
 namespace tracing {
@@ -43,8 +44,7 @@ class TracerTelemetry {
   bool debug_ = false;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
-  std::shared_ptr<const SpanDefaults> span_defaults_;
-  RuntimeID runtime_id_;
+  TracerId tracer_id_;
   std::string hostname_;
   uint64_t seq_id_ = 0;
   // This structure contains all the metrics that are exposed by tracer
@@ -100,8 +100,7 @@ class TracerTelemetry {
  public:
   TracerTelemetry(bool enabled, const Clock& clock,
                   const std::shared_ptr<Logger>& logger,
-                  const std::shared_ptr<const SpanDefaults>& span_defaults,
-                  const RuntimeID& runtime_id);
+                  const TracerId& tracer_id);
   bool enabled() { return enabled_; };
   // Provides access to the telemetry metrics for updating the values.
   // This value should not be stored.

@@ -8,13 +8,16 @@
 
 #include <memory>
 #include <mutex>
+#include <unordered_set>
 #include <vector>
 
 #include "clock.h"
 #include "collector.h"
+#include "datadog/runtime_id.h"
 #include "event_scheduler.h"
 #include "http_client.h"
 #include "metrics.h"
+#include "remote_config.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {
@@ -24,6 +27,8 @@ class FinalizedDatadogAgentConfig;
 class Logger;
 struct SpanData;
 class TraceSampler;
+struct TracerId;
+class ConfigManager;
 
 class DatadogAgent : public Collector {
  public:
@@ -40,17 +45,20 @@ class DatadogAgent : public Collector {
   std::vector<TraceChunk> trace_chunks_;
   HTTPClient::URL traces_endpoint_;
   HTTPClient::URL telemetry_endpoint_;
+  HTTPClient::URL remote_configuration_endpoint_;
   std::shared_ptr<HTTPClient> http_client_;
   std::shared_ptr<EventScheduler> event_scheduler_;
   EventScheduler::Cancel cancel_scheduled_flush_;
   EventScheduler::Cancel cancel_telemetry_timer_;
+  EventScheduler::Cancel cancel_remote_configuration_task_;
   std::chrono::steady_clock::duration flush_interval_;
   // Callbacks for submitting telemetry data
-  HTTPClient::HeadersSetter telemetry_set_request_headers_;
   HTTPClient::ResponseHandler telemetry_on_response_;
   HTTPClient::ErrorHandler telemetry_on_error_;
   std::chrono::steady_clock::duration request_timeout_;
   std::chrono::steady_clock::duration shutdown_timeout_;
+
+  RemoteConfigurationManager remote_config_;
 
   void flush();
   void send_heartbeat_and_telemetry();
@@ -59,7 +67,8 @@ class DatadogAgent : public Collector {
  public:
   DatadogAgent(const FinalizedDatadogAgentConfig&,
                const std::shared_ptr<TracerTelemetry>&,
-               const std::shared_ptr<Logger>&);
+               const std::shared_ptr<Logger>&, const TracerId& id,
+               ConfigManager& config_manager);
   ~DatadogAgent();
 
   Expected<void> send(
@@ -67,6 +76,8 @@ class DatadogAgent : public Collector {
       const std::shared_ptr<TraceSampler>& response_handler) override;
 
   void send_app_started();
+
+  void get_and_apply_remote_configuration_updates();
 
   nlohmann::json config_json() const override;
 };

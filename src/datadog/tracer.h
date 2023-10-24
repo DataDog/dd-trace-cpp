@@ -11,6 +11,7 @@
 // `tracer_config.h`.
 
 #include "clock.h"
+#include "config_manager.h"
 #include "error.h"
 #include "expected.h"
 #include "id_generator.h"
@@ -27,14 +28,15 @@ class DictReader;
 struct SpanConfig;
 class TraceSampler;
 class SpanSampler;
+struct TracerId;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<const SpanDefaults> defaults_;
   RuntimeID runtime_id_;
+  TracerId id_;
   std::shared_ptr<TracerTelemetry> tracer_telemetry_;
-  std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const IDGenerator> generator_;
   Clock clock_;
@@ -42,6 +44,8 @@ class Tracer {
   std::vector<PropagationStyle> extraction_styles_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
+
+  ConfigManager config_manager_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:
