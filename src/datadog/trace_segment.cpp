@@ -98,7 +98,7 @@ Expected<SamplingDecision> parse_sampling_delegation_response(
   } catch (const std::exception& e) {
     std::string msg{"Unable to parse sampling delegation response: "};
     msg += e.what();
-    return Error{Error::Code::TRACE_SAMPLING_RULES_INVALID_JSON, msg};
+    return Error{Error::Code::SAMPLING_DELEGATION_RESPONSE_INVALID_JSON, msg};
   }
 }
 
@@ -320,12 +320,7 @@ void TraceSegment::update_decision_maker_trace_tag() {
 }
 
 bool TraceSegment::inject(DictWriter& writer, const SpanData& span) {
-  // The caller did not specify `InjectionOptions`. Pick a default based on our
-  // sampling delegation configuration and state.
-  InjectionOptions options = {};
-  options.delegate_sampling_decision =
-      sampling_delegation_.enabled && !sampling_delegation_.sent_request_header;
-  return inject(writer, span, options);
+  return inject(writer, span, InjectionOptions{});
 }
 
 bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
@@ -335,6 +330,12 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
       injection_styles_[0] == PropagationStyle::NONE) {
     return false;
   }
+
+  // If `options.delegate_sampling_decision` is null, then pick a default based
+  // on our sampling delegation configuration and state.
+  const bool delegation_requested = options.delegate_sampling_decision.value_or(
+      sampling_delegation_.enabled &&
+      !sampling_delegation_.sent_request_header);
 
   bool delegated_trace_sampling_decision = false;
 
@@ -362,9 +363,9 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
         }
-        if (options.delegate_sampling_decision) {
-          delegated_trace_sampling_decision =
-              sampling_delegation_.sent_request_header = true;
+        if (delegation_requested) {
+          delegated_trace_sampling_decision = true;
+          sampling_delegation_.sent_request_header = true;
           writer.set("x-datadog-delegate-trace-sampling", "delegate");
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
