@@ -46,15 +46,6 @@ Optional<std::uint64_t> parse_trace_id_high(const std::string& value) {
   return nullopt;
 }
 
-Expected<SamplingDecision::Origin> parse_sampling_delegation_header(
-    StringView value) {
-  if (value == "delegate") return SamplingDecision::Origin::DELEGATED;
-
-  std::string msg("Unknown trace sampling delegation value: ");
-  msg += std::string{value};
-  return Error{Error::Code::INCONSISTENT_EXTRACTION_STYLES, msg};
-}
-
 // Decode the specified `trace_tags` and integrate them into the specified
 // `result`. If an error occurs, add a `tags::internal::propagation_error` tag
 // to the specified `span_tags` and log a diagnostic using the specified
@@ -142,23 +133,9 @@ Expected<ExtractedData> extract_datadog(
 
   if (auto sampling_delegation_header =
           headers.lookup(DD_SAMPLING_DELEGATION_HEADER)) {
-    auto sampling_delegation =
-        parse_sampling_delegation_header(*sampling_delegation_header);
-    if (auto* error = sampling_delegation.if_error()) {
-      std::string prefix(
-          "Could not extract Datadog-style sampling delegation request from ");
-      append(prefix, DD_SAMPLING_DELEGATION_HEADER);
-      prefix += ": ";
-      append(prefix, *sampling_delegation_header);
-      prefix += " ";
-
-      // NOTE(@dmehala): log the error to be aware it exists.
-      // As mentionned in the RFC in any case sampling delegation should still
-      // be performed.
-      logger.log_error(error->with_prefix(prefix));
-    }
-
     result.delegate_sampling_decision = true;
+    // If the trace sampling decision is being delegated to us, then we don't
+    // interpret the sampling priority (if any) included in the request.
   } else {
     result.delegate_sampling_decision = false;
 
