@@ -49,6 +49,8 @@ class DatadogAgent : public Collector {
   HTTPClient::HeadersSetter telemetry_set_request_headers_;
   HTTPClient::ResponseHandler telemetry_on_response_;
   HTTPClient::ErrorHandler telemetry_on_error_;
+  std::chrono::steady_clock::duration request_timeout_;
+  std::chrono::steady_clock::duration shutdown_timeout_;
 
   void flush();
   void send_heartbeat_and_telemetry();
