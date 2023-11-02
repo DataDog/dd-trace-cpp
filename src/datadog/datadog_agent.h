@@ -40,6 +40,8 @@ class DatadogAgent : public Collector {
   std::shared_ptr<EventScheduler> event_scheduler_;
   EventScheduler::Cancel cancel_scheduled_flush_;
   std::chrono::steady_clock::duration flush_interval_;
+  std::chrono::steady_clock::duration request_timeout_;
+  std::chrono::steady_clock::duration shutdown_timeout_;
 
   void flush();
 

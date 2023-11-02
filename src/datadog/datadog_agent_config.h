@@ -49,6 +49,10 @@ struct DatadogAgentConfig {
   std::string url = "http://localhost:8126";
   // How often, in milliseconds, to send batches of traces to the Datadog Agent.
   int flush_interval_milliseconds = 2000;
+  // TBD
+  int request_timeout_milliseconds = 2000;
+  // TBD
+  int shutdown_timeout_milliseconds = 2000;
 
   static Expected<HTTPClient::URL> parse(StringView);
 };
@@ -64,6 +68,8 @@ class FinalizedDatadogAgentConfig {
   std::shared_ptr<EventScheduler> event_scheduler;
   HTTPClient::URL url;
   std::chrono::steady_clock::duration flush_interval;
+  std::chrono::steady_clock::duration request_timeout;
+  std::chrono::steady_clock::duration shutdown_timeout;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(

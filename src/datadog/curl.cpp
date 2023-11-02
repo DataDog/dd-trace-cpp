@@ -25,8 +25,6 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-constexpr long k_default_timeout_ms = 2000;
-
 // `libcurl` is the default implementation: it calls `curl_*` functions under
 // the hood.
 CurlLibrary libcurl;
@@ -233,9 +231,9 @@ class CurlImpl {
 
   Expected<void> post(const URL &url, HeadersSetter set_headers,
                       std::string body, ResponseHandler on_response,
-                      ErrorHandler on_error);
+                      ErrorHandler on_error, HTTPClient::Timeout timeout);
 
-  void drain();
+  void drain(std::chrono::steady_clock::time_point deadline);
 };
 
 namespace {
@@ -262,11 +260,13 @@ Curl::~Curl() { delete impl_; }
 
 Expected<void> Curl::post(const URL &url, HeadersSetter set_headers,
                           std::string body, ResponseHandler on_response,
-                          ErrorHandler on_error) {
-  return impl_->post(url, set_headers, body, on_response, on_error);
+                          ErrorHandler on_error, Timeout timeout) {
+  return impl_->post(url, set_headers, body, on_response, on_error, timeout);
 }
 
-void Curl::drain() { impl_->drain(); }
+void Curl::drain(std::chrono::steady_clock::time_point deadline) {
+  impl_->drain(deadline);
+}
 
 nlohmann::json Curl::config_json() const {
   return nlohmann::json::object({{"type", "datadog::tracing::Curl"}});
@@ -323,7 +323,8 @@ CurlImpl::~CurlImpl() {
 Expected<void> CurlImpl::post(const HTTPClient::URL &url,
                               HeadersSetter set_headers, std::string body,
                               ResponseHandler on_response,
-                              ErrorHandler on_error) try {
+                              ErrorHandler on_error,
+                              HTTPClient::Timeout timeout) try {
   if (multi_handle_ == nullptr) {
     return Error{Error::CURL_HTTP_CLIENT_NOT_RUNNING,
                  "Unable to send request via libcurl because the HTTP client "
@@ -368,7 +369,7 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   throw_on_error(curl_.easy_setopt_headerdata(handle.get(), request.get()));
   throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
   throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
-  throw_on_error(curl_.easy_setopt_timeout(handle.get(), k_default_timeout_ms));
+  throw_on_error(curl_.easy_setopt_timeout(handle.get(), timeout.count()));
   if (url.scheme == "unix" || url.scheme == "http+unix" ||
       url.scheme == "https+unix") {
     throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
@@ -400,9 +401,9 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   return Error{Error::CURL_REQUEST_SETUP_FAILED, curl_.easy_strerror(error)};
 }
 
-void CurlImpl::drain() {
+void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
   std::unique_lock<std::mutex> lock(mutex_);
-  no_requests_.wait(lock, [this]() {
+  no_requests_.wait_until(lock, deadline, [this]() {
     return num_active_handles_ == 0 && new_handles_.empty();
   });
 }

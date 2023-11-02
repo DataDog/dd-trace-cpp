@@ -114,6 +114,22 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.flush_interval =
       std::chrono::milliseconds(config.flush_interval_milliseconds);
 
+  if (config.request_timeout_milliseconds <= 0) {
+    return Error{Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL,
+                 "DatadogAgent: Request timeout must be a positive number of "
+                 "milliseconds."};
+  }
+  result.request_timeout =
+      std::chrono::milliseconds(config.request_timeout_milliseconds);
+
+  if (config.shutdown_timeout_milliseconds <= 0) {
+    return Error{Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL,
+                 "DatadogAgent: Shutdown timeout must be a positive number of "
+                 "milliseconds."};
+  }
+  result.shutdown_timeout =
+      std::chrono::milliseconds(config.shutdown_timeout_milliseconds);
+
   auto env_host = lookup(environment::DD_AGENT_HOST);
   auto env_port = lookup(environment::DD_TRACE_AGENT_PORT);
 

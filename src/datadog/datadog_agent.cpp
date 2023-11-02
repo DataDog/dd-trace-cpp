@@ -139,9 +139,10 @@ DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
 }
 
 DatadogAgent::~DatadogAgent() {
+  const auto deadline = clock_().tick + shutdown_timeout_;
   cancel_scheduled_flush_();
   flush();
-  http_client_->drain();
+  http_client_->drain(deadline);
 }
 
 Expected<void> DatadogAgent::send(
@@ -256,7 +257,7 @@ void DatadogAgent::flush() {
 
   auto post_result = http_client_->post(
       traces_endpoint_, std::move(set_request_headers), std::move(body),
-      std::move(on_response), std::move(on_error));
+      std::move(on_response), std::move(on_error), request_timeout_);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(*error);
   }

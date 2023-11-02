@@ -96,9 +96,9 @@ class Curl : public HTTPClient {
 
   Expected<void> post(const URL &url, HeadersSetter set_headers,
                       std::string body, ResponseHandler on_response,
-                      ErrorHandler on_error) override;
+                      ErrorHandler on_error, Timeout timeout) override;
 
-  void drain() override;
+  void drain(std::chrono::steady_clock::time_point deadline) override;
 
   nlohmann::json config_json() const override;
 };
