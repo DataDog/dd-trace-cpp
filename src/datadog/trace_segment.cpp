@@ -333,9 +333,22 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
 
   // If `options.delegate_sampling_decision` is null, then pick a default based
   // on our sampling delegation configuration and state.
-  const bool delegation_requested = options.delegate_sampling_decision.value_or(
+  bool delegate_sampling = options.delegate_sampling_decision.value_or(
       sampling_delegation_.enabled &&
       !sampling_delegation_.sent_request_header);
+  // Also, even if the caller requested sampling delegation, do _not_ perform
+  // sampling delegation if we previously extracted a sampling decision for
+  // which delegation was not requested.
+  // That is, don't let our desire to delegate sampling result in overriding a
+  // sampling decision made earlier in the trace.
+  {
+    std::lock_guard<std::mutex> lock{mutex_};
+    if (sampling_decision_ &&
+        sampling_decision_->origin == SamplingDecision::Origin::EXTRACTED &&
+        !sampling_delegation_.decision_was_delegated_to_me) {
+      delegate_sampling = false;
+    }
+  }
 
   bool delegated_trace_sampling_decision = false;
 
@@ -363,7 +376,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
         }
-        if (delegation_requested) {
+        if (delegate_sampling) {
           delegated_trace_sampling_decision = true;
           sampling_delegation_.sent_request_header = true;
           writer.set("x-datadog-delegate-trace-sampling", "delegate");

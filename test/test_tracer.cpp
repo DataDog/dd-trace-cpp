@@ -1424,3 +1424,166 @@ TEST_CASE("_dd.is_sampling_decider") {
     }
   }
 }
+
+TEST_CASE("sampling delegation is not an override") {
+  // Verify that sampling delegation does not occur, even if so configured,
+  // when a sampling decision is extracted from an incoming request _and_
+  // sampling delegation was not indicated in that request.
+  // We want to make sure that a mid-trace tracer configured to delegate
+  // sampling does not "break the trace," i.e. change the sampling decision
+  // mid-trace.
+  //
+  // This test involves three tracers: "service1", "service2", and "service3".
+  // Each calls the next, and each produces one span: "local_root".
+  //
+  //     [service1]         -> [service2]  ->   [service3]
+  //     keep/drop/neither                       keep/drop
+  //     delegate?              delegate
+  //
+
+  // There are three variables:
+  //
+  // 1. the injected sampling decision from service1, if any,
+  // 2. the configured sampling decision for service3,
+  // 3. whether service1 is configured to delegate.
+  //
+  // When service1 is configured to delegate, the sampling decision of all
+  // three services should be consistent with that made by service3.
+  //
+  // When service1 is configured _not_ to delegate, and when it injects a
+  // sampling decision, then the sampling decision of all three services should
+  // be consistent with that made by service1.
+  //
+  // When service1 is configured _not_ to delegate, and when it does _not_
+  // inject a sampling decision, then the sampling decision of all three
+  // services should be consistent with that made by service3.
+  //
+  // The idea is that service2 does not perform delegation when service1 already
+  // made a decision and did not request delegation.
+  auto service1_sampling_priority =
+      GENERATE(values<Optional<int>>({nullopt, -1, 0, 1, 2}));
+  auto service1_delegate = GENERATE(true, false);
+  auto service3_sample_rate = GENERATE(0.0, 1.0);
+
+  int expected_sampling_priority;
+  if (service1_sampling_priority.has_value() && !service1_delegate) {
+    // Service1 made a decision and didn't ask for delegation, so that's the
+    // decision.
+    expected_sampling_priority = *service1_sampling_priority;
+  } else {
+    // Service1 either didn't make a decision or did request delegation, so the
+    // decision will be delegated through service2 to service3, whose decision
+    // depends on its configured sample rate.
+    expected_sampling_priority = service3_sample_rate == 0.0 ? -1 : 2;
+  }
+
+  CAPTURE(service1_sampling_priority);
+  CAPTURE(service1_delegate);
+  CAPTURE(service3_sample_rate);
+  CAPTURE(expected_sampling_priority);
+
+  const auto collector = std::make_shared<MockCollector>();
+  const auto logger = std::make_shared<MockLogger>();
+  const std::vector<PropagationStyle> styles = {PropagationStyle::DATADOG};
+
+  TracerConfig config1;
+  config1.collector = collector;
+  config1.logger = logger;
+  config1.extraction_styles = config1.injection_styles = styles;
+  config1.defaults.service = "service1";
+  config1.enable_sampling_delegation = service1_delegate;
+  config1.trace_sampler.sample_rate = 1.0;  // as a default
+  // `service1_sampling_priority` will be dealt with when service1 injects trace
+  // context.
+
+  TracerConfig config2;
+  config2.collector = collector;
+  config2.logger = logger;
+  config2.extraction_styles = config1.injection_styles = styles;
+  config2.defaults.service = "service2";
+  config2.enable_sampling_delegation = true;
+
+  TracerConfig config3;
+  config3.collector = collector;
+  config3.logger = logger;
+  config3.extraction_styles = config1.injection_styles = styles;
+  config3.defaults.service = "service3";
+  config3.trace_sampler.sample_rate = service3_sample_rate;
+
+  auto valid_config = finalize_config(config1);
+  REQUIRE(valid_config);
+  Tracer tracer1{*valid_config};
+
+  valid_config = finalize_config(config2);
+  REQUIRE(valid_config);
+  Tracer tracer2{*valid_config};
+
+  valid_config = finalize_config(config3);
+  Tracer tracer3{*valid_config};
+
+  // The spans will communicate forwards using the propagation writer and
+  // reader (trace context propagation).
+  MockDictWriter propagation_writer;
+  MockDictReader propagation_reader{propagation_writer.items};
+
+  // The spans will communicate backwards using the delegation writer and reader
+  // (delegation responses).
+  MockDictWriter delegation_writer;
+  MockDictReader delegation_reader{delegation_writer.items};
+
+  {
+    SpanConfig span_config;
+    span_config.name = "local_root";
+    Span span1 = tracer1.create_span(span_config);
+    span1.inject(propagation_writer);
+    if (service1_sampling_priority.has_value()) {
+      propagation_writer.items["x-datadog-sampling-priority"] =
+          std::to_string(*service1_sampling_priority);
+    } else {
+      propagation_writer.items.erase("x-datadog-sampling-priority");
+    }
+
+    {
+      auto span2 = tracer2.extract_span(propagation_reader, span_config);
+      REQUIRE(span2);
+      propagation_writer.items.clear();
+      span2->inject(propagation_writer);
+
+      {
+        auto span3 = tracer3.extract_span(propagation_reader, span_config);
+        REQUIRE(span3);
+        span3->trace_segment().write_sampling_delegation_response(
+            delegation_writer);
+      }
+
+      span2->trace_segment().read_sampling_delegation_response(
+          delegation_reader);
+      delegation_writer.items.clear();
+      span2->trace_segment().write_sampling_delegation_response(
+          delegation_writer);
+    }
+
+    span1.trace_segment().read_sampling_delegation_response(delegation_reader);
+  }
+
+  // Verify that we received three spans, and that they have the expected
+  // sampling priorities.
+  REQUIRE(collector->span_count() == 3);
+  for (const auto& chunk : collector->chunks) {
+    for (const auto& span_ptr : chunk) {
+      REQUIRE(span_ptr);
+      const SpanData& span = *span_ptr;
+      CAPTURE(span.service);
+      REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) == 1);
+      // If `service1_delegate` is false, then service1's sampling decision was
+      // made by the service1's sampler, which will result in priority 2.
+      // Otherwise, it's the same priority expected for the other spans.
+      if (span.service == "service1" && !service1_delegate) {
+        REQUIRE(span.numeric_tags.at(tags::internal::sampling_priority) == 2);
+      } else {
+        REQUIRE(span.numeric_tags.at(tags::internal::sampling_priority) ==
+                expected_sampling_priority);
+      }
+    }
+  }
+}

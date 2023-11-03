@@ -71,7 +71,7 @@ class TraceSegment {
   Optional<SamplingDecision> sampling_decision_;
   Optional<std::string> additional_w3c_tracestate_;
   Optional<std::string> additional_datadog_w3c_tracestate_;
-  // TODO: Revisit intended concurrency guarantees, i.e. `std::atomic`s below.
+  // TODO: Protect these with `mutex_` rather than using atomics.
   struct SamplingDelegation {
     // This segment is configured to delegate its sampling decision.
     bool enabled;
