@@ -40,7 +40,7 @@ struct SpanDefaults;
 
 class TracerTelemetry {
   bool enabled_ = false;
-  bool debug_ = false;
+  bool debug_ = true;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<const SpanDefaults> span_defaults_;
@@ -108,7 +108,7 @@ class TracerTelemetry {
   auto& metrics() { return metrics_; };
   // Constructs an `app-started` message using information provided when
   // constructed and the tracer_config value passed in.
-  std::string app_started(nlohmann::json&& tracer_config);
+  std::string app_started();
   // This is used to take a snapshot of the current state of metrics and collect
   // timestamped "points" of values. These values are later submitted in
   // `generate-metrics` messages.

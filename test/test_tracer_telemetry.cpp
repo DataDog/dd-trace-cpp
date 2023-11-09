@@ -28,7 +28,7 @@ TEST_CASE("Tracer telemetry") {
 
   SECTION("generates app-started message") {
     auto app_started_message =
-        tracer_telemetry.app_started(nlohmann::json::object());
+        tracer_telemetry.app_started();
     auto app_started = nlohmann::json::parse(app_started_message);
     REQUIRE(app_started["request_type"] == "app-started");
   }
