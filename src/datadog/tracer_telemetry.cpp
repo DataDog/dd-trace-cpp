@@ -80,20 +80,13 @@ nlohmann::json TracerTelemetry::generate_telemetry_body(
   });
 }
 
-std::string TracerTelemetry::app_started(nlohmann::json&& tracer_config) {
+std::string TracerTelemetry::app_started() {
   auto telemetry_body = generate_telemetry_body("app-started");
   // TODO: environment variables or finalized config details
   telemetry_body["payload"] = nlohmann::json::object({
       {"configuration", nlohmann::json::array({})},
 
   });
-  // TODO: Until we figure out "configuration", above, include a
-  // JSON dump of the tracer configuration as "additional_payload".
-  telemetry_body["additional_payload"] =
-      nlohmann::json::array({nlohmann::json::object({
-          {"name", "tracer_config_json"},
-          {"value", tracer_config.dump()},
-      })});
   auto app_started_payload = telemetry_body.dump();
   return app_started_payload;
 }

@@ -333,8 +333,8 @@ void DatadogAgent::flush() {
   }
 }
 
-void DatadogAgent::send_app_started(nlohmann::json&& tracer_config) {
-  auto payload = tracer_telemetry_->app_started(std::move(tracer_config));
+void DatadogAgent::send_app_started() {
+  auto payload = tracer_telemetry_->app_started();
   auto post_result = http_client_->post(
       telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
       telemetry_on_response_, telemetry_on_error_);
