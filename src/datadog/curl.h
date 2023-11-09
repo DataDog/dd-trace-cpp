@@ -17,6 +17,7 @@
 #include <string>
 #include <thread>
 
+#include "clock.h"
 #include "http_client.h"
 #include "json_fwd.hpp"
 
@@ -59,7 +60,7 @@ class CurlLibrary {
   virtual CURLcode easy_setopt_url(CURL *handle, const char *url);
   virtual CURLcode easy_setopt_writedata(CURL *handle, void *data);
   virtual CURLcode easy_setopt_writefunction(CURL *handle, WriteCallback);
-  virtual CURLcode easy_setopt_timeout(CURL *handle, long timeout_ms);
+  virtual CURLcode easy_setopt_timeout_ms(CURL *handle, long timeout_ms);
   virtual const char *easy_strerror(CURLcode error);
   virtual void global_cleanup();
   virtual CURLcode global_init(long flags);
@@ -87,16 +88,18 @@ class Curl : public HTTPClient {
  public:
   using ThreadGenerator = std::function<std::thread(std::function<void()> &&)>;
 
-  explicit Curl(const std::shared_ptr<Logger> &);
-  Curl(const std::shared_ptr<Logger> &, CurlLibrary &);
-  Curl(const std::shared_ptr<Logger> &, CurlLibrary &, const ThreadGenerator &);
+  explicit Curl(const std::shared_ptr<Logger> &, const Clock &);
+  Curl(const std::shared_ptr<Logger> &, const Clock &, CurlLibrary &);
+  Curl(const std::shared_ptr<Logger> &, const Clock &, CurlLibrary &,
+       const ThreadGenerator &);
   ~Curl();
 
   Curl(const Curl &) = delete;
 
   Expected<void> post(const URL &url, HeadersSetter set_headers,
                       std::string body, ResponseHandler on_response,
-                      ErrorHandler on_error, Deadline deadline) override;
+                      ErrorHandler on_error,
+                      std::chrono::steady_clock::time_point deadline) override;
 
   void drain(std::chrono::steady_clock::time_point deadline) override;
 

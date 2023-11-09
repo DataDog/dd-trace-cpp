@@ -71,7 +71,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
     return CURLE_OK;
   }
 
-  CURLcode easy_setopt_timeout(CURL *, long) override {
+  CURLcode easy_setopt_timeout_ms(CURL *, long) override {
     // TBD?
     return CURLE_OK;
   }
@@ -141,7 +141,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
 TEST_CASE("parse response headers and body", "[curl]") {
   const auto logger = std::make_shared<MockLogger>();
   SingleRequestMockCurlLibrary library;
-  const auto client = std::make_shared<Curl>(logger, library);
+  const auto client = std::make_shared<Curl>(logger, default_clock, library);
 
   SECTION("in the tracer") {
     // The tracer doesn't read response headers, at least as of this writing.
@@ -210,15 +210,15 @@ TEST_CASE("bad multi-handle means error mode", "[curl]") {
 
   const auto logger = std::make_shared<MockLogger>();
   MockCurlLibrary library;
-  const auto client = std::make_shared<Curl>(logger, library);
+  const auto client = std::make_shared<Curl>(logger, default_clock, library);
   REQUIRE(logger->first_error().code == Error::CURL_HTTP_CLIENT_SETUP_FAILED);
 
   const auto ignore = [](auto &&...) {};
   const HTTPClient::URL url = {"http", "whatever", ""};
-  const auto dummy_timeout =
+  const auto dummy_deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(10);
   const auto result =
-      client->post(url, ignore, "dummy body", ignore, ignore, dummy_timeout);
+      client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
   REQUIRE_FALSE(result);
   REQUIRE(result.error().code == Error::CURL_HTTP_CLIENT_NOT_RUNNING);
 }
@@ -228,19 +228,19 @@ TEST_CASE("bad std::thread means error mode", "[curl]") {
   // where calls to `post` always return an error.
   const auto logger = std::make_shared<MockLogger>();
   CurlLibrary libcurl;  // the default implementation
-  const auto client =
-      std::make_shared<Curl>(logger, libcurl, [](auto &&) -> std::thread {
+  const auto client = std::make_shared<Curl>(
+      logger, default_clock, libcurl, [](auto &&) -> std::thread {
         throw std::system_error(
             std::make_error_code(std::errc::resource_unavailable_try_again));
       });
   REQUIRE(logger->first_error().code == Error::CURL_HTTP_CLIENT_SETUP_FAILED);
 
   const auto ignore = [](auto &&...) {};
-  const auto dummy_timeout =
+  const auto dummy_deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(10);
   const HTTPClient::URL url = {"http", "whatever", ""};
   const auto result =
-      client->post(url, ignore, "dummy body", ignore, ignore, dummy_timeout);
+      client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
   REQUIRE_FALSE(result);
   REQUIRE(result.error().code == Error::CURL_HTTP_CLIENT_NOT_RUNNING);
 }
@@ -255,14 +255,14 @@ TEST_CASE("fail to allocate request handle", "[curl]") {
 
   const auto logger = std::make_shared<NullLogger>();
   MockCurlLibrary library;
-  const auto client = std::make_shared<Curl>(logger, library);
+  const auto client = std::make_shared<Curl>(logger, default_clock, library);
 
   const auto ignore = [](auto &&...) {};
   const HTTPClient::URL url = {"http", "whatever", ""};
-  const auto dummy_timeout =
+  const auto dummy_deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(10);
   const auto result =
-      client->post(url, ignore, "dummy body", ignore, ignore, dummy_timeout);
+      client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
   REQUIRE_FALSE(result);
   REQUIRE(result.error().code == Error::CURL_REQUEST_SETUP_FAILED);
 }
@@ -373,7 +373,7 @@ TEST_CASE("setopt failures", "[curl]") {
   library.fail = which_fails;
 
   const auto logger = std::make_shared<NullLogger>();
-  const auto client = std::make_shared<Curl>(logger, library);
+  const auto client = std::make_shared<Curl>(logger, default_clock, library);
 
   const auto ignore = [](auto &&...) {};
   HTTPClient::URL url;
@@ -386,10 +386,10 @@ TEST_CASE("setopt failures", "[curl]") {
     url.path = "/trace/thing";
   }
 
-  const auto dummy_timeout =
+  const auto dummy_deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(10);
   const auto result =
-      client->post(url, ignore, "dummy body", ignore, ignore, dummy_timeout);
+      client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
   REQUIRE_FALSE(result);
   REQUIRE(result.error().code == Error::CURL_REQUEST_SETUP_FAILED);
 }
@@ -397,13 +397,13 @@ TEST_CASE("setopt failures", "[curl]") {
 TEST_CASE("handles are always cleaned up", "[curl]") {
   const auto logger = std::make_shared<MockLogger>();
   SingleRequestMockCurlLibrary library;
-  auto client = std::make_shared<Curl>(logger, library);
+  auto client = std::make_shared<Curl>(logger, default_clock, library);
 
   SECTION("when the response is delivered") {
     Optional<Error> post_error;
     std::exception_ptr exception;
     const HTTPClient::URL url = {"http", "whatever", ""};
-    const auto dummy_timeout =
+    const auto dummy_deadline =
         std::chrono::steady_clock::now() + std::chrono::seconds(10);
     const auto result = client->post(
         url, [](const auto &) {}, "whatever",
@@ -416,7 +416,7 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
             exception = std::current_exception();
           }
         },
-        [&](const Error &error) { post_error = error; }, dummy_timeout);
+        [&](const Error &error) { post_error = error; }, dummy_deadline);
 
     REQUIRE(result);
     client->drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
@@ -430,12 +430,12 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
     Optional<Error> post_error;
     const HTTPClient::URL url = {"http", "whatever", ""};
     const auto ignore = [](auto &&...) {};
-    const auto dummy_timeout =
+    const auto dummy_deadline =
         std::chrono::steady_clock::now() + std::chrono::seconds(10);
     library.message_result_ = CURLE_COULDNT_CONNECT;  // any error would do
     const auto result = client->post(
         url, ignore, "whatever", ignore,
-        [&](const Error &error) { post_error = error; }, dummy_timeout);
+        [&](const Error &error) { post_error = error; }, dummy_deadline);
 
     REQUIRE(result);
     client->drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
@@ -445,11 +445,11 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
   SECTION("when we shut down while a request is in flight") {
     const HTTPClient::URL url = {"http", "whatever", ""};
     const auto ignore = [](auto &&...) {};
-    const auto dummy_timeout =
+    const auto dummy_deadline =
         std::chrono::steady_clock::now() + std::chrono::seconds(10);
     library.delay_message_ = true;
     const auto result =
-        client->post(url, ignore, "whatever", ignore, ignore, dummy_timeout);
+        client->post(url, ignore, "whatever", ignore, ignore, dummy_deadline);
 
     REQUIRE(result);
     // Destroy the `Curl` object.
@@ -461,5 +461,24 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
   REQUIRE(library.created_handles_ == library.destroyed_handles_);
 }
 
-// TODO: "multi_*" failures
-// TODO: "getinfo" failures
+TEST_CASE("post() deadline exceeded before request start", "[curl]") {
+  Curl client{std::make_shared<NullLogger>(), default_clock};
+
+  const auto ignore = [](auto &&...) {};
+  const HTTPClient::URL url = {"http", "whatever", ""};
+  const std::string body;
+  const auto deadline =
+      std::chrono::steady_clock::now() - std::chrono::milliseconds(1);
+  Optional<Error> error_delivered;
+
+  const auto result = client.post(
+      url, ignore, body, ignore, [&](Error error) { error_delivered = error; },
+      deadline);
+  REQUIRE(result);
+
+  client.drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
+
+  REQUIRE(error_delivered);
+  REQUIRE(error_delivered->code ==
+          Error::CURL_DEADLINE_EXCEEDED_BEFORE_REQUEST_START);
+}

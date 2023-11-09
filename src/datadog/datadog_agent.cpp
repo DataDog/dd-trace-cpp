@@ -125,9 +125,8 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 }  // namespace
 
 DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
-                           const Clock& clock,
                            const std::shared_ptr<Logger>& logger)
-    : clock_(clock),
+    : clock_(config.clock),
       logger_(logger),
       traces_endpoint_(traces_endpoint(config.url)),
       http_client_(config.http_client),

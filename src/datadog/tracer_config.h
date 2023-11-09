@@ -9,6 +9,7 @@
 #include <variant>
 #include <vector>
 
+#include "clock.h"
 #include "datadog_agent_config.h"
 #include "error.h"
 #include "expected.h"
@@ -108,7 +109,7 @@ struct TracerConfig {
 // `FinalizedTracerConfig` must be obtained by calling `finalize_config`.
 class FinalizedTracerConfig {
   friend Expected<FinalizedTracerConfig> finalize_config(
-      const TracerConfig& config);
+      const TracerConfig& config, const Clock& clock);
   FinalizedTracerConfig() = default;
 
  public:
@@ -129,12 +130,19 @@ class FinalizedTracerConfig {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
+
+  Clock clock;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
 // relevant environment variables.  If any configuration is invalid, return an
 // `Error`.
+// Optionally specify a `clock` used to calculate span start times, span
+// durations, and timeouts.  If `clock` is not specified, then `default_clock`
+// is used.
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config);
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config,
+                                                const Clock& clock);
 
 }  // namespace tracing
 }  // namespace datadog

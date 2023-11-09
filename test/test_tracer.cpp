@@ -1034,9 +1034,9 @@ TEST_CASE("128-bit trace IDs") {
   config.extraction_styles.push_back(PropagationStyle::W3C);
   config.extraction_styles.push_back(PropagationStyle::DATADOG);
   config.extraction_styles.push_back(PropagationStyle::B3);
-  const auto finalized = finalize_config(config);
+  const auto finalized = finalize_config(config, clock);
   REQUIRE(finalized);
-  Tracer tracer{*finalized, clock};
+  Tracer tracer{*finalized};
   TraceID trace_id;  // used below the following SECTIONs
 
   SECTION("are generated") {

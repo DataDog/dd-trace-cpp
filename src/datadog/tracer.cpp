@@ -200,26 +200,18 @@ Expected<ExtractedData> extract_b3(
 }  // namespace
 
 Tracer::Tracer(const FinalizedTracerConfig& config)
-    : Tracer(config, default_id_generator(config.trace_id_128_bit),
-             default_clock) {}
+    : Tracer(config, default_id_generator(config.trace_id_128_bit)) {}
 
 Tracer::Tracer(const FinalizedTracerConfig& config,
                const std::shared_ptr<const IDGenerator>& generator)
-    : Tracer(config, generator, default_clock) {}
-
-Tracer::Tracer(const FinalizedTracerConfig& config, const Clock& clock)
-    : Tracer(config, default_id_generator(config.trace_id_128_bit), clock) {}
-
-Tracer::Tracer(const FinalizedTracerConfig& config,
-               const std::shared_ptr<const IDGenerator>& generator,
-               const Clock& clock)
     : logger_(config.logger),
       collector_(/* see constructor body */),
       trace_sampler_(
-          std::make_shared<TraceSampler>(config.trace_sampler, clock)),
-      span_sampler_(std::make_shared<SpanSampler>(config.span_sampler, clock)),
+          std::make_shared<TraceSampler>(config.trace_sampler, config.clock)),
+      span_sampler_(
+          std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
       generator_(generator),
-      clock_(clock),
+      clock_(config.clock),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
@@ -231,8 +223,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   } else {
     auto& agent_config =
         std::get<FinalizedDatadogAgentConfig>(config.collector);
-    collector_ =
-        std::make_shared<DatadogAgent>(agent_config, clock, config.logger);
+    collector_ = std::make_shared<DatadogAgent>(agent_config, config.logger);
   }
 
   if (config.log_on_startup) {

@@ -46,7 +46,7 @@ class DatadogAgent : public Collector {
   void flush();
 
  public:
-  DatadogAgent(const FinalizedDatadogAgentConfig&, const Clock& clock,
+  DatadogAgent(const FinalizedDatadogAgentConfig&,
                const std::shared_ptr<Logger>&);
   ~DatadogAgent();
 

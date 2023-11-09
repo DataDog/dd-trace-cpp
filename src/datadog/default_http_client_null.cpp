@@ -9,8 +9,8 @@
 namespace datadog {
 namespace tracing {
 
-std::shared_ptr<HTTPClient> default_http_client(
-    const std::shared_ptr<Logger>&) {
+std::shared_ptr<HTTPClient> default_http_client(const std::shared_ptr<Logger> &,
+                                                const Clock &) {
   return nullptr;
 }
 
