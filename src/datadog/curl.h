@@ -96,7 +96,7 @@ class Curl : public HTTPClient {
 
   Expected<void> post(const URL &url, HeadersSetter set_headers,
                       std::string body, ResponseHandler on_response,
-                      ErrorHandler on_error, Timeout timeout) override;
+                      ErrorHandler on_error, Deadline deadline) override;
 
   void drain(std::chrono::steady_clock::time_point deadline) override;
 

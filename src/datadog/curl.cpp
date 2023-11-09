@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "clock.h"
 #include "dict_reader.h"
 #include "dict_writer.h"
 #include "http_client.h"
@@ -173,6 +174,7 @@ class CurlImpl {
   int num_active_handles_;
   std::condition_variable no_requests_;
   std::thread event_loop_;
+  Clock clock_;
 
   struct Request {
     CurlLibrary *curl = nullptr;
@@ -183,6 +185,7 @@ class CurlImpl {
     char error_buffer[CURL_ERROR_SIZE] = "";
     std::unordered_map<std::string, std::string> response_headers_lower;
     std::string response_body;
+    HTTPClient::Deadline deadline;
 
     ~Request();
   };
@@ -231,7 +234,7 @@ class CurlImpl {
 
   Expected<void> post(const URL &url, HeadersSetter set_headers,
                       std::string body, ResponseHandler on_response,
-                      ErrorHandler on_error, HTTPClient::Timeout timeout);
+                      ErrorHandler on_error, HTTPClient::Deadline deadline);
 
   void drain(std::chrono::steady_clock::time_point deadline);
 };
@@ -260,8 +263,8 @@ Curl::~Curl() { delete impl_; }
 
 Expected<void> Curl::post(const URL &url, HeadersSetter set_headers,
                           std::string body, ResponseHandler on_response,
-                          ErrorHandler on_error, Timeout timeout) {
-  return impl_->post(url, set_headers, body, on_response, on_error, timeout);
+                          ErrorHandler on_error, Deadline deadline) {
+  return impl_->post(url, set_headers, body, on_response, on_error, deadline);
 }
 
 void Curl::drain(std::chrono::steady_clock::time_point deadline) {
@@ -324,7 +327,7 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
                               HeadersSetter set_headers, std::string body,
                               ResponseHandler on_response,
                               ErrorHandler on_error,
-                              HTTPClient::Timeout timeout) try {
+                              HTTPClient::Deadline deadline) try {
   if (multi_handle_ == nullptr) {
     return Error{Error::CURL_HTTP_CLIENT_NOT_RUNNING,
                  "Unable to send request via libcurl because the HTTP client "
@@ -344,6 +347,7 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   request->request_body = std::move(body);
   request->on_response = std::move(on_response);
   request->on_error = std::move(on_error);
+  request->deadline = std::move(deadline);
 
   auto cleanup_handle = [&](auto handle) { curl_.easy_cleanup(handle); };
   std::unique_ptr<CURL, decltype(cleanup_handle)> handle{
@@ -369,7 +373,6 @@ Expected<void> CurlImpl::post(const HTTPClient::URL &url,
   throw_on_error(curl_.easy_setopt_headerdata(handle.get(), request.get()));
   throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
   throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
-  throw_on_error(curl_.easy_setopt_timeout(handle.get(), timeout.count()));
   if (url.scheme == "unix" || url.scheme == "http+unix" ||
       url.scheme == "https+unix") {
     throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
@@ -496,7 +499,30 @@ void CurlImpl::run() {
 
     // New requests might have been added while we were sleeping.
     for (; !new_handles_.empty(); new_handles_.pop_front()) {
-      CURL *const handle = new_handles_.front();
+      CURL *handle = new_handles_.front();
+      char *user_data;
+      if (log_on_error(curl_.easy_getinfo_private(handle, &user_data)) !=
+          CURLE_OK) {
+        curl_.easy_cleanup(handle);
+        continue;
+      }
+
+      auto *request = reinterpret_cast<Request *>(user_data);
+      const auto timeout = request->deadline - clock_().tick;
+      if (timeout <= HTTPClient::Deadline::duration::zero()) {
+        request->on_error(
+            Error{Error::CURL_REQUEST_FAILURE,
+                  "Request not processed as the deadline has been reached."});
+
+        curl_.easy_cleanup(handle);
+        delete request;
+
+        continue;
+      }
+
+      throw_on_error(curl_.easy_setopt_timeout(
+          handle, std::chrono::duration_cast<std::chrono::milliseconds>(timeout)
+                      .count()));
       log_on_error(curl_.multi_add_handle(multi_handle_, handle));
       request_handles_.insert(handle);
     }

@@ -36,7 +36,7 @@ class HTTPClient {
   // `ErrorHandler` is for errors encountered by `HTTPClient`, not for
   // error-indicating HTTP responses.
   using ErrorHandler = std::function<void(Error)>;
-  using Timeout = std::chrono::steady_clock::duration;
+  using Deadline = std::chrono::steady_clock::time_point;
 
   // Send a POST request to the specified `url`.  Set request headers by calling
   // the specified `set_headers` callback.  Include the specified `body` at the
@@ -48,11 +48,11 @@ class HTTPClient {
   // either of `on_response` or `on_error` throws an exception.
   virtual Expected<void> post(const URL& url, HeadersSetter set_headers,
                               std::string body, ResponseHandler on_response,
-                              ErrorHandler on_error, Timeout timeout) = 0;
+                              ErrorHandler on_error, Deadline deadline) = 0;
 
   // Wait until there are no more outstanding requests, or until the specified
   // `deadline`.
-  virtual void drain(std::chrono::steady_clock::time_point deadline) = 0;
+  virtual void drain(Deadline deadline) = 0;
 
   // Return a JSON representation of this object's configuration. The JSON
   // representation is an object with the following properties:

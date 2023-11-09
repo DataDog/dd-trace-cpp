@@ -193,7 +193,7 @@ TEST_CASE("parse response headers and body", "[curl]") {
           }
         },
         [&](const Error &error) { post_error = error; },
-        std::chrono::seconds(0));
+        std::chrono::steady_clock::now() + std::chrono::seconds(10));
 
     REQUIRE(result);
     client->drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
@@ -218,9 +218,10 @@ TEST_CASE("bad multi-handle means error mode", "[curl]") {
 
   const auto ignore = [](auto &&...) {};
   const HTTPClient::URL url = {"http", "whatever", ""};
-  const auto ignore_timeout = std::chrono::seconds(10);
+  const auto dummy_timeout =
+      std::chrono::steady_clock::now() + std::chrono::seconds(10);
   const auto result =
-      client->post(url, ignore, "dummy body", ignore, ignore, ignore_timeout);
+      client->post(url, ignore, "dummy body", ignore, ignore, dummy_timeout);
   REQUIRE_FALSE(result);
   REQUIRE(result.error().code == Error::CURL_HTTP_CLIENT_NOT_RUNNING);
 }
@@ -238,10 +239,11 @@ TEST_CASE("bad std::thread means error mode", "[curl]") {
   REQUIRE(logger->first_error().code == Error::CURL_HTTP_CLIENT_SETUP_FAILED);
 
   const auto ignore = [](auto &&...) {};
-  const auto ignore_timeout = std::chrono::seconds(10);
+  const auto dummy_timeout =
+      std::chrono::steady_clock::now() + std::chrono::seconds(10);
   const HTTPClient::URL url = {"http", "whatever", ""};
   const auto result =
-      client->post(url, ignore, "dummy body", ignore, ignore, ignore_timeout);
+      client->post(url, ignore, "dummy body", ignore, ignore, dummy_timeout);
   REQUIRE_FALSE(result);
   REQUIRE(result.error().code == Error::CURL_HTTP_CLIENT_NOT_RUNNING);
 }
@@ -260,9 +262,10 @@ TEST_CASE("fail to allocate request handle", "[curl]") {
 
   const auto ignore = [](auto &&...) {};
   const HTTPClient::URL url = {"http", "whatever", ""};
-  const auto ignore_timeout = std::chrono::seconds(10);
+  const auto dummy_timeout =
+      std::chrono::steady_clock::now() + std::chrono::seconds(10);
   const auto result =
-      client->post(url, ignore, "dummy body", ignore, ignore, ignore_timeout);
+      client->post(url, ignore, "dummy body", ignore, ignore, dummy_timeout);
   REQUIRE_FALSE(result);
   REQUIRE(result.error().code == Error::CURL_REQUEST_SETUP_FAILED);
 }
@@ -386,9 +389,10 @@ TEST_CASE("setopt failures", "[curl]") {
     url.path = "/trace/thing";
   }
 
-  const auto ignore_timeout = std::chrono::seconds(0);
+  const auto dummy_timeout =
+      std::chrono::steady_clock::now() + std::chrono::seconds(10);
   const auto result =
-      client->post(url, ignore, "dummy body", ignore, ignore, ignore_timeout);
+      client->post(url, ignore, "dummy body", ignore, ignore, dummy_timeout);
   REQUIRE_FALSE(result);
   REQUIRE(result.error().code == Error::CURL_REQUEST_SETUP_FAILED);
 }
@@ -402,7 +406,8 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
     Optional<Error> post_error;
     std::exception_ptr exception;
     const HTTPClient::URL url = {"http", "whatever", ""};
-    const auto ignore_timeout = std::chrono::seconds(10);
+    const auto dummy_timeout =
+        std::chrono::steady_clock::now() + std::chrono::seconds(10);
     const auto result = client->post(
         url, [](const auto &) {}, "whatever",
         [&](int status, const DictReader & /*headers*/, std::string body) {
@@ -414,7 +419,7 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
             exception = std::current_exception();
           }
         },
-        [&](const Error &error) { post_error = error; }, ignore_timeout);
+        [&](const Error &error) { post_error = error; }, dummy_timeout);
 
     REQUIRE(result);
     client->drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
@@ -428,11 +433,12 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
     Optional<Error> post_error;
     const HTTPClient::URL url = {"http", "whatever", ""};
     const auto ignore = [](auto &&...) {};
-    const auto ignore_timeout = std::chrono::seconds(10);
+    const auto dummy_timeout =
+        std::chrono::steady_clock::now() + std::chrono::seconds(10);
     library.message_result_ = CURLE_COULDNT_CONNECT;  // any error would do
     const auto result = client->post(
         url, ignore, "whatever", ignore,
-        [&](const Error &error) { post_error = error; }, ignore_timeout);
+        [&](const Error &error) { post_error = error; }, dummy_timeout);
 
     REQUIRE(result);
     client->drain(std::chrono::steady_clock::now() + std::chrono::seconds(1));
@@ -442,10 +448,11 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
   SECTION("when we shut down while a request is in flight") {
     const HTTPClient::URL url = {"http", "whatever", ""};
     const auto ignore = [](auto &&...) {};
-    const auto ignore_timeout = std::chrono::seconds(10);
+    const auto dummy_timeout =
+        std::chrono::steady_clock::now() + std::chrono::seconds(10);
     library.delay_message_ = true;
     const auto result =
-        client->post(url, ignore, "whatever", ignore, ignore, ignore_timeout);
+        client->post(url, ignore, "whatever", ignore, ignore, dummy_timeout);
 
     REQUIRE(result);
     // Destroy the `Curl` object.
