@@ -134,7 +134,9 @@ DatadogAgent::DatadogAgent(const FinalizedDatadogAgentConfig& config,
       event_scheduler_(config.event_scheduler),
       cancel_scheduled_flush_(event_scheduler_->schedule_recurring_event(
           config.flush_interval, [this]() { flush(); })),
-      flush_interval_(config.flush_interval) {
+      flush_interval_(config.flush_interval),
+      request_timeout_(config.request_timeout),
+      shutdown_timeout_(config.shutdown_timeout) {
   assert(logger_);
 }
 
@@ -155,16 +157,15 @@ Expected<void> DatadogAgent::send(
 
 nlohmann::json DatadogAgent::config_json() const {
   const auto& url = traces_endpoint_;  // brevity
-  const auto flush_interval_milliseconds =
-      std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_)
-          .count();
 
   // clang-format off
   return nlohmann::json::object({
     {"type", "datadog::tracing::DatadogAgent"},
     {"config", nlohmann::json::object({
       {"url", (url.scheme + "://" + url.authority + url.path)},
-      {"flush_interval_milliseconds", flush_interval_milliseconds},
+      {"flush_interval_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_).count() },
+      {"request_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(request_timeout_).count() },
+      {"shutdown_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(request_timeout_).count() },
       {"http_client", http_client_->config_json()},
       {"event_scheduler", event_scheduler_->config_json()},
     })},
@@ -255,9 +256,10 @@ void DatadogAgent::flush() {
         error.with_prefix("Error occurred during HTTP request: "));
   };
 
-  auto post_result = http_client_->post(
-      traces_endpoint_, std::move(set_request_headers), std::move(body),
-      std::move(on_response), std::move(on_error), request_timeout_);
+  auto post_result =
+      http_client_->post(traces_endpoint_, std::move(set_request_headers),
+                         std::move(body), std::move(on_response),
+                         std::move(on_error), clock_().tick + request_timeout_);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(*error);
   }
