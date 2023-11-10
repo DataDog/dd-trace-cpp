@@ -58,7 +58,7 @@ class DatadogAgent : public Collector {
 
  public:
   DatadogAgent(const FinalizedDatadogAgentConfig&,
-               const std::shared_ptr<TracerTelemetry>&, const Clock& clock,
+               const std::shared_ptr<TracerTelemetry>&,
                const std::shared_ptr<Logger>&);
   ~DatadogAgent();
 

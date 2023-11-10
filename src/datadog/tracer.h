@@ -50,10 +50,6 @@ class Tracer {
   explicit Tracer(const FinalizedTracerConfig& config);
   Tracer(const FinalizedTracerConfig& config,
          const std::shared_ptr<const IDGenerator>& generator);
-  Tracer(const FinalizedTracerConfig& config, const Clock& clock);
-  Tracer(const FinalizedTracerConfig& config,
-         const std::shared_ptr<const IDGenerator>& generator,
-         const Clock& clock);
 
   // Create a new trace and return the root span of the trace.  Optionally
   // specify a `config` indicating the attributes of the root span.

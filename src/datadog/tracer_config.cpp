@@ -265,8 +265,14 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
 }  // namespace
 
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
+  return finalize_config(config, default_clock);
+}
+
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
+                                                const Clock &clock) {
   FinalizedTracerConfig result;
 
+  result.clock = clock;
   result.defaults = config.defaults;
 
   if (auto service_env = lookup(environment::DD_SERVICE)) {
@@ -314,7 +320,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   if (!report_traces) {
     result.collector = std::make_shared<NullCollector>();
   } else if (!config.collector) {
-    auto finalized = finalize_config(config.agent, result.logger);
+    auto finalized = finalize_config(config.agent, result.logger, clock);
     if (auto *error = finalized.if_error()) {
       return std::move(*error);
     }

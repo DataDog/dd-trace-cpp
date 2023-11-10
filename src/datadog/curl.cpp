@@ -96,7 +96,7 @@ CURLcode CurlLibrary::easy_setopt_writefunction(CURL *handle,
   return curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, on_write);
 }
 
-CURLcode CurlLibrary::easy_setopt_timeout(CURL *handle, long timeout_ms) {
+CURLcode CurlLibrary::easy_setopt_timeout_ms(CURL *handle, long timeout_ms) {
   return curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, timeout_ms);
 }
 
@@ -167,6 +167,7 @@ class CurlImpl {
   std::mutex mutex_;
   CurlLibrary &curl_;
   const std::shared_ptr<Logger> logger_;
+  Clock clock_;
   CURLM *multi_handle_;
   std::unordered_set<CURL *> request_handles_;
   std::list<CURL *> new_handles_;
@@ -174,7 +175,6 @@ class CurlImpl {
   int num_active_handles_;
   std::condition_variable no_requests_;
   std::thread event_loop_;
-  Clock clock_;
 
   struct Request {
     CurlLibrary *curl = nullptr;
@@ -185,7 +185,7 @@ class CurlImpl {
     char error_buffer[CURL_ERROR_SIZE] = "";
     std::unordered_map<std::string, std::string> response_headers_lower;
     std::string response_body;
-    HTTPClient::Deadline deadline;
+    std::chrono::steady_clock::time_point deadline;
 
     ~Request();
   };
@@ -228,13 +228,14 @@ class CurlImpl {
   static StringView trim(StringView);
 
  public:
-  explicit CurlImpl(const std::shared_ptr<Logger> &, CurlLibrary &,
-                    const Curl::ThreadGenerator &);
+  explicit CurlImpl(const std::shared_ptr<Logger> &, const Clock &,
+                    CurlLibrary &, const Curl::ThreadGenerator &);
   ~CurlImpl();
 
   Expected<void> post(const URL &url, HeadersSetter set_headers,
                       std::string body, ResponseHandler on_response,
-                      ErrorHandler on_error, HTTPClient::Deadline deadline);
+                      ErrorHandler on_error,
+                      std::chrono::steady_clock::time_point deadline);
 
   void drain(std::chrono::steady_clock::time_point deadline);
 };
@@ -249,21 +250,24 @@ void throw_on_error(CURLcode result) {
 
 }  // namespace
 
-Curl::Curl(const std::shared_ptr<Logger> &logger) : Curl(logger, libcurl) {}
+Curl::Curl(const std::shared_ptr<Logger> &logger, const Clock &clock)
+    : Curl(logger, clock, libcurl) {}
 
-Curl::Curl(const std::shared_ptr<Logger> &logger, CurlLibrary &curl)
-    : Curl(logger, curl,
+Curl::Curl(const std::shared_ptr<Logger> &logger, const Clock &clock,
+           CurlLibrary &curl)
+    : Curl(logger, clock, curl,
            [](auto &&func) { return std::thread(std::move(func)); }) {}
 
-Curl::Curl(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
-           const Curl::ThreadGenerator &make_thread)
-    : impl_(new CurlImpl{logger, curl, make_thread}) {}
+Curl::Curl(const std::shared_ptr<Logger> &logger, const Clock &clock,
+           CurlLibrary &curl, const Curl::ThreadGenerator &make_thread)
+    : impl_(new CurlImpl{logger, clock, curl, make_thread}) {}
 
 Curl::~Curl() { delete impl_; }
 
 Expected<void> Curl::post(const URL &url, HeadersSetter set_headers,
                           std::string body, ResponseHandler on_response,
-                          ErrorHandler on_error, Deadline deadline) {
+                          ErrorHandler on_error,
+                          std::chrono::steady_clock::time_point deadline) {
   return impl_->post(url, set_headers, body, on_response, on_error, deadline);
 }
 
@@ -275,10 +279,11 @@ nlohmann::json Curl::config_json() const {
   return nlohmann::json::object({{"type", "datadog::tracing::Curl"}});
 }
 
-CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger, CurlLibrary &curl,
-                   const Curl::ThreadGenerator &make_thread)
+CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger, const Clock &clock,
+                   CurlLibrary &curl, const Curl::ThreadGenerator &make_thread)
     : curl_(curl),
       logger_(logger),
+      clock_(clock),
       shutting_down_(false),
       num_active_handles_(0) {
   curl_.global_init(CURL_GLOBAL_ALL);
@@ -323,11 +328,10 @@ CurlImpl::~CurlImpl() {
   curl_.global_cleanup();
 }
 
-Expected<void> CurlImpl::post(const HTTPClient::URL &url,
-                              HeadersSetter set_headers, std::string body,
-                              ResponseHandler on_response,
-                              ErrorHandler on_error,
-                              HTTPClient::Deadline deadline) try {
+Expected<void> CurlImpl::post(
+    const HTTPClient::URL &url, HeadersSetter set_headers, std::string body,
+    ResponseHandler on_response, ErrorHandler on_error,
+    std::chrono::steady_clock::time_point deadline) try {
   if (multi_handle_ == nullptr) {
     return Error{Error::CURL_HTTP_CLIENT_NOT_RUNNING,
                  "Unable to send request via libcurl because the HTTP client "
@@ -509,10 +513,19 @@ void CurlImpl::run() {
 
       auto *request = reinterpret_cast<Request *>(user_data);
       const auto timeout = request->deadline - clock_().tick;
-      if (timeout <= HTTPClient::Deadline::duration::zero()) {
+      if (timeout <= std::chrono::steady_clock::time_point::duration::zero()) {
+        std::string message;
+        message +=
+            "Request deadline exceeded before request was even added to "
+            "libcurl "
+            "event loop. Deadline was ";
+        message += std::to_string(
+            -std::chrono::duration_cast<std::chrono::nanoseconds>(timeout)
+                 .count());
+        message += " nanoseconds ago.";
         request->on_error(
-            Error{Error::CURL_REQUEST_FAILURE,
-                  "Request not processed as the deadline has been reached."});
+            Error{Error::CURL_DEADLINE_EXCEEDED_BEFORE_REQUEST_START,
+                  std::move(message)});
 
         curl_.easy_cleanup(handle);
         delete request;
@@ -520,7 +533,7 @@ void CurlImpl::run() {
         continue;
       }
 
-      throw_on_error(curl_.easy_setopt_timeout(
+      log_on_error(curl_.easy_setopt_timeout_ms(
           handle, std::chrono::duration_cast<std::chrono::milliseconds>(timeout)
                       .count()));
       log_on_error(curl_.multi_add_handle(multi_handle_, handle));

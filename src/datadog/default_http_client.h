@@ -9,6 +9,8 @@
 
 #include <memory>
 
+#include "clock.h"
+
 namespace datadog {
 namespace tracing {
 
@@ -16,7 +18,7 @@ class HTTPClient;
 class Logger;
 
 std::shared_ptr<HTTPClient> default_http_client(
-    const std::shared_ptr<Logger>& logger);
+    const std::shared_ptr<Logger>& logger, const Clock& clock);
 
 }  // namespace tracing
 }  // namespace datadog

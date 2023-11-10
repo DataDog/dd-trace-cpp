@@ -84,11 +84,14 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
 }
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger) {
+    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
+    const Clock& clock) {
   FinalizedDatadogAgentConfig result;
 
+  result.clock = clock;
+
   if (!config.http_client) {
-    result.http_client = default_http_client(logger);
+    result.http_client = default_http_client(logger, clock);
     // `default_http_client` might return a `Curl` instance depending on how
     // this library was built.  If it returns `nullptr`, then there's no
     // built-in default, and so the user must provide a value.

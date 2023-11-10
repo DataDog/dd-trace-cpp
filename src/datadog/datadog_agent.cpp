@@ -134,9 +134,9 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 DatadogAgent::DatadogAgent(
     const FinalizedDatadogAgentConfig& config,
     const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
-    const Clock& clock, const std::shared_ptr<Logger>& logger)
+    const std::shared_ptr<Logger>& logger)
     : tracer_telemetry_(tracer_telemetry),
-      clock_(clock),
+      clock_(config.clock),
       logger_(logger),
       traces_endpoint_(traces_endpoint(config.url)),
       telemetry_endpoint_(telemetry_endpoint(config.url)),

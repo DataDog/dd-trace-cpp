@@ -16,6 +16,7 @@
 #include <string>
 #include <variant>
 
+#include "clock.h"
 #include "expected.h"
 #include "http_client.h"
 #include "string_view.h"
@@ -59,7 +60,7 @@ struct DatadogAgentConfig {
 
 class FinalizedDatadogAgentConfig {
   friend Expected<FinalizedDatadogAgentConfig> finalize_config(
-      const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger);
+      const DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&);
 
   FinalizedDatadogAgentConfig() = default;
 
@@ -70,10 +71,12 @@ class FinalizedDatadogAgentConfig {
   std::chrono::steady_clock::duration flush_interval;
   std::chrono::steady_clock::duration request_timeout;
   std::chrono::steady_clock::duration shutdown_timeout;
+  Clock clock;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger);
+    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
+    const Clock& clock);
 
 }  // namespace tracing
 }  // namespace datadog
