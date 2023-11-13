@@ -305,10 +305,10 @@ TEST_CASE("span rule limiter") {
   rule.max_per_second = test_case.max_per_second;
   config.span_sampler.rules.push_back(rule);
 
-  auto finalized = finalize_config(config);
-  REQUIRE(finalized);
   auto clock = [frozen_time = default_clock()]() { return frozen_time; };
-  Tracer tracer{*finalized, clock};
+  auto finalized = finalize_config(config, clock);
+  REQUIRE(finalized);
+  Tracer tracer{*finalized};
 
   for (std::size_t i = 0; i < test_case.num_spans; ++i) {
     auto span = tracer.create_span();

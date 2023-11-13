@@ -216,8 +216,9 @@ nlohmann::json DatadogAgent::config_json() const {
     {"config", nlohmann::json::object({
       {"traces_url", (traces_endpoint_.scheme + "://" + traces_endpoint_.authority + traces_endpoint_.path)},
       {"telemetry_url", (telemetry_endpoint_.scheme + "://" + telemetry_endpoint_.authority + telemetry_endpoint_.path)},
+      {"flush_interval_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_).count() },
       {"request_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(request_timeout_).count() },
-      {"shutdown_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(request_timeout_).count() },
+      {"shutdown_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(shutdown_timeout_).count() },
       {"http_client", http_client_->config_json()},
       {"event_scheduler", event_scheduler_->config_json()},
     })},
@@ -335,9 +336,10 @@ void DatadogAgent::flush() {
 
 void DatadogAgent::send_app_started() {
   auto payload = tracer_telemetry_->app_started();
-  auto post_result = http_client_->post(
-      telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
-      telemetry_on_response_, telemetry_on_error_, clock_().tick + request_timeout_);
+  auto post_result =
+      http_client_->post(telemetry_endpoint_, telemetry_set_request_headers_,
+                         std::move(payload), telemetry_on_response_,
+                         telemetry_on_error_, clock_().tick + request_timeout_);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(error->with_prefix(
         "Unexpected error submitting telemetry app-started event: "));
@@ -346,9 +348,10 @@ void DatadogAgent::send_app_started() {
 
 void DatadogAgent::send_heartbeat_and_telemetry() {
   auto payload = tracer_telemetry_->heartbeat_and_telemetry();
-  auto post_result = http_client_->post(
-      telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
-      telemetry_on_response_, telemetry_on_error_, clock_().tick + request_timeout_);
+  auto post_result =
+      http_client_->post(telemetry_endpoint_, telemetry_set_request_headers_,
+                         std::move(payload), telemetry_on_response_,
+                         telemetry_on_error_, clock_().tick + request_timeout_);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(error->with_prefix(
         "Unexpected error submitting telemetry app-heartbeat event: "));
@@ -357,9 +360,10 @@ void DatadogAgent::send_heartbeat_and_telemetry() {
 
 void DatadogAgent::send_app_closing() {
   auto payload = tracer_telemetry_->app_closing();
-  auto post_result = http_client_->post(
-      telemetry_endpoint_, telemetry_set_request_headers_, std::move(payload),
-      telemetry_on_response_, telemetry_on_error_, clock_().tick + request_timeout_);
+  auto post_result =
+      http_client_->post(telemetry_endpoint_, telemetry_set_request_headers_,
+                         std::move(payload), telemetry_on_response_,
+                         telemetry_on_error_, clock_().tick + request_timeout_);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(error->with_prefix(
         "Unexpected error submitting telemetry app-closing event: "));

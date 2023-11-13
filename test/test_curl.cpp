@@ -70,9 +70,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
     return CURLE_OK;
   }
 
-  CURLcode easy_setopt_timeout_ms(CURL *, long) override {
-    return CURLE_OK;
-  }
+  CURLcode easy_setopt_timeout_ms(CURL *, long) override { return CURLE_OK; }
 
   CURLMcode multi_add_handle(CURLM *, CURL *easy_handle) override {
     added_handle_ = easy_handle;

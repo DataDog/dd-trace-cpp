@@ -210,7 +210,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
-          config.report_telemetry, clock, logger_, defaults_, runtime_id_)),
+          config.report_telemetry, config.clock, logger_, defaults_,
+          runtime_id_)),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, config.clock)),
       span_sampler_(
