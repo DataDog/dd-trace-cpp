@@ -43,7 +43,8 @@ class HTTPClient {
   // a response is delivered (even if that response contains an error HTTP
   // response status).  Invoke the specified `on_error` if an error occurs
   // outside of HTTP, such as a connection failure.  If an error occurs while
-  // preparing the request, return an `Error`.
+  // preparing the request, return an `Error`. The behavior is undefined if
+  // either of `on_response` or `on_error` throws an exception.
   virtual Expected<void> post(
       const URL& url, HeadersSetter set_headers, std::string body,
       ResponseHandler on_response, ErrorHandler on_error,
