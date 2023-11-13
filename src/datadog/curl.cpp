@@ -481,7 +481,7 @@ CURLMcode CurlImpl::log_on_error(CURLMcode result) {
 void CurlImpl::run() {
   int num_messages_remaining;
   CURLMsg *message;
-  const int max_wait_milliseconds = 1000;
+  const int max_wait_milliseconds = 10000;
   std::unique_lock<std::mutex> lock(mutex_);
 
   for (;;) {

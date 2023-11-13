@@ -50,9 +50,9 @@ struct DatadogAgentConfig {
   std::string url = "http://localhost:8126";
   // How often, in milliseconds, to send batches of traces to the Datadog Agent.
   int flush_interval_milliseconds = 2000;
-  // TBD
+  // Maximum amount of time an HTTP request is allowed to run.
   int request_timeout_milliseconds = 2000;
-  // TBD
+  // Maximum amount of time the process is allowed to wait before shutting down.
   int shutdown_timeout_milliseconds = 2000;
 
   static Expected<HTTPClient::URL> parse(StringView);

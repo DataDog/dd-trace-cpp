@@ -15,7 +15,6 @@
 #include "test.h"
 
 using namespace datadog::tracing;
-using namespace std::chrono_literals;
 
 class SingleRequestMockCurlLibrary : public CurlLibrary {
  public:
@@ -72,7 +71,6 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
   }
 
   CURLcode easy_setopt_timeout_ms(CURL *, long) override {
-    // TBD?
     return CURLE_OK;
   }
 
