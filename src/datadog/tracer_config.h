@@ -108,7 +108,7 @@ struct TracerConfig {
   // IDs.  If true, the tracer will generate 128-bit trace IDs. If false, the
   // tracer will generate 64-bit trace IDs. `trace_id_128_bit` is overridden by
   // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
-  bool trace_id_128_bit = false;
+  bool trace_id_128_bit = true;
 
   // `runtime_id` denotes the current run of the application in which the tracer
   // is embedded. If `runtime_id` is not specified, then it defaults to a
