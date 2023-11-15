@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <sstream>
 
 #include "datadog_agent.h"
 #include "dict_reader.h"
@@ -111,6 +112,7 @@ Expected<ExtractedData> extract_datadog(
     const DictReader& headers,
     std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
   ExtractedData result;
+  result.style = PropagationStyle::DATADOG;
 
   auto trace_id =
       extract_id_header(headers, "x-datadog-trace-id", "trace", "Datadog", 10);
@@ -160,6 +162,7 @@ Expected<ExtractedData> extract_b3(
     const DictReader& headers, std::unordered_map<std::string, std::string>&,
     Logger&) {
   ExtractedData result;
+  result.style = PropagationStyle::B3;
 
   if (auto found = headers.lookup("x-b3-traceid")) {
     auto parsed = TraceID::parse_hex(*found);
@@ -196,6 +199,59 @@ Expected<ExtractedData> extract_b3(
 
   return result;
 }
+
+Expected<ExtractedData> extract_none(
+    const DictReader&, std::unordered_map<std::string, std::string>&, Logger&) {
+  ExtractedData result;
+  result.style = PropagationStyle::NONE;
+  return result;
+}
+
+std::string extraction_error_prefix(
+    const Optional<PropagationStyle>& style,
+    const std::vector<std::pair<std::string, std::string>>& headers_examined) {
+  std::ostringstream stream;
+  stream << "While extracting trace context";
+  if (style) {
+    stream << " in the " << to_json(*style) << " propagation style";
+  }
+  auto it = headers_examined.begin();
+  if (it != headers_examined.end()) {
+    stream << " from the following headers: [";
+    stream << nlohmann::json(it->first + ": " + it->second);
+    for (++it; it != headers_examined.end(); ++it) {
+      stream << ", ";
+      stream << nlohmann::json(it->first + ": " + it->second);
+    }
+    stream << "]";
+  }
+  stream << ", an error occurred: ";
+  return stream.str();
+}
+
+struct AuditedReader : public DictReader {
+  const DictReader& underlying;
+  mutable std::vector<std::pair<std::string, std::string>> entries_found;
+
+  explicit AuditedReader(const DictReader& underlying)
+      : underlying(underlying) {}
+
+  Optional<StringView> lookup(StringView key) const override {
+    auto value = underlying.lookup(key);
+    if (value) {
+      entries_found.emplace_back(key, *value);
+    }
+    return value;
+  }
+
+  void visit(const std::function<void(StringView key, StringView value)>&
+                 visitor) const override {
+    underlying.visit([&, this](StringView key, StringView value) {
+      entries_found.emplace_back(key, value);
+      visitor(key, value);
+    });
+  }
+};
 
 }  // namespace
 
@@ -302,6 +358,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
   assert(!extraction_styles_.empty());
 
+  AuditedReader audited_reader{reader};
+
   auto span_data = std::make_unique<SpanData>();
   ExtractedData extracted_data;
 
@@ -320,14 +378,16 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         break;
       default:
         assert(style == PropagationStyle::NONE);
-        extracted_data = ExtractedData{};
-        continue;
+        extract = &extract_none;
     }
-    auto data = extract(reader, span_data->tags, *logger_);
+    audited_reader.entries_found.clear();
+    auto data = extract(audited_reader, span_data->tags, *logger_);
     if (auto* error = data.if_error()) {
-      return std::move(*error);
+      return error->with_prefix(
+          extraction_error_prefix(style, audited_reader.entries_found));
     }
     extracted_data = *data;
+    extracted_data.headers_examined = audited_reader.entries_found;
     // If the extractor produced a non-null trace ID, then we consider this
     // extraction style the one "chosen" for this trace.
     // Otherwise, we loop around to the next configured extraction style.
@@ -337,8 +397,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
-         additional_w3c_tracestate, additional_datadog_w3c_tracestate] =
-      extracted_data;
+         additional_w3c_tracestate, additional_datadog_w3c_tracestate, style,
+         headers_examined] = extracted_data;
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -357,14 +417,16 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   if (!trace_id && !parent_id) {
     return Error{Error::NO_SPAN_TO_EXTRACT,
-                 "There's neither a trace ID nor a parent span ID to extract."};
+                 "There's neither a trace ID nor a parent span ID to extract."}
+        .with_prefix(extraction_error_prefix(style, headers_examined));
   }
   if (!trace_id) {
     std::string message;
     message +=
         "There's no trace ID to extract, but there is a parent span ID: ";
     message += std::to_string(*parent_id);
-    return Error{Error::MISSING_TRACE_ID, std::move(message)};
+    return Error{Error::MISSING_TRACE_ID, std::move(message)}.with_prefix(
+        extraction_error_prefix(style, headers_examined));
   }
   if (!parent_id && !origin) {
     std::string message;
@@ -377,7 +439,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       message += std::to_string(trace_id->low);
     }
     message += ']';
-    return Error{Error::MISSING_PARENT_SPAN_ID, std::move(message)};
+    return Error{Error::MISSING_PARENT_SPAN_ID, std::move(message)}.with_prefix(
+        extraction_error_prefix(style, headers_examined));
   }
 
   if (!parent_id) {
@@ -392,7 +455,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   if (*trace_id == 0) {
     return Error{Error::ZERO_TRACE_ID,
-                 "extracted zero value for trace ID, which is invalid"};
+                 "extracted zero value for trace ID, which is invalid"}
+        .with_prefix(extraction_error_prefix(style, headers_examined));
   }
 
   // We're done extracting fields.  Now create the span.

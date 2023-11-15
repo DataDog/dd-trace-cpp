@@ -9,6 +9,7 @@
 #include "dict_reader.h"
 #include "hex.h"
 #include "parse_util.h"
+#include "propagation_style.h"
 #include "tags.h"
 
 namespace datadog {
@@ -284,6 +285,7 @@ Expected<ExtractedData> extract_w3c(
     const DictReader& headers,
     std::unordered_map<std::string, std::string>& span_tags, Logger&) {
   ExtractedData result;
+  result.style = PropagationStyle::W3C;
 
   if (auto error_tag_value = extract_traceparent(result, headers)) {
     span_tags[tags::internal::w3c_extraction_error] =

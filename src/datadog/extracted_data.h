@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "optional.h"
+#include "propagation_style.h"
 #include "trace_id.h"
 
 namespace datadog {
@@ -33,6 +34,13 @@ struct ExtractedData {
   // `additional_datadog_w3c_tracestate` is null.
   // `additional_datadog_w3c_tracestate` is used for the `W3C` injection style.
   Optional<std::string> additional_datadog_w3c_tracestate;
+  // `style` is the extraction style used to obtain this `ExtractedData`. It's
+  // for diagnostics.
+  Optional<PropagationStyle> style;
+  // `headers_examined` are the name/value pairs of HTTP headers (or equivalent
+  // request meta-data) that were looked up and had values during the
+  // preparation of this `ExtractedData`. It's for diagnostics.
+  std::vector<std::pair<std::string, std::string>> headers_examined;
 };
 
 }  // namespace tracing
