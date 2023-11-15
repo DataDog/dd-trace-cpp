@@ -45,9 +45,10 @@ class HTTPClient {
   // outside of HTTP, such as a connection failure.  If an error occurs while
   // preparing the request, return an `Error`. The behavior is undefined if
   // either of `on_response` or `on_error` throws an exception.
-  virtual Expected<void> post(const URL& url, HeadersSetter set_headers,
-                              std::string body, ResponseHandler on_response,
-                              ErrorHandler on_error) = 0;
+  virtual Expected<void> post(
+      const URL& url, HeadersSetter set_headers, std::string body,
+      ResponseHandler on_response, ErrorHandler on_error,
+      std::chrono::steady_clock::time_point deadline) = 0;
 
   // Wait until there are no more outstanding requests, or until the specified
   // `deadline`.

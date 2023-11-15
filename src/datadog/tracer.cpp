@@ -197,63 +197,27 @@ Expected<ExtractedData> extract_b3(
   return result;
 }
 
-nlohmann::json make_config_json(
-    StringView tracer_version_string, const Collector& collector,
-    const SpanDefaults& defaults, const RuntimeID& runtime_id,
-    const TraceSampler& trace_sampler, const SpanSampler& span_sampler,
-    const std::vector<PropagationStyle>& injection_styles,
-    const std::vector<PropagationStyle>& extraction_styles,
-    const Optional<std::string>& hostname, std::size_t tags_header_max_size) {
-  // clang-format off
-  auto config = nlohmann::json::object({
-    {"version", tracer_version_string},
-    {"defaults", to_json(defaults)},
-    {"runtime_id", runtime_id.string()},
-    {"collector", collector.config_json()},
-    {"trace_sampler", trace_sampler.config_json()},
-    {"span_sampler", span_sampler.config_json()},
-    {"injection_styles", to_json(injection_styles)},
-    {"extraction_styles", to_json(extraction_styles)},
-    {"tags_header_size", tags_header_max_size},
-    {"environment_variables", environment::to_json()},
-  });
-  // clang-format on
-
-  if (hostname) {
-    config["hostname"] = *hostname;
-  }
-
-  return config;
-}
-
 }  // namespace
 
 Tracer::Tracer(const FinalizedTracerConfig& config)
-    : Tracer(config, default_id_generator(config.trace_id_128_bit),
-             default_clock) {}
+    : Tracer(config, default_id_generator(config.trace_id_128_bit)) {}
 
 Tracer::Tracer(const FinalizedTracerConfig& config,
                const std::shared_ptr<const IDGenerator>& generator)
-    : Tracer(config, generator, default_clock) {}
-
-Tracer::Tracer(const FinalizedTracerConfig& config, const Clock& clock)
-    : Tracer(config, default_id_generator(config.trace_id_128_bit), clock) {}
-
-Tracer::Tracer(const FinalizedTracerConfig& config,
-               const std::shared_ptr<const IDGenerator>& generator,
-               const Clock& clock)
     : logger_(config.logger),
       collector_(/* see constructor body */),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
-          config.report_telemetry, clock, logger_, defaults_, runtime_id_)),
+          config.report_telemetry, config.clock, logger_, defaults_,
+          runtime_id_)),
       trace_sampler_(
-          std::make_shared<TraceSampler>(config.trace_sampler, clock)),
-      span_sampler_(std::make_shared<SpanSampler>(config.span_sampler, clock)),
+          std::make_shared<TraceSampler>(config.trace_sampler, config.clock)),
+      span_sampler_(
+          std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
       generator_(generator),
-      clock_(clock),
+      clock_(config.clock),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       hostname_(config.report_hostname ? get_hostname() : nullopt),
@@ -265,7 +229,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     auto& agent_config =
         std::get<FinalizedDatadogAgentConfig>(config.collector);
     auto agent = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
-                                                clock, config.logger);
+                                                config.logger);
     collector_ = agent;
     if (tracer_telemetry_->enabled()) {
       agent->send_app_started();
@@ -280,10 +244,26 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 }
 
 nlohmann::json Tracer::config_json() const {
-  return make_config_json(tracer_version_string, *collector_, *defaults_,
-                          runtime_id_, *trace_sampler_, *span_sampler_,
-                          injection_styles_, extraction_styles_, hostname_,
-                          tags_header_max_size_);
+  // clang-format off
+  auto config = nlohmann::json::object({
+    {"version", tracer_version_string},
+    {"defaults", to_json(*defaults_)},
+    {"runtime_id", runtime_id_.string()},
+    {"collector", collector_->config_json()},
+    {"trace_sampler", trace_sampler_->config_json()},
+    {"span_sampler", span_sampler_->config_json()},
+    {"injection_styles", to_json(injection_styles_)},
+    {"extraction_styles", to_json(extraction_styles_)},
+    {"tags_header_size", tags_header_max_size_},
+    {"environment_variables", environment::to_json()},
+  });
+  // clang-format on
+
+  if (hostname_) {
+    config["hostname"] = *hostname_;
+  }
+
+  return config;
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }

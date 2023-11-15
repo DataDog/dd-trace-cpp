@@ -16,6 +16,7 @@
 #include <string>
 #include <variant>
 
+#include "clock.h"
 #include "expected.h"
 #include "http_client.h"
 #include "string_view.h"
@@ -49,13 +50,17 @@ struct DatadogAgentConfig {
   std::string url = "http://localhost:8126";
   // How often, in milliseconds, to send batches of traces to the Datadog Agent.
   int flush_interval_milliseconds = 2000;
+  // Maximum amount of time an HTTP request is allowed to run.
+  int request_timeout_milliseconds = 2000;
+  // Maximum amount of time the process is allowed to wait before shutting down.
+  int shutdown_timeout_milliseconds = 2000;
 
   static Expected<HTTPClient::URL> parse(StringView);
 };
 
 class FinalizedDatadogAgentConfig {
   friend Expected<FinalizedDatadogAgentConfig> finalize_config(
-      const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger);
+      const DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&);
 
   FinalizedDatadogAgentConfig() = default;
 
@@ -64,10 +69,14 @@ class FinalizedDatadogAgentConfig {
   std::shared_ptr<EventScheduler> event_scheduler;
   HTTPClient::URL url;
   std::chrono::steady_clock::duration flush_interval;
+  std::chrono::steady_clock::duration request_timeout;
+  std::chrono::steady_clock::duration shutdown_timeout;
+  Clock clock;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger);
+    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
+    const Clock& clock);
 
 }  // namespace tracing
 }  // namespace datadog
