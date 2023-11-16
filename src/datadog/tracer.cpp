@@ -134,7 +134,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   AuditedReader audited_reader{reader};
 
   auto span_data = std::make_unique<SpanData>();
-  ExtractedData extracted_data;
+  std::vector<ExtractedData> extracted_contexts;
 
   for (const auto style : extraction_styles_) {
     using Extractor = decltype(&extract_datadog);  // function pointer
@@ -159,19 +159,13 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       return error->with_prefix(
           extraction_error_prefix(style, audited_reader.entries_found));
     }
-    extracted_data = *data;
-    extracted_data.headers_examined = audited_reader.entries_found;
-    // If the extractor produced a non-null trace ID, then we consider this
-    // extraction style the one "chosen" for this trace.
-    // Otherwise, we loop around to the next configured extraction style.
-    if (extracted_data.trace_id) {
-      break;
-    }
+    extracted_contexts.push_back(std::move(*data));
+    extracted_contexts.back().headers_examined = audited_reader.entries_found;
   }
 
-  auto& [trace_id, parent_id, origin, trace_tags, sampling_priority,
-         additional_w3c_tracestate, additional_datadog_w3c_tracestate, style,
-         headers_examined] = extracted_data;
+  auto [trace_id, parent_id, origin, trace_tags, sampling_priority,
+        additional_w3c_tracestate, additional_datadog_w3c_tracestate, style,
+        headers_examined] = merge(extracted_contexts);
 
   // Some information might be missing.
   // Here are the combinations considered:

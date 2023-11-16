@@ -1,5 +1,6 @@
 #include "extraction_util.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -227,6 +228,55 @@ void AuditedReader::visit(
     entries_found.emplace_back(key, value);
     visitor(key, value);
   });
+}
+
+ExtractedData merge(const std::vector<ExtractedData>& contexts) {
+  ExtractedData result;
+
+  const auto found = std::find_if(
+      contexts.begin(), contexts.end(),
+      [](const ExtractedData& data) { return data.trace_id.has_value(); });
+
+  if (found == contexts.end()) {
+    // Nothing extracted a trace ID. Return the first context that includes a
+    // parent ID, if any, or otherwise just return an empty `ExtractedData`.
+    // The purpose of looking for a parent ID is to allow for the error
+    // "extracted a parent ID without a trace ID," if that's what happened.
+    const auto other = std::find_if(
+        contexts.begin(), contexts.end(),
+        [](const ExtractedData& data) { return data.parent_id.has_value(); });
+    if (other != contexts.end()) {
+      result = *other;
+    }
+    return result;
+  }
+
+  // `found` refers to the first extracted context that yielded a trace ID.
+  // This will be our main context.
+  //
+  // If the style of `found` is not W3C, then examine the remaining contexts
+  // for W3C-style tracestate that we might want to include in `result`.
+  result = *found;
+  if (result.style == PropagationStyle::W3C) {
+    return result;
+  }
+
+  const auto other =
+      std::find_if(found, contexts.end(), [&](const ExtractedData& data) {
+        return data.style == PropagationStyle::W3C &&
+               data.trace_id == found->trace_id;
+      });
+
+  if (other != contexts.end()) {
+    result.additional_w3c_tracestate = other->additional_w3c_tracestate;
+    result.additional_datadog_w3c_tracestate =
+        other->additional_datadog_w3c_tracestate;
+    result.headers_examined.insert(result.headers_examined.end(),
+                                   other->headers_examined.begin(),
+                                   other->headers_examined.end());
+  }
+
+  return result;
 }
 
 }  // namespace tracing
