@@ -1224,7 +1224,7 @@ TEST_CASE("configure 128-bit trace IDs") {
   TracerConfig config;
   config.defaults.service = "testsvc";
 
-  SECTION("defaults to false") { REQUIRE(config.trace_id_128_bit == false); }
+  SECTION("defaults to true") { REQUIRE(config.trace_id_128_bit == true); }
 
   SECTION("value honored in finalizer") {
     const auto value = GENERATE(true, false);
