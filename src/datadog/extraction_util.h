@@ -22,7 +22,7 @@ class Logger;
 
 // Parse the high 64 bits of a trace ID from the specified `value`. If `value`
 // is correctly formatted, then return the resulting bits. If `value` is
-// incorrectly formatted then return `nullopt`.
+// incorrectly formatted, then return `nullopt`.
 Optional<std::uint64_t> parse_trace_id_high(const std::string& value);
 
 // Decode the specified `trace_tags` and integrate them into the specified
