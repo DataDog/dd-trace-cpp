@@ -15,9 +15,6 @@
 namespace datadog {
 namespace tracing {
 
-// Parse the high 64 bits of a trace ID from the specified `value`. If `value`
-// is correctly formatted, then return the resulting bits. If `value` is
-// incorrectly formatted then return `nullopt`.
 Optional<std::uint64_t> parse_trace_id_high(const std::string& value) {
   if (value.size() != 16) {
     return nullopt;
@@ -31,10 +28,6 @@ Optional<std::uint64_t> parse_trace_id_high(const std::string& value) {
   return nullopt;
 }
 
-// Decode the specified `trace_tags` and integrate them into the specified
-// `result`. If an error occurs, add a `tags::internal::propagation_error` tag
-// to the specified `span_tags` and log a diagnostic using the specified
-// `logger`.
 void handle_trace_tags(StringView trace_tags, ExtractedData& result,
                        std::unordered_map<std::string, std::string>& span_tags,
                        Logger& logger) {
