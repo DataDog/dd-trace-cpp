@@ -1003,12 +1003,12 @@ TEST_CASE("TracerConfig propagation styles") {
   TracerConfig config;
   config.defaults.service = "testsvc";
 
-  SECTION("default style is Datadog") {
+  SECTION("default style is [Datadog, W3C]") {
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
     const std::vector<PropagationStyle> expected_styles = {
-        PropagationStyle::DATADOG};
+        PropagationStyle::DATADOG, PropagationStyle::W3C};
 
     REQUIRE(finalized->injection_styles == expected_styles);
     REQUIRE(finalized->extraction_styles == expected_styles);

@@ -72,7 +72,8 @@ struct TracerConfig {
   // All styles indicated by `injection_styles` are used for injection.
   // `injection_styles` is overridden by the `DD_TRACE_PROPAGATION_STYLE_INJECT`
   // and `DD_TRACE_PROPAGATION_STYLE` environment variables.
-  std::vector<PropagationStyle> injection_styles = {PropagationStyle::DATADOG};
+  std::vector<PropagationStyle> injection_styles = {PropagationStyle::DATADOG,
+                                                    PropagationStyle::W3C};
 
   // `extraction_styles` indicates with which tracing systems trace propagation
   // will be compatible when extracting (receiving) trace context.
@@ -82,7 +83,8 @@ struct TracerConfig {
   // `extraction_styles` is overridden by the
   // `DD_TRACE_PROPAGATION_STYLE_EXTRACT` and `DD_TRACE_PROPAGATION_STYLE`
   // environment variables.
-  std::vector<PropagationStyle> extraction_styles = {PropagationStyle::DATADOG};
+  std::vector<PropagationStyle> extraction_styles = {PropagationStyle::DATADOG,
+                                                     PropagationStyle::W3C};
 
   // `report_hostname` indicates whether the tracer will include the result of
   // `gethostname` with traces sent to the collector.
