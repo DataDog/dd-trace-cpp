@@ -262,7 +262,7 @@ ExtractedData merge(const std::vector<ExtractedData>& contexts) {
   }
 
   const auto other =
-      std::find_if(found, contexts.end(), [&](const ExtractedData& data) {
+      std::find_if(found + 1, contexts.end(), [&](const ExtractedData& data) {
         return data.style == PropagationStyle::W3C &&
                data.trace_id == found->trace_id;
       });
