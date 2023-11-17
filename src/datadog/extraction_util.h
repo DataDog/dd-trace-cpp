@@ -58,8 +58,8 @@ Expected<ExtractedData> extract_b3(
     const DictReader& headers, std::unordered_map<std::string, std::string>&,
     Logger&);
 
-// Return a default constructed `ExtractedData`, which indicates the absence of
-// extracted trace information.
+// Return an `ExtractedData` whose only non-default field is
+// `style = PropagationStyle::NONE`.
 Expected<ExtractedData> extract_none(
     const DictReader&, std::unordered_map<std::string, std::string>&, Logger&);
 
