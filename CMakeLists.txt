@@ -106,6 +106,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
 #     src/datadog/default_http_client_null.cpp use libcurl
     src/datadog/environment.cpp
     src/datadog/error.cpp
+    src/datadog/extraction_util.cpp
     src/datadog/glob.cpp
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
@@ -160,6 +161,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/event_scheduler.h
   src/datadog/expected.h
   src/datadog/extracted_data.h
+  src/datadog/extraction_util.h
   src/datadog/glob.h
   src/datadog/hex.h
   src/datadog/http_client.h
