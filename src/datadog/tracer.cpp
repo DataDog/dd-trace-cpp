@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <sstream>
 
 #include "datadog_agent.h"
 #include "dict_reader.h"
