@@ -38,10 +38,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     endif ()
 endif()
 
-include(ProcessorCount)
-ProcessorCount(NUM_PROCESSORS)
-set(MAKE_JOB_COUNT ${NUM_PROCESSORS} CACHE STRING "Number of jobs to use when building libcurl")
-
 function(add_sanitizers)
   add_compile_options(-fsanitize=address)
   add_link_options(-fsanitize=address)
