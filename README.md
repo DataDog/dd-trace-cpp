@@ -1,6 +1,7 @@
 Datadog C++ Tracing Library
 ===========================
 ```c++
+#include <datadog/span_config.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -12,7 +13,7 @@ int main() {
     namespace dd = datadog::tracing;
 
     dd::TracerConfig config;
-    config.service = "my-service";
+    config.defaults.service = "my-service";
 
     const auto validated_config = dd::finalize_config(config);
     if (!validated_config) {
