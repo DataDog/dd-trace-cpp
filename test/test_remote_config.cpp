@@ -83,39 +83,39 @@ REMOTE_CONFIG_TEST("response processing") {
       R"({ "targets": "eyJmb28iOiAiYmFyIn0=" })",
       // `targets` is missing the `targets` field.
       // decode("eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAiY3VzdG9tIjogeyJvcGFxdWVfYmFja2VuZF9zdGF0ZSI6ICIxNSJ9fX0=") == "{"signed": {"version": 2, "custom": {"opaque_backend_state": "15"}}}"
-      R"({ 
+      R"({
           "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAiY3VzdG9tIjogeyJvcGFxdWVfYmFja2VuZF9zdGF0ZSI6ICIxNSJ9fX0=",
           "client_configs": ["datadog"]
       })",
       // `/targets/targets` have no `datadog` entry
       // {"signed": {"version": 2, "targets": {"foo": {}, "bar": {}},"custom": {"opaque_backend_state": "15"}}}
-      R"({ 
+      R"({
           "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAidGFyZ2V0cyI6IHsiZm9vIjoge30sICJiYXIiOiB7fX0sImN1c3RvbSI6IHsib3BhcXVlX2JhY2tlbmRfc3RhdGUiOiAiMTUifX19",
           "client_configs": ["datadog"]
       })",
       // `targets` OK but no `target_files` field.
       // {"signed": {"version": 2, "targets": {"foo/APM_TRACING/30": {}, "bar": {}},"custom": {"opaque_backend_state": "15"}}}
-      R"({ 
+      R"({
           "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAidGFyZ2V0cyI6IHsiZm9vL0FQTV9UUkFDSU5HLzMwIjoge30sICJiYXIiOiB7fX0sImN1c3RvbSI6IHsib3BhcXVlX2JhY2tlbmRfc3RhdGUiOiAiMTUifX19",
           "client_configs": ["foo/APM_TRACING/30"]
       })",
       // `targets` OK. `target_files` field is empty.
       // {"signed": {"version": 2, "targets": {"foo/APM_TRACING/30": {}, "bar": {}},"custom": {"opaque_backend_state": "15"}}}
-      R"({ 
+      R"({
           "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAidGFyZ2V0cyI6IHsiZm9vL0FQTV9UUkFDSU5HLzMwIjoge30sICJiYXIiOiB7fX0sImN1c3RvbSI6IHsib3BhcXVlX2JhY2tlbmRfc3RhdGUiOiAiMTUifX19",
           "client_configs": ["foo/APM_TRACING/30"],
           "target_files": []
       })",
       // `targets` OK. `target_files` field is not an array.
       // {"signed": {"version": 2, "targets": {"foo/APM_TRACING/30": {}, "bar": {}},"custom": {"opaque_backend_state": "15"}}}
-      R"({ 
+      R"({
           "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAidGFyZ2V0cyI6IHsiZm9vL0FQTV9UUkFDSU5HLzMwIjoge30sICJiYXIiOiB7fX0sImN1c3RvbSI6IHsib3BhcXVlX2JhY2tlbmRfc3RhdGUiOiAiMTUifX19",
           "client_configs": ["foo/APM_TRACING/30"],
           "target_files": 15
       })",
       // `targets` OK. `target_files` field content is not base64 encoded.
       // {"signed": {"version": 2, "targets": {"foo/APM_TRACING/30": {}, "bar": {}},"custom": {"opaque_backend_state": "15"}}}
-      R"({ 
+      R"({
           "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAidGFyZ2V0cyI6IHsiZm9vL0FQTV9UUkFDSU5HLzMwIjoge30sICJiYXIiOiB7fX0sImN1c3RvbSI6IHsib3BhcXVlX2JhY2tlbmRfc3RhdGUiOiAiMTUifX19",
           "client_configs": ["foo/APM_TRACING/30"],
           "target_files": [{"path": "foo/APM_TRACING/30", "raw": "Hello, Uranus!"}]
@@ -123,7 +123,7 @@ REMOTE_CONFIG_TEST("response processing") {
       // `targets` OK. `target_files` field content is not a JSON base64 encoded.
       // decode("bm90IGpzb24=") == "not json"
       // {"signed": {"version": 2, "targets": {"foo/APM_TRACING/30": {}, "bar": {}},"custom": {"opaque_backend_state": "15"}}}
-      R"({ 
+      R"({
           "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAidGFyZ2V0cyI6IHsiZm9vL0FQTV9UUkFDSU5HLzMwIjoge30sICJiYXIiOiB7fX0sImN1c3RvbSI6IHsib3BhcXVlX2JhY2tlbmRfc3RhdGUiOiAiMTUifX19",
           "client_configs": ["foo/APM_TRACING/30"],
           "target_files": [{"path": "foo/APM_TRACING/30", "raw": "bm90IGpzb24="}]
@@ -131,7 +131,7 @@ REMOTE_CONFIG_TEST("response processing") {
       // `targets` OK. `target_files` field JSON base64 content do not follow the expected schema.
       // decode("eyJmb28iOiAiYmFyIn0=") == "{"foo": "bar"}"
       // {"signed": {"version": 2, "targets": {"foo/APM_TRACING/30": {}, "bar": {}},"custom": {"opaque_backend_state": "15"}}}
-      R"({ 
+      R"({
           "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAidGFyZ2V0cyI6IHsiZm9vL0FQTV9UUkFDSU5HLzMwIjoge30sICJiYXIiOiB7fX0sImN1c3RvbSI6IHsib3BhcXVlX2JhY2tlbmRfc3RhdGUiOiAiMTUifX19",
           "client_configs": ["foo/APM_TRACING/30"],
           "target_files": [{"path": "foo/APM_TRACING/30", "raw": "eyJmb28iOiAiYmFyIn0="}]
