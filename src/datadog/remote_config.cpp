@@ -7,6 +7,7 @@
 
 #include "base64.h"
 #include "json.hpp"
+#include "random.h"
 #include "version.h"
 
 using namespace nlohmann::literals;
@@ -50,7 +51,7 @@ RemoteConfigurationManager::RemoteConfigurationManager(
     const TracerId& tracer_id, ConfigManager& config_manager)
     : tracer_id_(tracer_id),
       config_manager_(config_manager),
-      rc_id_(RuntimeID::generate()) {}
+      client_id_(uuid()) {}
 
 bool RemoteConfigurationManager::is_new_config(
     StringView config_path, const nlohmann::json& config_meta) {
@@ -65,7 +66,7 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
   // clang-format off
   auto j = nlohmann::json{
     {"client", {
-      {"id", rc_id_.string()},
+      {"id", client_id_},
       {"products", nlohmann::json::array({k_apm_product})},
       {"is_tracer", true},
       {"capabilities", k_apm_capabilities},
