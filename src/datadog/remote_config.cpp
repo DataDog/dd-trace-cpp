@@ -153,7 +153,6 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
         continue;
       }
 
-      // NOTE(@dmehala): is it worth indexing first?
       const auto& target_files = json.at("/target_files"_json_pointer);
       auto target_it = std::find_if(
           target_files.cbegin(), target_files.cend(),
