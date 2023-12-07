@@ -67,13 +67,5 @@ class HTTPClient {
   virtual ~HTTPClient() = default;
 };
 
-namespace httputil::header {
-
-inline void json_content_type_setter(DictWriter& headers) {
-  headers.set("Content-Type", "application/json");
-}
-
-}  // namespace httputil::header
-
 }  // namespace tracing
 }  // namespace datadog
