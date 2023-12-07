@@ -37,7 +37,7 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
 
 }  // namespace
 
-void from_json(const nlohmann::json& j, ConfigUpdate& out) {
+void from_json(const nlohmann::json& j, ConfigManager::Update& out) {
   if (auto sampling_rate_it = j.find("tracing_sampling_rate");
       sampling_rate_it != j.cend()) {
     TraceSamplerConfig trace_sampler_cfg;
@@ -173,7 +173,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
       new_config.id = config_json.at("id");
       new_config.version = config_json.at("revision");
-      new_config.content = ConfigUpdate(config_json.at("lib_config"));
+      new_config.content = ConfigManager::Update(config_json.at("lib_config"));
 
       apply_config(new_config);
       applied_config_[std::string{config_path}] = new_config;

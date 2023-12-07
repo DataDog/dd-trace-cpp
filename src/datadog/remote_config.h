@@ -24,7 +24,7 @@ class RemoteConfigurationManager {
     std::string id;
     std::string hash;
     std::size_t version;
-    ConfigUpdate content;
+    ConfigManager::Update content;
   };
 
   TracerId tracer_id_;
