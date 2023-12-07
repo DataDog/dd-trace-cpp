@@ -10,7 +10,7 @@ namespace tracing {
 
 TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
                                  const std::shared_ptr<Logger>& logger,
-                                 const TracerId& tracer_id)
+                                 const TracerID& tracer_id)
     : enabled_(enabled),
       clock_(clock),
       logger_(logger),

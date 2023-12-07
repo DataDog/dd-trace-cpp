@@ -1,5 +1,7 @@
 #pragma once
 
+// TODO: Document
+
 #include <string>
 
 #include "config_manager.h"
@@ -24,18 +26,18 @@ class RemoteConfigurationManager {
     std::string id;
     std::string hash;
     std::size_t version;
-    ConfigUpdate content;
+    ConfigManager::Update content;
   };
 
-  TracerId tracer_id_;
+  TracerID tracer_id_;
   ConfigManager& config_manager_;
-  RuntimeID rc_id_;
+  std::string client_id_;
 
   State state_;
   std::unordered_map<std::string, Configuration> applied_config_;
 
  public:
-  RemoteConfigurationManager(const TracerId& tracer_id,
+  RemoteConfigurationManager(const TracerID& tracer_id,
                              ConfigManager& config_manager);
 
   nlohmann::json make_request_payload();

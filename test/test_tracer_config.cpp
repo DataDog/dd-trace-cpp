@@ -410,7 +410,7 @@ TEST_CASE("TracerConfig::agent") {
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code ==
-              Error::DATADOG_AGENT_INVALID_CONFIGURATION);
+              Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
     }
 
     SECTION("cannot be negative") {
@@ -418,7 +418,7 @@ TEST_CASE("TracerConfig::agent") {
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code ==
-              Error::DATADOG_AGENT_INVALID_CONFIGURATION);
+              Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
     }
 
     SECTION("override default value") {

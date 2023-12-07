@@ -4,6 +4,7 @@ cc_library(
     "src/datadog/base64.cpp",
     "src/datadog/cerr_logger.cpp",
     "src/datadog/clock.cpp",
+    "src/datadog/config_manager.cpp",
     "src/datadog/collector_response.cpp",
 #     "src/datadog/curl.cpp", no libcurl
     "src/datadog/datadog_agent_config.cpp",

@@ -104,6 +104,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
+    src/datadog/config_manager.cpp
     src/datadog/collector_response.cpp
     src/datadog/curl.cpp
     src/datadog/datadog_agent_config.cpp

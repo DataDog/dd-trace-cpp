@@ -1,12 +1,12 @@
 #include "remote_config.h"
 
-#include <stdint.h>
-
+#include <cstdint>
 #include <type_traits>
 #include <unordered_set>
 
 #include "base64.h"
 #include "json.hpp"
+#include "random.h"
 #include "version.h"
 
 using namespace nlohmann::literals;
@@ -15,6 +15,16 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+// The ".client.capabilities" field of the remote config request payload
+// describes which parts of the library's configuration are supported for remote
+// configuration.
+//
+// It's a bitset, 64 bits wide, where each bit indicates whether the library
+// supports a particular feature for remote configuration.
+//
+// The bitset is encoded in the request as a JSON array of 8 integers, where
+// each integer is one byte from the 64 bits. The bytes are in big-endian order
+// within the array.
 enum CapabilitiesFlag : uint64_t {
   APM_TRACING_SAMPLE_RATE = 1 << 12,
 };
@@ -30,14 +40,15 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
   return res;
 }
 
-constexpr StringView k_apm_product = "APM_TRACING";
-
 constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
-    capabilities_byte_array((uint64_t)0 | APM_TRACING_SAMPLE_RATE);
+    capabilities_byte_array(APM_TRACING_SAMPLE_RATE);
+
+constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
+constexpr StringView k_apm_product = "APM_TRACING";
 
 }  // namespace
 
-void from_json(const nlohmann::json& j, ConfigUpdate& out) {
+void from_json(const nlohmann::json& j, ConfigManager::Update& out) {
   if (auto sampling_rate_it = j.find("tracing_sampling_rate");
       sampling_rate_it != j.cend()) {
     TraceSamplerConfig trace_sampler_cfg;
@@ -47,10 +58,10 @@ void from_json(const nlohmann::json& j, ConfigUpdate& out) {
 }
 
 RemoteConfigurationManager::RemoteConfigurationManager(
-    const TracerId& tracer_id, ConfigManager& config_manager)
+    const TracerID& tracer_id, ConfigManager& config_manager)
     : tracer_id_(tracer_id),
       config_manager_(config_manager),
-      rc_id_(RuntimeID::generate()) {}
+      client_id_(uuid()) {}
 
 bool RemoteConfigurationManager::is_new_config(
     StringView config_path, const nlohmann::json& config_meta) {
@@ -65,7 +76,7 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
   // clang-format off
   auto j = nlohmann::json{
     {"client", {
-      {"id", rc_id_.string()},
+      {"id", client_id_},
       {"products", nlohmann::json::array({k_apm_product})},
       {"is_tracer", true},
       {"capabilities", k_apm_capabilities},
@@ -109,7 +120,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
 
   try {
     const auto targets = nlohmann::json::parse(
-        base64::decode(json.at("targets").get<StringView>()));
+        base64_decode(json.at("targets").get<StringView>()));
 
     state_.targets_version = targets.at("/signed/version"_json_pointer);
     state_.opaque_backend_state =
@@ -138,18 +149,16 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
 
       const auto& config_metadata =
           targets.at("/signed/targets"_json_pointer).at(config_path);
-      if (!contains(config_path, k_apm_product) ||
+      if (!contains(config_path, k_apm_product_path_substring) ||
           !is_new_config(config_path, config_metadata)) {
         continue;
       }
 
-      // NOTE(@dmehala): is it worth indexing first?
       const auto& target_files = json.at("/target_files"_json_pointer);
       auto target_it = std::find_if(
           target_files.cbegin(), target_files.cend(),
-          [&config_path](const auto& j) {
-            return j.at("/path"_json_pointer).template get<StringView>() ==
-                   config_path;
+          [&config_path](const nlohmann::json& j) {
+            return j.at("/path"_json_pointer).get<StringView>() == config_path;
           });
 
       if (target_it == target_files.cend()) {
@@ -159,7 +168,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       }
 
       const auto config_json = nlohmann::json::parse(
-          base64::decode(target_it.value().at("raw").get<StringView>()));
+          base64_decode(target_it.value().at("raw").get<StringView>()));
 
       const auto& targeted_service = config_json.at("service_target");
       if (targeted_service.at("service").get<StringView>() !=
@@ -173,7 +182,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
       new_config.id = config_json.at("id");
       new_config.version = config_json.at("revision");
-      new_config.content = ConfigUpdate(config_json.at("lib_config"));
+      new_config.content = ConfigManager::Update(config_json.at("lib_config"));
 
       apply_config(new_config);
       applied_config_[std::string{config_path}] = new_config;

@@ -26,7 +26,7 @@ class FinalizedDatadogAgentConfig;
 class Logger;
 struct SpanData;
 class TraceSampler;
-struct TracerId;
+struct TracerID;
 
 class DatadogAgent : public Collector {
  public:
@@ -65,7 +65,7 @@ class DatadogAgent : public Collector {
  public:
   DatadogAgent(const FinalizedDatadogAgentConfig&,
                const std::shared_ptr<TracerTelemetry>&,
-               const std::shared_ptr<Logger>&, const TracerId& id,
+               const std::shared_ptr<Logger>&, const TracerID& id,
                ConfigManager& config_manager);
   ~DatadogAgent();
 

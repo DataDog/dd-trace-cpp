@@ -28,14 +28,14 @@ class DictReader;
 struct SpanConfig;
 class TraceSampler;
 class SpanSampler;
-struct TracerId;
+struct TracerID;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<const SpanDefaults> defaults_;
   RuntimeID runtime_id_;
-  TracerId id_;
+  TracerID id_;
   std::shared_ptr<TracerTelemetry> tracer_telemetry_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const IDGenerator> generator_;

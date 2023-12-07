@@ -133,7 +133,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   if (rc_poll_interval_seconds <= 0) {
-    return Error{Error::DATADOG_AGENT_INVALID_CONFIGURATION,
+    return Error{Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL,
                  "DatadogAgent: Remote Configuration poll interval must be a "
                  "positive number of seconds."};
   }

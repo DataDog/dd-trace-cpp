@@ -22,7 +22,7 @@ TEST_CASE("Tracer telemetry") {
   };
   auto logger = std::make_shared<MockLogger>();
 
-  const TracerId tracer_id{/* runtime_id = */ RuntimeID::generate(),
+  const TracerID tracer_id{/* runtime_id = */ RuntimeID::generate(),
                            /* service = */ "testsvc",
                            /* environment = */ "test"};
 
