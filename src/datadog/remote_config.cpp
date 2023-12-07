@@ -48,7 +48,7 @@ void from_json(const nlohmann::json& j, ConfigManager::Update& out) {
 }
 
 RemoteConfigurationManager::RemoteConfigurationManager(
-    const TracerId& tracer_id, ConfigManager& config_manager)
+    const TracerID& tracer_id, ConfigManager& config_manager)
     : tracer_id_(tracer_id),
       config_manager_(config_manager),
       client_id_(uuid()) {}

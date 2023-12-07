@@ -6,7 +6,7 @@ namespace datadog {
 namespace tracing {
 
 // Identify a tracer
-struct TracerId {
+struct TracerID {
   RuntimeID runtime_id;
   std::string service;
   std::string environment;

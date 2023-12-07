@@ -29,7 +29,7 @@ class RemoteConfigurationManager {
     ConfigManager::Update content;
   };
 
-  TracerId tracer_id_;
+  TracerID tracer_id_;
   ConfigManager& config_manager_;
   std::string client_id_;
 
@@ -37,7 +37,7 @@ class RemoteConfigurationManager {
   std::unordered_map<std::string, Configuration> applied_config_;
 
  public:
-  RemoteConfigurationManager(const TracerId& tracer_id,
+  RemoteConfigurationManager(const TracerID& tracer_id,
                              ConfigManager& config_manager);
 
   nlohmann::json make_request_payload();
