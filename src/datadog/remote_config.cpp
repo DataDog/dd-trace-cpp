@@ -1,7 +1,6 @@
 #include "remote_config.h"
 
-#include <stdint.h>
-
+#include <cstdint>
 #include <type_traits>
 #include <unordered_set>
 
@@ -16,6 +15,16 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+// The ".client.capabilities" field of the remote config request payload
+// describes which parts of the library's configuration are supported for remote
+// configuration.
+//
+// It's a bitset, 64 bits wide, where each bit indicates whether the library
+// supports a particular feature for remote configuration.
+//
+// The bitset is encoded in the request as a JSON array of 8 integers, where
+// each integer is one byte from the 64 bits. The bytes are in big-endian order
+// within the array.
 enum CapabilitiesFlag : uint64_t {
   APM_TRACING_SAMPLE_RATE = 1 << 12,
 };
@@ -31,10 +40,10 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
   return res;
 }
 
-constexpr StringView k_apm_product = "APM_TRACING";
-
 constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
-    capabilities_byte_array((uint64_t)0 | APM_TRACING_SAMPLE_RATE);
+    capabilities_byte_array(APM_TRACING_SAMPLE_RATE);
+
+constexpr StringView k_apm_product = "APM_TRACING";
 
 }  // namespace
 
