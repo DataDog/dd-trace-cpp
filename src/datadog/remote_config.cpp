@@ -43,6 +43,7 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
 constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
     capabilities_byte_array(APM_TRACING_SAMPLE_RATE);
 
+constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
 constexpr StringView k_apm_product = "APM_TRACING";
 
 }  // namespace
@@ -148,7 +149,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
 
       const auto& config_metadata =
           targets.at("/signed/targets"_json_pointer).at(config_path);
-      if (!contains(config_path, k_apm_product) ||
+      if (!contains(config_path, k_apm_product_path_substring) ||
           !is_new_config(config_path, config_metadata)) {
         continue;
       }
