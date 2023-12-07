@@ -430,6 +430,7 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
           return;
         }
 
+        // TODO(@dgoffredo): When is the parsed JSON object empty?
         if (!response_json.empty()) {
           // TODO (during Active Configuration): `process_response` should
           // return a list of configuration update and should be consumed by
