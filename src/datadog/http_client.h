@@ -11,7 +11,6 @@
 #include <chrono>
 #include <functional>
 
-#include "dict_writer.h"
 #include "error.h"
 #include "expected.h"
 #include "json_fwd.hpp"
