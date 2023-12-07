@@ -1,19 +1,15 @@
 #pragma once
 
+#include <string>
+
 #include "string_view.h"
 
 namespace datadog {
 namespace tracing {
-namespace base64 {
 
-/*
- * Decode a base64-encoded string and returns the decoded data.
- *
- * It only supported padded base64-encoded string. Providing an unpadded
- * input will return an empty string.
- */
-std::string decode(StringView in);
+// Return the result of decoding the specified padded base64-encoded `input`. If
+// `input` is not padded, then return the empty string instead.
+std::string base64_decode(StringView input);
 
-}  // namespace base64
 }  // namespace tracing
 }  // namespace datadog

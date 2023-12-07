@@ -109,7 +109,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
 
   try {
     const auto targets = nlohmann::json::parse(
-        base64::decode(json.at("targets").get<StringView>()));
+        base64_decode(json.at("targets").get<StringView>()));
 
     state_.targets_version = targets.at("/signed/version"_json_pointer);
     state_.opaque_backend_state =
@@ -159,7 +159,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       }
 
       const auto config_json = nlohmann::json::parse(
-          base64::decode(target_it.value().at("raw").get<StringView>()));
+          base64_decode(target_it.value().at("raw").get<StringView>()));
 
       const auto& targeted_service = config_json.at("service_target");
       if (targeted_service.at("service").get<StringView>() !=
