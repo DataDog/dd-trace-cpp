@@ -148,9 +148,8 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       const auto& target_files = json.at("/target_files"_json_pointer);
       auto target_it = std::find_if(
           target_files.cbegin(), target_files.cend(),
-          [&config_path](const auto& j) {
-            return j.at("/path"_json_pointer).template get<StringView>() ==
-                   config_path;
+          [&config_path](const nlohmann::json& j) {
+            return j.at("/path"_json_pointer).get<StringView>() == config_path;
           });
 
       if (target_it == target_files.cend()) {
