@@ -401,12 +401,11 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
              std::string response_body) {
         if (response_status < 200 || response_status >= 300) {
           if (response_status == 404) {
-            /*
-             * 404 is not considered as an error as the agent use it to
-             * signal remote configuration is disabled. At any point, the
-             * feature could be enabled, so the tracer must continuously check
-             * for new remote configuration.
-             */
+            // If the Datadog Agent doesn't understand remote configuration,
+            // or if remote configuration is disabled in the agent, then it
+            // will return 404. This is not an error.
+            // We'll keep polling, though, because the agent's configuration
+            // might change.
             return;
           }
 
