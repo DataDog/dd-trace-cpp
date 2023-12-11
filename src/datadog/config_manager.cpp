@@ -14,7 +14,7 @@ std::shared_ptr<TraceSampler> ConfigManager::get_trace_sampler() {
   return current_trace_sampler_;
 }
 
-void ConfigManager::update(const ConfigManager::Update& conf) {
+void ConfigManager::update(const ConfigUpdate& conf) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (conf.trace_sampler) {

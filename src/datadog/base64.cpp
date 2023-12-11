@@ -11,7 +11,7 @@ constexpr uint8_t _ = k_sentinel;  // for brevity
 constexpr uint8_t k_eol = 0;
 
 // Invalid inputs are mapped to the value 255. '=' maps to 0.
-constexpr uint8_t k_base64_table[]{
+constexpr uint8_t k_base64_table[] = {
     _,  _,  _,  _,  _,  _,  _,  _,     _,  _,  _,  _,  _,  _,  _,  _,  _,  _,
     _,  _,  _,  _,  _,  _,  _,  _,     _,  _,  _,  _,  _,  _,  _,  _,  _,  _,
     _,  _,  _,  _,  _,  _,  _,  62,    _,  _,  _,  63, 52, 53, 54, 55, 56, 57,
@@ -34,11 +34,6 @@ std::string base64_decode(StringView input) {
   std::string output;
   output.reserve(in_size);
 
-  union {
-    uint32_t buffer;
-    uint8_t bytes[4];
-  } decoder;
-
   size_t i = 0;
 
   for (; i + 4 < in_size;) {
@@ -52,17 +47,9 @@ std::string base64_decode(StringView input) {
       return "";
     }
 
-    decoder.buffer = 0 | c0 << 26 | c1 << 20 | c2 << 14 | c3 << 8;
-
-    // NOTE(@dmehala): It might seem confusing to read those bytes input reverse
-    // order. It is related to the architecture endianess. For now the set of
-    // architecture we support (x86_64 and arm64) are all little-endian.
-    // TODO(@dgoffredo): I'd prefer an endian-agnostic implementation.
-    // nginx-datadog targets x86_64 and arm64 in its binary releases, but
-    // dd-trace-cpp targets any standard C++17 compiler.
-    output.push_back(decoder.bytes[3]);
-    output.push_back(decoder.bytes[2]);
-    output.push_back(decoder.bytes[1]);
+    output.push_back(c0 << 2 | (c1 & 0xF0) >> 4);
+    output.push_back((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2));
+    output.push_back(((c2 & 0x03) << 6) | (c3 & 0x3F));
   }
 
   // If padding is missing, return the empty string in lieu of an Error.
@@ -78,17 +65,20 @@ std::string base64_decode(StringView input) {
     return "";
   }
 
-  decoder.buffer = 0 | c0 << 26 | c1 << 20 | c2 << 14 | c3 << 8;
-
   if (c2 == k_eol) {
-    output.push_back(decoder.bytes[3]);
+    // The last quadruplet is of the form "xx==", where only one character needs
+    // to be decoded.
+    output.push_back(c0 << 2 | (c1 & 0xF0) >> 4);
   } else if (c3 == k_eol) {
-    output.push_back(decoder.bytes[3]);
-    output.push_back(decoder.bytes[2]);
+    // The last quadruplet is of the form "xxx=", where only two character needs
+    // to be decoded.
+    output.push_back(c0 << 2 | (c1 & 0xF0) >> 4);
+    output.push_back((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2));
   } else {
-    output.push_back(decoder.bytes[3]);
-    output.push_back(decoder.bytes[2]);
-    output.push_back(decoder.bytes[1]);
+    // The last quadruplet is not padded -> common use case
+    output.push_back(c0 << 2 | (c1 & 0xF0) >> 4);
+    output.push_back((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2));
+    output.push_back(((c2 & 0x03) << 6) | (c3 & 0x3F));
   }
 
   return output;

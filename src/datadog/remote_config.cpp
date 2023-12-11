@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "base64.h"
+#include "datadog/string_view.h"
 #include "json.hpp"
 #include "random.h"
 #include "version.h"
@@ -43,19 +44,24 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
 constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
     capabilities_byte_array(APM_TRACING_SAMPLE_RATE);
 
-constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
 constexpr StringView k_apm_product = "APM_TRACING";
+constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
 
-}  // namespace
+ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
+  ConfigUpdate config_update;
 
-void from_json(const nlohmann::json& j, ConfigManager::Update& out) {
   if (auto sampling_rate_it = j.find("tracing_sampling_rate");
       sampling_rate_it != j.cend()) {
     TraceSamplerConfig trace_sampler_cfg;
     trace_sampler_cfg.sample_rate = *sampling_rate_it;
-    out.trace_sampler = trace_sampler_cfg;
+
+    config_update.trace_sampler = trace_sampler_cfg;
   }
+
+  return config_update;
 }
+
+}  // namespace
 
 RemoteConfigurationManager::RemoteConfigurationManager(
     const TracerID& tracer_id, ConfigManager& config_manager)
@@ -182,7 +188,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
       new_config.id = config_json.at("id");
       new_config.version = config_json.at("revision");
-      new_config.content = ConfigManager::Update(config_json.at("lib_config"));
+      new_config.content = parse_dynamic_config(config_json.at("lib_config"));
 
       apply_config(new_config);
       applied_config_[std::string{config_path}] = new_config;
