@@ -42,7 +42,7 @@ TEST_CASE("TraceSegment accessors") {
     auto span = tracer.create_span();
 
     auto hostname = span.trace_segment().hostname();
-    if (config.report_hostname) {
+    if (*config.report_hostname) {
       REQUIRE(hostname);
     } else {
       REQUIRE(!hostname);

@@ -49,14 +49,14 @@ struct TracerConfig {
   // `report_traces` is `false`, then both `agent` and `collector` are ignored.
   // `report_traces` is overridden by the `DD_TRACE_ENABLED` environment
   // variable.
-  bool report_traces = true;
+  Optional<bool> report_traces;
 
   // `report_telemetry` indicates whether telemetry about the tracer will be
   // sent to a collector (`true`) or discarded on completion (`false`).  If
   // `report_telemetry` is `false`, then this feature is disabled.
   // `report_telemetry` is overridden by the
   // `DD_INSTRUMENTATION_TELEMETRY_ENABLED` environment variable.
-  bool report_telemetry = true;
+  Optional<bool> report_telemetry;
 
   // `trace_sampler` configures trace sampling.  Trace sampling determines which
   // traces are sent to Datadog.  See `trace_sampler_config.h`.
@@ -72,8 +72,7 @@ struct TracerConfig {
   // All styles indicated by `injection_styles` are used for injection.
   // `injection_styles` is overridden by the `DD_TRACE_PROPAGATION_STYLE_INJECT`
   // and `DD_TRACE_PROPAGATION_STYLE` environment variables.
-  std::vector<PropagationStyle> injection_styles = {PropagationStyle::DATADOG,
-                                                    PropagationStyle::W3C};
+  std::vector<PropagationStyle> injection_styles;
 
   // `extraction_styles` indicates with which tracing systems trace propagation
   // will be compatible when extracting (receiving) trace context.
@@ -83,18 +82,17 @@ struct TracerConfig {
   // `extraction_styles` is overridden by the
   // `DD_TRACE_PROPAGATION_STYLE_EXTRACT` and `DD_TRACE_PROPAGATION_STYLE`
   // environment variables.
-  std::vector<PropagationStyle> extraction_styles = {PropagationStyle::DATADOG,
-                                                     PropagationStyle::W3C};
+  std::vector<PropagationStyle> extraction_styles;
 
   // `report_hostname` indicates whether the tracer will include the result of
   // `gethostname` with traces sent to the collector.
-  bool report_hostname = false;
+  Optional<bool> report_hostname;
 
   // `tags_header_size` is the maximum allowed size, in bytes, of the serialized
   // value of the "X-Datadog-Tags" header used when injecting trace context for
   // propagation.  If the serialized value of the header would exceed
   // `tags_header_size`, the header will be omitted instead.
-  std::size_t tags_header_size = 512;
+  Optional<std::size_t> tags_header_size;
 
   // `logger` specifies how the tracer will issue diagnostic messages.  If
   // `logger` is null, then it defaults to a logger that inserts into
@@ -105,13 +103,13 @@ struct TracerConfig {
   // configuration information once initialized.
   // `log_on_startup` is overridden by the `DD_TRACE_STARTUP_LOGS` environment
   // variable.
-  bool log_on_startup = true;
+  Optional<bool> log_on_startup;
 
   // `trace_id_128_bit` indicates whether the tracer will generate 128-bit trace
   // IDs.  If true, the tracer will generate 128-bit trace IDs. If false, the
   // tracer will generate 64-bit trace IDs. `trace_id_128_bit` is overridden by
   // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
-  bool trace_id_128_bit = true;
+  Optional<bool> trace_id_128_bit;
 
   // `runtime_id` denotes the current run of the application in which the tracer
   // is embedded. If `runtime_id` is not specified, then it defaults to a
@@ -142,13 +140,13 @@ class FinalizedTracerConfig {
   std::vector<PropagationStyle> injection_styles;
   std::vector<PropagationStyle> extraction_styles;
 
-  bool report_hostname;
+  Optional<std::string> hostname;
   std::size_t tags_header_size;
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
   bool report_telemetry;
-  Optional<RuntimeID> runtime_id;
+  RuntimeID runtime_id;
   Clock clock;
 };
 

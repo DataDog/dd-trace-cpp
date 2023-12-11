@@ -115,6 +115,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/error.cpp
     src/datadog/extraction_util.cpp
     src/datadog/glob.cpp
+    src/datadog/http_client.cpp
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
     src/datadog/logger.cpp

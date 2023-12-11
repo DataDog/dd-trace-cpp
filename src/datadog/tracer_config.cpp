@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "cerr_logger.h"
+#include "datadog/platform_util.h"
 #include "datadog_agent.h"
 #include "environment.h"
 #include "json.hpp"
@@ -18,6 +19,23 @@
 
 namespace datadog {
 namespace tracing {
+namespace defaults {
+
+constexpr bool enable_128bit_traceid = true;
+constexpr bool log_on_startup = true;
+constexpr bool report_traces = true;
+constexpr bool report_telemetry = true;
+constexpr bool report_hostname = false;
+constexpr std::size_t tags_header_size = 512;
+
+const std::vector<PropagationStyle> injection_styles{PropagationStyle::DATADOG,
+                                                     PropagationStyle::W3C};
+
+const std::vector<PropagationStyle> extraction_styles{PropagationStyle::DATADOG,
+                                                      PropagationStyle::W3C};
+
+}  // namespace defaults
+
 namespace {
 
 bool falsy(StringView text) {
@@ -236,16 +254,23 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
   // Parse the propagation styles from the configuration and/or from the
   // environment.
   // Exceptions make this section simpler.
+  std::vector<PropagationStyle> extraction_styles =
+      config.extraction_styles.empty() ? defaults::extraction_styles
+                                       : config.extraction_styles;
+  std::vector<PropagationStyle> injection_styles =
+      config.injection_styles.empty() ? defaults::injection_styles
+                                      : config.injection_styles;
+
   try {
     const auto global_styles = styles_from_env(env::DD_TRACE_PROPAGATION_STYLE);
     result.extraction_styles =
         value_or(styles_from_env(env::DD_TRACE_PROPAGATION_STYLE_EXTRACT),
                  styles_from_env(env::DD_PROPAGATION_STYLE_EXTRACT),
-                 global_styles, config.extraction_styles);
+                 global_styles, extraction_styles);
     result.injection_styles =
         value_or(styles_from_env(env::DD_TRACE_PROPAGATION_STYLE_INJECT),
                  styles_from_env(env::DD_PROPAGATION_STYLE_INJECT),
-                 global_styles, config.injection_styles);
+                 global_styles, injection_styles);
   } catch (Error &error) {
     return std::move(error);
   }
@@ -307,12 +332,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
     result.logger = std::make_shared<CerrLogger>();
   }
 
-  result.log_on_startup = config.log_on_startup;
+  result.log_on_startup =
+      config.log_on_startup.value_or(defaults::log_on_startup);
   if (auto startup_env = lookup(environment::DD_TRACE_STARTUP_LOGS)) {
     result.log_on_startup = !falsy(*startup_env);
   }
 
-  bool report_traces = config.report_traces;
+  bool report_traces = config.report_traces.value_or(defaults::report_traces);
   if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
     report_traces = !falsy(*enabled_env);
   }
@@ -329,7 +355,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
     result.collector = config.collector;
   }
 
-  bool report_telemetry = config.report_telemetry;
+  bool report_telemetry =
+      config.report_telemetry.value_or(defaults::report_telemetry);
   if (auto enabled_env =
           lookup(environment::DD_INSTRUMENTATION_TELEMETRY_ENABLED)) {
     report_telemetry = !falsy(*enabled_env);
@@ -355,17 +382,24 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
     return maybe_error.error();
   }
 
-  result.report_hostname = config.report_hostname;
-  result.tags_header_size = config.tags_header_size;
+  bool report_hostname =
+      config.report_hostname.value_or(defaults::report_hostname);
+
+  result.hostname = report_hostname ? get_hostname() : nullopt;
+
+  result.tags_header_size =
+      config.tags_header_size.value_or(defaults::tags_header_size);
 
   if (auto enabled_env =
           lookup(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)) {
     result.trace_id_128_bit = !falsy(*enabled_env);
   } else {
-    result.trace_id_128_bit = config.trace_id_128_bit;
+    result.trace_id_128_bit =
+        config.trace_id_128_bit.value_or(defaults::enable_128bit_traceid);
   }
 
-  result.runtime_id = config.runtime_id;
+  result.runtime_id =
+      config.runtime_id ? *config.runtime_id : RuntimeID::generate();
 
   return result;
 }

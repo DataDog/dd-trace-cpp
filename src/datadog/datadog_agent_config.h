@@ -37,7 +37,7 @@ struct DatadogAgentConfig {
   // The `EventScheduler` used to periodically submit batches of traces to the
   // Datadog Agent.  If `event_scheduler` is null, then a
   // `ThreadedEventScheduler` instance will be used instead.
-  std::shared_ptr<EventScheduler> event_scheduler = nullptr;
+  std::shared_ptr<EventScheduler> event_scheduler;
   // A URL at which the Datadog Agent can be contacted.
   // The following formats are supported:
   //
@@ -47,18 +47,16 @@ struct DatadogAgentConfig {
   // - unix://<path to socket>
   //
   // The port defaults to 8126 if it is not specified.
-  std::string url = "http://localhost:8126";
+  Optional<std::string> url;
   // How often, in milliseconds, to send batches of traces to the Datadog Agent.
-  int flush_interval_milliseconds = 2000;
+  Optional<int> flush_interval_milliseconds;
   // Maximum amount of time an HTTP request is allowed to run.
-  int request_timeout_milliseconds = 2000;
+  Optional<int> request_timeout_milliseconds;
   // Maximum amount of time the process is allowed to wait before shutting down.
-  int shutdown_timeout_milliseconds = 2000;
+  Optional<int> shutdown_timeout_milliseconds;
   // How often, in seconds, to query the Datadog Agent for remote configuration
   // updates.
-  int remote_configuration_poll_interval_seconds = 5;
-
-  static Expected<HTTPClient::URL> parse(StringView);
+  Optional<int> remote_configuration_poll_interval_seconds;
 };
 
 class FinalizedDatadogAgentConfig {

@@ -13,9 +13,10 @@ namespace tracing {
 
 class RuntimeID {
   std::string uuid_;
-  RuntimeID();
 
  public:
+  RuntimeID();
+
   // Return the canonical textual representation of this runtime ID.
   const std::string& string() const { return uuid_; }
 

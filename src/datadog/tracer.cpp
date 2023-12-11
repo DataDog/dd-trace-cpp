@@ -38,8 +38,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     : logger_(config.logger),
       collector_(/* see constructor body */),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
-      runtime_id_(config.runtime_id ? *config.runtime_id
-                                    : RuntimeID::generate()),
+      runtime_id_(config.runtime_id),
       id_{runtime_id_, config.defaults.service, config.defaults.environment},
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
           config.report_telemetry, config.clock, logger_, id_)),
@@ -49,7 +48,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       clock_(config.clock),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
-      hostname_(config.report_hostname ? get_hostname() : nullopt),
+      hostname_(config.hostname),
       tags_header_max_size_(config.tags_header_size),
       config_manager_(config) {
   if (auto* collector =
