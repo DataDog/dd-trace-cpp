@@ -10,6 +10,7 @@
 #include <map>
 #include <ostream>
 
+#include "datadog/trace_sampler_config.h"
 #include "mocks/collectors.h"
 #include "mocks/loggers.h"
 #include "test.h"
@@ -63,15 +64,18 @@ TEST_CASE("trace sampling rule sample rate") {
 
   const std::size_t num_iterations = 10'000;
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.trace_sampler.sample_rate = test_case.sample_rate;
-  // Plenty of head room so that the limiter doesn't throttle us.
-  config.trace_sampler.max_per_second = num_iterations * 2;
-  const auto collector = std::make_shared<PriorityCountingCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
+  config.set_service_name("testsvc");
 
-  auto finalized = finalize_config(config);
+  TraceSamplerConfig trace_sampler;
+  trace_sampler.sample_rate = test_case.sample_rate;
+  // Plenty of head room so that the limiter doesn't throttle us.
+  trace_sampler.max_per_second = num_iterations * 2;
+  config.set_trace_sampler(trace_sampler);
+  const auto collector = std::make_shared<PriorityCountingCollector>();
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
+
+  auto finalized = config.finalize();
   REQUIRE(finalized);
   Tracer tracer{*finalized};
 
@@ -120,18 +124,22 @@ TEST_CASE("trace sampling rate limiter") {
   CAPTURE(test_case.expected_kept_count);
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.trace_sampler.sample_rate = 1.0;
-  config.trace_sampler.max_per_second = test_case.max_per_second;
+  config.set_service_name("testsvc");
+
+  TraceSamplerConfig trace_sampler;
+  trace_sampler.sample_rate = 1.0;
+  trace_sampler.max_per_second = test_case.max_per_second;
+  config.set_trace_sampler(trace_sampler);
+
   const auto collector = std::make_shared<PriorityCountingCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
 
   TimePoint current_time = default_clock();
   // Modify `current_time` to advance the clock.
   auto clock = [&current_time]() { return current_time; };
 
-  auto finalized = finalize_config(config, clock);
+  auto finalized = config.finalize(clock);
   REQUIRE(finalized);
 
   Tracer tracer{*finalized};
@@ -176,16 +184,20 @@ TEST_CASE("priority sampling") {
         1.0}}));
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.defaults.environment = "dev";
+  config.set_service_name("testsvc");
+  config.set_environment("dev");
+
   // plenty of head room
-  config.trace_sampler.max_per_second = 2 * num_iterations;
+  TraceSamplerConfig trace_sampler;
+  trace_sampler.max_per_second = 2 * num_iterations;
+  config.set_trace_sampler(trace_sampler);
+
   const auto collector =
       std::make_shared<PriorityCountingCollectorWithResponse>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
 
-  auto finalized = finalize_config(config);
+  auto finalized = config.finalize();
   REQUIRE(finalized);
   Tracer tracer{*finalized};
 
@@ -206,17 +218,20 @@ TEST_CASE("priority sampling") {
 
 TEST_CASE("sampling rules") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<PriorityCountingCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
 
   SECTION("no rule matches → priority sampling") {
     TraceSamplerConfig::Rule rule;
     rule.service = "foosvc";
-    config.trace_sampler.rules.push_back(rule);
 
-    auto finalized = finalize_config(config);
+    TraceSamplerConfig trace_sampler;
+    trace_sampler.rules.push_back(rule);
+    config.set_trace_sampler(trace_sampler);
+
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
     {
@@ -234,9 +249,13 @@ TEST_CASE("sampling rules") {
     TraceSamplerConfig::Rule rule;
     rule.service = "testsvc";
     rule.sample_rate = 1.0;  // this is also the default
-    config.trace_sampler.rules.push_back(rule);
 
-    auto finalized = finalize_config(config);
+    TraceSamplerConfig trace_sampler;
+    trace_sampler.rules.push_back(rule);
+
+    config.set_trace_sampler(trace_sampler);
+
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
     {
@@ -249,16 +268,21 @@ TEST_CASE("sampling rules") {
   }
 
   SECTION("matches second rule") {
+    TraceSamplerConfig trace_sampler;
+
     TraceSamplerConfig::Rule rule;
     rule.service = "foosvc";
     rule.sample_rate = 1.0;  // this is also the default
-    config.trace_sampler.rules.push_back(rule);
+    trace_sampler.rules.push_back(rule);
 
     rule.service = "testsvc";
     rule.sample_rate = 0.0;
-    config.trace_sampler.rules.push_back(rule);
 
-    auto finalized = finalize_config(config);
+    trace_sampler.rules.push_back(rule);
+
+    config.set_trace_sampler(trace_sampler);
+
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
     {

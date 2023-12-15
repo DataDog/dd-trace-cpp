@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <utility>
 
+#include "datadog/span_sampler_config.h"
+#include "datadog/trace_sampler_config.h"
 #include "mocks/collectors.h"
 #include "mocks/loggers.h"
 #include "test.h"
@@ -152,14 +154,20 @@ TEST_CASE("span rules matching") {
   }));
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
-  config.span_sampler.rules = test_case.rules;
-  config.trace_sampler.sample_rate = 0;  // drop the trace
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
 
-  auto finalized = finalize_config(config);
+  SpanSamplerConfig span_sampler;
+  span_sampler.rules = test_case.rules;
+  config.set_span_sampler(span_sampler);
+
+  TraceSamplerConfig trace_sampler;
+  trace_sampler.sample_rate = 0;  // drop the trace
+  config.set_trace_sampler(trace_sampler);
+
+  auto finalized = config.finalize();
   REQUIRE(finalized);
   Tracer tracer{*finalized};
   {
@@ -208,11 +216,15 @@ TEST_CASE("span rules matching") {
 
 TEST_CASE("span rules only on trace drop") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
-  config.span_sampler.rules.push_back(by_service("testsvc"));
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
+
+  SpanSamplerConfig span_sampler;
+  span_sampler.rules.push_back(by_service("testsvc"));
+
+  config.set_span_sampler(span_sampler);
 
   struct TestCase {
     std::string name;
@@ -226,9 +238,14 @@ TEST_CASE("span rules only on trace drop") {
   }));
 
   CAPTURE(test_case.name);
-  config.trace_sampler.sample_rate =
+
+  TraceSamplerConfig trace_sampler;
+  trace_sampler.sample_rate =
       test_case.decision == TestCase::KEEP_TRACE ? 1.0 : 0.0;
-  auto finalized = finalize_config(config);
+
+  config.set_trace_sampler(trace_sampler);
+
+  auto finalized = config.finalize();
   REQUIRE(finalized);
   Tracer tracer{*finalized};
   {
@@ -244,10 +261,10 @@ TEST_CASE("span rules only on trace drop") {
 
 TEST_CASE("span rule sample rate") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
 
   struct TestCase {
     std::string name;
@@ -265,9 +282,16 @@ TEST_CASE("span rule sample rate") {
   SpanSamplerConfig::Rule rule;
   rule.service = "testsvc";
   rule.sample_rate = test_case.span_rule_rate;
-  config.span_sampler.rules.push_back(rule);
-  config.trace_sampler.sample_rate = 0.0;  // drop the trace
-  auto finalized = finalize_config(config);
+
+  SpanSamplerConfig span_sampler;
+  span_sampler.rules.push_back(rule);
+
+  TraceSamplerConfig trace_sampler;
+  trace_sampler.sample_rate = 0.0;  // drop the trace
+
+  config.set_span_sampler(span_sampler);
+  config.set_trace_sampler(trace_sampler);
+  auto finalized = config.finalize();
   REQUIRE(finalized);
   Tracer tracer{*finalized};
   {
@@ -283,11 +307,15 @@ TEST_CASE("span rule sample rate") {
 
 TEST_CASE("span rule limiter") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
-  config.trace_sampler.sample_rate = 0.0;  // drop the trace
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
+
+  TraceSamplerConfig trace_sampler;
+  trace_sampler.sample_rate = 0.0;  // drop the trace
+
+  config.set_trace_sampler(trace_sampler);
 
   struct TestCase {
     std::string name;
@@ -303,10 +331,14 @@ TEST_CASE("span rule limiter") {
   CAPTURE(test_case.name);
   SpanSamplerConfig::Rule rule;
   rule.max_per_second = test_case.max_per_second;
-  config.span_sampler.rules.push_back(rule);
+
+  SpanSamplerConfig span_sampler;
+  span_sampler.rules.push_back(rule);
+
+  config.set_span_sampler(span_sampler);
 
   auto clock = [frozen_time = default_clock()]() { return frozen_time; };
-  auto finalized = finalize_config(config, clock);
+  auto finalized = config.finalize(clock);
   REQUIRE(finalized);
   Tracer tracer{*finalized};
 

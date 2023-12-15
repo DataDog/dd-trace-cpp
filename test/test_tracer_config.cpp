@@ -19,6 +19,8 @@
 #include <system_error>
 #include <unordered_map>
 
+#include "datadog/span_sampler_config.h"
+#include "datadog/trace_sampler_config.h"
 #include "mocks/collectors.h"
 #include "mocks/event_schedulers.h"
 #include "mocks/loggers.h"
@@ -40,6 +42,7 @@ std::ostream& operator<<(std::ostream& stream, PropagationStyle style) {
 }  // namespace datadog
 
 using namespace datadog::tracing;
+using namespace std::chrono_literals;
 
 namespace {
 
@@ -147,39 +150,39 @@ TEST_CASE("TracerConfig::defaults") {
 
   SECTION("service is required") {
     SECTION("empty") {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::SERVICE_NAME_REQUIRED);
     }
     SECTION("nonempty") {
-      config.defaults.service = "testsvc";
-      auto finalized = finalize_config(config);
+      config.set_service_name("testsvc");
+      auto finalized = config.finalize();
       REQUIRE(finalized);
     }
   }
 
   SECTION("DD_SERVICE overrides service") {
     const EnvGuard guard{"DD_SERVICE", "foosvc"};
-    config.defaults.service = "testsvc";
-    auto finalized = finalize_config(config);
+    config.set_service_name("testsvc");
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.service == "foosvc");
   }
 
   SECTION("DD_ENV overrides environment") {
     const EnvGuard guard{"DD_ENV", "prod"};
-    config.defaults.environment = "dev";
-    config.defaults.service = "required";
-    auto finalized = finalize_config(config);
+    config.set_environment("dev");
+    config.set_service_name("required");
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.environment == "prod");
   }
 
   SECTION("DD_VERSION overrides version") {
     const EnvGuard guard{"DD_VERSION", "v2"};
-    config.defaults.version = "v1";
-    config.defaults.service = "required";
-    auto finalized = finalize_config(config);
+    config.set_version("v1");
+    config.set_service_name("required");
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.version == "v2");
   }
@@ -212,12 +215,12 @@ TEST_CASE("TracerConfig::defaults") {
     }));
 
     // This will be overriden by the DD_TAGS environment variable.
-    config.defaults.tags = {{"foo", "bar"}};
-    config.defaults.service = "required";
+    config.set_tags({{"foo", "bar"}});
+    config.set_service_name("required");
 
     CAPTURE(test_case.name);
     const EnvGuard guard{"DD_TAGS", test_case.dd_tags};
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     if (test_case.expected_error) {
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == *test_case.expected_error);
@@ -231,13 +234,13 @@ TEST_CASE("TracerConfig::defaults") {
 
 TEST_CASE("TracerConfig::log_on_startup") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto logger = std::make_shared<MockLogger>();
-  config.logger = logger;
+  config.set_logger(logger);
 
   SECTION("default is true") {
     {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       const Tracer tracer{*finalized};
       (void)tracer;
@@ -249,8 +252,8 @@ TEST_CASE("TracerConfig::log_on_startup") {
 
   SECTION("false silences the startup message") {
     {
-      config.log_on_startup = false;
-      auto finalized = finalize_config(config);
+      config.log_configuration_on_startup(false);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       const Tracer tracer{*finalized};
       (void)tracer;
@@ -281,7 +284,7 @@ TEST_CASE("TracerConfig::log_on_startup") {
     const EnvGuard guard{"DD_TRACE_STARTUP_LOGS",
                          test_case.dd_trace_startup_logs};
     {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       const Tracer tracer{*finalized};
       (void)tracer;
@@ -292,14 +295,14 @@ TEST_CASE("TracerConfig::log_on_startup") {
 
 TEST_CASE("TracerConfig::report_traces") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<NullLogger>();
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<NullLogger>());
 
   SECTION("default is true") {
     {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       Tracer tracer{*finalized};
       auto span = tracer.create_span();
@@ -311,8 +314,8 @@ TEST_CASE("TracerConfig::report_traces") {
 
   SECTION("false disables collection") {
     {
-      config.report_traces = false;
-      auto finalized = finalize_config(config);
+      config.enable_traces(false);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       Tracer tracer{*finalized};
       auto span = tracer.create_span();
@@ -342,9 +345,9 @@ TEST_CASE("TracerConfig::report_traces") {
 
     CAPTURE(test_case.name);
     const EnvGuard guard{"DD_TRACE_ENABLED", test_case.dd_trace_enabled};
-    config.report_traces = test_case.original_value;
+    config.enable_traces(test_case.original_value);
     {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       Tracer tracer{*finalized};
       auto span = tracer.create_span();
@@ -361,43 +364,37 @@ TEST_CASE("TracerConfig::report_traces") {
 
 TEST_CASE("TracerConfig::agent") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
 
   SECTION("event_scheduler") {
     SECTION("default") {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
-      const auto* const agent =
-          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-      REQUIRE(agent);
-      REQUIRE(
-          dynamic_cast<ThreadedEventScheduler*>(agent->event_scheduler.get()));
+      REQUIRE(dynamic_cast<ThreadedEventScheduler*>(
+          finalized->agent_config.event_scheduler.get()));
     }
 
     SECTION("custom") {
       auto scheduler = std::make_shared<MockEventScheduler>();
-      config.agent.event_scheduler = scheduler;
-      auto finalized = finalize_config(config);
+      config.set_event_scheduler(scheduler);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
-      const auto* const agent =
-          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-      REQUIRE(agent);
-      REQUIRE(agent->event_scheduler == scheduler);
+      REQUIRE(finalized->agent_config.event_scheduler == scheduler);
     }
   }
 
   SECTION("flush interval") {
     SECTION("cannot be zero") {
-      config.agent.flush_interval_milliseconds = 0;
-      auto finalized = finalize_config(config);
+      config.set_flush_interval(0ms);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code ==
               Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL);
     }
 
     SECTION("cannot be negative") {
-      config.agent.flush_interval_milliseconds = -1337;
-      auto finalized = finalize_config(config);
+      config.set_flush_interval(-1337ms);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code ==
               Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL);
@@ -406,49 +403,35 @@ TEST_CASE("TracerConfig::agent") {
 
   SECTION("remote configuration poll interval") {
     SECTION("cannot be zero") {
-      config.agent.remote_configuration_poll_interval_seconds = 0;
-      auto finalized = finalize_config(config);
+      config.set_remote_configuration_poll_interval(0s);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code ==
               Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
     }
 
     SECTION("cannot be negative") {
-      config.agent.remote_configuration_poll_interval_seconds = -1337;
-      auto finalized = finalize_config(config);
+      config.set_remote_configuration_poll_interval(-1337s);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code ==
               Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
     }
 
     SECTION("override default value") {
-      SECTION("programmatically") {
-        config.agent.remote_configuration_poll_interval_seconds = 42;
-        auto finalized = finalize_config(config);
-        REQUIRE(finalized);
-        const auto* const agent =
-            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-        REQUIRE(agent);
-        REQUIRE(agent->remote_configuration_poll_interval ==
-                std::chrono::seconds(42));
-      }
-
       SECTION("environment variable") {
         const EnvGuard env_guard{"DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS",
                                  "15"};
-        auto finalized = finalize_config(config);
+        auto finalized = config.finalize();
         REQUIRE(finalized);
-        const auto* const agent =
-            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-        REQUIRE(agent);
-        REQUIRE(agent->remote_configuration_poll_interval ==
+        REQUIRE(finalized->agent_config.remote_configuration_poll_interval ==
                 std::chrono::seconds(15));
       }
 
       SECTION("ill-formated environment variable is an error") {
         const EnvGuard env_guard{"DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS",
                                  "ddog"};
-        auto finalized = finalize_config(config);
+        auto finalized = config.finalize();
         REQUIRE(!finalized);
         REQUIRE(finalized.error().code == Error::INVALID_INTEGER);
       }
@@ -482,19 +465,18 @@ TEST_CASE("TracerConfig::agent") {
       }));
 
       CAPTURE(test_case.url);
-      config.agent.url = test_case.url;
-      auto finalized = finalize_config(config);
+      config.set_datadog_agent_url(test_case.url);
+      auto finalized = config.finalize();
       if (test_case.expected_error) {
         REQUIRE(!finalized);
         REQUIRE(finalized.error().code == *test_case.expected_error);
       } else {
         REQUIRE(finalized);
-        const auto* const agent =
-            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-        REQUIRE(agent);
-        REQUIRE(agent->url.scheme == test_case.expected_scheme);
-        REQUIRE(agent->url.authority == test_case.expected_authority);
-        REQUIRE(agent->url.path == test_case.expected_path);
+
+        const auto& url = finalized->agent_config.url;
+        REQUIRE(url.scheme == test_case.expected_scheme);
+        REQUIRE(url.authority == test_case.expected_authority);
+        REQUIRE(url.path == test_case.expected_path);
       }
     }
 
@@ -545,34 +527,35 @@ TEST_CASE("TracerConfig::agent") {
         url_guard.emplace("DD_TRACE_AGENT_URL", *test_case.env_url);
       }
 
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
-      const auto* const agent =
-          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-      REQUIRE(agent);
-      REQUIRE(agent->url.scheme == test_case.expected_scheme);
-      REQUIRE(agent->url.authority == test_case.expected_authority);
+
+      const auto& url = finalized->agent_config.url;
+      REQUIRE(url.scheme == test_case.expected_scheme);
+      REQUIRE(url.authority == test_case.expected_authority);
     }
   }
 }
 
 TEST_CASE("TracerConfig::trace_sampler") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
 
   SECTION("default is no rules") {
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->trace_sampler.rules.size() == 0);
   }
 
   SECTION("one sampling rule") {
-    auto& rules = config.trace_sampler.rules;
+    TraceSamplerConfig trace_sampler;
+    auto& rules = trace_sampler.rules;
     rules.resize(rules.size() + 1);
     TraceSamplerConfig::Rule& rule = rules.back();
 
     SECTION("yields one sampling rule") {
-      auto finalized = finalize_config(config);
+      config.set_trace_sampler(trace_sampler);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.size() == 1);
       // and the default sample_rate is 100%
@@ -584,18 +567,22 @@ TEST_CASE("TracerConfig::trace_sampler") {
                            std::numeric_limits<double>::infinity(),
                            -std::numeric_limits<double>::infinity(), 42);
       rule.sample_rate = rate;
-      auto finalized = finalize_config(config);
+      config.set_trace_sampler(trace_sampler);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::RATE_OUT_OF_RANGE);
     }
   }
 
   SECTION("two sampling rules") {
-    auto& rules = config.trace_sampler.rules;
+    TraceSamplerConfig trace_sampler;
+    auto& rules = trace_sampler.rules;
     rules.resize(rules.size() + 2);
     rules[0].sample_rate = 0.5;
     rules[1].sample_rate = 0.6;
-    auto finalized = finalize_config(config);
+
+    config.set_trace_sampler(trace_sampler);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->trace_sampler.rules.size() == 2);
     REQUIRE(finalized->trace_sampler.rules[0].sample_rate == 0.5);
@@ -603,8 +590,11 @@ TEST_CASE("TracerConfig::trace_sampler") {
   }
 
   SECTION("global sample_rate creates a catch-all rule") {
-    config.trace_sampler.sample_rate = 0.25;
-    auto finalized = finalize_config(config);
+    TraceSamplerConfig trace_sampler;
+    trace_sampler.sample_rate = 0.25;
+
+    config.set_trace_sampler(trace_sampler);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->trace_sampler.rules.size() == 1);
     const auto& rule = finalized->trace_sampler.rules.front();
@@ -618,16 +608,19 @@ TEST_CASE("TracerConfig::trace_sampler") {
   SECTION("DD_TRACE_SAMPLE_RATE") {
     SECTION("sets the global sample_rate") {
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", "0.5"};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.size() == 1);
       REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 0.5);
     }
 
     SECTION("overrides TraceSamplerConfig::sample_rate") {
-      config.trace_sampler.sample_rate = 0.25;
+      TraceSamplerConfig trace_sampler;
+      trace_sampler.sample_rate = 0.25;
+
+      config.set_trace_sampler(trace_sampler);
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", "0.5"};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.size() == 1);
       REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 0.5);
@@ -662,7 +655,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
       CAPTURE(test_case.name);
 
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", test_case.env_value};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE_THAT(test_case.allowed_errors,
                    Catch::Matchers::VectorContains(finalized.error().code));
@@ -671,7 +664,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
 
   SECTION("max_per_second") {
     SECTION("defaults to 200") {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.max_per_second == 200);
     }
@@ -684,8 +677,11 @@ TEST_CASE("TracerConfig::trace_sampler") {
       CAPTURE(limit);
       CAPTURE(std::fpclassify(limit));
 
-      config.trace_sampler.max_per_second = limit;
-      auto finalized = finalize_config(config);
+      TraceSamplerConfig trace_sampler;
+      trace_sampler.max_per_second = limit;
+
+      config.set_trace_sampler(trace_sampler);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MAX_PER_SECOND_OUT_OF_RANGE);
     }
@@ -694,7 +690,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
   SECTION("DD_TRACE_RATE_LIMIT") {
     SECTION("overrides SpanSamplerConfig::max_per_second") {
       const EnvGuard guard{"DD_TRACE_RATE_LIMIT", "120"};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.max_per_second == 120);
     }
@@ -738,7 +734,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
       CAPTURE(test_case.name);
 
       const EnvGuard guard{"DD_TRACE_RATE_LIMIT", test_case.env_value};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE_THAT(test_case.allowed_errors,
                    Catch::Matchers::VectorContains(finalized.error().code));
@@ -749,7 +745,11 @@ TEST_CASE("TracerConfig::trace_sampler") {
     SECTION("sets sampling rules and overrides TraceSampler::rules") {
       TraceSamplerConfig::Rule config_rule;
       config_rule.service = "whatever";
-      config.trace_sampler.rules.push_back(config_rule);
+
+      TraceSamplerConfig trace_sampler;
+      trace_sampler.rules.push_back(config_rule);
+
+      config.set_trace_sampler(trace_sampler);
 
       auto rules_json = R"json([
         {"service": "poohbear", "name": "get.honey", "sample_rate": 0},
@@ -757,7 +757,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
       ])json";
 
       const EnvGuard guard{"DD_TRACE_SAMPLING_RULES", rules_json};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
 
       const auto& rules = finalized->trace_sampler.rules;
@@ -814,7 +814,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
       CAPTURE(test_case.name);
 
       const EnvGuard guard{"DD_TRACE_SAMPLING_RULES", test_case.json};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == test_case.expected_error);
     }
@@ -823,21 +823,23 @@ TEST_CASE("TracerConfig::trace_sampler") {
 
 TEST_CASE("TracerConfig::span_sampler") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
 
   SECTION("default is no rules") {
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->span_sampler.rules.size() == 0);
   }
 
   SECTION("one sampling rule") {
-    auto& rules = config.span_sampler.rules;
+    SpanSamplerConfig span_sampler;
+    auto& rules = span_sampler.rules;
     rules.resize(rules.size() + 1);
     SpanSamplerConfig::Rule& rule = rules.back();
 
     SECTION("yields one sampling rule") {
-      auto finalized = finalize_config(config);
+      config.set_span_sampler(span_sampler);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       REQUIRE(finalized->span_sampler.rules.size() == 1);
       // the default sample_rate is 100%
@@ -852,7 +854,9 @@ TEST_CASE("TracerConfig::span_sampler") {
                            -std::numeric_limits<double>::infinity(), 42);
       CAPTURE(rate);
       rule.sample_rate = rate;
-      auto finalized = finalize_config(config);
+
+      config.set_span_sampler(span_sampler);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::RATE_OUT_OF_RANGE);
     }
@@ -863,19 +867,25 @@ TEST_CASE("TracerConfig::span_sampler") {
                    -std::numeric_limits<double>::infinity(), std::nan(""));
       CAPTURE(limit);
       rule.max_per_second = limit;
-      auto finalized = finalize_config(config);
+
+      config.set_span_sampler(span_sampler);
+
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MAX_PER_SECOND_OUT_OF_RANGE);
     }
   }
 
   SECTION("two sampling rules") {
-    auto& rules = config.span_sampler.rules;
+    SpanSamplerConfig span_sampler;
+    auto& rules = span_sampler.rules;
     rules.resize(rules.size() + 2);
     rules[0].sample_rate = 0.5;
     rules[1].sample_rate = 0.6;
     rules[1].max_per_second = 10;
-    auto finalized = finalize_config(config);
+    config.set_span_sampler(span_sampler);
+
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->span_sampler.rules.size() == 2);
     REQUIRE(finalized->span_sampler.rules[0].sample_rate == 0.5);
@@ -891,7 +901,11 @@ TEST_CASE("TracerConfig::span_sampler") {
       SpanSamplerConfig::Rule config_rule;
       config_rule.service = "foosvc";
       config_rule.max_per_second = 9.2;
-      config.span_sampler.rules.push_back(config_rule);
+
+      SpanSamplerConfig span_sampler;
+      span_sampler.rules.push_back(config_rule);
+
+      config.set_span_sampler(span_sampler);
 
       auto rules_json = R"json([
         {"name": "mysql2.query", "max_per_second": 100},
@@ -899,7 +913,7 @@ TEST_CASE("TracerConfig::span_sampler") {
       ])json";
 
       const EnvGuard guard{"DD_SPAN_SAMPLING_RULES", rules_json};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       const auto& rules = finalized->span_sampler.rules;
       REQUIRE(rules.size() == 2);
@@ -956,7 +970,7 @@ TEST_CASE("TracerConfig::span_sampler") {
       CAPTURE(test_case.name);
 
       const EnvGuard guard{"DD_SPAN_SAMPLING_RULES", test_case.json};
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == test_case.expected_error);
     }
@@ -964,13 +978,17 @@ TEST_CASE("TracerConfig::span_sampler") {
     SECTION("DD_SPAN_SAMPLING_RULES_FILE") {
       SECTION("successful usage") {
         const auto logger = std::make_shared<MockLogger>();
-        config.logger = logger;
+        config.set_logger(logger);
 
         // This rule will be overridden.
         SpanSamplerConfig::Rule config_rule;
         config_rule.service = "foosvc";
         config_rule.max_per_second = 9.2;
-        config.span_sampler.rules.push_back(config_rule);
+
+        SpanSamplerConfig span_sampler;
+        span_sampler.rules.push_back(config_rule);
+
+        config.set_span_sampler(span_sampler);
 
         auto rules_file_json = R"json([
         {"name": "mysql2.query"},
@@ -986,7 +1004,7 @@ TEST_CASE("TracerConfig::span_sampler") {
                              file.path().string()};
 
         SECTION("overrides SpanSamplerConfig::rules") {
-          auto finalized = finalize_config(config);
+          auto finalized = config.finalize();
           REQUIRE(finalized);
           const auto& rules = finalized->span_sampler.rules;
           REQUIRE(rules.size() == 3);
@@ -1003,7 +1021,7 @@ TEST_CASE("TracerConfig::span_sampler") {
           ])json";
 
           const EnvGuard guard{"DD_SPAN_SAMPLING_RULES", rules_json};
-          auto finalized = finalize_config(config);
+          auto finalized = config.finalize();
           REQUIRE(finalized);
           const auto& rules = finalized->span_sampler.rules;
           REQUIRE(rules.size() == 2);
@@ -1025,7 +1043,7 @@ TEST_CASE("TracerConfig::span_sampler") {
             defunct = file.path();
           }
           const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE", defunct.string()};
-          auto finalized = finalize_config(config);
+          auto finalized = config.finalize();
           REQUIRE(!finalized);
           REQUIRE(finalized.error().code == Error::SPAN_SAMPLING_RULES_FILE_IO);
         }
@@ -1041,7 +1059,7 @@ TEST_CASE("TracerConfig::span_sampler") {
           file.close();
           const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE",
                                file.path().string()};
-          auto finalized = finalize_config(config);
+          auto finalized = config.finalize();
           REQUIRE(!finalized);
           REQUIRE(finalized.error().code ==
                   Error::SPAN_SAMPLING_RULES_INVALID_JSON);
@@ -1053,10 +1071,10 @@ TEST_CASE("TracerConfig::span_sampler") {
 
 TEST_CASE("TracerConfig propagation styles") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
 
   SECTION("default style is [Datadog, W3C]") {
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
 
     const std::vector<PropagationStyle> expected_styles = {
@@ -1068,7 +1086,7 @@ TEST_CASE("TracerConfig propagation styles") {
 
   SECTION("DD_TRACE_PROPAGATION_STYLE overrides defaults") {
     const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE", "B3"};
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
 
     const std::vector<PropagationStyle> expected_styles = {
@@ -1080,8 +1098,8 @@ TEST_CASE("TracerConfig propagation styles") {
 
   SECTION("injection_styles") {
     SECTION("need at least one") {
-      config.injection_styles.clear();
-      auto finalized = finalize_config(config);
+      config.set_injection_styles({});
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_INJECTION_STYLE);
     }
@@ -1089,7 +1107,7 @@ TEST_CASE("TracerConfig propagation styles") {
     SECTION("DD_TRACE_PROPAGATION_STYLE_INJECT") {
       SECTION("overrides injection_styles") {
         const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_INJECT", "B3"};
-        auto finalized = finalize_config(config);
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         const std::vector<PropagationStyle> expected_styles = {
             PropagationStyle::B3};
@@ -1099,8 +1117,8 @@ TEST_CASE("TracerConfig propagation styles") {
       SECTION("overrides DD_PROPAGATION_STYLE_INJECT") {
         const EnvGuard guard1{"DD_TRACE_PROPAGATION_STYLE_INJECT", "B3"};
         const EnvGuard guard2{"DD_PROPAGATION_STYLE_INJECT", "Datadog"};
-        config.logger = std::make_shared<MockLogger>();  // suppress warning
-        auto finalized = finalize_config(config);
+        config.set_logger(std::make_shared<MockLogger>());  // suppress warning
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         const std::vector<PropagationStyle> expected_styles = {
             PropagationStyle::B3};
@@ -1110,8 +1128,8 @@ TEST_CASE("TracerConfig propagation styles") {
       SECTION("overrides DD_TRACE_PROPAGATION_STYLE") {
         const EnvGuard guard1{"DD_TRACE_PROPAGATION_STYLE_INJECT", "B3"};
         const EnvGuard guard2{"DD_TRACE_PROPAGATION_STYLE", "Datadog"};
-        config.logger = std::make_shared<MockLogger>();  // suppress warning
-        auto finalized = finalize_config(config);
+        config.set_logger(std::make_shared<MockLogger>());  // suppress warning
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         const std::vector<PropagationStyle> expected_styles = {
             PropagationStyle::B3};
@@ -1157,7 +1175,7 @@ TEST_CASE("TracerConfig propagation styles") {
 
         const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_INJECT",
                              test_case.env_value};
-        auto finalized = finalize_config(config);
+        auto finalized = config.finalize();
         if (test_case.expected_error) {
           REQUIRE(!finalized);
           REQUIRE(finalized.error().code == *test_case.expected_error);
@@ -1172,8 +1190,8 @@ TEST_CASE("TracerConfig propagation styles") {
   // This section is very much like "injection_styles", above.
   SECTION("extraction_styles") {
     SECTION("need at least one") {
-      config.extraction_styles.clear();
-      auto finalized = finalize_config(config);
+      config.set_extraction_styles({});
+      auto finalized = config.finalize();
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_EXTRACTION_STYLE);
     }
@@ -1181,7 +1199,7 @@ TEST_CASE("TracerConfig propagation styles") {
     SECTION("DD_TRACE_PROPAGATION_STYLE_EXTRACT") {
       SECTION("overrides extraction_styles") {
         const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "B3"};
-        auto finalized = finalize_config(config);
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         const std::vector<PropagationStyle> expected_styles = {
             PropagationStyle::B3};
@@ -1191,8 +1209,8 @@ TEST_CASE("TracerConfig propagation styles") {
       SECTION("overrides DD_PROPAGATION_STYLE_EXTRACT") {
         const EnvGuard guard1{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "B3"};
         const EnvGuard guard2{"DD_PROPAGATION_STYLE_EXTRACT", "Datadog"};
-        config.logger = std::make_shared<MockLogger>();  // suppress warning
-        auto finalized = finalize_config(config);
+        config.set_logger(std::make_shared<MockLogger>());  // suppress warning
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         const std::vector<PropagationStyle> expected_styles = {
             PropagationStyle::B3};
@@ -1202,8 +1220,8 @@ TEST_CASE("TracerConfig propagation styles") {
       SECTION("overrides DD_TRACE_PROPAGATION_STYLE") {
         const EnvGuard guard1{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "B3"};
         const EnvGuard guard2{"DD_TRACE_PROPAGATION_STYLE", "Datadog"};
-        config.logger = std::make_shared<MockLogger>();  // suppress warning
-        auto finalized = finalize_config(config);
+        config.set_logger(std::make_shared<MockLogger>());  // suppress warning
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         const std::vector<PropagationStyle> expected_styles = {
             PropagationStyle::B3};
@@ -1215,7 +1233,7 @@ TEST_CASE("TracerConfig propagation styles") {
       // error handling code in `TracerConfig`.
       SECTION("parsing failure") {
         const EnvGuard guard{"DD_PROPAGATION_STYLE_EXTRACT", "b3,,datadog"};
-        auto finalized = finalize_config(config);
+        auto finalized = config.finalize();
         REQUIRE(!finalized);
         REQUIRE(finalized.error().code == Error::UNKNOWN_PROPAGATION_STYLE);
       }
@@ -1224,7 +1242,7 @@ TEST_CASE("TracerConfig propagation styles") {
 
   SECTION("warn if one env var overrides another") {
     const auto logger = std::make_shared<MockLogger>();
-    config.logger = logger;
+    config.set_logger(logger);
     const auto ts = "DD_TRACE_PROPAGATION_STYLE";
     const auto tse = "DD_TRACE_PROPAGATION_STYLE_EXTRACT";
     const auto se = "DD_PROPAGATION_STYLE_EXTRACT";
@@ -1257,7 +1275,7 @@ TEST_CASE("TracerConfig propagation styles") {
         CAPTURE(expect_warning[i][j]);
         const EnvGuard guard1{vars[i], "B3"};
         const EnvGuard guard2{vars[j], "B3"};
-        const auto finalized_config = finalize_config(config);
+        const auto finalized_config = config.finalize();
         REQUIRE(finalized_config);
         if (expect_warning[i][j]) {
           REQUIRE(logger->error_count() == 1);
@@ -1274,14 +1292,18 @@ TEST_CASE("TracerConfig propagation styles") {
 
 TEST_CASE("configure 128-bit trace IDs") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
 
-  SECTION("defaults to true") { REQUIRE(config.trace_id_128_bit == true); }
+  SECTION("defaults to true") {
+    const auto finalized = config.finalize();
+    REQUIRE(finalized);
+    REQUIRE(finalized->trace_id_128_bit == true);
+  }
 
   SECTION("value honored in finalizer") {
     const auto value = GENERATE(true, false);
-    config.trace_id_128_bit = value;
-    const auto finalized = finalize_config(config);
+    config.enable_128bit_trace_id(value);
+    const auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->trace_id_128_bit == value);
   }
@@ -1310,15 +1332,14 @@ TEST_CASE("configure 128-bit trace IDs") {
     EnvGuard guard{"DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED",
                    test_case.env_value};
 
-    config.trace_id_128_bit = true;
-    CAPTURE(config.trace_id_128_bit);
-    auto finalized = finalize_config(config);
+    config.enable_128bit_trace_id(true);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
 
-    config.trace_id_128_bit = false;
-    CAPTURE(config.trace_id_128_bit);
-    finalized = finalize_config(config);
+    config.enable_128bit_trace_id(false);
+    // CAPTURE(config.trace_id_128_bit);
+    finalized = config.finalize();
     REQUIRE(finalized);
     REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
   }

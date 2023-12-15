@@ -57,14 +57,13 @@ struct DatadogAgentConfig {
   // How often, in seconds, to query the Datadog Agent for remote configuration
   // updates.
   int remote_configuration_poll_interval_seconds = 5;
-
-  static Expected<HTTPClient::URL> parse(StringView);
 };
 
 class FinalizedDatadogAgentConfig {
   friend Expected<FinalizedDatadogAgentConfig> finalize_config(
       const DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&);
 
+  friend class FinalizedTracerConfig;
   FinalizedDatadogAgentConfig() = default;
 
  public:

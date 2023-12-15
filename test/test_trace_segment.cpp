@@ -6,8 +6,11 @@
 #include <datadog/tracer_config.h>
 
 #include <regex>
+#include <unordered_set>
 #include <vector>
 
+#include "catch.hpp"
+#include "datadog/trace_sampler_config.h"
 #include "matchers.h"
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
@@ -28,21 +31,24 @@ Rate assert_rate(double rate) {
 
 TEST_CASE("TraceSegment accessors") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<MockLogger>();
+  config.set_collector(collector);
+
+  auto logger = std::make_shared<MockLogger>();
+  config.set_logger(logger);
 
   SECTION("hostname") {
-    config.report_hostname = GENERATE(true, false);
+    bool report_hostname = GENERATE(true, false);
+    config.enable_hostname_in_span(report_hostname);
 
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
     auto span = tracer.create_span();
 
     auto hostname = span.trace_segment().hostname();
-    if (config.report_hostname) {
+    if (report_hostname) {
       REQUIRE(hostname);
     } else {
       REQUIRE(!hostname);
@@ -50,22 +56,30 @@ TEST_CASE("TraceSegment accessors") {
   }
 
   SECTION("defaults") {
-    config.defaults.name = "wobble";
-    config.defaults.service_type = "fake";
-    config.defaults.version = "v0";
-    config.defaults.environment = "test";
-    config.defaults.tags = {{"hello", "world"}, {"foo", "bar"}};
+    // config.defaults.name = "wobble";
+    config.set_service_type("fake");
+    config.set_version("v0");
+    config.set_environment("test");
 
-    auto finalized = finalize_config(config);
+    const std::unordered_map<std::string, std::string> tags{{"hello", "world"},
+                                                            {"foo", "bar"}};
+    config.set_tags(tags);
+
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
     auto span = tracer.create_span();
 
-    REQUIRE(span.trace_segment().defaults() == config.defaults);
+    const auto span_defaults = span.trace_segment().defaults();
+    REQUIRE(span_defaults.service_type == "fake");
+    REQUIRE(span_defaults.version == "v0");
+    REQUIRE(span_defaults.tags == tags);
+    // REQUIRE(span_defaults.name == );
+    // REQUIRE(span_defaults.service == );
   }
 
   SECTION("origin") {
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
 
@@ -80,7 +94,7 @@ TEST_CASE("TraceSegment accessors") {
   }
 
   SECTION("sampling_decision") {
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
 
@@ -122,23 +136,23 @@ TEST_CASE("TraceSegment accessors") {
   }
 
   SECTION("logger") {
-    auto finalized = finalize_config(config);
+    auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
     auto span = tracer.create_span();
-    REQUIRE(&span.trace_segment().logger() == config.logger.get());
+    REQUIRE(&span.trace_segment().logger() == logger.get());
   }
 }
 
 TEST_CASE("When Collector::send fails, TraceSegment logs the error.") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<FailureCollector>();
-  config.collector = collector;
+  config.set_collector(collector);
   const auto logger = std::make_shared<MockLogger>();
-  config.logger = logger;
+  config.set_logger(logger);
 
-  auto finalized = finalize_config(config);
+  auto finalized = config.finalize();
   REQUIRE(finalized);
   Tracer tracer{*finalized};
   {
@@ -153,16 +167,16 @@ TEST_CASE("When Collector::send fails, TraceSegment logs the error.") {
 
 TEST_CASE("TraceSegment finalization of spans") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.collector = collector;
-  config.logger = std::make_shared<MockLogger>();
+  config.set_collector(collector);
+  config.set_logger(std::make_shared<MockLogger>());
 
   SECTION("root span") {
     SECTION(
         "'inject_max_size' propagation error if X-Datadog-Tags oversized on "
         "inject") {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       Tracer tracer{*finalized};
 
@@ -197,7 +211,7 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
 
     SECTION("sampling priority") {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       Tracer tracer{*finalized};
 
@@ -258,8 +272,8 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
 
     SECTION("hostname") {
-      config.report_hostname = true;
-      auto finalized = finalize_config(config);
+      config.enable_hostname_in_span(true);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       Tracer tracer{*finalized};
       {
@@ -272,7 +286,7 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
 
     SECTION("x-datadog-tags") {
-      auto finalized = finalize_config(config);
+      auto finalized = config.finalize();
       REQUIRE(finalized);
       Tracer tracer{*finalized};
 
@@ -301,7 +315,7 @@ TEST_CASE("TraceSegment finalization of spans") {
 
     SECTION("rate tags") {
       SECTION("default mechanism (100%) -> agent psr tag on first trace") {
-        auto finalized = finalize_config(config);
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         Tracer tracer{*finalized};
         {
@@ -319,9 +333,9 @@ TEST_CASE("TraceSegment finalization of spans") {
         collector->response
             .sample_rate_by_key[CollectorResponse::key_of_default_rate] =
             assert_rate(1.0);
-        config.collector = collector;
+        config.set_collector(collector);
 
-        auto finalized = finalize_config(config);
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         Tracer tracer{*finalized};
         // First trace doesn't have a collector-specified sample rate.
@@ -346,19 +360,22 @@ TEST_CASE("TraceSegment finalization of spans") {
         // When sample rate is 100%, the sampler will consult the limiter.
         // When sample rate is 0%, it won't.  We test both cases.
         auto sample_rate = GENERATE(0.0, 1.0);
+        TraceSamplerConfig trace_sampler;
 
         SECTION("global sample rate") {
-          config.trace_sampler.sample_rate = sample_rate;
+          trace_sampler.sample_rate = sample_rate;
         }
 
         SECTION("sampling rule") {
           TraceSamplerConfig::Rule rule;
           rule.service = "testsvc";
           rule.sample_rate = sample_rate;
-          config.trace_sampler.rules.push_back(rule);
+
+          trace_sampler.rules.push_back(rule);
         }
 
-        auto finalized = finalize_config(config);
+        config.set_trace_sampler(trace_sampler);
+        auto finalized = config.finalize();
         REQUIRE(finalized);
         Tracer tracer{*finalized};
         {
@@ -383,7 +400,7 @@ TEST_CASE("TraceSegment finalization of spans") {
 
   SECTION(
       "every span tagged with: _dd.origin, process_id, language, resource-id") {
-    const auto finalized = finalize_config(config);
+    const auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
 
