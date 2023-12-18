@@ -211,5 +211,19 @@ std::string TracerTelemetry::app_closing() {
   return message_batch_payload;
 }
 
+std::string TracerTelemetry::configuration_change(
+    const std::vector<ConfigTelemetry>& configuration) {
+  // clang-format off
+  auto configuration_change = nlohmann::json{
+    {"request_type", "app-client-configuration-change"},
+    {"payload", {
+      {"configuration", configuration}
+    }}
+  };
+  // clang-format on
+
+  return configuration_change.dump();
+}
+
 }  // namespace tracing
 }  // namespace datadog

@@ -74,6 +74,8 @@ class DatadogAgent : public Collector {
       const std::shared_ptr<TraceSampler>& response_handler) override;
 
   void send_app_started();
+  void send_configuration_change(
+      const std::vector<ConfigTelemetry>& configuration);
 
   void get_and_apply_remote_configuration_updates();
 

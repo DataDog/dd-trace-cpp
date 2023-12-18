@@ -163,6 +163,9 @@ class TracerTelemetry {
   // Constructs a message-batch containing `app-closing`, and if metrics have
   // been modified, a `generate-metrics` message.
   std::string app_closing();
+  // Constructs `configuration_change` payload.
+  std::string configuration_change(
+      const std::vector<ConfigTelemetry>& configuration);
 };
 
 }  // namespace tracing

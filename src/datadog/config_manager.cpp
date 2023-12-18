@@ -1,5 +1,8 @@
 #include "config_manager.h"
 
+#include "environment.h"
+#include "tracer_telemetry.h"
+
 namespace datadog {
 namespace tracing {
 
@@ -14,20 +17,31 @@ std::shared_ptr<TraceSampler> ConfigManager::get_trace_sampler() {
   return current_trace_sampler_;
 }
 
-void ConfigManager::update(const ConfigUpdate& conf) {
+std::vector<ConfigTelemetry> ConfigManager::update(const ConfigUpdate& conf) {
+  std::vector<ConfigTelemetry> res;
+
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (conf.trace_sampler) {
-    if (auto finalized_trace_sampler_cfg =
-            finalize_config(*conf.trace_sampler)) {
+    ConfigTelemetry cfg_telemetry;
+    cfg_telemetry.name = std::string{name(environment::DD_TRACE_SAMPLE_RATE)};
+    cfg_telemetry.value = std::to_string(*conf.trace_sampler->sample_rate);
+    cfg_telemetry.origin = ConfigOrigin::REMOTE_CONFIG;
+
+    auto finalized_trace_sampler_cfg = finalize_config(*conf.trace_sampler);
+    if (auto error = finalized_trace_sampler_cfg.if_error()) {
+      cfg_telemetry.error = std::move(*error);
+    } else {
       current_trace_sampler_ =
           std::make_shared<TraceSampler>(*finalized_trace_sampler_cfg, clock_);
-    } else {
-      // TODO: report error
     }
+
+    res.emplace_back(std::move(cfg_telemetry));
   } else {
     current_trace_sampler_ = default_trace_sampler_;
   }
+
+  return res;
 }
 
 void ConfigManager::reset() {
