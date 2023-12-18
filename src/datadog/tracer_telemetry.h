@@ -28,8 +28,10 @@
 #include <vector>
 
 #include "clock.h"
+#include "error.h"
 #include "json.hpp"
 #include "metrics.h"
+#include "optional.h"
 #include "runtime_id.h"
 #include "tracer_id.h"
 
@@ -39,6 +41,47 @@ namespace tracing {
 class Logger;
 struct SpanDefaults;
 
+enum ConfigOrigin { ENVIRONMENT_VARIABLE, CODE, REMOTE_CONFIG, DEFAULT };
+
+struct ConfigTelemetry {
+  std::string name;
+  std::string value;
+  ConfigOrigin origin;
+  Optional<Error> error;
+};
+
+inline void to_json(nlohmann::json& j, const ConfigTelemetry& config) {
+  j["name"] = config.name;
+  j["value"] = config.value;
+
+  std::string origin;
+  switch (config.origin) {
+    case ConfigOrigin::ENVIRONMENT_VARIABLE:
+      origin = "env_var";
+      break;
+    case ConfigOrigin::CODE:
+      origin = "code";
+      break;
+    case ConfigOrigin::REMOTE_CONFIG:
+      origin = "remote_config";
+      break;
+    case ConfigOrigin::DEFAULT:
+      origin = "default";
+      break;
+  }
+
+  j["origin"] = origin;
+
+  if (config.error) {
+    // clang-format off
+    j["error"] = {
+      {"code", config.error->code},
+      {"message", config.error->message}
+    };
+    // clang-format on
+  }
+}
+
 class TracerTelemetry {
   bool enabled_ = false;
   bool debug_ = false;
@@ -47,6 +90,7 @@ class TracerTelemetry {
   TracerID tracer_id_;
   std::string hostname_;
   uint64_t seq_id_ = 0;
+  std::vector<ConfigTelemetry> configuration_;
   // This structure contains all the metrics that are exposed by tracer
   // telemetry.
   struct {
@@ -100,7 +144,8 @@ class TracerTelemetry {
  public:
   TracerTelemetry(bool enabled, const Clock& clock,
                   const std::shared_ptr<Logger>& logger,
-                  const TracerID& tracer_id);
+                  const TracerID& tracer_id,
+                  const std::vector<ConfigTelemetry>& configuration);
   bool enabled() { return enabled_; };
   // Provides access to the telemetry metrics for updating the values.
   // This value should not be stored.

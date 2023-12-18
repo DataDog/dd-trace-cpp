@@ -26,7 +26,7 @@ TEST_CASE("Tracer telemetry") {
                            /* service = */ "testsvc",
                            /* environment = */ "test"};
 
-  TracerTelemetry tracer_telemetry = {true, clock, logger, tracer_id};
+  TracerTelemetry tracer_telemetry = {true, clock, logger, tracer_id, {}};
 
   SECTION("generates app-started message") {
     auto app_started_message = tracer_telemetry.app_started();

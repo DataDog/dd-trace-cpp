@@ -8,14 +8,16 @@
 namespace datadog {
 namespace tracing {
 
-TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
-                                 const std::shared_ptr<Logger>& logger,
-                                 const TracerID& tracer_id)
+TracerTelemetry::TracerTelemetry(
+    bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
+    const TracerID& tracer_id,
+    const std::vector<ConfigTelemetry>& configuration)
     : enabled_(enabled),
       clock_(clock),
       logger_(logger),
       tracer_id_(tracer_id),
-      hostname_(get_hostname().value_or("hostname-unavailable")) {
+      hostname_(get_hostname().value_or("hostname-unavailable")),
+      configuration_(configuration) {
   if (enabled_) {
     // Register all the metrics that we're tracking by adding them to the
     // metrics_snapshots_ container. This allows for simpler iteration logic
@@ -80,11 +82,10 @@ nlohmann::json TracerTelemetry::generate_telemetry_body(
 
 std::string TracerTelemetry::app_started() {
   auto telemetry_body = generate_telemetry_body("app-started");
-  // TODO: environment variables or finalized config details
   telemetry_body["payload"] = nlohmann::json::object({
-      {"configuration", nlohmann::json::array({})},
-
+      {"configuration", configuration_},
   });
+
   auto app_started_payload = telemetry_body.dump();
   return app_started_payload;
 }

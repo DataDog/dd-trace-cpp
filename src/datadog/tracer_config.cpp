@@ -12,6 +12,7 @@
 #include "cerr_logger.h"
 #include "collector.h"
 #include "datadog/propagation_style.h"
+#include "datadog/tracer_telemetry.h"
 #include "datadog_agent.h"
 #include "environment.h"
 #include "json.hpp"
@@ -272,184 +273,235 @@ Expected<void> finalize_propagation_styles(
 
 TracerConfig::TracerConfig() {
   // Default values
-  config.report_traces = true;
-  config.report_telemetry = true;
-  config.report_hostname = false;
-  config.tags_header_size = 512;
-  config.log_on_startup = true;
-  config.trace_id_128_bit = true;
-  config.injection_styles = {PropagationStyle::DATADOG, PropagationStyle::W3C};
-  config.extraction_styles = {PropagationStyle::DATADOG, PropagationStyle::W3C};
+  log_configuration_on_startup(true, ConfigOrigin::DEFAULT);
+  enable_traces(true, ConfigOrigin::DEFAULT);
+  enable_telemetry(true, ConfigOrigin::DEFAULT);
+  enable_hostname_in_span(false, ConfigOrigin::DEFAULT);
+  enable_128bit_trace_id(true, ConfigOrigin::DEFAULT);
+  set_injection_styles({PropagationStyle::DATADOG, PropagationStyle::W3C},
+                       ConfigOrigin::DEFAULT);
+  set_extraction_styles({PropagationStyle::DATADOG, PropagationStyle::W3C},
+                        ConfigOrigin::DEFAULT);
+  set_max_tags_header_size(512, ConfigOrigin::DEFAULT);
 }
 
-TracerConfig& TracerConfig::set_service_name(std::string service_name) {
+TracerConfig& TracerConfig::set_service_name(std::string service_name,
+                                             ConfigOrigin origin) {
+  set_telemetry(name(environment::DD_SERVICE), service_name, origin);
   config.defaults.service = std::move(service_name);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_service_type(std::string service_type) {
+TracerConfig& TracerConfig::set_service_type(std::string service_type,
+                                             ConfigOrigin) {
   config.defaults.service_type = std::move(service_type);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_environment(std::string environment) {
+TracerConfig& TracerConfig::set_environment(std::string environment,
+                                            ConfigOrigin origin) {
+  set_telemetry(name(environment::DD_ENV), environment, origin);
   config.defaults.environment = std::move(environment);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_version(std::string version) {
+TracerConfig& TracerConfig::set_version(std::string version,
+                                        ConfigOrigin origin) {
+  set_telemetry(name(environment::DD_VERSION), version, origin);
   config.defaults.version = std::move(version);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_span_default_name(
-    std::string default_span_name) {
+TracerConfig& TracerConfig::set_span_default_name(std::string default_span_name,
+                                                  ConfigOrigin) {
   config.defaults.name = std::move(default_span_name);
   return *this;
 }
 
 TracerConfig& TracerConfig::set_tags(
-    std::unordered_map<std::string, std::string> tags) {
+    std::unordered_map<std::string, std::string> tags, ConfigOrigin) {
   config.defaults.tags = std::move(tags);
+  // set_telemetry(name(environment::DD_TAGS),
+  //               stringutil::join(config.defaults.tags), ConfigOrigin::CODE);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_datadog_agent_url(std::string url) {
+TracerConfig& TracerConfig::set_datadog_agent_url(std::string url,
+                                                  ConfigOrigin origin) {
+  set_telemetry(name(environment::DD_TRACE_AGENT_URL), url, origin);
   agent_config.url = std::move(url);
   return *this;
 }
 
-TracerConfig& TracerConfig::enable_traces(bool report_traces) {
+TracerConfig& TracerConfig::enable_traces(bool report_traces,
+                                          ConfigOrigin origin) {
+  set_telemetry(name(environment::DD_TRACE_ENABLED),
+                std::to_string(report_traces), origin);
   config.report_traces = report_traces;
   return *this;
 }
 
-TracerConfig& TracerConfig::enable_telemetry(bool report_telemetry) {
+TracerConfig& TracerConfig::enable_telemetry(bool report_telemetry,
+                                             ConfigOrigin origin) {
+  set_telemetry(name(environment::DD_INSTRUMENTATION_TELEMETRY_ENABLED),
+                std::to_string(report_telemetry), origin);
   config.report_telemetry = report_telemetry;
   return *this;
 }
 
-TracerConfig& TracerConfig::enable_128bit_trace_id(
-    bool report_128bit_trace_id) {
+TracerConfig& TracerConfig::enable_128bit_trace_id(bool report_128bit_trace_id,
+                                                   ConfigOrigin origin) {
+  set_telemetry(name(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED),
+                std::to_string(report_128bit_trace_id), origin);
   config.trace_id_128_bit = report_128bit_trace_id;
   return *this;
 }
 
-TracerConfig& TracerConfig::log_configuration_on_startup(bool log_on_startup) {
+TracerConfig& TracerConfig::log_configuration_on_startup(bool log_on_startup,
+                                                         ConfigOrigin origin) {
+  set_telemetry(name(environment::DD_TRACE_STARTUP_LOGS),
+                std::to_string(log_on_startup), origin);
   config.log_on_startup = log_on_startup;
   return *this;
 }
 
 TracerConfig& TracerConfig::set_injection_styles(
-    std::vector<PropagationStyle> injection_styles) {
+    std::vector<PropagationStyle> injection_styles, ConfigOrigin) {
+  // set_telemetry(name(environment::DD_TRACE_PROPAGATION_STYLE_INJECT),
+  //               stringutil::join(",", injection_styles), ConfigOrigin::CODE);
   config.injection_styles = std::move(injection_styles);
   return *this;
 }
 
 TracerConfig& TracerConfig::set_extraction_styles(
-    std::vector<PropagationStyle> extraction_styles) {
+    std::vector<PropagationStyle> extraction_styles, ConfigOrigin) {
+  // set_telemetry(name(environment::DD_TRACE_PROPAGATION_STYLE_INJECT),
+  //               stringutil::join(",", extraction_styles),
+  //               ConfigOrigin::CODE);
   config.extraction_styles = std::move(extraction_styles);
   return *this;
 }
 
-TracerConfig& TracerConfig::enable_hostname_in_span(bool report_hostname) {
+TracerConfig& TracerConfig::set_trace_sampler(TraceSamplerConfig trace_sampler,
+                                              ConfigOrigin) {
+  // set_telemetry(name(environment::DD_TRACE_SAMPLING_RULES),
+  // trace_sampler_.to_json(),
+  //               ConfigOrigin::CODE);
+  trace_sampler_ = std::move(trace_sampler);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_span_sampler(SpanSamplerConfig trace_sampler,
+                                             ConfigOrigin) {
+  // set_telemetry(name(environment::DD_TRACE_SAMPLING_RULES),
+  // trace_sampler_.to_json(),
+  //               ConfigOrigin::CODE);
+  span_sampler_ = std::move(trace_sampler);
+  return *this;
+}
+
+TracerConfig& TracerConfig::enable_hostname_in_span(bool report_hostname,
+                                                    ConfigOrigin) {
   config.report_hostname = report_hostname;
   return *this;
 }
 
 TracerConfig& TracerConfig::set_http_client(
-    std::shared_ptr<HTTPClient> http_client) {
+    std::shared_ptr<HTTPClient> http_client, ConfigOrigin) {
   agent_config.http_client = std::move(http_client);
   return *this;
 }
 
 TracerConfig& TracerConfig::set_event_scheduler(
-    std::shared_ptr<EventScheduler> event_scheduler) {
+    std::shared_ptr<EventScheduler> event_scheduler, ConfigOrigin) {
   agent_config.event_scheduler = std::move(event_scheduler);
   return *this;
 }
 
 TracerConfig& TracerConfig::set_flush_interval(
-    std::chrono::milliseconds flush_interval) {
+    std::chrono::milliseconds flush_interval, ConfigOrigin) {
   agent_config.flush_interval_milliseconds = flush_interval.count();
   return *this;
 }
 
 TracerConfig& TracerConfig::set_request_timeout(
-    std::chrono::milliseconds request_timeout) {
+    std::chrono::milliseconds request_timeout, ConfigOrigin) {
   agent_config.request_timeout_milliseconds = request_timeout.count();
   return *this;
 }
 
 TracerConfig& TracerConfig::set_shutdown_timeout(
-    std::chrono::milliseconds shutdown_timeout) {
+    std::chrono::milliseconds shutdown_timeout, ConfigOrigin) {
   agent_config.shutdown_timeout_milliseconds = shutdown_timeout.count();
   return *this;
 }
 
-TracerConfig& TracerConfig::set_collector(
-    std::shared_ptr<Collector> collector) {
+TracerConfig& TracerConfig::set_collector(std::shared_ptr<Collector> collector,
+                                          ConfigOrigin) {
   config.collector = std::move(collector);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_trace_sampler(
-    TraceSamplerConfig trace_sampler) {
-  trace_sampler_ = std::move(trace_sampler);
-  return *this;
-}
-
-TracerConfig& TracerConfig::set_span_sampler(SpanSamplerConfig trace_sampler) {
-  span_sampler_ = std::move(trace_sampler);
-  return *this;
-}
-
 TracerConfig& TracerConfig::set_max_tags_header_size(
-    std::size_t max_tags_header_size) {
+    std::size_t max_tags_header_size, ConfigOrigin) {
   config.tags_header_size = max_tags_header_size;
   return *this;
 }
 
-TracerConfig& TracerConfig::set_logger(std::shared_ptr<Logger> logger) {
+TracerConfig& TracerConfig::set_logger(std::shared_ptr<Logger> logger,
+                                       ConfigOrigin) {
   config.logger = std::move(logger);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_runtime_id(RuntimeID runtime_id) {
+TracerConfig& TracerConfig::set_runtime_id(RuntimeID runtime_id, ConfigOrigin) {
   config.runtime_id = std::move(runtime_id);
   return *this;
 }
 
 TracerConfig& TracerConfig::set_remote_configuration_poll_interval(
-    std::chrono::seconds poll_interval) {
+    std::chrono::seconds poll_interval, ConfigOrigin) {
   agent_config.remote_configuration_poll_interval_seconds =
       poll_interval.count();
   return *this;
 }
 
-Expected<FinalizedTracerConfig> TracerConfig::finalize() const {
+void TracerConfig::set_telemetry(StringView name, std::string value,
+                                 ConfigOrigin origin) {
+  ConfigTelemetry cfg_telemetry;
+  cfg_telemetry.name = std::string{name};
+  cfg_telemetry.value = value;
+  cfg_telemetry.origin = origin;
+  cfg_telemetry.error = nullopt;
+
+  telemetry_data_[std::string{name}] = cfg_telemetry;
+}
+
+Expected<FinalizedTracerConfig> TracerConfig::finalize() {
   return finalize(default_clock);
 }
 
-Expected<FinalizedTracerConfig> TracerConfig::finalize(
-    const Clock& clock) const {
-  FinalizedTracerConfig result(config);
-  result.clock = clock;
+Expected<FinalizedTracerConfig> TracerConfig::finalize(const Clock& clock) {
+  FinalizedTracerConfig tmp(config);
+
+  config.clock = clock;
 
   if (auto service_env = lookup(environment::DD_SERVICE)) {
-    assign(result.defaults.service, *service_env);
+    set_service_name(std::string{*service_env},
+                     ConfigOrigin::ENVIRONMENT_VARIABLE);
   }
 
-  if (result.defaults.service.empty()) {
+  if (config.defaults.service.empty()) {
     return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
   }
 
   if (auto environment_env = lookup(environment::DD_ENV)) {
-    assign(result.defaults.environment, *environment_env);
+    set_environment(std::string{*environment_env},
+                    ConfigOrigin::ENVIRONMENT_VARIABLE);
   }
 
   if (auto version_env = lookup(environment::DD_VERSION)) {
-    assign(result.defaults.version, *version_env);
+    set_version(std::string{*version_env}, ConfigOrigin::ENVIRONMENT_VARIABLE);
   }
 
   if (auto tags_env = lookup(environment::DD_TAGS)) {
@@ -462,54 +514,66 @@ Expected<FinalizedTracerConfig> TracerConfig::finalize(
       return error->with_prefix(prefix);
     }
 
-    result.defaults.tags = std::move(*tags);
+    set_tags(std::move(*tags), ConfigOrigin::ENVIRONMENT_VARIABLE);
   }
 
   if (auto startup_env = lookup(environment::DD_TRACE_STARTUP_LOGS)) {
-    result.log_on_startup = !falsy(*startup_env);
+    log_configuration_on_startup(!falsy(*startup_env),
+                                 ConfigOrigin::ENVIRONMENT_VARIABLE);
   }
 
   if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
-    result.report_traces = !falsy(*enabled_env);
+    enable_traces(!falsy(*enabled_env), ConfigOrigin::ENVIRONMENT_VARIABLE);
   }
 
-  auto finalized = finalize_config(agent_config, result.logger, clock);
+  auto finalized = finalize_config(agent_config, config.logger, clock);
   if (auto* error = finalized.if_error()) {
     return std::move(*error);
   }
-  result.agent_config = std::move(*finalized);
+  config.agent_config = std::move(*finalized);
 
   if (auto enabled_env =
           lookup(environment::DD_INSTRUMENTATION_TELEMETRY_ENABLED)) {
-    result.report_telemetry = !falsy(*enabled_env);
+    enable_telemetry(!falsy(*enabled_env), ConfigOrigin::ENVIRONMENT_VARIABLE);
   }
 
   if (auto trace_sampler_config = finalize_config(trace_sampler_)) {
-    result.trace_sampler = std::move(*trace_sampler_config);
+    config.trace_sampler = std::move(*trace_sampler_config);
   } else {
     return std::move(trace_sampler_config.error());
   }
 
   if (auto span_sampler_config =
-          finalize_config(span_sampler_, *result.logger)) {
-    result.span_sampler = std::move(*span_sampler_config);
+          finalize_config(span_sampler_, *config.logger)) {
+    config.span_sampler = std::move(*span_sampler_config);
   } else {
     return std::move(span_sampler_config.error());
   }
 
   auto maybe_error =
-      finalize_propagation_styles(result, config.extraction_styles,
-                                  config.injection_styles, *result.logger);
+      finalize_propagation_styles(config, config.extraction_styles,
+                                  config.injection_styles, *config.logger);
   if (!maybe_error) {
     return maybe_error.error();
   }
 
   if (auto enabled_env =
           lookup(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)) {
-    result.trace_id_128_bit = !falsy(*enabled_env);
+    enable_128bit_trace_id(!falsy(*enabled_env),
+                           ConfigOrigin::ENVIRONMENT_VARIABLE);
   }
 
-  return result;
+  // Set defaults if nullptr
+  if (config.logger == nullptr) {
+    config.logger = std::make_shared<CerrLogger>();
+  }
+
+  for (auto [_, value] : telemetry_data_) {
+    config.telemetry_data.emplace_back(std::move(value));
+  }
+
+  std::swap(tmp, config);
+  return tmp;
 }
 
 }  // namespace tracing

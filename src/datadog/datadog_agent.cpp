@@ -361,6 +361,7 @@ void DatadogAgent::flush() {
 
 void DatadogAgent::send_app_started() {
   auto payload = tracer_telemetry_->app_started();
+  logger_->log_error(payload);
   auto post_result =
       http_client_->post(telemetry_endpoint_, set_content_type_json,
                          std::move(payload), telemetry_on_response_,
