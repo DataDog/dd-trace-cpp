@@ -396,6 +396,21 @@ void DatadogAgent::send_app_closing() {
   }
 }
 
+void DatadogAgent::send_configuration_change(
+    const std::vector<ConfigTelemetry>& configuration) {
+  auto payload = tracer_telemetry_->configuration_change(configuration);
+  logger_->log_error(payload);
+  auto post_result =
+      http_client_->post(telemetry_endpoint_, set_content_type_json,
+                         std::move(payload), telemetry_on_response_,
+                         telemetry_on_error_, clock_().tick + request_timeout_);
+  if (auto* error = post_result.if_error()) {
+    logger_->log_error(
+        error->with_prefix("Unexpected error submitting telemetry "
+                           "app_client_configuration_change event: "));
+  }
+}
+
 void DatadogAgent::get_and_apply_remote_configuration_updates() {
   auto remote_configuration_on_response =
       [this](int response_status, const DictReader& /*response_headers*/,
@@ -436,7 +451,11 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
           // TODO (during Active Configuration): `process_response` should
           // return a list of configuration update and should be consumed by
           // telemetry.
-          remote_config_.process_response(response_json);
+          const auto processed_configuration =
+              remote_config_.process_response(response_json);
+          if (!processed_configuration.empty()) {
+            send_configuration_change(processed_configuration);
+          }
         }
       };
 

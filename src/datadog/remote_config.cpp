@@ -6,6 +6,7 @@
 
 #include "base64.h"
 #include "datadog/string_view.h"
+#include "datadog/tracer_telemetry.h"
 #include "json.hpp"
 #include "random.h"
 #include "version.h"
@@ -121,7 +122,9 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
   return j;
 }
 
-void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
+std::vector<ConfigTelemetry> RemoteConfigurationManager::process_response(
+    const nlohmann::json& json) {
+  std::vector<ConfigTelemetry> res;
   state_.error_message = nullopt;
 
   try {
@@ -142,7 +145,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
                       [this](const auto it) { revert_config(it.second); });
         applied_config_.clear();
       }
-      return;
+      return res;
     }
 
     // Keep track of config path received to know which ones to revert.
@@ -170,7 +173,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       if (target_it == target_files.cend()) {
         state_.error_message =
             "Missing configuration from Remote Configuration response";
-        return;
+        return res;
       }
 
       const auto config_json = nlohmann::json::parse(
@@ -190,7 +193,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       new_config.version = config_json.at("revision");
       new_config.content = parse_dynamic_config(config_json.at("lib_config"));
 
-      apply_config(new_config);
+      res = apply_config(new_config);
       applied_config_[std::string{config_path}] = new_config;
     }
 
@@ -209,10 +212,13 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
 
     state_.error_message = std::move(error_message);
   }
+
+  return res;
 }
 
-void RemoteConfigurationManager::apply_config(Configuration config) {
-  config_manager_.update(config.content);
+std::vector<ConfigTelemetry> RemoteConfigurationManager::apply_config(
+    Configuration config) {
+  return config_manager_.update(config.content);
 }
 
 void RemoteConfigurationManager::revert_config(Configuration) {

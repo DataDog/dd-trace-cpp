@@ -8,6 +8,7 @@
 #include "config_update.h"
 #include "json.hpp"
 #include "tracer_config.h"
+#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
@@ -25,7 +26,7 @@ class ConfigManager {
   std::shared_ptr<TraceSampler> get_trace_sampler();
 
   // Apply the specified `conf` update.
-  void update(const ConfigUpdate& conf);
+  std::vector<ConfigTelemetry> update(const ConfigUpdate& conf);
 
   // Restore the configuration that was passed to this object's constructor,
   // overriding any previous calls to `update`.

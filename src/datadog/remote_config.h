@@ -5,6 +5,7 @@
 #include <string>
 
 #include "config_manager.h"
+#include "datadog/tracer_telemetry.h"
 #include "logger.h"
 #include "optional.h"
 #include "runtime_id.h"
@@ -42,12 +43,12 @@ class RemoteConfigurationManager {
 
   nlohmann::json make_request_payload();
 
-  void process_response(const nlohmann::json& json);
+  std::vector<ConfigTelemetry> process_response(const nlohmann::json& json);
 
  private:
   bool is_new_config(StringView config_path, const nlohmann::json& config_meta);
 
-  void apply_config(Configuration config);
+  std::vector<ConfigTelemetry> apply_config(Configuration config);
   void revert_config(Configuration config);
 };
 
