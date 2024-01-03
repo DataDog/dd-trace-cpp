@@ -64,8 +64,8 @@ ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
 }  // namespace
 
 RemoteConfigurationManager::RemoteConfigurationManager(
-    const TracerID& tracer_id, ConfigManager& config_manager)
-    : tracer_id_(tracer_id),
+    const TracerSignature& tracer_signature, ConfigManager& config_manager)
+    : tracer_signature_(tracer_signature),
       config_manager_(config_manager),
       client_id_(uuid()) {}
 
@@ -87,11 +87,11 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
       {"is_tracer", true},
       {"capabilities", k_apm_capabilities},
       {"client_tracer", {
-        {"runtime_id", tracer_id_.runtime_id.string()},
-        {"language", "cpp"},
-        {"tracer_version", tracer_version},
-        {"service", tracer_id_.service},
-        {"env", tracer_id_.environment}
+        {"runtime_id", tracer_signature_.runtime_id().string()},
+        {"language", tracer_signature_.library_language()},
+        {"tracer_version", tracer_signature_.library_version()},
+        {"service", tracer_signature_.default_service()},
+        {"env", tracer_signature_.default_environment()}
       }},
       {"state", {
         {"root_version", 1},
@@ -178,9 +178,9 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
 
       const auto& targeted_service = config_json.at("service_target");
       if (targeted_service.at("service").get<StringView>() !=
-              tracer_id_.service ||
+              tracer_signature_.default_service() ||
           targeted_service.at("env").get<StringView>() !=
-              tracer_id_.environment) {
+              tracer_signature_.default_environment()) {
         continue;
       }
 

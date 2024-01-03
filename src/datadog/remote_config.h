@@ -10,7 +10,7 @@
 #include "runtime_id.h"
 #include "string_view.h"
 #include "trace_sampler_config.h"
-#include "tracer_id.h"
+#include "tracer_signature.h"
 
 namespace datadog {
 namespace tracing {
@@ -29,7 +29,7 @@ class RemoteConfigurationManager {
     ConfigUpdate content;
   };
 
-  TracerID tracer_id_;
+  TracerSignature tracer_signature_;
   ConfigManager& config_manager_;
   std::string client_id_;
 
@@ -37,7 +37,7 @@ class RemoteConfigurationManager {
   std::unordered_map<std::string, Configuration> applied_config_;
 
  public:
-  RemoteConfigurationManager(const TracerID& tracer_id,
+  RemoteConfigurationManager(const TracerSignature& tracer_signature,
                              ConfigManager& config_manager);
 
   nlohmann::json make_request_payload();
