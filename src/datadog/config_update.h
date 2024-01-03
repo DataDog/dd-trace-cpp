@@ -1,7 +1,9 @@
+#pragma once
+
 // TODO: Document
 
 #include "optional"
-#include "trace_sampler.h"
+#include "trace_sampler_config.h"
 
 namespace datadog {
 namespace tracing {
