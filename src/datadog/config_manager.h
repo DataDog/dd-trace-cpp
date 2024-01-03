@@ -5,8 +5,8 @@
 #include <mutex>
 
 #include "clock.h"
+#include "config_update.h"
 #include "json.hpp"
-#include "trace_sampler.h"
 #include "tracer_config.h"
 
 namespace datadog {
@@ -19,17 +19,13 @@ class ConfigManager {
   std::shared_ptr<TraceSampler> current_trace_sampler_;
 
  public:
-  struct Update {
-    Optional<TraceSamplerConfig> trace_sampler;
-  };
-
   ConfigManager(const FinalizedTracerConfig& config);
 
   // Return the `TraceSampler` consistent with the most recent configuration.
   std::shared_ptr<TraceSampler> get_trace_sampler();
 
   // Apply the specified `conf` update.
-  void update(const Update& conf);
+  void update(const ConfigUpdate& conf);
 
   // Restore the configuration that was passed to this object's constructor,
   // overriding any previous calls to `update`.

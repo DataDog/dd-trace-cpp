@@ -158,6 +158,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/cerr_logger.h
   src/datadog/clock.h
   src/datadog/config_manager.h
+  src/datadog/config_update.h
   src/datadog/collector.h
   src/datadog/collector_response.h
   # src/datadog/curl.h except for curl.h
