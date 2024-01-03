@@ -64,13 +64,14 @@ nlohmann::json TracerTelemetry::generate_telemetry_body(
       {"tracer_time", tracer_time},
       {"runtime_id", tracer_signature_.runtime_id().string()},
       {"debug", debug_},
-      {"application", nlohmann::json::object({
-                          {"service_name", tracer_signature_.default_service()},
-                          {"env", tracer_signature_.default_environment()},
-                          {"tracer_version", tracer_signature_.library_version()},
-                          {"language_name", tracer_signature_.library_language()},
-                          {"language_version", tracer_signature_.library_language_version()},
-                      })},
+      {"application",
+       nlohmann::json::object({
+           {"service_name", tracer_signature_.default_service()},
+           {"env", tracer_signature_.default_environment()},
+           {"tracer_version", tracer_signature_.library_version()},
+           {"language_name", tracer_signature_.library_language()},
+           {"language_version", tracer_signature_.library_language_version()},
+       })},
       // TODO: host information (os, os_version, kernel, etc)
       {"host", nlohmann::json::object({
                    {"hostname", hostname_},

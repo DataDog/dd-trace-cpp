@@ -11,9 +11,10 @@ using namespace datadog::tracing;
 #define REMOTE_CONFIG_TEST(x) TEST_CASE(x, "[remote_config]")
 
 REMOTE_CONFIG_TEST("first payload") {
-  const TracerSignature tracer_signature{/* runtime_id = */ RuntimeID::generate(),
-                           /* service = */ "testsvc",
-                           /* environment = */ "test"};
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
 
   TracerConfig tracer_cfg;
 
@@ -43,9 +44,10 @@ REMOTE_CONFIG_TEST("first payload") {
 }
 
 REMOTE_CONFIG_TEST("response processing") {
-  const TracerSignature tracer_signature{/* runtime_id = */ RuntimeID::generate(),
-                           /* service = */ "testsvc",
-                           /* environment = */ "test"};
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
 
   TracerConfig tracer_cfg;
 

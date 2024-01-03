@@ -22,9 +22,10 @@ TEST_CASE("Tracer telemetry") {
   };
   auto logger = std::make_shared<MockLogger>();
 
-  const TracerSignature tracer_signature{/* runtime_id = */ RuntimeID::generate(),
-                           /* service = */ "testsvc",
-                           /* environment = */ "test"};
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
 
   TracerTelemetry tracer_telemetry = {true, clock, logger, tracer_signature};
 
