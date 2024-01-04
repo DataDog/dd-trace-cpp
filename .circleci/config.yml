@@ -73,6 +73,52 @@ jobs:
         - "d3:8f:a8:6e:b6:ef:37:65:1a:dc:2b:88:3b:ff:50:f4"
     - run: bin/publish-coverage
 
+  # Copy-pasta from dd-trace-java. Thank you <3
+  system-tests:
+    parameters:
+      systemTestsCommit:
+        type: string
+        default: main
+    machine:
+      image: ubuntu-2004:current
+    resource_class: large
+    steps:
+      - run:
+          name: Install python 3.9
+          command: |
+            sudo apt-get install python3.9-full python3.9-dev python3.9-venv
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$BASH_ENV"
+      - run:
+          name: Clone system-tests
+          command: |
+            git init system-tests
+            cd system-tests
+            git remote add origin https://github.com/DataDog/system-tests.git
+            git fetch origin << parameters.systemTestsCommit >>
+            git reset --hard FETCH_HEAD
+      - run:
+          name: Install requirements
+          command: |
+            cd system-tests
+            pyenv local system
+            python3.9 --version
+            python3.9 -m pip install wheel
+            python3.9 -m pip install -r requirements.txt
+            sudo ln -sf /usr/bin/python3.9 /usr/bin/python
+      - run:
+          name: Run
+          environment:
+            TEST_LIBRARY: cpp
+            DD_TRACE_CPP_COMMIT: << pipeline.git.revision >>
+          command: cd system-tests && ./build.sh -i runner && ./run.sh PARAMETRIC --log-cli-level=DEBUG 
+      - run:
+          name: Collect artifacts
+          command: tar -cvzf logs_cpp_parametric_dev.tar.gz -C system-tests logs_parametric
+      - store_test_results:
+          path: system-tests/logs_parametric
+      - store_artifacts:
+          path: logs_cpp_parametric_dev.tar.gz
+
 workflows:
   pull-request:
     jobs:
@@ -90,3 +136,8 @@ workflows:
             arch: ["amd64", "arm64"]
             toolchain: ["gnu", "llvm"]
     - coverage
+    - system-tests:
+        filters:
+          branches:
+            only:
+              - main
