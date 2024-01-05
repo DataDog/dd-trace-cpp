@@ -105,6 +105,12 @@ jobs:
             python3.9 -m pip install wheel
             python3.9 -m pip install -r requirements.txt
             sudo ln -sf /usr/bin/python3.9 /usr/bin/python
+
+      - run:
+          name: Copy tracer to system test binaries folder
+          command: |
+            ls -la ~/
+            #cp ~/dd-trace-java/workspace/dd-java-agent/build/libs/*.jar system-tests/binaries/
       - run:
           name: Run
           environment:
@@ -136,8 +142,8 @@ workflows:
             arch: ["amd64", "arm64"]
             toolchain: ["gnu", "llvm"]
     - coverage
-    - system-tests:
-        filters:
-          branches:
-            only:
-              - main
+    - system-tests #:
+    #    filters:
+    #      branches:
+    #        only:
+    #          - main
