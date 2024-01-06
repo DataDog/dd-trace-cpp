@@ -11,11 +11,13 @@
 namespace datadog {
 namespace tracing {
 
+constexpr StringView k_separator = "://";
+constexpr StringView supported[] = {"http", "https", "unix", "http+unix",
+                                "https+unix"};
+
 Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
-  const StringView separator = "://";
-  const auto after_scheme = std::search(input.begin(), input.end(),
-                                        separator.begin(), separator.end());
-  if (after_scheme == input.end()) {
+  const auto after_scheme = input.find(k_separator);
+  if (after_scheme == StringView::npos) {
     std::string message;
     message += "Datadog Agent URL is missing the \"://\" separator: \"";
     append(message, input);
@@ -23,9 +25,7 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
     return Error{Error::URL_MISSING_SEPARATOR, std::move(message)};
   }
 
-  const StringView scheme = range(input.begin(), after_scheme);
-  const StringView supported[] = {"http", "https", "unix", "http+unix",
-                                  "https+unix"};
+  const StringView scheme = input.substr(0, after_scheme);
   const auto found =
       std::find(std::begin(supported), std::end(supported), scheme);
   if (found == std::end(supported)) {
@@ -42,8 +42,8 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
     return Error{Error::URL_UNSUPPORTED_SCHEME, std::move(message)};
   }
 
-  const StringView authority_and_path =
-      range(after_scheme + separator.size(), input.end());
+  const StringView authority_and_path = input.substr(after_scheme + k_separator.size());
+      // range(after_scheme + separator.size(), input.end());
   // If the scheme is for unix domain sockets, then there's no way to
   // distinguish the path-to-socket from the path-to-resource.  Some
   // implementations require that the forward slashes in the path-to-socket
@@ -75,12 +75,11 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
   // Again, though, we're only parsing URLs that designate the location of
   // the Datadog Agent service, and so they will not have a resource
   // location.  Still, let's parse it properly.
-  const auto after_authority =
-      std::find(authority_and_path.begin(), authority_and_path.end(), '/');
+  const auto after_authority = authority_and_path.find('/');
   return HTTPClient::URL{
       std::string(scheme),
-      std::string(range(authority_and_path.begin(), after_authority)),
-      std::string(range(after_authority, authority_and_path.end()))};
+      std::string(authority_and_path.substr(0, after_authority)),
+      (after_authority == StringView::npos) ? "" : std::string(authority_and_path.substr(after_authority))};
 }
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(

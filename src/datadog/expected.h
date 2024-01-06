@@ -52,7 +52,7 @@ class Expected {
  public:
   Expected() = default;
   Expected(const Expected&) = default;
-  Expected(Expected&) = default;
+  // Expected(Expected&) = default;
   Expected(Expected&&) = default;
   Expected& operator=(const Expected&) = default;
   Expected& operator=(Expected&&) = default;
@@ -193,11 +193,11 @@ class Expected<void> {
 
  public:
   Expected() = default;
-  Expected(const Expected&) = default;
-  Expected(Expected&) = default;
-  Expected(Expected&&) = default;
-  Expected& operator=(const Expected&) = default;
-  Expected& operator=(Expected&&) = default;
+  // Expected(const Expected&) = default;
+  // Expected(Expected&) = default;
+  // Expected(Expected&&) = default;
+  // Expected& operator=(const Expected&) = default;
+  // Expected& operator=(Expected&&) = default;
 
   template <typename Other>
   Expected(Other&&);

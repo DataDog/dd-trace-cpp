@@ -17,14 +17,16 @@ namespace {
 template <typename Integer>
 Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
   Integer value;
-  const auto status = std::from_chars(input.begin(), input.end(), value, base);
+  const auto beg = input.data();
+  const auto end = input.data() + input.size();
+  const auto status = std::from_chars(beg, end, value, base);
   if (status.ec == std::errc::invalid_argument) {
     std::string message;
     message += "Is not a valid integer: \"";
     append(message, input);
     message += '\"';
     return Error{Error::INVALID_INTEGER, std::move(message)};
-  } else if (status.ptr != input.end()) {
+  } else if (status.ptr != end) {
     std::string message;
     message += "Integer has trailing characters in: \"";
     append(message, input);
@@ -44,19 +46,17 @@ Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
 }  // namespace
 
 StringView strip(StringView input) {
-  const auto not_whitespace = [](unsigned char ch) {
-    return !std::isspace(ch);
-  };
-  const char* const begin =
-      std::find_if(input.begin(), input.end(), not_whitespace);
-  const char* const end =
-      std::find_if(input.rbegin(), std::make_reverse_iterator(begin),
-                   not_whitespace)
-          .base();
+  if (input.empty()) return input;
+
+  auto begin = input.data();
+  auto end = begin + input.size() - 1;
+
+  while (begin && std::isspace(*begin)) ++begin;
+  while (end && std::isspace(*end)) --end;
 
   assert(begin <= end);
 
-  return StringView{begin, std::size_t(end - begin)};
+  return StringView{begin, std::size_t(end + 1 - begin)};
 }
 
 Expected<std::uint64_t> parse_uint64(StringView input, int base) {
@@ -103,8 +103,15 @@ bool starts_with(StringView subject, StringView prefix) {
     return false;
   }
 
-  return std::mismatch(subject.begin(), subject.end(), prefix.begin()).second ==
-         prefix.end();
+  auto c0 = subject.data();
+  auto c1 = prefix.data();
+  const auto prefix_end = c1 + prefix.size();
+  while (*c0 == *c1) {
+    ++c0;
+    ++c1;
+  }
+  
+  return c1 == prefix_end;
 }
 
 void to_lower(std::string& text) {

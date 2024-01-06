@@ -1018,7 +1018,7 @@ TEST_CASE("128-bit trace IDs") {
   // Use a clock that always returns a hard-coded `TimePoint`.
   // May 6, 2010 14:45:13 America/New_York
   const std::time_t flash_crash = 1273171513;
-  const Clock clock = []() {
+  const Clock clock = [flash_crash]() {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(flash_crash);
     return result;

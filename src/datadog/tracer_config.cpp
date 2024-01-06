@@ -38,10 +38,10 @@ std::vector<StringView> parse_list(StringView input) {
     return items;
   }
 
-  const char *const end = input.end();
-
-  const char *current = input.begin();
+  const char *const end = input.data() + input.size();
+  const char *current = input.data();
   const char *begin_delim;
+
   do {
     const char *begin_item =
         std::find_if(current, end, [](uchar ch) { return !std::isspace(ch); });

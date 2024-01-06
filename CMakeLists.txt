@@ -17,67 +17,37 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# This warning has a false positive. See
-# <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108088>.
-add_compile_options(-Wno-error=free-nonheap-object)
+## Compiler
+if (MSVC)
+  message(STATUS "Toolchain: MSVC")
+  include(cmake/compiler/msvc.cmake)
+else ()
+  if (APPLE)
+    message(STATUS "Toolchain: clang-apple")
+    include(cmake/compiler/clang_apple.cmake)
+  else ()
+    message(STATUS "Toolchain: clang")
+    include(cmake/compiler/clang.cmake)
+  endif ()
+endif ()
 
-# This warning has a false positive with clang. See
-# <https://stackoverflow.com/questions/52416362>.
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    add_compile_options(-Wno-error=unused-lambda-capture)
-
-    # If we're building with clang, then use the libc++ version of the standard
-    # library instead of libstdc++. Better coverage of build configurations.
-    #
-    # But there's one exception: libfuzzer is built with libstdc++ on Ubuntu,
-    # and so won't link to libc++. So, if any of the FUZZ_* variables are set,
-    # keep to libstdc++ (the default on most systems).
-    if (NOT ${FUZZ_W3C_PROPAGATION})
-      add_compile_options(-stdlib=libc++)
-      add_link_options(-stdlib=libc++)
-    endif ()
-endif()
-
-function(add_sanitizers)
-  add_compile_options(-fsanitize=address)
-  add_link_options(-fsanitize=address)
-  add_compile_options(-fsanitize=undefined)
-  add_link_options(-fsanitize=undefined)
-endfunction()
-
-if(FUZZ_W3C_PROPAGATION)
-  add_compile_options(-fsanitize=fuzzer)
-  add_link_options(-fsanitize=fuzzer)
-  add_sanitizers()
-  add_subdirectory(fuzz/w3c-propagation)
-endif()
-
-if (SANITIZE)
-  add_sanitizers()
-endif()
+## Dependencies
+include(cmake/curl.cmake)
 
 if (BUILD_TESTING)
   set(CMAKE_BUILD_TYPE "Debug")
+  add_subdirectory(test)
 endif()
 
-include(cmake/curl.cmake)
-
-if (APPLE)
-  find_library(COREFOUNDATION_LIBRARY CoreFoundation)
-  find_library(SYSTEMCONFIGURATION_LIBRARY SystemConfiguration)
+if (FUZZ_W3C_PROPAGATION)
+  add_subdirectory(fuzz/w3c-propagation)
 endif ()
 
-if (MSVC)
-    add_compile_options(/W4 /WX)
-else()
-    add_compile_options(-Wall -Wextra -pedantic -Werror)
-    if (BUILD_COVERAGE)
-      add_compile_options(-g -O0 -fprofile-arcs -ftest-coverage)
-    endif()
-endif()
+# Each example has its own build flag.
+add_subdirectory(examples)
 
-if(BUILD_COVERAGE)
-  set(COVERAGE_LIBRARIES gcov)
+if(BUILD_BENCHMARK)
+  add_subdirectory(benchmark)
 endif()
 
 add_library(dd_trace_cpp-objects OBJECT)
@@ -207,10 +177,10 @@ target_link_libraries(dd_trace_cpp-objects
 )
 
 # Produce both shared and static versions of the library.
-add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
-set_target_properties(dd_trace_cpp-shared PROPERTIES OUTPUT_NAME "dd_trace_cpp")
-add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)
-target_link_libraries(dd_trace_cpp-shared dd_trace_cpp-objects)
+#add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
+#set_target_properties(dd_trace_cpp-shared PROPERTIES OUTPUT_NAME "dd_trace_cpp")
+#add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)
+#target_link_libraries(dd_trace_cpp-shared dd_trace_cpp-objects)
 
 add_library(dd_trace_cpp-static STATIC $<TARGET_OBJECTS:dd_trace_cpp-objects>)
 set_target_properties(dd_trace_cpp-static PROPERTIES OUTPUT_NAME "dd_trace_cpp")
@@ -219,16 +189,6 @@ target_link_libraries(dd_trace_cpp-static dd_trace_cpp-objects)
 
 # When installing, install the static library, the shared library, and the
 # public headers.
-install(TARGETS dd_trace_cpp-static dd_trace_cpp-shared dd_trace_cpp-objects
+install(TARGETS dd_trace_cpp-static dd_trace_cpp-objects
   FILE_SET public_headers)
 
-if(BUILD_TESTING)
-  add_subdirectory(test)
-endif()
-
-# Each example has its own build flag.
-add_subdirectory(examples)
-
-if(BUILD_BENCHMARK)
-  add_subdirectory(benchmark)
-endif()
