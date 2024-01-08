@@ -109,7 +109,7 @@ jobs:
       - run:
           name: Copy tracer to system test binaries folder
           command: |
-            ls -la ~/
+            ls -la ~/project/
             #cp ~/dd-trace-java/workspace/dd-java-agent/build/libs/*.jar system-tests/binaries/
       - run:
           name: Run
