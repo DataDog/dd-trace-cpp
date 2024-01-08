@@ -1,4 +1,4 @@
-include(cmake/toolchain/clang.cmake)
+include(cmake/compiler/clang.cmake)
 
 if (APPLE)
   find_library(COREFOUNDATION_LIBRARY CoreFoundation)
