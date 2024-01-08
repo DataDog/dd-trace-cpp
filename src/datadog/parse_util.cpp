@@ -18,7 +18,7 @@ template <typename Integer>
 Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
   Integer value;
   const auto beg = input.data();
-  const auto end = input.data() + input.size();
+  const auto end = beg + input.size();
   const auto status = std::from_chars(beg, end, value, base);
   if (status.ec == std::errc::invalid_argument) {
     std::string message;

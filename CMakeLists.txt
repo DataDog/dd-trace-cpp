@@ -177,6 +177,7 @@ target_link_libraries(dd_trace_cpp-objects
 )
 
 # Produce both shared and static versions of the library.
+# FIX-ME: Issue with Ninja generator on Windows.
 #add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
 #set_target_properties(dd_trace_cpp-shared PROPERTIES OUTPUT_NAME "dd_trace_cpp")
 #add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)

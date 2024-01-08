@@ -4,7 +4,7 @@
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
-#include <stdlib.h>  // setenv, unsetenv
+#include <stdlib.h>
 
 #include <cmath>
 #include <cstddef>
@@ -1072,56 +1072,53 @@ TEST_CASE("TracerConfig propagation styles") {
         REQUIRE(finalized->injection_styles == expected_styles);
       }
 
-      // SECTION("parsing") {
-      //   struct TestCase {
-      //     int line;
-      //     std::string env_value;
-      //     Optional<Error::Code> expected_error;
-      //     std::vector<PropagationStyle> expected_styles = {};
-      //   };
-      //
-      //   // brevity
-      //   const auto datadog = PropagationStyle::DATADOG,
-      //              b3 = PropagationStyle::B3, none = PropagationStyle::NONE;
-      //   // clang-format off
-      //   auto test_case = GENERATE(values<TestCase>({
-      //     {__LINE__, "Datadog", x, {datadog}},
-      //     {__LINE__, "DaTaDoG", x, {datadog}},
-      //     {__LINE__, "B3", x, {b3}},
-      //     {__LINE__, "b3", x, {b3}},
-      //     {__LINE__, "b3MULTI", x, {b3}},
-      //     {__LINE__, "b3, b3multi", Error::DUPLICATE_PROPAGATION_STYLE  },
-      //     {__LINE__, "Datadog B3", x, {datadog, b3}},
-      //     {__LINE__, "Datadog B3 none", x, {datadog, b3, none}},
-      //     {__LINE__, "NONE", x, {none}},
-      //     {__LINE__, "B3 Datadog", x, {b3, datadog}},
-      //     {__LINE__, "b3 datadog", x, {b3, datadog}},
-      //     {__LINE__, "b3, datadog", x, {b3, datadog}},
-      //     {__LINE__, "b3,datadog", x, {b3, datadog}},
-      //     {__LINE__, "b3,             datadog", x, {b3, datadog}},
-      //     {__LINE__, "b3,,datadog", Error::UNKNOWN_PROPAGATION_STYLE},
-      //     {__LINE__, "b3,datadog,w3c", Error::UNKNOWN_PROPAGATION_STYLE},
-      //     {__LINE__, "b3,datadog,datadog",
-      //     Error::DUPLICATE_PROPAGATION_STYLE},
-      //     {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ",
-      //     Error::DUPLICATE_PROPAGATION_STYLE},
-      //   }));
-      //   // clang-format on
-      //
-      //   CAPTURE(test_case.line);
-      //   CAPTURE(test_case.env_value);
-      //
-      //   const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_INJECT",
-      //                        test_case.env_value};
-      //   auto finalized = finalize_config(config);
-      //   if (test_case.expected_error) {
-      //     REQUIRE(!finalized);
-      //     REQUIRE(finalized.error().code == *test_case.expected_error);
-      //   } else {
-      //     REQUIRE(finalized);
-      //     REQUIRE(finalized->injection_styles == test_case.expected_styles);
-      //   }
-      // }
+      SECTION("parsing") {
+        struct TestCase {
+          int line;
+          std::string env_value;
+          Optional<Error::Code> expected_error;
+          std::vector<PropagationStyle> expected_styles = {};
+        };
+
+        // clang-format off
+        auto test_case = GENERATE(values<TestCase>({
+          {__LINE__, "Datadog", x, {PropagationStyle::DATADOG}},
+          {__LINE__, "DaTaDoG", x, {PropagationStyle::DATADOG}},
+          {__LINE__, "B3", x, {PropagationStyle::B3}},
+          {__LINE__, "b3", x, {PropagationStyle::B3}},
+          {__LINE__, "b3MULTI", x, {PropagationStyle::B3}},
+          {__LINE__, "b3, b3multi", Error::DUPLICATE_PROPAGATION_STYLE  },
+          {__LINE__, "Datadog B3", x, {PropagationStyle::DATADOG, PropagationStyle::B3}},
+          {__LINE__, "Datadog B3 none", x, {PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::NONE}},
+          {__LINE__, "NONE", x, {PropagationStyle::NONE}},
+          {__LINE__, "B3 Datadog", x, {PropagationStyle::B3, PropagationStyle::DATADOG}},
+          {__LINE__, "b3 datadog", x, {PropagationStyle::B3, PropagationStyle::DATADOG}},
+          {__LINE__, "b3, datadog", x, {PropagationStyle::B3, PropagationStyle::DATADOG}},
+          {__LINE__, "b3,datadog", x, {PropagationStyle::B3, PropagationStyle::DATADOG}},
+          {__LINE__, "b3,             datadog", x, {PropagationStyle::B3, PropagationStyle::DATADOG}},
+          {__LINE__, "b3,,datadog", Error::UNKNOWN_PROPAGATION_STYLE},
+          {__LINE__, "b3,datadog,w3c", Error::UNKNOWN_PROPAGATION_STYLE},
+          {__LINE__, "b3,datadog,datadog",
+          Error::DUPLICATE_PROPAGATION_STYLE},
+          {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ",
+          Error::DUPLICATE_PROPAGATION_STYLE},
+        }));
+        // clang-format on
+
+        CAPTURE(test_case.line);
+        CAPTURE(test_case.env_value);
+
+        const EnvGuard guard{"DD_TRACE_PROPAGATION_STYLE_INJECT",
+                             test_case.env_value};
+        auto finalized = finalize_config(config);
+        if (test_case.expected_error) {
+          REQUIRE(!finalized);
+          REQUIRE(finalized.error().code == *test_case.expected_error);
+        } else {
+          REQUIRE(finalized);
+          REQUIRE(finalized->injection_styles == test_case.expected_styles);
+        }
+      }
     }
   }
 
