@@ -28,6 +28,7 @@
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
 #include "mocks/dict_writers.h"
+#include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
@@ -1018,7 +1019,7 @@ TEST_CASE("128-bit trace IDs") {
   // Use a clock that always returns a hard-coded `TimePoint`.
   // May 6, 2010 14:45:13 America/New_York
   const std::time_t flash_crash = 1273171513;
-  const Clock clock = []() {
+  const Clock clock = [flash_crash = flash_crash]() {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(flash_crash);
     return result;
@@ -1272,6 +1273,7 @@ TEST_CASE("heterogeneous extraction") {
 
   TracerConfig config;
   config.defaults.service = "testsvc";
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.extraction_styles = test_case.extraction_styles;
   config.injection_styles = test_case.injection_styles;
   config.logger = std::make_shared<NullLogger>();

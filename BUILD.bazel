@@ -111,3 +111,49 @@ cc_library(
         "@com_google_absl//absl/types:optional",
     ],
 )
+
+
+cc_test(
+    name = "dd_trace_cpp_test",
+    srcs = [
+        # test driver
+        "test/main.cpp",
+
+        # wrapper around Catch2
+        "test/test.cpp",
+
+        # mocks
+        "test/mocks/collectors.cpp",
+        "test/mocks/dict_readers.cpp",
+        "test/mocks/dict_writers.cpp",
+        "test/mocks/event_schedulers.cpp",
+        "test/mocks/http_clients.cpp",
+        "test/mocks/loggers.cpp",
+
+        # utilities
+        "test/matchers.cpp",
+
+        # test cases
+        "test/test_cerr_logger.cpp",
+        # "test/test_curl.cpp", no curl: bazel build/test is for Envoy.
+        "test/test_datadog_agent.cpp",
+        "test/test_glob.cpp",
+        "test/test_limiter.cpp",
+        "test/test_metrics.cpp",
+        "test/test_msgpack.cpp",
+        "test/test_parse_util.cpp",
+        "test/test_smoke.cpp",
+        "test/test_span.cpp",
+        "test/test_span_sampler.cpp",
+        "test/test_trace_id.cpp",
+        "test/test_trace_segment.cpp",
+        "test/test_tracer_config.cpp",
+        "test/test_tracer_telemetry.cpp",
+        "test/test_tracer.cpp",
+        "test/test_trace_sampler.cpp",
+    ],
+    includes = ["test"],
+    deps = [
+        "dd_trace_cpp",
+    ],
+)

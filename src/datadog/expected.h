@@ -201,6 +201,8 @@ class Expected<void> {
   Expected(const Error&);
   Expected(Error&&);
   Expected(decltype(nullopt));
+  explicit Expected(const Optional<Error>&);
+  explicit Expected(Optional<Error>&&);
 
   Expected& operator=(const Expected&) = default;
   Expected& operator=(Expected&&) = default;
@@ -225,6 +227,9 @@ class Expected<void> {
 inline Expected<void>::Expected(const Error& error) : data_(error) {}
 inline Expected<void>::Expected(Error&& error) : data_(std::move(error)) {}
 inline Expected<void>::Expected(decltype(nullopt)) : data_(nullopt) {}
+inline Expected<void>::Expected(const Optional<Error>& data) : data_(data) {}
+inline Expected<void>::Expected(Optional<Error>&& data)
+    : data_(std::move(data)) {}
 
 inline void Expected<void>::swap(Expected& other) { data_.swap(other.data_); }
 

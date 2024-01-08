@@ -20,9 +20,11 @@
 
 #include "mocks/collectors.h"
 #include "mocks/event_schedulers.h"
+#include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 #ifdef _MSC_VER
+#include <windows.h>
 #include <winbase.h>  // SetEnvironmentVariable
 #else
 #include <stdlib.h>  // setenv, unsetenv
@@ -47,10 +49,12 @@ namespace {
 class EnvGuard {
   std::string name_;
   Optional<std::string> former_value_;
+  // maximum size of an environment variable value on Windows
+  char buffer_[32767];
 
  public:
   EnvGuard(std::string name, std::string value) : name_(std::move(name)) {
-    const char* current = std::getenv(name_.c_str());
+    const char* current = get_value(name_);
     if (current) {
       former_value_ = current;
     }
@@ -65,9 +69,21 @@ class EnvGuard {
     }
   }
 
+  const char *get_value(const std::string& name) {
+#ifdef _MSC_VER
+    const DWORD rc = GetEnvironmentVariable(name.c_str(), buffer_, sizeof buffer_);
+    if (rc == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
+      return nullptr;
+    }
+    return buffer_;
+#else
+    return std::getenv(name_.c_str());
+#endif
+  }
+
   void set_value(const std::string& value) {
 #ifdef _MSC_VER
-    ::SetEnvironmentVariable(name_.c_str(), value.c_str());
+    REQUIRE(::SetEnvironmentVariable(name_.c_str(), value.c_str()));
 #else
     const bool overwrite = true;
     ::setenv(name_.c_str(), value.c_str(), overwrite);
@@ -76,7 +92,7 @@ class EnvGuard {
 
   void unset() {
 #ifdef _MSC_VER
-    ::SetEnvironmentVariable(name_.c_str(), NULL);
+    REQUIRE(::SetEnvironmentVariable(name_.c_str(), NULL));
 #else
     ::unsetenv(name_.c_str());
 #endif
@@ -143,6 +159,7 @@ class SomewhatSecureTemporaryFile : public std::fstream {
 
 TEST_CASE("TracerConfig::defaults") {
   TracerConfig config;
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
 
   SECTION("service is required") {
     SECTION("empty") {
@@ -192,7 +209,6 @@ TEST_CASE("TracerConfig::defaults") {
     };
 
     auto test_case = GENERATE(values<TestCase>({
-        {"empty", "", {}, nullopt},
         {"missing colon", "foo", {}, Error::TAG_MISSING_SEPARATOR},
         {"trailing comma",
          "foo:bar, baz:123,",
@@ -230,6 +246,7 @@ TEST_CASE("TracerConfig::defaults") {
 
 TEST_CASE("TracerConfig::log_on_startup") {
   TracerConfig config;
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.defaults.service = "testsvc";
   const auto logger = std::make_shared<MockLogger>();
   config.logger = logger;
@@ -291,6 +308,7 @@ TEST_CASE("TracerConfig::log_on_startup") {
 
 TEST_CASE("TracerConfig::report_traces") {
   TracerConfig config;
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.defaults.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
@@ -361,6 +379,7 @@ TEST_CASE("TracerConfig::report_traces") {
 TEST_CASE("TracerConfig::agent") {
   TracerConfig config;
   config.defaults.service = "testsvc";
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
 
   SECTION("event_scheduler") {
     SECTION("default") {
@@ -467,7 +486,6 @@ TEST_CASE("TracerConfig::agent") {
           // during configuration.  For the purposes of configuration, any
           // value is accepted.
           {"we don't parse port", x, "bogus", x, "http", "localhost:bogus"},
-          {"even empty is ok", x, "", x, "http", "localhost:"},
           {"URL", x, x, "http://dd-agent:8080", "http", "dd-agent:8080"},
           {"URL overrides scheme", x, x, "https://dd-agent:8080", "https",
            "dd-agent:8080"},
@@ -506,6 +524,7 @@ TEST_CASE("TracerConfig::agent") {
 
 TEST_CASE("TracerConfig::trace_sampler") {
   TracerConfig config;
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.defaults.service = "testsvc";
 
   SECTION("default is no rules") {
@@ -589,7 +608,6 @@ TEST_CASE("TracerConfig::trace_sampler") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"empty", "", {Error::INVALID_DOUBLE}},
           {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
           {"trailing space", "0.23   ", {Error::INVALID_DOUBLE}},
           {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
@@ -655,7 +673,6 @@ TEST_CASE("TracerConfig::trace_sampler") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"empty", "", {Error::INVALID_DOUBLE}},
           {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
           {"trailing space", "23   ", {Error::INVALID_DOUBLE}},
           {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
@@ -771,6 +788,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
 
 TEST_CASE("TracerConfig::span_sampler") {
   TracerConfig config;
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.defaults.service = "testsvc";
 
   SECTION("default is no rules") {
@@ -966,13 +984,18 @@ TEST_CASE("TracerConfig::span_sampler") {
 
       SECTION("failed usage") {
         SECTION("unable to open") {
-          std::filesystem::path defunct;
-          {
-            SomewhatSecureTemporaryFile file;
-            REQUIRE(file.is_open());
-            defunct = file.path();
-          }
-          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE", defunct.string()};
+          // It's not elegant, but neither an empty path nor a path to a
+          // deleted file work for this test on Windows.          
+          //
+          // On Windows, deleting the file doesn't delete the file, and an
+          // empty path deletes the environment variable rather than set the
+          // environment variable empty.
+          //
+          // An easy workaround is to choose a path that is very likely not on
+          // the file system.
+          const std::string invalid = "ooga/booga/booga/booga";
+
+          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE", invalid};
           auto finalized = finalize_config(config);
           REQUIRE(!finalized);
           REQUIRE(finalized.error().code == Error::SPAN_SAMPLING_RULES_FILE_IO);
@@ -1001,6 +1024,7 @@ TEST_CASE("TracerConfig::span_sampler") {
 
 TEST_CASE("TracerConfig propagation styles") {
   TracerConfig config;
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.defaults.service = "testsvc";
 
   SECTION("default style is [Datadog, W3C]") {
@@ -1075,7 +1099,7 @@ TEST_CASE("TracerConfig propagation styles") {
         };
 
         // brevity
-        const auto datadog = PropagationStyle::DATADOG,
+        static const auto datadog = PropagationStyle::DATADOG,
                    b3 = PropagationStyle::B3, none = PropagationStyle::NONE;
         // clang-format off
         auto test_case = GENERATE(values<TestCase>({
@@ -1222,6 +1246,7 @@ TEST_CASE("TracerConfig propagation styles") {
 
 TEST_CASE("configure 128-bit trace IDs") {
   TracerConfig config;
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.defaults.service = "testsvc";
 
   SECTION("defaults to true") { REQUIRE(config.trace_id_128_bit == true); }
@@ -1248,7 +1273,6 @@ TEST_CASE("configure 128-bit trace IDs") {
       {__LINE__, "no", false},
       {__LINE__, "nein", true},
       {__LINE__, "0", false},
-      {__LINE__, "", true},
     }));
     // clang-format on
 
@@ -1259,13 +1283,11 @@ TEST_CASE("configure 128-bit trace IDs") {
                    test_case.env_value};
 
     config.trace_id_128_bit = true;
-    CAPTURE(config.trace_id_128_bit);
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
 
     config.trace_id_128_bit = false;
-    CAPTURE(config.trace_id_128_bit);
     finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);

@@ -6,6 +6,19 @@
 
 #include "test.h"
 
+// The `timegm` function has a different name on Windows.
+// See <https://stackoverflow.com/a/29411795>.
+#ifdef _MSC_VER
+namespace {
+
+std::time_t timegm(std::tm *tm) {
+  return _mkgmtime(tm);
+}
+
+} // namespace
+#endif
+
+
 using namespace datadog::tracing;
 
 TEST_CASE("limiter") {

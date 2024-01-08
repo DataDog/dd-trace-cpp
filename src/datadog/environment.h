@@ -18,6 +18,8 @@
 #include "optional.h"
 #include "string_view.h"
 
+#include <string>
+
 namespace datadog {
 namespace tracing {
 namespace environment {
@@ -74,7 +76,7 @@ StringView name(Variable variable);
 
 // Return the value of the specified environment `variable`, or return
 // `nullopt` if that variable is not set in the environment.
-Optional<StringView> lookup(Variable variable);
+Optional<std::string> lookup(Variable variable);
 
 nlohmann::json to_json();
 
