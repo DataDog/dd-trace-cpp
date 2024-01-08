@@ -73,7 +73,7 @@ jobs:
         - "d3:8f:a8:6e:b6:ef:37:65:1a:dc:2b:88:3b:ff:50:f4"
     - run: bin/publish-coverage
 
-  # Copy-paste from dd-trace-java. Thank you <3
+  # Copy-pasta from dd-trace-java. Thank you <3
   system-tests:
     parameters:
       systemTestsCommit:
