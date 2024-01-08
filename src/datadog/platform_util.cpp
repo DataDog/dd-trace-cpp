@@ -52,7 +52,9 @@ void init_winsock_if_not_already() {
 }  // namespace
 
 Optional<std::string> get_hostname() {
+#ifdef _MSC_VER
   init_winsock_if_not_already();
+#endif
   char buffer[256];
   if (::gethostname(buffer, sizeof buffer)) {
     return nullopt;

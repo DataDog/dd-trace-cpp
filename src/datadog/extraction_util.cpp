@@ -70,7 +70,7 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
                                                     int base) {
   auto found = headers.lookup(header);
   if (!found) {
-    return nullopt;
+    return Optional<std::uint64_t>();
   }
   auto result = parse_uint64(*found, base);
   if (auto* error = result.if_error()) {
@@ -86,7 +86,7 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
     prefix += ' ';
     return error->with_prefix(prefix);
   }
-  return *result;
+  return Optional<std::uint64_t>(*result);
 }
 
 Expected<ExtractedData> extract_datadog(

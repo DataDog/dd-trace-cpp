@@ -49,12 +49,14 @@ namespace {
 class EnvGuard {
   std::string name_;
   Optional<std::string> former_value_;
+#ifdef _MSC_VER
   // maximum size of an environment variable value on Windows
   char buffer_[32767];
+#endif
 
  public:
   EnvGuard(std::string name, std::string value) : name_(std::move(name)) {
-    const char* current = get_value(name_);
+    const char* current = get_value();
     if (current) {
       former_value_ = current;
     }
@@ -69,10 +71,10 @@ class EnvGuard {
     }
   }
 
-  const char* get_value(const std::string& name) {
+  const char* get_value() {
 #ifdef _MSC_VER
     const DWORD rc =
-        GetEnvironmentVariable(name.c_str(), buffer_, sizeof buffer_);
+        GetEnvironmentVariable(name_.c_str(), buffer_, sizeof buffer_);
     if (rc == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
       return nullptr;
     }
