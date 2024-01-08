@@ -1,6 +1,7 @@
 #include "platform_util.h"
 
 #ifdef _MSC_VER
+#include <windows.h>
 #include <processthreadsapi.h>
 #include <winsock.h>
 #else

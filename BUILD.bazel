@@ -104,14 +104,6 @@ cc_library(
     "src/datadog/version.h",
     "src/datadog/w3c_propagation.h",
     ],
-    copts = [
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-pedantic",
-        "-std=c++17",
-        "-DDD_USE_ABSEIL_FOR_ENVOY",
-    ],
     strip_include_prefix = "src/",
     visibility = ["//visibility:public"],
     deps = [
