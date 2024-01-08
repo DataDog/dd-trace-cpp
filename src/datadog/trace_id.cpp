@@ -48,9 +48,9 @@ Expected<TraceID> TraceID::parse_hex(StringView input) {
   }
 
   // Parse the lower part and the higher part separately.
-  const auto divider = input.begin() + (input.size() - 16);
-  const auto high_hex = range(input.begin(), divider);
-  const auto low_hex = range(divider, input.end());
+  const auto divider = input.size() - 16;
+  const auto high_hex = input.substr(0, divider);
+  const auto low_hex = input.substr(divider);
   TraceID trace_id;
 
   auto result = parse_hex_piece(low_hex);

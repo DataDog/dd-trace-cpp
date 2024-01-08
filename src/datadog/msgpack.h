@@ -160,7 +160,7 @@ inline void pack_integer(std::string& buffer, std::int32_t value) {
 }
 
 inline Expected<void> pack_string(std::string& buffer, StringView value) {
-  return pack_string(buffer, value.begin(), value.size());
+  return pack_string(buffer, value.data(), value.size());
 }
 
 }  // namespace msgpack

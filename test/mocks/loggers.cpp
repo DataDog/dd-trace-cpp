@@ -10,7 +10,7 @@ std::ostream& operator<<(std::ostream& stream,
   for (; i < entries.size(); ++i) {
     const auto& entry = entries[i];
     const auto kind_name =
-        entry.kind == MockLogger::Entry::ERROR ? "ERROR" : "STARTUP";
+        entry.kind == MockLogger::Entry::DD_ERROR ? "ERROR" : "STARTUP";
     stream << '\n' << (i + 1) << ". " << kind_name << ": ";
     std::visit([&](const auto& value) { stream << value; }, entry.payload);
   }

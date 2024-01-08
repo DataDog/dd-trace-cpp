@@ -8,6 +8,12 @@
 
 using namespace datadog::tracing;
 
+// clang-format off
+#if defined(DD_TRACE_PLATFORM_WINDOWS)
+#  define timegm _mkgmtime
+#endif
+// clang-format on
+
 TEST_CASE("limiter") {
   // Starting calendar time 2007-03-12 00:00:00
   std::tm start{};
