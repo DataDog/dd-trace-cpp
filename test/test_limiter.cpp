@@ -11,13 +11,10 @@
 #ifdef _MSC_VER
 namespace {
 
-std::time_t timegm(std::tm *tm) {
-  return _mkgmtime(tm);
-}
+std::time_t timegm(std::tm *tm) { return _mkgmtime(tm); }
 
-} // namespace
+}  // namespace
 #endif
-
 
 using namespace datadog::tracing;
 

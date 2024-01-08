@@ -2,8 +2,8 @@
 
 #include <cstdlib>
 #ifdef _MSC_VER
-#include <windows.h>
 #include <winbase.h>  // GetEnvironmentVariable
+#include <windows.h>
 #endif
 
 #include "json.hpp"
@@ -21,7 +21,7 @@ Optional<std::string> get_env(const char *name) {
   if (rc == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
     return nullopt;
   }
-  return std::string(buffer, rc); // `rc` is the length on success
+  return std::string(buffer, rc);  // `rc` is the length on success
 #else
   if (const char *value = std::getenv(name)) {
     return value;

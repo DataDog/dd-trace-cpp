@@ -1,8 +1,8 @@
 #include "platform_util.h"
 
 #ifdef _MSC_VER
-#include <winsock2.h>
 #include <processthreadsapi.h>
+#include <winsock2.h>
 #else
 #include <pthread.h>
 #include <unistd.h>
@@ -21,12 +21,13 @@ namespace {
 //
 // `class WinsockLibraryGuard` initializes winsock in its constructor and
 // cleans up winsock in its destructor.
-// See <https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-wsastartup>.
+// See
+// <https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-wsastartup>.
 #ifdef _MSC_VER
 class WinsockLibraryGuard {
   int startup_rc_;
 
-public:
+ public:
   WinsockLibraryGuard() {
     const WORD version_requested = MAKEWORD(2, 2);
     WSADATA info;
@@ -48,7 +49,7 @@ void init_winsock_if_not_already() {
 
 #endif
 
-} // namespace
+}  // namespace
 
 Optional<std::string> get_hostname() {
   init_winsock_if_not_already();

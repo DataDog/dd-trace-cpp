@@ -24,8 +24,8 @@
 #include "mocks/loggers.h"
 #include "test.h"
 #ifdef _MSC_VER
-#include <windows.h>
 #include <winbase.h>  // SetEnvironmentVariable
+#include <windows.h>
 #else
 #include <stdlib.h>  // setenv, unsetenv
 #endif
@@ -69,9 +69,10 @@ class EnvGuard {
     }
   }
 
-  const char *get_value(const std::string& name) {
+  const char* get_value(const std::string& name) {
 #ifdef _MSC_VER
-    const DWORD rc = GetEnvironmentVariable(name.c_str(), buffer_, sizeof buffer_);
+    const DWORD rc =
+        GetEnvironmentVariable(name.c_str(), buffer_, sizeof buffer_);
     if (rc == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
       return nullptr;
     }
@@ -985,7 +986,7 @@ TEST_CASE("TracerConfig::span_sampler") {
       SECTION("failed usage") {
         SECTION("unable to open") {
           // It's not elegant, but neither an empty path nor a path to a
-          // deleted file work for this test on Windows.          
+          // deleted file work for this test on Windows.
           //
           // On Windows, deleting the file doesn't delete the file, and an
           // empty path deletes the environment variable rather than set the
@@ -1100,7 +1101,8 @@ TEST_CASE("TracerConfig propagation styles") {
 
         // brevity
         static const auto datadog = PropagationStyle::DATADOG,
-                   b3 = PropagationStyle::B3, none = PropagationStyle::NONE;
+                          b3 = PropagationStyle::B3,
+                          none = PropagationStyle::NONE;
         // clang-format off
         auto test_case = GENERATE(values<TestCase>({
           {__LINE__, "Datadog", x, {datadog}},

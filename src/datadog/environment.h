@@ -14,11 +14,11 @@
 //
 // `lookup` retrieves the value of `Variable` in the environment.
 
+#include <string>
+
 #include "json_fwd.hpp"
 #include "optional.h"
 #include "string_view.h"
-
-#include <string>
 
 namespace datadog {
 namespace tracing {
