@@ -8,9 +8,9 @@
 #include <datadog/trace_sampler.h>
 
 #include <algorithm>
-#include <numeric>
 #include <cstddef>
 #include <map>
+#include <numeric>
 #include <unordered_set>
 #include <utility>
 #include <vector>

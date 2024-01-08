@@ -43,7 +43,9 @@ Expected<void> decode_tag(
   }
 
   const StringView key = entry.substr(0, separator - entry.cbegin());
-  const StringView value = entry.substr(separator - entry.cbegin() + 1, separator - entry.cbegin() + entry.size());
+  const StringView value =
+      entry.substr(separator - entry.cbegin() + 1,
+                   separator - entry.cbegin() + entry.size());
   destination.emplace_back(std::string(key), std::string(value));
 
   return nullopt;
@@ -63,8 +65,7 @@ Expected<std::vector<std::pair<std::string, std::string>>> decode_tags(
   std::vector<std::pair<std::string, std::string>> tags;
   tags.reserve(header_value.size());
 
-  if (header_value.empty())
-    return tags;
+  if (header_value.empty()) return tags;
 
   std::size_t beg = 0;
   for (std::size_t i = 0; i < header_value.size(); ++i) {
@@ -83,7 +84,8 @@ Expected<std::vector<std::pair<std::string, std::string>>> decode_tags(
   }
 
   if (beg != header_value.size()) {
-    auto result = decode_tag(tags, header_value.substr(beg, header_value.size() - beg));
+    auto result =
+        decode_tag(tags, header_value.substr(beg, header_value.size() - beg));
     if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Error decoding trace tags \"";

@@ -4,6 +4,7 @@
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
+#include <stdlib.h>  // setenv, unsetenv
 
 #include <cmath>
 #include <cstddef>
@@ -22,7 +23,6 @@
 #include "mocks/event_schedulers.h"
 #include "mocks/loggers.h"
 #include "test.h"
-#include <stdlib.h>  // setenv, unsetenv
 
 namespace datadog {
 namespace tracing {
@@ -62,7 +62,7 @@ class EnvGuard {
   }
 
   void set_value(const std::string& value) {
-#ifdef DD_TRACE_PLATFORM_WINDOWS 
+#ifdef DD_TRACE_PLATFORM_WINDOWS
     std::string envstr{name_};
     envstr += "=";
     envstr += value;
@@ -193,7 +193,7 @@ TEST_CASE("TracerConfig::defaults") {
     };
 
     auto test_case = GENERATE(values<TestCase>({
-          // IGNORED for Windows empty string on putenv erase the env variable.
+        // IGNORED for Windows empty string on putenv erase the env variable.
         // {"empty", "", {}, nullopt},
         {"missing colon", "foo", {}, Error::TAG_MISSING_SEPARATOR},
         {"trailing comma",
@@ -592,7 +592,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          // WINDOWS: Empty 
+          // WINDOWS: Empty
           // {"empty", "", {Error::INVALID_DOUBLE}},
           {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
           {"trailing space", "0.23   ", {Error::INVALID_DOUBLE}},
@@ -980,7 +980,8 @@ TEST_CASE("TracerConfig::span_sampler") {
           const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE", defunct.string()};
           auto finalized = finalize_config(config);
           REQUIRE(!finalized);
-          // REQUIRE(finalized.error().code == Error::SPAN_SAMPLING_RULES_FILE_IO);
+          // REQUIRE(finalized.error().code ==
+          // Error::SPAN_SAMPLING_RULES_FILE_IO);
         }
 
         SECTION("unable to parse") {
@@ -1100,8 +1101,10 @@ TEST_CASE("TracerConfig propagation styles") {
       //     {__LINE__, "b3,             datadog", x, {b3, datadog}},
       //     {__LINE__, "b3,,datadog", Error::UNKNOWN_PROPAGATION_STYLE},
       //     {__LINE__, "b3,datadog,w3c", Error::UNKNOWN_PROPAGATION_STYLE},
-      //     {__LINE__, "b3,datadog,datadog", Error::DUPLICATE_PROPAGATION_STYLE},
-      //     {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ", Error::DUPLICATE_PROPAGATION_STYLE},
+      //     {__LINE__, "b3,datadog,datadog",
+      //     Error::DUPLICATE_PROPAGATION_STYLE},
+      //     {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ",
+      //     Error::DUPLICATE_PROPAGATION_STYLE},
       //   }));
       //   // clang-format on
       //

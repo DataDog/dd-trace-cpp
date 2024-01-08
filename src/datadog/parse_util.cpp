@@ -110,7 +110,7 @@ bool starts_with(StringView subject, StringView prefix) {
     ++c0;
     ++c1;
   }
-  
+
   return c1 == prefix_end;
 }
 

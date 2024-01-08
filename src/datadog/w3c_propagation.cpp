@@ -67,9 +67,11 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
   assert(match.ready());
   assert(match.size() == 5 + 1);
 
-  const auto to_string_view = [traceparent](const std::cmatch& match, const std::size_t index) {
+  const auto to_string_view = [traceparent](const std::cmatch& match,
+                                            const std::size_t index) {
     assert(index < match.size());
-    return StringView(traceparent.data() + match.position(index), std::size_t(match.length(index)));
+    return StringView(traceparent.data() + match.position(index),
+                      std::size_t(match.length(index)));
   };
 
   const auto version = to_string_view(match, 1);
@@ -115,7 +117,8 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
     const std::size_t pair_end = tracestate.find(',', pair_begin);
     // Note that since this `pair` is `strip`ped, `pair_begin` is not
     // necessarily equal to `pair.begin()` (similarly for the ends).
-    const auto pair = strip(tracestate.substr(pair_begin, pair_end - pair_begin));
+    const auto pair =
+        strip(tracestate.substr(pair_begin, pair_end - pair_begin));
     if (pair.empty()) {
       pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
       continue;

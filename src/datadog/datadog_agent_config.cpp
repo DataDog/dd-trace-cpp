@@ -13,7 +13,7 @@ namespace tracing {
 
 constexpr StringView k_separator = "://";
 constexpr StringView supported[] = {"http", "https", "unix", "http+unix",
-                                "https+unix"};
+                                    "https+unix"};
 
 Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
   const auto after_scheme = input.find(k_separator);
@@ -42,8 +42,9 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
     return Error{Error::URL_UNSUPPORTED_SCHEME, std::move(message)};
   }
 
-  const StringView authority_and_path = input.substr(after_scheme + k_separator.size());
-      // range(after_scheme + separator.size(), input.end());
+  const StringView authority_and_path =
+      input.substr(after_scheme + k_separator.size());
+  // range(after_scheme + separator.size(), input.end());
   // If the scheme is for unix domain sockets, then there's no way to
   // distinguish the path-to-socket from the path-to-resource.  Some
   // implementations require that the forward slashes in the path-to-socket
@@ -79,7 +80,9 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
   return HTTPClient::URL{
       std::string(scheme),
       std::string(authority_and_path.substr(0, after_authority)),
-      (after_authority == StringView::npos) ? "" : std::string(authority_and_path.substr(after_authority))};
+      (after_authority == StringView::npos)
+          ? ""
+          : std::string(authority_and_path.substr(after_authority))};
 }
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
