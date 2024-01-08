@@ -95,7 +95,7 @@ jobs:
             cd system-tests
             git remote add origin https://github.com/DataDog/system-tests.git
             #git fetch origin << parameters.systemTestsCommit >>
-            git fetch origin 5598dcb607258ad2ee5be79917a344197f862c28
+            git fetch origin f9b90d5ff2ecc7937e68d572ae3c8dcc6812234b
             git reset --hard FETCH_HEAD
       - run:
           name: Install requirements
