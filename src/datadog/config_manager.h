@@ -1,6 +1,9 @@
 #pragma once
 
-// TODO: Document
+// The `ConfigManager` class is designed to handle configuration update
+// and provide access to the current configuration.
+// It utilizes a mutex to ensure thread safety when updating or accessing
+// the configuration.
 
 #include <mutex>
 

@@ -23,7 +23,7 @@
 #include "tags.h"
 #include "trace_sampler.h"
 #include "trace_segment.h"
-#include "tracer_id.h"
+#include "tracer_signature.h"
 #include "version.h"
 #include "w3c_propagation.h"
 
@@ -40,9 +40,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
-      id_{runtime_id_, config.defaults.service, config.defaults.environment},
+      signature_{runtime_id_, config.defaults.service,
+                 config.defaults.environment},
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
-          config.report_telemetry, config.clock, logger_, id_)),
+          config.report_telemetry, config.clock, logger_, signature_)),
       span_sampler_(
           std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
       generator_(generator),
@@ -59,8 +60,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     auto& agent_config =
         std::get<FinalizedDatadogAgentConfig>(config.collector);
 
-    auto agent = std::make_shared<DatadogAgent>(
-        agent_config, tracer_telemetry_, config.logger, id_, config_manager_);
+    auto agent = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
+                                                config.logger, signature_,
+                                                config_manager_);
     collector_ = agent;
 
     if (tracer_telemetry_->enabled()) {

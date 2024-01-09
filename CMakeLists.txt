@@ -208,10 +208,10 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/tags.h
   src/datadog/threaded_event_scheduler.h
   src/datadog/tracer_config.h
+  src/datadog/tracer_signature.h
   src/datadog/tracer_telemetry.h
   src/datadog/tracer.h
   src/datadog/trace_id.h
-  src/datadog/tracer_id.h
   src/datadog/trace_sampler_config.h
   src/datadog/trace_sampler.h
   src/datadog/trace_segment.h

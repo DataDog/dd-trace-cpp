@@ -1,5 +1,7 @@
 #include "config_manager.h"
 
+#include "trace_sampler.h"
+
 namespace datadog {
 namespace tracing {
 

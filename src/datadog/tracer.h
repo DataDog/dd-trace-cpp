@@ -19,6 +19,7 @@
 #include "optional.h"
 #include "span.h"
 #include "tracer_config.h"
+#include "tracer_signature.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {
@@ -28,14 +29,13 @@ class DictReader;
 struct SpanConfig;
 class TraceSampler;
 class SpanSampler;
-struct TracerID;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<const SpanDefaults> defaults_;
   RuntimeID runtime_id_;
-  TracerID id_;
+  TracerSignature signature_;
   std::shared_ptr<TracerTelemetry> tracer_telemetry_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const IDGenerator> generator_;

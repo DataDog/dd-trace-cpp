@@ -11,9 +11,10 @@ using namespace datadog::tracing;
 #define REMOTE_CONFIG_TEST(x) TEST_CASE(x, "[remote_config]")
 
 REMOTE_CONFIG_TEST("first payload") {
-  const TracerID tracer_id{/* runtime_id = */ RuntimeID::generate(),
-                           /* service = */ "testsvc",
-                           /* environment = */ "test"};
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
 
   TracerConfig tracer_cfg;
 
@@ -29,7 +30,7 @@ REMOTE_CONFIG_TEST("first payload") {
   config.defaults.environment = "test";
   ConfigManager config_manager(*finalize_config(config));
 
-  RemoteConfigurationManager rc(tracer_id, config_manager);
+  RemoteConfigurationManager rc(tracer_signature, config_manager);
 
   const auto payload = rc.make_request_payload();
 
@@ -43,9 +44,10 @@ REMOTE_CONFIG_TEST("first payload") {
 }
 
 REMOTE_CONFIG_TEST("response processing") {
-  const TracerID tracer_id{/* runtime_id = */ RuntimeID::generate(),
-                           /* service = */ "testsvc",
-                           /* environment = */ "test"};
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
 
   TracerConfig tracer_cfg;
 
@@ -62,7 +64,7 @@ REMOTE_CONFIG_TEST("response processing") {
   config.trace_sampler.sample_rate = 1.0;
   ConfigManager config_manager(*finalize_config(config));
 
-  RemoteConfigurationManager rc(tracer_id, config_manager);
+  RemoteConfigurationManager rc(tracer_signature, config_manager);
 
   SECTION("ill formatted input",
           "inputs not following the Remote Configuration JSON schema should "
