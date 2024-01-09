@@ -169,7 +169,10 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
 
       if (target_it == target_files.cend()) {
         state_.error_message =
-            "Missing configuration from Remote Configuration response";
+            "Missing configuration from Remote Configuration response: No "
+            "target file having path \"";
+        append(*state_.error_message, config_path);
+        *state_.error_message += '\"';
         return;
       }
 
