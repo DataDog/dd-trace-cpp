@@ -119,6 +119,10 @@ struct TracerConfig {
   // such as those in the worker threads/processes of a reverse proxy, might
   // specify the same `runtime_id` for all tracer instances in the same run.
   Optional<RuntimeID> runtime_id;
+
+  // TODO
+  std::string integration_name;
+  std::string integration_version;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -150,6 +154,8 @@ class FinalizedTracerConfig {
   bool report_telemetry;
   Optional<RuntimeID> runtime_id;
   Clock clock;
+  std::string integration_name;
+  std::string integration_version;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

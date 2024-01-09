@@ -27,7 +27,10 @@ TEST_CASE("Tracer telemetry") {
       /* service = */ "testsvc",
       /* environment = */ "test"};
 
-  TracerTelemetry tracer_telemetry = {true, clock, logger, tracer_signature};
+  const std::string ignore{""};
+
+  TracerTelemetry tracer_telemetry = {true,   clock, logger, tracer_signature,
+                                      ignore, ignore};
 
   SECTION("generates app-started message") {
     auto app_started_message = tracer_telemetry.app_started();
