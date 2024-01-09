@@ -51,3 +51,6 @@ struct TracerSignature {
 
 }  // namespace tracing
 }  // namespace datadog
+
+#undef DD_TRACE_STRINGIFY_HELPER
+#undef DD_TRACE_STRINGIFY
