@@ -17,6 +17,7 @@ add_executable(tests
     matchers.cpp
 
     # test cases
+    test_base64.cpp
     test_cerr_logger.cpp
     test_curl.cpp
     test_datadog_agent.cpp
@@ -25,6 +26,7 @@ add_executable(tests
     test_metrics.cpp
     test_msgpack.cpp
     test_parse_util.cpp
+    test_remote_config.cpp
     test_smoke.cpp
     test_span.cpp
     test_span_sampler.cpp

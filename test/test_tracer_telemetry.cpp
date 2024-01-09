@@ -7,6 +7,7 @@
 
 #include <datadog/json.hpp>
 
+#include "datadog/runtime_id.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
@@ -20,11 +21,13 @@ TEST_CASE("Tracer telemetry") {
     return result;
   };
   auto logger = std::make_shared<MockLogger>();
-  auto span_defaults = std::make_shared<SpanDefaults>();
-  span_defaults->service = "testsvc";
-  span_defaults->environment = "test";
-  TracerTelemetry tracer_telemetry = {true, clock, logger, span_defaults,
-                                      RuntimeID::generate()};
+
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
+
+  TracerTelemetry tracer_telemetry = {true, clock, logger, tracer_signature};
 
   SECTION("generates app-started message") {
     auto app_started_message = tracer_telemetry.app_started();

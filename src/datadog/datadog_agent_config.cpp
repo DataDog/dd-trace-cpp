@@ -1,6 +1,7 @@
 #include "datadog_agent_config.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 
 #include "default_http_client.h"
@@ -122,6 +123,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "DatadogAgent: Request timeout must be a positive number of "
                  "milliseconds."};
   }
+
   result.request_timeout =
       std::chrono::milliseconds(config.request_timeout_milliseconds);
 
@@ -130,8 +132,32 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "DatadogAgent: Shutdown timeout must be a positive number of "
                  "milliseconds."};
   }
+
   result.shutdown_timeout =
       std::chrono::milliseconds(config.shutdown_timeout_milliseconds);
+
+  int rc_poll_interval_seconds =
+      config.remote_configuration_poll_interval_seconds;
+
+  if (auto raw_rc_poll_interval_value =
+          lookup(environment::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS)) {
+    auto res = parse_int(*raw_rc_poll_interval_value, 10);
+    if (auto error = res.if_error()) {
+      return error->with_prefix(
+          "DatadogAgent: Remote Configuration poll interval error ");
+    }
+
+    rc_poll_interval_seconds = *res;
+  }
+
+  if (rc_poll_interval_seconds <= 0) {
+    return Error{Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL,
+                 "DatadogAgent: Remote Configuration poll interval must be a "
+                 "positive number of seconds."};
+  }
+
+  result.remote_configuration_poll_interval =
+      std::chrono::seconds(rc_poll_interval_seconds);
 
   auto env_host = lookup(environment::DD_AGENT_HOST);
   auto env_port = lookup(environment::DD_TRACE_AGENT_PORT);

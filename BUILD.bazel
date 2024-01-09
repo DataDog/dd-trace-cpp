@@ -1,8 +1,10 @@
 cc_library(
     name = "dd_trace_cpp",
     srcs = [
+    "src/datadog/base64.cpp",
     "src/datadog/cerr_logger.cpp",
     "src/datadog/clock.cpp",
+    "src/datadog/config_manager.cpp",
     "src/datadog/collector_response.cpp",
 #     "src/datadog/curl.cpp", no libcurl
     "src/datadog/datadog_agent_config.cpp",
@@ -24,6 +26,7 @@ cc_library(
     "src/datadog/propagation_style.cpp",
     "src/datadog/random.cpp",
     "src/datadog/rate.cpp",
+    "src/datadog/remote_config.cpp",
     "src/datadog/runtime_id.cpp",
     "src/datadog/span.cpp",
     "src/datadog/span_data.cpp",
@@ -45,8 +48,11 @@ cc_library(
     "src/datadog/w3c_propagation.cpp",
     ],
     hdrs = [
+    "src/datadog/base64.h",
     "src/datadog/cerr_logger.h",
     "src/datadog/clock.h",
+    "src/datadog/config_manager.h",
+    "src/datadog/config_update.h",
     "src/datadog/collector.h",
     "src/datadog/collector_response.h",
 #     "src/datadog/curl.h", no libcurl
@@ -78,6 +84,7 @@ cc_library(
     "src/datadog/propagation_style.h",
     "src/datadog/random.h",
     "src/datadog/rate.h",
+    "src/datadog/remote_config.h",
     "src/datadog/runtime_id.h",
     "src/datadog/sampling_decision.h",
     "src/datadog/sampling_mechanism.h",
@@ -95,6 +102,7 @@ cc_library(
     "src/datadog/tags.h",
     "src/datadog/threaded_event_scheduler.h",
     "src/datadog/tracer_config.h",
+    "src/datadog/tracer_signature.h",
     "src/datadog/tracer_telemetry.h",
     "src/datadog/tracer.h",
     "src/datadog/trace_id.h",

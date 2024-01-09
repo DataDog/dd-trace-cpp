@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cassert>
 
+#include "datadog/runtime_id.h"
+#include "datadog/trace_sampler_config.h"
 #include "datadog_agent.h"
 #include "dict_reader.h"
 #include "environment.h"
@@ -21,6 +23,7 @@
 #include "tags.h"
 #include "trace_sampler.h"
 #include "trace_segment.h"
+#include "tracer_signature.h"
 #include "version.h"
 #include "w3c_propagation.h"
 
@@ -37,11 +40,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
+      signature_{runtime_id_, config.defaults.service,
+                 config.defaults.environment},
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
-          config.report_telemetry, config.clock, logger_, defaults_,
-          runtime_id_)),
-      trace_sampler_(
-          std::make_shared<TraceSampler>(config.trace_sampler, config.clock)),
+          config.report_telemetry, config.clock, logger_, signature_)),
       span_sampler_(
           std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
       generator_(generator),
@@ -49,16 +51,20 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       hostname_(config.report_hostname ? get_hostname() : nullopt),
-      tags_header_max_size_(config.tags_header_size) {
+      tags_header_max_size_(config.tags_header_size),
+      config_manager_(config) {
   if (auto* collector =
           std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
     collector_ = *collector;
   } else {
     auto& agent_config =
         std::get<FinalizedDatadogAgentConfig>(config.collector);
+
     auto agent = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
-                                                config.logger);
+                                                config.logger, signature_,
+                                                config_manager_);
     collector_ = agent;
+
     if (tracer_telemetry_->enabled()) {
       agent->send_app_started();
     }
@@ -78,7 +84,6 @@ nlohmann::json Tracer::config_json() const {
     {"defaults", to_json(*defaults_)},
     {"runtime_id", runtime_id_.string()},
     {"collector", collector_->config_json()},
-    {"trace_sampler", trace_sampler_->config_json()},
     {"span_sampler", span_sampler_->config_json()},
     {"injection_styles", to_json(injection_styles_)},
     {"extraction_styles", to_json(extraction_styles_)},
@@ -86,6 +91,8 @@ nlohmann::json Tracer::config_json() const {
     {"environment_variables", environment::to_json()},
   });
   // clang-format on
+
+  config.merge_patch(config_manager_.config_json());
 
   if (hostname_) {
     config["hostname"] = *hostname_;
@@ -99,21 +106,23 @@ Span Tracer::create_span() { return create_span(SpanConfig{}); }
 Span Tracer::create_span(const SpanConfig& config) {
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults_, config, clock_);
-  std::vector<std::pair<std::string, std::string>> trace_tags;
   span_data->trace_id = generator_->trace_id(span_data->start);
+  span_data->span_id = span_data->trace_id.low;
+  span_data->parent_id = 0;
+
+  std::vector<std::pair<std::string, std::string>> trace_tags;
   if (span_data->trace_id.high) {
     trace_tags.emplace_back(tags::internal::trace_id_high,
                             hex_padded(span_data->trace_id.high));
   }
-  span_data->span_id = span_data->trace_id.low;
-  span_data->parent_id = 0;
 
   const auto span_data_ptr = span_data.get();
   tracer_telemetry_->metrics().tracer.trace_segments_created_new.inc();
   const auto segment = std::make_shared<TraceSegment>(
-      logger_, collector_, tracer_telemetry_, trace_sampler_, span_sampler_,
-      defaults_, runtime_id_, injection_styles_, hostname_,
-      nullopt /* origin */, tags_header_max_size_, std::move(trace_tags),
+      logger_, collector_, tracer_telemetry_,
+      config_manager_.get_trace_sampler(), span_sampler_, defaults_,
+      runtime_id_, injection_styles_, hostname_, nullopt /* origin */,
+      tags_header_max_size_, std::move(trace_tags),
       nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment,
@@ -237,8 +246,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     // corresponding `trace_id_high` tag, so that the Datadog backend is aware
     // of those bits.
     //
-    // First, though, if the `trace_id_high` tag is already set and has a bogus
-    // value or a value inconsistent with the trace ID, tag an error.
+    // First, though, if the `trace_id_high` tag is already set and has a
+    // bogus value or a value inconsistent with the trace ID, tag an error.
     const auto hex_high = hex_padded(span_data->trace_id.high);
     const auto extant = std::find_if(
         trace_tags.begin(), trace_tags.end(), [&](const auto& pair) {
@@ -247,9 +256,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     if (extant == trace_tags.end()) {
       trace_tags.emplace_back(tags::internal::trace_id_high, hex_high);
     } else {
-      // There is already a `trace_id_high` tag. `hex_high` is its proper value.
-      // Check if the extant value is malformed or different from `hex_high`. In
-      // either case, tag an error and overwrite the tag with `hex_high`.
+      // There is already a `trace_id_high` tag. `hex_high` is its proper
+      // value. Check if the extant value is malformed or different from
+      // `hex_high`. In either case, tag an error and overwrite the tag with
+      // `hex_high`.
       const Optional<std::uint64_t> high = parse_trace_id_high(extant->second);
       if (!high) {
         span_data->tags[tags::internal::propagation_error] =
@@ -277,8 +287,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   const auto span_data_ptr = span_data.get();
   tracer_telemetry_->metrics().tracer.trace_segments_created_continued.inc();
   const auto segment = std::make_shared<TraceSegment>(
-      logger_, collector_, tracer_telemetry_, trace_sampler_, span_sampler_,
-      defaults_, runtime_id_, injection_styles_, hostname_, std::move(origin),
+      logger_, collector_, tracer_telemetry_,
+      config_manager_.get_trace_sampler(), span_sampler_, defaults_,
+      runtime_id_, injection_styles_, hostname_, std::move(origin),
       tags_header_max_size_, std::move(trace_tags),
       std::move(sampling_decision), std::move(additional_w3c_tracestate),
       std::move(additional_datadog_w3c_tracestate), std::move(span_data));
