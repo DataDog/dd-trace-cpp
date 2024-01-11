@@ -26,7 +26,6 @@
 // When all of the `Span`s associated with `TraceSegment` have been destroyed,
 // the `TraceSegment` submits them in a payload to a `Collector`.
 
-#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -71,7 +70,6 @@ class TraceSegment {
   Optional<SamplingDecision> sampling_decision_;
   Optional<std::string> additional_w3c_tracestate_;
   Optional<std::string> additional_datadog_w3c_tracestate_;
-  // TODO: Protect these with `mutex_` rather than using atomics.
   struct SamplingDelegation {
     // This segment is configured to delegate its sampling decision.
     bool enabled;
@@ -80,13 +78,13 @@ class TraceSegment {
     bool decision_was_delegated_to_me;
     // This segment included a request for sampling delegation in outbound
     // injected trace context (see `inject`).
-    std::atomic<bool> sent_request_header;
+    bool sent_request_header;
     // This segment received a (presumably delegated) sampling decision. See
     // `read_sampling_delegation_response`.
-    std::atomic<bool> received_matching_response_header;
+    bool received_matching_response_header;
     // This segment conveyed a sampling decision back to a parent service that
     // had previously requested a delegated sampling decision.
-    std::atomic<bool> sent_response_header;
+    bool sent_response_header;
   } sampling_delegation_ = {};
 
  public:

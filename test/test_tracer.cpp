@@ -1282,6 +1282,7 @@ TEST_CASE("_dd.is_sampling_decider") {
   Tracer tracer2{*valid_config};
 
   valid_config = finalize_config(config3);
+  REQUIRE(valid_config);
   Tracer tracer3{*valid_config};
 
   // The spans will communicate forwards using the propagation writer and

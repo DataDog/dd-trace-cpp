@@ -331,11 +331,10 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     return false;
   }
 
+  bool delegate_sampling;
   // If `options.delegate_sampling_decision` is null, then pick a default based
   // on our sampling delegation configuration and state.
-  bool delegate_sampling = options.delegate_sampling_decision.value_or(
-      sampling_delegation_.enabled &&
-      !sampling_delegation_.sent_request_header);
+  //
   // Also, even if the caller requested sampling delegation, do _not_ perform
   // sampling delegation if we previously extracted a sampling decision for
   // which delegation was not requested.
@@ -347,6 +346,10 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         sampling_decision_->origin == SamplingDecision::Origin::EXTRACTED &&
         !sampling_delegation_.decision_was_delegated_to_me) {
       delegate_sampling = false;
+    } else {
+      delegate_sampling = options.delegate_sampling_decision.value_or(
+          sampling_delegation_.enabled &&
+          !sampling_delegation_.sent_request_header);
     }
   }
 
@@ -378,7 +381,10 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         }
         if (delegate_sampling) {
           delegated_trace_sampling_decision = true;
-          sampling_delegation_.sent_request_header = true;
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            sampling_delegation_.sent_request_header = true;
+          }
           writer.set("x-datadog-delegate-trace-sampling", "delegate");
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
@@ -417,19 +423,18 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
 }
 
 void TraceSegment::write_sampling_delegation_response(DictWriter& writer) {
-  if (!sampling_delegation_.decision_was_delegated_to_me) return;
-
   nlohmann::json j;
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!sampling_delegation_.decision_was_delegated_to_me) return;
     make_sampling_decision_if_null();
     assert(sampling_decision_);
     j["priority"] = sampling_decision_->priority;
     j["mechanism"] = *sampling_decision_->mechanism;
+    sampling_delegation_.sent_response_header = true;
   }
 
   writer.set(sampling_delegation_response_header, j.dump());
-  sampling_delegation_.sent_response_header = true;
 }
 
 Expected<void> TraceSegment::read_sampling_delegation_response(
@@ -444,9 +449,8 @@ Expected<void> TraceSegment::read_sampling_delegation_response(
     return std::move(*error);
   }
 
-  sampling_delegation_.received_matching_response_header = true;
-
   std::lock_guard<std::mutex> lock(mutex_);
+  sampling_delegation_.received_matching_response_header = true;
   // Overwrite any existing sampling decision if and only if the existing
   // decision is not a local manual override.
   if (!(sampling_decision_ &&
