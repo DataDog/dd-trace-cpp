@@ -27,7 +27,7 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-constexpr StringView DD_SAMPLING_DELEGATION_HEADER =
+constexpr StringView sampling_delegation_request_header =
     "x-datadog-delegate-trace-sampling";
 
 // Parse the high 64 bits of a trace ID from the specified `value`. If `value`
@@ -132,7 +132,7 @@ Expected<ExtractedData> extract_datadog(
   result.parent_id = *parent_id;
 
   if (auto sampling_delegation_header =
-          headers.lookup(DD_SAMPLING_DELEGATION_HEADER)) {
+          headers.lookup(sampling_delegation_request_header)) {
     result.delegate_sampling_decision = true;
     // If the trace sampling decision is being delegated to us, then we don't
     // interpret the sampling priority (if any) included in the request.
