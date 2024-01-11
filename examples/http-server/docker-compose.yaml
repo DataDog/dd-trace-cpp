@@ -1,7 +1,7 @@
 version: "3.2"
 services:
 
-    # The Node.js proxy that sits in front of the C++ server.
+    # The C++ proxy that sits in front of the C++ server.
     proxy:
         build:
             context: .
