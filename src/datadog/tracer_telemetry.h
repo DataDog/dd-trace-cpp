@@ -46,6 +46,8 @@ class TracerTelemetry {
   std::shared_ptr<Logger> logger_;
   TracerSignature tracer_signature_;
   std::string hostname_;
+  std::string integration_name_;
+  std::string integration_version_;
   uint64_t seq_id_ = 0;
   // This structure contains all the metrics that are exposed by tracer
   // telemetry.
@@ -100,7 +102,9 @@ class TracerTelemetry {
  public:
   TracerTelemetry(bool enabled, const Clock& clock,
                   const std::shared_ptr<Logger>& logger,
-                  const TracerSignature& tracer_signature);
+                  const TracerSignature& tracer_signature,
+                  const std::string& integration_name,
+                  const std::string& integration_version);
   bool enabled() { return enabled_; };
   // Provides access to the telemetry metrics for updating the values.
   // This value should not be stored.

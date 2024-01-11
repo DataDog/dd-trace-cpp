@@ -10,12 +10,16 @@ namespace tracing {
 
 TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
                                  const std::shared_ptr<Logger>& logger,
-                                 const TracerSignature& tracer_signature)
+                                 const TracerSignature& tracer_signature,
+                                 const std::string& integration_name,
+                                 const std::string& integration_version)
     : enabled_(enabled),
       clock_(clock),
       logger_(logger),
       tracer_signature_(tracer_signature),
-      hostname_(get_hostname().value_or("hostname-unavailable")) {
+      hostname_(get_hostname().value_or("hostname-unavailable")),
+      integration_name_(integration_name),
+      integration_version_(integration_version) {
   if (enabled_) {
     // Register all the metrics that we're tracking by adding them to the
     // metrics_snapshots_ container. This allows for simpler iteration logic
@@ -80,14 +84,40 @@ nlohmann::json TracerTelemetry::generate_telemetry_body(
 }
 
 std::string TracerTelemetry::app_started() {
-  auto telemetry_body = generate_telemetry_body("app-started");
-  // TODO: environment variables or finalized config details
-  telemetry_body["payload"] = nlohmann::json::object({
-      {"configuration", nlohmann::json::array({})},
+  // clang-format off
+  auto app_started_msg = nlohmann::json{
+    {"request_type", "app-started"},
+    {"payload", nlohmann::json{
+      {"configuration", nlohmann::json::array()}
+    }}
+  };
 
+  auto batch = generate_telemetry_body("message-batch");
+  batch["payload"] = nlohmann::json::array({
+    std::move(app_started_msg)
   });
-  auto app_started_payload = telemetry_body.dump();
-  return app_started_payload;
+  // clang-format on
+
+  if (!integration_name_.empty()) {
+    // clang-format off
+    auto integration_msg = nlohmann::json{
+      {"request_type", "app-integrations-change"},
+      {"payload", nlohmann::json{
+        {"integrations", nlohmann::json::array({
+          nlohmann::json{
+            {"name", integration_name_},
+            {"version", integration_version_},
+            {"enabled", true}
+          }
+        })}
+      }}
+    };
+    // clang-format on
+
+    batch["payload"].emplace_back(std::move(integration_msg));
+  }
+
+  return batch.dump();
 }
 
 void TracerTelemetry::capture_metrics() {

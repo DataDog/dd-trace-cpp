@@ -6,6 +6,7 @@
 #include <datadog/tracer_telemetry.h>
 
 #include <datadog/json.hpp>
+#include <unordered_set>
 
 #include "datadog/runtime_id.h"
 #include "mocks/loggers.h"
@@ -13,7 +14,7 @@
 
 using namespace datadog::tracing;
 
-TEST_CASE("Tracer telemetry") {
+TEST_CASE("Tracer telemetry", "[telemetry]") {
   const std::time_t mock_time = 1672484400;
   const Clock clock = []() {
     TimePoint result;
@@ -27,12 +28,35 @@ TEST_CASE("Tracer telemetry") {
       /* service = */ "testsvc",
       /* environment = */ "test"};
 
-  TracerTelemetry tracer_telemetry = {true, clock, logger, tracer_signature};
+  const std::string ignore{""};
+
+  TracerTelemetry tracer_telemetry{true,   clock, logger, tracer_signature,
+                                   ignore, ignore};
 
   SECTION("generates app-started message") {
-    auto app_started_message = tracer_telemetry.app_started();
-    auto app_started = nlohmann::json::parse(app_started_message);
-    REQUIRE(app_started["request_type"] == "app-started");
+    SECTION("Without a defined integration") {
+      auto app_started_message = tracer_telemetry.app_started();
+      auto app_started = nlohmann::json::parse(app_started_message);
+      REQUIRE(app_started["request_type"] == "message-batch");
+      REQUIRE(app_started["payload"].size() == 1);
+      CHECK(app_started["payload"][0]["request_type"] == "app-started");
+    }
+
+    SECTION("With an integration") {
+      TracerTelemetry tracer_telemetry{
+          true, clock, logger, tracer_signature, "nginx", "1.25.2"};
+      auto app_started_message = tracer_telemetry.app_started();
+      auto app_started = nlohmann::json::parse(app_started_message);
+      REQUIRE(app_started["request_type"] == "message-batch");
+      REQUIRE(app_started["payload"].size() == 2);
+
+      const std::unordered_set<std::string> expected{"app-started",
+                                                     "app-integrations-change"};
+
+      for (const auto& payload : app_started["payload"]) {
+        CHECK(expected.find(payload["request_type"]) != expected.cend());
+      }
+    }
   }
 
   SECTION("generates a heartbeat message") {

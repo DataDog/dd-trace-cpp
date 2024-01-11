@@ -366,6 +366,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
   }
 
   result.runtime_id = config.runtime_id;
+  result.integration_name = config.integration_name;
+  result.integration_version = config.integration_version;
 
   return result;
 }
