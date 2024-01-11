@@ -1,3 +1,6 @@
+// This is an HTTP server that listens on port 80 and forwards all requests to
+// the the "server" host on port 80.
+
 #include <datadog/tracer.h>
 
 #include <csignal>
