@@ -323,10 +323,10 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
     result.collector = config.collector;
   }
 
-  result.enable_sampling_delegation = config.enable_sampling_delegation;
+  result.delegate_trace_sampling = config.delegate_trace_sampling;
   if (auto trace_delegate_sampling_env =
           lookup(environment::DD_TRACE_DELEGATE_SAMPLING)) {
-    result.enable_sampling_delegation = !falsy(*trace_delegate_sampling_env);
+    result.delegate_trace_sampling = !falsy(*trace_delegate_sampling_env);
   }
 
   if (auto trace_sampler_config = finalize_config(config.trace_sampler)) {

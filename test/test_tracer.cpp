@@ -1001,7 +1001,7 @@ TEST_CASE("span extraction") {
   }
 
   SECTION("inject an extracted span that delegated sampling") {
-    config.enable_sampling_delegation = GENERATE(true, false);
+    config.delegate_trace_sampling = GENERATE(true, false);
     auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
@@ -1021,7 +1021,7 @@ TEST_CASE("span extraction") {
     span->inject(writer);
 
     CAPTURE(writer.items);
-    if (config.enable_sampling_delegation) {
+    if (config.delegate_trace_sampling) {
       // If sampling delegation is enabled, then expect the delegation header to
       // have been injected.
       auto found = writer.items.find("x-datadog-delegate-trace-sampling");
@@ -1257,21 +1257,21 @@ TEST_CASE("_dd.is_sampling_decider") {
   config1.collector = collector;
   config1.logger = logger;
   config1.defaults.service = "service1";
-  config1.enable_sampling_delegation = true;
+  config1.delegate_trace_sampling = true;
 
   TracerConfig config2;
   config2.collector = collector;
   config2.logger = logger;
   config2.defaults.service = "service2";
-  config2.enable_sampling_delegation = true;
+  config2.delegate_trace_sampling = true;
 
   TracerConfig config3;
   config3.collector = collector;
   config3.logger = logger;
   config3.defaults.service = "service3";
-  config3.enable_sampling_delegation = service3_delegation_enabled;
+  config3.delegate_trace_sampling = service3_delegation_enabled;
   config3.trace_sampler.sample_rate = 1;  // keep all traces
-  CAPTURE(config3.enable_sampling_delegation);
+  CAPTURE(config3.delegate_trace_sampling);
 
   auto valid_config = finalize_config(config1);
   REQUIRE(valid_config);
@@ -1492,7 +1492,7 @@ TEST_CASE("sampling delegation is not an override") {
   config1.logger = logger;
   config1.extraction_styles = config1.injection_styles = styles;
   config1.defaults.service = "service1";
-  config1.enable_sampling_delegation = service1_delegate;
+  config1.delegate_trace_sampling = service1_delegate;
   config1.trace_sampler.sample_rate = 1.0;  // as a default
   // `service1_sampling_priority` will be dealt with when service1 injects trace
   // context.
@@ -1502,7 +1502,7 @@ TEST_CASE("sampling delegation is not an override") {
   config2.logger = logger;
   config2.extraction_styles = config1.injection_styles = styles;
   config2.defaults.service = "service2";
-  config2.enable_sampling_delegation = true;
+  config2.delegate_trace_sampling = true;
 
   TracerConfig config3;
   config3.collector = collector;

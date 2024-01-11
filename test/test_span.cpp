@@ -761,13 +761,13 @@ TEST_CASE("sampling delegation injection") {
   config.collector = std::make_shared<NullCollector>();
 
   SECTION("configuration") {
-    config.enable_sampling_delegation = true;
+    config.delegate_trace_sampling = true;
     const auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
     Tracer tracer{*finalized};
 
-    SECTION("enable_sampling_delegation inject header") {
+    SECTION("delegate_trace_sampling inject header") {
       auto span = tracer.create_span();
       MockDictWriter writer;
       span.inject(writer);
@@ -805,7 +805,7 @@ TEST_CASE("sampling delegation injection") {
   }
 
   SECTION("end-to-end") {
-    config.enable_sampling_delegation = true;
+    config.delegate_trace_sampling = true;
     const auto finalized = finalize_config(config);
     REQUIRE(finalized);
 

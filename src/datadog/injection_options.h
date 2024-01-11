@@ -15,7 +15,7 @@ struct InjectionOptions {
   // context "on the other side" may make their own trace sampling decision
   // and convey it back to us in a response header. If
   // `delegate_sampling_decision` is null, then its value is taken from the
-  // tracer configuration (see `TracerConfig::enable_sampling_delegation`).
+  // tracer configuration (see `TracerConfig::delegate_trace_sampling`).
   Optional<bool> delegate_sampling_decision;
 };
 

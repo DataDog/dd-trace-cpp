@@ -189,7 +189,7 @@ TEST_CASE("TracerConfig::defaults") {
       config.defaults.service = "required";
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->enable_sampling_delegation == false);
+      REQUIRE(finalized->delegate_trace_sampling == false);
     }
 
     SECTION("setting is overridden by environment variable") {
@@ -198,7 +198,7 @@ TEST_CASE("TracerConfig::defaults") {
       config.defaults.service = "required";
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->enable_sampling_delegation == true);
+      REQUIRE(finalized->delegate_trace_sampling == true);
     }
   }
 
