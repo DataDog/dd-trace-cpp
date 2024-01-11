@@ -46,8 +46,6 @@
 #include <memory>
 
 #include "clock.h"
-#include "datadog/dict_reader.h"
-#include "datadog/trace_segment.h"
 #include "error.h"
 #include "optional.h"
 #include "string_view.h"
@@ -57,6 +55,7 @@ namespace datadog {
 namespace tracing {
 
 struct InjectionOptions;
+class DictReader;
 class DictWriter;
 struct SpanConfig;
 struct SpanData;
