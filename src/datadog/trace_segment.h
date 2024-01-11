@@ -70,6 +70,8 @@ class TraceSegment {
   Optional<SamplingDecision> sampling_decision_;
   Optional<std::string> additional_w3c_tracestate_;
   Optional<std::string> additional_datadog_w3c_tracestate_;
+  // See `doc/sampling-delegation.md` for more information about
+  // `struct SamplingDelegation`.
   struct SamplingDelegation {
     // This segment is configured to delegate its sampling decision.
     bool enabled;
