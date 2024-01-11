@@ -21,12 +21,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# TODO
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_definitions(-DDD_TRACE_CPP_VERSION=dmehala)
-  add_compile_definitions(DD_TRACE_CPP_VERSION="dmehala")
-endif ()
-
 # This warning has a false positive. See
 # <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108088>.
 add_compile_options(-Wno-error=free-nonheap-object)
