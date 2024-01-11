@@ -430,6 +430,7 @@ void TraceSegment::write_sampling_delegation_response(DictWriter& writer) {
     make_sampling_decision_if_null();
     assert(sampling_decision_);
     j["priority"] = sampling_decision_->priority;
+    assert(sampling_decision_->mechanism);
     j["mechanism"] = *sampling_decision_->mechanism;
     sampling_delegation_.sent_response_header = true;
   }
