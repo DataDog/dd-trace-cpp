@@ -5,6 +5,7 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
@@ -419,6 +420,57 @@ TEST_CASE("TracerConfig::agent") {
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code ==
               Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL);
+    }
+  }
+
+  SECTION("remote configuration poll interval") {
+    SECTION("cannot be zero") {
+      config.agent.remote_configuration_poll_interval_seconds = 0;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code ==
+              Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
+    }
+
+    SECTION("cannot be negative") {
+      config.agent.remote_configuration_poll_interval_seconds = -1337;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code ==
+              Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
+    }
+
+    SECTION("override default value") {
+      SECTION("programmatically") {
+        config.agent.remote_configuration_poll_interval_seconds = 42;
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        const auto* const agent =
+            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+        REQUIRE(agent);
+        REQUIRE(agent->remote_configuration_poll_interval ==
+                std::chrono::seconds(42));
+      }
+
+      SECTION("environment variable") {
+        const EnvGuard env_guard{"DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS",
+                                 "15"};
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        const auto* const agent =
+            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+        REQUIRE(agent);
+        REQUIRE(agent->remote_configuration_poll_interval ==
+                std::chrono::seconds(15));
+      }
+
+      SECTION("ill-formated environment variable is an error") {
+        const EnvGuard env_guard{"DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS",
+                                 "ddog"};
+        auto finalized = finalize_config(config);
+        REQUIRE(!finalized);
+        REQUIRE(finalized.error().code == Error::INVALID_INTEGER);
+      }
     }
   }
 
@@ -1022,12 +1074,12 @@ TEST_CASE("TracerConfig propagation styles") {
   TracerConfig config;
   config.defaults.service = "testsvc";
 
-  SECTION("default style is Datadog") {
+  SECTION("default style is [Datadog, W3C]") {
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
     const std::vector<PropagationStyle> expected_styles = {
-        PropagationStyle::DATADOG};
+        PropagationStyle::DATADOG, PropagationStyle::W3C};
 
     REQUIRE(finalized->injection_styles == expected_styles);
     REQUIRE(finalized->extraction_styles == expected_styles);
@@ -1243,7 +1295,7 @@ TEST_CASE("configure 128-bit trace IDs") {
   TracerConfig config;
   config.defaults.service = "testsvc";
 
-  SECTION("defaults to false") { REQUIRE(config.trace_id_128_bit == false); }
+  SECTION("defaults to true") { REQUIRE(config.trace_id_128_bit == true); }
 
   SECTION("value honored in finalizer") {
     const auto value = GENERATE(true, false);

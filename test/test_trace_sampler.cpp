@@ -127,13 +127,14 @@ TEST_CASE("trace sampling rate limiter") {
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
 
-  auto finalized = finalize_config(config);
-  REQUIRE(finalized);
-
   TimePoint current_time = default_clock();
   // Modify `current_time` to advance the clock.
   auto clock = [&current_time]() { return current_time; };
-  Tracer tracer{*finalized, clock};
+
+  auto finalized = finalize_config(config, clock);
+  REQUIRE(finalized);
+
+  Tracer tracer{*finalized};
 
   for (std::size_t i = 0; i < test_case.burst_size; ++i) {
     auto span = tracer.create_span();

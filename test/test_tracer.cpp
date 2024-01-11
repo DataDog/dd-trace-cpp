@@ -22,6 +22,7 @@
 #include <chrono>
 #include <ctime>
 #include <iosfwd>
+#include <stdexcept>
 
 #include "matchers.h"
 #include "mocks/collectors.h"
@@ -1079,9 +1080,9 @@ TEST_CASE("128-bit trace IDs") {
   config.extraction_styles.push_back(PropagationStyle::W3C);
   config.extraction_styles.push_back(PropagationStyle::DATADOG);
   config.extraction_styles.push_back(PropagationStyle::B3);
-  const auto finalized = finalize_config(config);
+  const auto finalized = finalize_config(config, clock);
   REQUIRE(finalized);
-  Tracer tracer{*finalized, clock};
+  Tracer tracer{*finalized};
   TraceID trace_id;  // used below the following SECTIONs
 
   SECTION("are generated") {
@@ -1587,4 +1588,117 @@ TEST_CASE("sampling delegation is not an override") {
       }
     }
   }
+}
+
+TEST_CASE("heterogeneous extraction") {
+  // These test cases verify that when W3C is among the configured extraction
+  // styles, then non-Datadog and unexpected Datadog fields in an incoming
+  // `tracestate` are extracted, under certain conditions, even when trace
+  // context was extracted in a non-W3C style.
+  //
+  // The idea is that a tracer might be configured to extract, e.g.,
+  // [DATADOG, B3, W3C] and to inject [DATADOG, W3C]. We want to make
+  // sure that no W3C-relevant information from the incoming request is lost in
+  // the outgoing W3C headers, even if trace context is extracted on account of
+  // DATADOG or B3.
+  //
+  // See the `TestCase` instances, below, for more information.
+
+  class MockIDGenerator : public IDGenerator {
+   public:
+    TraceID trace_id(const TimePoint&) const override {
+      throw std::logic_error("This test should not generate a trace ID.");
+    }
+    std::uint64_t span_id() const override { return 0x2a; }
+  };
+
+  struct TestCase {
+    int line;
+    std::string description;
+    std::vector<PropagationStyle> extraction_styles;
+    std::vector<PropagationStyle> injection_styles;
+    std::unordered_map<std::string, std::string> extracted_headers;
+    std::unordered_map<std::string, std::string> expected_injected_headers;
+  };
+
+  // clang-format off
+  auto test_case = GENERATE(values<TestCase>({
+    {__LINE__, "tracestate from primary style",
+     {PropagationStyle::W3C, PropagationStyle::DATADOG},
+     {PropagationStyle::W3C},
+     {{"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
+      {"tracestate", "dd=foo:bar,lol=wut"}},
+     {{"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-000000000000002a-01"},
+      {"tracestate", "dd=s:1;foo:bar,lol=wut"}}},
+
+    {__LINE__, "tracestate from subsequent style",
+     {PropagationStyle::DATADOG, PropagationStyle::W3C},
+     {PropagationStyle::W3C},
+     {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
+      {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
+      {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}}, // origin is different
+     {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
+      {"tracestate", "dd=s:2;o:Kansas;ah:choo,competitor=stuff"}}},
+
+    {__LINE__, "ignore interlopers",
+     {PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C},
+     {PropagationStyle::W3C},
+     {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
+      {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
+      {"x-b3-traceid", "00000000000000000000000000000030"},
+      {"x-b3-parentspanid", "000000000000002a"},
+      {"x-b3-sampled", "0"}, // sampling is different
+      {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
+     {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
+      {"tracestate", "dd=s:2;o:Kansas;ah:choo,competitor=stuff"}}},
+
+    {__LINE__, "don't take tracestate if trace ID doesn't match",
+     {PropagationStyle::DATADOG, PropagationStyle::W3C},
+     {PropagationStyle::W3C},
+     {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
+      {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
+      {"traceparent", "00-00000000000000000000000000000031-0000000000000040-01"},
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
+     {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
+      {"tracestate", "dd=s:2;o:Kansas"}}},
+
+    {__LINE__, "don't take tracestate if W3C extraction isn't configured",
+     {PropagationStyle::DATADOG, PropagationStyle::B3},
+     {PropagationStyle::W3C},
+     {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
+      {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
+      {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
+     {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
+      {"tracestate", "dd=s:2;o:Kansas"}}},
+  }));
+  // clang-format on
+
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.description);
+  CAPTURE(to_json(test_case.extraction_styles));
+  CAPTURE(to_json(test_case.injection_styles));
+  CAPTURE(test_case.extracted_headers);
+  CAPTURE(test_case.expected_injected_headers);
+
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.extraction_styles = test_case.extraction_styles;
+  config.injection_styles = test_case.injection_styles;
+  config.logger = std::make_shared<NullLogger>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config, std::make_shared<MockIDGenerator>()};
+
+  MockDictReader reader{test_case.extracted_headers};
+  auto span = tracer.extract_span(reader);
+  REQUIRE(span);
+
+  MockDictWriter writer;
+  span->inject(writer);
+
+  REQUIRE(writer.items == test_case.expected_injected_headers);
 }

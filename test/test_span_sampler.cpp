@@ -305,7 +305,8 @@ TEST_CASE("span rule limiter") {
   rule.max_per_second = test_case.max_per_second;
   config.span_sampler.rules.push_back(rule);
 
-  auto finalized = finalize_config(config);
+  auto clock = [frozen_time = default_clock()]() { return frozen_time; };
+  auto finalized = finalize_config(config, clock);
   REQUIRE(finalized);
   Tracer tracer{*finalized};
 
@@ -326,10 +327,5 @@ TEST_CASE("span rule limiter") {
     }
   }
 
-  // The `TestCase` that expects 100 span allowed once failed because 101 were
-  // allowed.  I'm not sure how that works, but we are using a real clock and
-  // different machines run these cases at different rates, so let's build in a
-  // fudge factor.
-  REQUIRE(count_of_sampled_spans >= test_case.expected_count - 10);
-  REQUIRE(count_of_sampled_spans <= test_case.expected_count + 10);
+  REQUIRE(count_of_sampled_spans == test_case.expected_count);
 }

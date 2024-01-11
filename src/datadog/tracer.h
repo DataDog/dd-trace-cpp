@@ -11,6 +11,7 @@
 // `tracer_config.h`.
 
 #include "clock.h"
+#include "config_manager.h"
 #include "error.h"
 #include "expected.h"
 #include "id_generator.h"
@@ -18,6 +19,8 @@
 #include "optional.h"
 #include "span.h"
 #include "tracer_config.h"
+#include "tracer_signature.h"
+#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
@@ -30,15 +33,18 @@ class SpanSampler;
 class Tracer {
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
-  std::shared_ptr<TraceSampler> trace_sampler_;
+  std::shared_ptr<const SpanDefaults> defaults_;
+  RuntimeID runtime_id_;
+  TracerSignature signature_;
+  std::shared_ptr<TracerTelemetry> tracer_telemetry_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const IDGenerator> generator_;
   Clock clock_;
-  std::shared_ptr<const SpanDefaults> defaults_;
   std::vector<PropagationStyle> injection_styles_;
   std::vector<PropagationStyle> extraction_styles_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
+  ConfigManager config_manager_;
   bool sampling_delegation_enabled_;
 
  public:
@@ -48,10 +54,6 @@ class Tracer {
   explicit Tracer(const FinalizedTracerConfig& config);
   Tracer(const FinalizedTracerConfig& config,
          const std::shared_ptr<const IDGenerator>& generator);
-  Tracer(const FinalizedTracerConfig& config, const Clock& clock);
-  Tracer(const FinalizedTracerConfig& config,
-         const std::shared_ptr<const IDGenerator>& generator,
-         const Clock& clock);
 
   // Create a new trace and return the root span of the trace.  Optionally
   // specify a `config` indicating the attributes of the root span.

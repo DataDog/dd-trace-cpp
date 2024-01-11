@@ -265,8 +265,14 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
 }  // namespace
 
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
+  return finalize_config(config, default_clock);
+}
+
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
+                                                const Clock &clock) {
   FinalizedTracerConfig result;
 
+  result.clock = clock;
   result.defaults = config.defaults;
 
   if (auto service_env = lookup(environment::DD_SERVICE)) {
@@ -314,7 +320,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   if (!report_traces) {
     result.collector = std::make_shared<NullCollector>();
   } else if (!config.collector) {
-    auto finalized = finalize_config(config.agent, result.logger);
+    auto finalized = finalize_config(config.agent, result.logger, clock);
     if (auto *error = finalized.if_error()) {
       return std::move(*error);
     }
@@ -322,6 +328,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   } else {
     result.collector = config.collector;
   }
+
+  bool report_telemetry = config.report_telemetry;
+  if (auto enabled_env =
+          lookup(environment::DD_INSTRUMENTATION_TELEMETRY_ENABLED)) {
+    report_telemetry = !falsy(*enabled_env);
+  }
+  result.report_telemetry = report_telemetry;
 
   result.delegate_trace_sampling = config.delegate_trace_sampling;
   if (auto trace_delegate_sampling_env =
@@ -357,6 +370,10 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
   } else {
     result.trace_id_128_bit = config.trace_id_128_bit;
   }
+
+  result.runtime_id = config.runtime_id;
+  result.integration_name = config.integration_name;
+  result.integration_version = config.integration_version;
 
   return result;
 }

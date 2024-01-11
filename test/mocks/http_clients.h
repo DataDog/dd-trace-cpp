@@ -4,6 +4,7 @@
 #include <datadog/http_client.h>
 #include <datadog/optional.h>
 
+#include <chrono>
 #include <datadog/json.hpp>
 #include <mutex>
 #include <sstream>
@@ -39,9 +40,10 @@ struct MockHTTPClient : public HTTPClient {
   ResponseHandler on_response_;
   ErrorHandler on_error_;
 
-  Expected<void> post(const URL&, HeadersSetter set_headers,
-                      std::string /*body*/, ResponseHandler on_response,
-                      ErrorHandler on_error) override {
+  Expected<void> post(
+      const URL&, HeadersSetter set_headers, std::string /*body*/,
+      ResponseHandler on_response, ErrorHandler on_error,
+      std::chrono::steady_clock::time_point /*deadline*/) override {
     std::lock_guard<std::mutex> lock{mutex_};
     if (!post_error) {
       on_response_ = on_response;

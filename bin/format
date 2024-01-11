@@ -11,7 +11,7 @@ cd "$(dirname "$0")"/..
 # occasionally bumps the required version, reformatting everything.
 version=14
 formatter=clang-format-$version
-formatter_options="--style=file -i"
+formatter_options="--style=file -i $*"
 
 find_sources() {
     find src/ examples/ test/ fuzz/ -type f \( -name '*.h' -o -name '*.cpp' \) "$@"

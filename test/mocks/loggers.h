@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <iosfwd>
+#include <mutex>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -28,6 +29,7 @@ struct MockLogger : public Logger {
     std::variant<std::string, Error> payload;
   };
 
+  mutable std::mutex mutex;
   std::ostream* echo = nullptr;
   std::vector<Entry> entries;
 
@@ -41,6 +43,7 @@ struct MockLogger : public Logger {
   MockLogger() = default;
 
   void log_error(const LogFunc& write) override {
+    std::lock_guard<std::mutex> lock{mutex};
     std::ostringstream stream;
     write(stream);
     if (echo) {
@@ -50,6 +53,7 @@ struct MockLogger : public Logger {
   }
 
   void log_startup(const LogFunc& write) override {
+    std::lock_guard<std::mutex> lock{mutex};
     std::ostringstream stream;
     write(stream);
     if (echo && policy == ERRORS_AND_STARTUP) {
@@ -59,6 +63,7 @@ struct MockLogger : public Logger {
   }
 
   void log_error(const Error& error) override {
+    std::lock_guard<std::mutex> lock{mutex};
     if (echo) {
       *echo << error << '\n';
     }
@@ -66,6 +71,7 @@ struct MockLogger : public Logger {
   }
 
   void log_error(StringView message) override {
+    std::lock_guard<std::mutex> lock{mutex};
     if (echo) {
       *echo << message << '\n';
     }
@@ -77,6 +83,7 @@ struct MockLogger : public Logger {
   int startup_count() const { return count(Entry::STARTUP); }
 
   int count(Entry::Kind kind) const {
+    std::lock_guard<std::mutex> lock{mutex};
     return std::count_if(
         entries.begin(), entries.end(),
         [kind](const Entry& entry) { return entry.kind == kind; });
@@ -84,6 +91,7 @@ struct MockLogger : public Logger {
 
   const Error& first_error() const {
     REQUIRE(error_count() > 0);
+    std::lock_guard<std::mutex> lock{mutex};
     auto found = std::find_if(
         entries.begin(), entries.end(),
         [](const Entry& entry) { return entry.kind == Entry::ERROR; });
@@ -92,6 +100,7 @@ struct MockLogger : public Logger {
 
   const std::string& first_startup() const {
     REQUIRE(startup_count() > 0);
+    std::lock_guard<std::mutex> lock{mutex};
     auto found = std::find_if(
         entries.begin(), entries.end(),
         [](const Entry& entry) { return entry.kind == Entry::STARTUP; });

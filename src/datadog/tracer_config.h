@@ -9,10 +9,12 @@
 #include <variant>
 #include <vector>
 
+#include "clock.h"
 #include "datadog_agent_config.h"
 #include "error.h"
 #include "expected.h"
 #include "propagation_style.h"
+#include "runtime_id.h"
 #include "span_defaults.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
@@ -49,6 +51,13 @@ struct TracerConfig {
   // variable.
   bool report_traces = true;
 
+  // `report_telemetry` indicates whether telemetry about the tracer will be
+  // sent to a collector (`true`) or discarded on completion (`false`).  If
+  // `report_telemetry` is `false`, then this feature is disabled.
+  // `report_telemetry` is overridden by the
+  // `DD_INSTRUMENTATION_TELEMETRY_ENABLED` environment variable.
+  bool report_telemetry = true;
+
   // `delegate_trace_sampling` indicates whether the tracer will consult a child
   // service for a trace sampling decision, and prefer the resulting decision
   // over its own, if appropriate.
@@ -68,7 +77,8 @@ struct TracerConfig {
   // All styles indicated by `injection_styles` are used for injection.
   // `injection_styles` is overridden by the `DD_TRACE_PROPAGATION_STYLE_INJECT`
   // and `DD_TRACE_PROPAGATION_STYLE` environment variables.
-  std::vector<PropagationStyle> injection_styles = {PropagationStyle::DATADOG};
+  std::vector<PropagationStyle> injection_styles = {PropagationStyle::DATADOG,
+                                                    PropagationStyle::W3C};
 
   // `extraction_styles` indicates with which tracing systems trace propagation
   // will be compatible when extracting (receiving) trace context.
@@ -78,7 +88,8 @@ struct TracerConfig {
   // `extraction_styles` is overridden by the
   // `DD_TRACE_PROPAGATION_STYLE_EXTRACT` and `DD_TRACE_PROPAGATION_STYLE`
   // environment variables.
-  std::vector<PropagationStyle> extraction_styles = {PropagationStyle::DATADOG};
+  std::vector<PropagationStyle> extraction_styles = {PropagationStyle::DATADOG,
+                                                     PropagationStyle::W3C};
 
   // `report_hostname` indicates whether the tracer will include the result of
   // `gethostname` with traces sent to the collector.
@@ -105,7 +116,22 @@ struct TracerConfig {
   // IDs.  If true, the tracer will generate 128-bit trace IDs. If false, the
   // tracer will generate 64-bit trace IDs. `trace_id_128_bit` is overridden by
   // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
-  bool trace_id_128_bit = false;
+  bool trace_id_128_bit = true;
+
+  // `runtime_id` denotes the current run of the application in which the tracer
+  // is embedded. If `runtime_id` is not specified, then it defaults to a
+  // pseudo-randomly generated value. A server that contains multiple tracers,
+  // such as those in the worker threads/processes of a reverse proxy, might
+  // specify the same `runtime_id` for all tracer instances in the same run.
+  Optional<RuntimeID> runtime_id;
+
+  // `integration_name` is the name of the product integrating this library.
+  // Example: "nginx", "envoy" or "istio".
+  std::string integration_name;
+  // `integration_version` is the version of the product integrating this
+  // library.
+  // Example: "1.2.3", "6c44da20", "2020.02.13"
+  std::string integration_version;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -113,7 +139,7 @@ struct TracerConfig {
 // `FinalizedTracerConfig` must be obtained by calling `finalize_config`.
 class FinalizedTracerConfig {
   friend Expected<FinalizedTracerConfig> finalize_config(
-      const TracerConfig& config);
+      const TracerConfig& config, const Clock& clock);
   FinalizedTracerConfig() = default;
 
  public:
@@ -134,13 +160,23 @@ class FinalizedTracerConfig {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool trace_id_128_bit;
+  bool report_telemetry;
+  Optional<RuntimeID> runtime_id;
+  Clock clock;
+  std::string integration_name;
+  std::string integration_version;
   bool delegate_trace_sampling;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
 // relevant environment variables.  If any configuration is invalid, return an
 // `Error`.
+// Optionally specify a `clock` used to calculate span start times, span
+// durations, and timeouts.  If `clock` is not specified, then `default_clock`
+// is used.
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config);
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config,
+                                                const Clock& clock);
 
 }  // namespace tracing
 }  // namespace datadog
