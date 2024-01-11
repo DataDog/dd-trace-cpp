@@ -5,7 +5,6 @@
 
 #include <string>
 
-#include "parse_util.h"
 #include "string_view.h"
 
 namespace datadog {
@@ -41,9 +40,7 @@ extern const std::string sampling_decider;
 
 // Return whether the specified `tag_name` is reserved for use internal to this
 // library.
-inline bool is_internal(StringView tag_name) {
-  return starts_with(tag_name, "_dd.");
-}
+bool is_internal(StringView tag_name);
 
 }  // namespace tags
 }  // namespace tracing
