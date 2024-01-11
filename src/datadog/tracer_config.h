@@ -121,11 +121,11 @@ struct TracerConfig {
   Optional<RuntimeID> runtime_id;
 
   // `integration_name` is the name of the product integrating this library.
-  // Example: `nginx`, `envoy` or `istio`.
+  // Example: "nginx", "envoy" or "istio".
   std::string integration_name;
   // `integration_version` is the version of the product integrating this
   // library.
-  // Example: `1.2.3`, `6c44da20`, `2020.02.13`
+  // Example: "1.2.3", "6c44da20", "2020.02.13"
   std::string integration_version;
 };
 
