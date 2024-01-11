@@ -120,8 +120,12 @@ struct TracerConfig {
   // specify the same `runtime_id` for all tracer instances in the same run.
   Optional<RuntimeID> runtime_id;
 
-  // TODO
+  // `integration_name` is the name of the product integrating this library.
+  // Example: `nginx`, `envoy` or `istio`.
   std::string integration_name;
+  // `integration_version` is the version of the product integrating this
+  // library.
+  // Example: `1.2.3`, `6c44da20`, `2020.02.13`
   std::string integration_version;
 };
 
