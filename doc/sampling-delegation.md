@@ -112,6 +112,20 @@ to be the "sampling decider" if the service that delegated to it does not know
 about the decision. If `sent_response_header` is true, then the trace segment
 can be fairly confident that the client will receive the sampling decision.
 
+### `bool Span::expecting_delegated_sampling_decision_`
+In addition to the state maintained in `TraceSegment`, `Span` also has a
+sampling delegation related `bool`.  See [span.h][5].
+
+When sampling delegation is requested for an injected `Span`, that span
+remembers that it injected the `X-Datadog-Delegate-Trace-Sampling` header.
+
+Later, when the corresponding response is examined, the `Span` knows whether to
+expect the `X-Datadog-Trace-Sampling-Decision` response header to be present.
+
+`bool Span::expecting_delegated_sampling_decision_` prevents a `Span` from
+interpreting an `X-Datadog-Trace-Sampling-Decision` response header when none
+was requested.
+
 ## Reading and Writing Responses
 Distributed tracing typically does not involve RPC _responses_.  When a service
 X makes an HTTP/gRPC/etc. request to another service Y, X injects information
@@ -135,9 +149,20 @@ response-related metadata (see [trace_segment.h][2]):
   reads the `X-Datadog-Delegate-Trace-Sampling` response header, if present.
   This is something that a _delegator_ does.
 
+`TraceSegment::read_sampling_delegation_response` is not called directly by an
+instrumented application.
+Instead, an instrumented application calls
+`Span::read_sampling_delegation_response` on the `Span` that performed the
+injection whose response is being examined.
+`Span::read_sampling_delegation_response` then might call
+`TraceSegment::read_sampling_delegation_response`.
+
+`TraceSegment::write_sampling_delegation_response` is called directly by an
+instrumented application.
+
 Just as `Tracer::extract_span` and `Span::inject` must be called by an
 instrumented application in order for trace context propagation to work,
-`TraceSegment::read_sampling_delegation_response` and
+`Span::read_sampling_delegation_response` and
 `TraceSegment::write_sampling_delegation_response` must be called by an
 instrumented application in order for sampling delegation to work.
 
@@ -161,3 +186,4 @@ upstream or backend) might be configured for sampling delegation, while another
 [2]: ../src/datadog/trace_segment.h
 [3]: ../src/datadog/trace_segment.cpp
 [4]: ../src/datadog/sampling_decision.h
+[5]: ../src/datadog/sampling_decision.h
