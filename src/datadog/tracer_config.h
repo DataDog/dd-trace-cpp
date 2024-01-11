@@ -49,8 +49,9 @@ struct TracerConfig {
   // variable.
   bool report_traces = true;
 
-  // `delegate_trace_sampling` instructs the tracer to delegate the trace
-  // sampling decision, when possible.
+  // `delegate_trace_sampling` indicates whether the tracer will consult a child
+  // service for a trace sampling decision, and prefer the resulting decision
+  // over its own, if appropriate.
   bool delegate_trace_sampling = false;
 
   // `trace_sampler` configures trace sampling.  Trace sampling determines which
