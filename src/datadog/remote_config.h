@@ -12,6 +12,7 @@
 // It interacts with the `ConfigManager` to seamlessly apply or revert
 // configurations based on responses received from the remote source.
 
+#include <memory>
 #include <string>
 
 #include "config_manager.h"
@@ -44,15 +45,16 @@ class RemoteConfigurationManager {
   };
 
   TracerSignature tracer_signature_;
-  ConfigManager& config_manager_;
+  std::shared_ptr<ConfigManager> config_manager_;
   std::string client_id_;  ///< Identifier a `RemoteConfigurationManager`
 
   State state_;
   std::unordered_map<std::string, Configuration> applied_config_;
 
  public:
-  RemoteConfigurationManager(const TracerSignature& tracer_signature,
-                             ConfigManager& config_manager);
+  RemoteConfigurationManager(
+      const TracerSignature& tracer_signature,
+      const std::shared_ptr<ConfigManager>& config_manager);
 
   // Construct a JSON object representing the payload to be sent in a remote
   // configuration request.

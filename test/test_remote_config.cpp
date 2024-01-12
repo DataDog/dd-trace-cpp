@@ -28,7 +28,8 @@ REMOTE_CONFIG_TEST("first payload") {
   TracerConfig config;
   config.defaults.service = "testsvc";
   config.defaults.environment = "test";
-  ConfigManager config_manager(*finalize_config(config));
+  const auto config_manager =
+      std::make_shared<ConfigManager>(*finalize_config(config));
 
   RemoteConfigurationManager rc(tracer_signature, config_manager);
 
@@ -62,7 +63,8 @@ REMOTE_CONFIG_TEST("response processing") {
   config.defaults.service = "testsvc";
   config.defaults.environment = "test";
   config.trace_sampler.sample_rate = 1.0;
-  ConfigManager config_manager(*finalize_config(config));
+  const auto config_manager =
+      std::make_shared<ConfigManager>(*finalize_config(config));
 
   RemoteConfigurationManager rc(tracer_signature, config_manager);
 
@@ -177,9 +179,9 @@ REMOTE_CONFIG_TEST("response processing") {
 
     REQUIRE(!response_json.is_discarded());
 
-    const auto old_trace_sampler = config_manager.get_trace_sampler();
+    const auto old_trace_sampler = config_manager->get_trace_sampler();
     rc.process_response(response_json);
-    const auto new_trace_sampler = config_manager.get_trace_sampler();
+    const auto new_trace_sampler = config_manager->get_trace_sampler();
 
     CHECK(new_trace_sampler != old_trace_sampler);
 
@@ -201,7 +203,7 @@ REMOTE_CONFIG_TEST("response processing") {
         REQUIRE(!response_json.is_discarded());
 
         rc.process_response(response_json);
-        const auto current_trace_sampler = config_manager.get_trace_sampler();
+        const auto current_trace_sampler = config_manager->get_trace_sampler();
         CHECK(old_trace_sampler == current_trace_sampler);
       }
 
@@ -227,7 +229,7 @@ REMOTE_CONFIG_TEST("response processing") {
         REQUIRE(!response_json.is_discarded());
 
         rc.process_response(response_json);
-        const auto current_trace_sampler = config_manager.get_trace_sampler();
+        const auto current_trace_sampler = config_manager->get_trace_sampler();
         CHECK(old_trace_sampler == current_trace_sampler);
       }
     }
@@ -270,9 +272,9 @@ REMOTE_CONFIG_TEST("response processing") {
 
     REQUIRE(!response_json.is_discarded());
 
-    const auto old_sampling_rate = config_manager.get_trace_sampler();
+    const auto old_sampling_rate = config_manager->get_trace_sampler();
     rc.process_response(response_json);
-    const auto new_sampling_rate = config_manager.get_trace_sampler();
+    const auto new_sampling_rate = config_manager->get_trace_sampler();
 
     CHECK(new_sampling_rate == old_sampling_rate);
   }
