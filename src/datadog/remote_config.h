@@ -46,7 +46,7 @@ class RemoteConfigurationManager {
 
   TracerSignature tracer_signature_;
   std::shared_ptr<ConfigManager> config_manager_;
-  std::string client_id_;  ///< Identifier a `RemoteConfigurationManager`
+  std::string client_id_;
 
   State state_;
   std::unordered_map<std::string, Configuration> applied_config_;
