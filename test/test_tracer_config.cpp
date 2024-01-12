@@ -184,6 +184,25 @@ TEST_CASE("TracerConfig::defaults") {
     REQUIRE(finalized->defaults.version == "v2");
   }
 
+  SECTION("DD_TRACE_DELEGATE_SAMPLING") {
+    SECTION("is disabled by default") {
+      config.defaults.version = "v1";
+      config.defaults.service = "required";
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->delegate_trace_sampling == false);
+    }
+
+    SECTION("setting is overridden by environment variable") {
+      const EnvGuard guard{"DD_TRACE_DELEGATE_SAMPLING", "1"};
+      config.defaults.version = "v1";
+      config.defaults.service = "required";
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->delegate_trace_sampling == true);
+    }
+  }
+
   SECTION("DD_TAGS") {
     struct TestCase {
       std::string name;

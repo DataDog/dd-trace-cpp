@@ -15,20 +15,15 @@
 
 namespace datadog {
 namespace tracing {
+namespace {
 
-Optional<std::uint64_t> parse_trace_id_high(const std::string& value) {
-  if (value.size() != 16) {
-    return nullopt;
-  }
+constexpr StringView sampling_delegation_request_header =
+    "x-datadog-delegate-trace-sampling";
 
-  auto high = parse_uint64(value, 16);
-  if (high) {
-    return *high;
-  }
-
-  return nullopt;
-}
-
+// Decode the specified `trace_tags` and integrate them into the specified
+// `result`. If an error occurs, add a `tags::internal::propagation_error` tag
+// to the specified `span_tags` and log a diagnostic using the specified
+// `logger`.
 void handle_trace_tags(StringView trace_tags, ExtractedData& result,
                        std::unordered_map<std::string, std::string>& span_tags,
                        Logger& logger) {
@@ -63,6 +58,12 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
   }
 }
 
+// Extract an ID from the specified `header`, which might be present in the
+// specified `headers`, and return the ID. If `header` is not present in
+// `headers`, then return `nullopt`. If an error occurs, return an `Error`.
+// Parse the ID with respect to the specified numeric `base`, e.g. `10` or `16`.
+// The specified `header_kind` and `style_name` are used in diagnostic messages
+// should an error occur.
 Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
                                                     StringView header,
                                                     StringView header_kind,
@@ -89,6 +90,21 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
   return *result;
 }
 
+}  // namespace
+
+Optional<std::uint64_t> parse_trace_id_high(const std::string& value) {
+  if (value.size() != 16) {
+    return nullopt;
+  }
+
+  auto high = parse_uint64(value, 16);
+  if (high) {
+    return *high;
+  }
+
+  return nullopt;
+}
+
 Expected<ExtractedData> extract_datadog(
     const DictReader& headers,
     std::unordered_map<std::string, std::string>& span_tags, Logger& logger) {
@@ -111,19 +127,29 @@ Expected<ExtractedData> extract_datadog(
   }
   result.parent_id = *parent_id;
 
-  const StringView sampling_priority_header = "x-datadog-sampling-priority";
-  if (auto found = headers.lookup(sampling_priority_header)) {
-    auto sampling_priority = parse_int(*found, 10);
-    if (auto* error = sampling_priority.if_error()) {
-      std::string prefix;
-      prefix += "Could not extract Datadog-style sampling priority from ";
-      append(prefix, sampling_priority_header);
-      prefix += ": ";
-      append(prefix, *found);
-      prefix += ' ';
-      return error->with_prefix(prefix);
+  if (auto sampling_delegation_header =
+          headers.lookup(sampling_delegation_request_header)) {
+    result.delegate_sampling_decision = true;
+    // If the trace sampling decision is being delegated to us, then we don't
+    // interpret the sampling priority (if any) included in the request.
+  } else {
+    result.delegate_sampling_decision = false;
+
+    const StringView sampling_priority_header = "x-datadog-sampling-priority";
+    if (auto found = headers.lookup(sampling_priority_header)) {
+      auto sampling_priority = parse_int(*found, 10);
+      if (auto* error = sampling_priority.if_error()) {
+        std::string prefix;
+        prefix += "Could not extract Datadog-style sampling priority from ";
+        append(prefix, sampling_priority_header);
+        prefix += ": ";
+        append(prefix, *found);
+        prefix += ' ';
+        return error->with_prefix(prefix);
+      }
+
+      result.sampling_priority = *sampling_priority;
     }
-    result.sampling_priority = *sampling_priority;
   }
 
   auto origin = headers.lookup("x-datadog-origin");

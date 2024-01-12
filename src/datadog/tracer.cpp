@@ -53,7 +53,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       extraction_styles_(config.extraction_styles),
       hostname_(config.report_hostname ? get_hostname() : nullopt),
       tags_header_max_size_(config.tags_header_size),
-      config_manager_(config) {
+      config_manager_(config),
+      sampling_delegation_enabled_(config.delegate_trace_sampling) {
   if (auto* collector =
           std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
     collector_ = *collector;
@@ -122,9 +123,11 @@ Span Tracer::create_span(const SpanConfig& config) {
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_,
       config_manager_.get_trace_sampler(), span_sampler_, defaults_,
-      runtime_id_, injection_styles_, hostname_, nullopt /* origin */,
-      tags_header_max_size_, std::move(trace_tags),
-      nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
+      runtime_id_, sampling_delegation_enabled_,
+      false /* sampling_decision_was_delegated_to_me */, injection_styles_,
+      hostname_, nullopt /* origin */, tags_header_max_size_,
+      std::move(trace_tags), nullopt /* sampling_decision */,
+      nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
@@ -172,9 +175,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     extracted_contexts.back().headers_examined = audited_reader.entries_found;
   }
 
-  auto [trace_id, parent_id, origin, trace_tags, sampling_priority,
-        additional_w3c_tracestate, additional_datadog_w3c_tracestate, style,
-        headers_examined] = merge(extracted_contexts);
+  auto [trace_id, parent_id, origin, trace_tags, delegate_sampling_decision,
+        sampling_priority, additional_w3c_tracestate,
+        additional_datadog_w3c_tracestate, style, headers_examined] =
+      merge(extracted_contexts);
 
   // Some information might be missing.
   // Here are the combinations considered:
@@ -290,9 +294,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_,
       config_manager_.get_trace_sampler(), span_sampler_, defaults_,
-      runtime_id_, injection_styles_, hostname_, std::move(origin),
-      tags_header_max_size_, std::move(trace_tags),
-      std::move(sampling_decision), std::move(additional_w3c_tracestate),
+      runtime_id_, sampling_delegation_enabled_, delegate_sampling_decision,
+      injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
+      std::move(trace_tags), std::move(sampling_decision),
+      std::move(additional_w3c_tracestate),
       std::move(additional_datadog_w3c_tracestate), std::move(span_data));
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },

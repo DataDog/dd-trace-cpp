@@ -24,7 +24,6 @@ struct SamplingDecision {
     // We made a provisional sampling decision earlier, and later requested that
     // another service that we call make the sampling decision instead. That
     // service then responded with its own sampling decision, which is this one.
-    // Note that sampling delegation is not yet implemented.
     DELEGATED
   };
 

@@ -58,7 +58,7 @@ Click one of the results to display a flame graph of the associated trace.
 
 ![screenshot of flame graph](diagrams/flame-graph.png)
 
-At the top is the Node.js proxy that we called using `curl`. Below that is the
+At the top is the C++ proxy that we called using `curl`. Below that is the
 C++ server to which the proxy forwarded our request. Below that is the
 Python database service, including a span indicating its use of SQLite.
 

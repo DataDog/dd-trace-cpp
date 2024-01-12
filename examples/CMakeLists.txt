@@ -1,3 +1,2 @@
-if (BUILD_HASHER_EXAMPLE)
-    add_subdirectory(hasher)
-endif()
+add_subdirectory(hasher)
+add_subdirectory(http-server)

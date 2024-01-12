@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.24)
 project(dd-trace-cpp)
 
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
-option(BUILD_HASHER_EXAMPLE "Build the example program examples/hasher" OFF)
+option(BUILD_EXAMPLES "Build example programs" OFF)
 option(BUILD_TESTING "Build the unit tests (test/)" OFF)
 option(BUILD_FUZZERS "Build fuzzers" OFF)
 option(BUILD_BENCHMARK "Build benchmark binaries" OFF)
@@ -120,8 +120,8 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/span_matcher.cpp
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp
-    src/datadog/tag_propagation.cpp
     src/datadog/tags.cpp
+    src/datadog/tag_propagation.cpp
     src/datadog/threaded_event_scheduler.cpp
     src/datadog/tracer_config.cpp
     src/datadog/tracer_telemetry.cpp
@@ -163,6 +163,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/hex.h
   src/datadog/http_client.h
   src/datadog/id_generator.h
+  src/datadog/injection_options.h
   src/datadog/json_fwd.hpp
   src/datadog/json.hpp
   src/datadog/limiter.h
@@ -212,7 +213,6 @@ find_package(Threads REQUIRED)
 target_link_libraries(dd_trace_cpp-objects
   PUBLIC
     libcurl
-  PUBLIC
     Threads::Threads
     ${COVERAGE_LIBRARIES}
     ${COREFOUNDATION_LIBRARY}
@@ -239,8 +239,9 @@ if(BUILD_TESTING)
   add_subdirectory(test)
 endif()
 
-# Each example has its own build flag.
-add_subdirectory(examples)
+if(BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 if(BUILD_BENCHMARK)
   add_subdirectory(benchmark)

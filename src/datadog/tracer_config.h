@@ -58,6 +58,11 @@ struct TracerConfig {
   // `DD_INSTRUMENTATION_TELEMETRY_ENABLED` environment variable.
   bool report_telemetry = true;
 
+  // `delegate_trace_sampling` indicates whether the tracer will consult a child
+  // service for a trace sampling decision, and prefer the resulting decision
+  // over its own, if appropriate.
+  bool delegate_trace_sampling = false;
+
   // `trace_sampler` configures trace sampling.  Trace sampling determines which
   // traces are sent to Datadog.  See `trace_sampler_config.h`.
   TraceSamplerConfig trace_sampler;
@@ -160,6 +165,7 @@ class FinalizedTracerConfig {
   Clock clock;
   std::string integration_name;
   std::string integration_version;
+  bool delegate_trace_sampling;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

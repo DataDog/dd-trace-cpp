@@ -336,6 +336,12 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
   }
   result.report_telemetry = report_telemetry;
 
+  result.delegate_trace_sampling = config.delegate_trace_sampling;
+  if (auto trace_delegate_sampling_env =
+          lookup(environment::DD_TRACE_DELEGATE_SAMPLING)) {
+    result.delegate_trace_sampling = !falsy(*trace_delegate_sampling_env);
+  }
+
   if (auto trace_sampler_config = finalize_config(config.trace_sampler)) {
     result.trace_sampler = std::move(*trace_sampler_config);
   } else {
