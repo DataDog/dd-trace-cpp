@@ -87,8 +87,8 @@ Expected<SamplingDecision> parse_sampling_delegation_response(
 
     SamplingDecision sampling_decision;
     sampling_decision.origin = SamplingDecision::Origin::DELEGATED;
-    sampling_decision.priority = json["priority"];
-    sampling_decision.mechanism = json["mechanism"];
+    sampling_decision.priority = json.at("priority");
+    sampling_decision.mechanism = json.at("mechanism");
 
     return sampling_decision;
   } catch (const std::exception& e) {
