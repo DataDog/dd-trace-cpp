@@ -1,8 +1,10 @@
 #include "platform_util.h"
 
 #ifdef _MSC_VER
-#include <processthreadsapi.h>
+// clang-format off
 #include <winsock2.h>
+#include <processthreadsapi.h>
+// clang-format on
 #else
 #include <pthread.h>
 #include <unistd.h>
