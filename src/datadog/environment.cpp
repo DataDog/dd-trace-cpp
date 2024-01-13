@@ -2,8 +2,10 @@
 
 #include <cstdlib>
 #ifdef _MSC_VER
-#include <winbase.h>  // GetEnvironmentVariable
+// clang-format off
 #include <windows.h>
+#include <winbase.h>  // GetEnvironmentVariable
+// clang-format on
 #endif
 
 #include "json.hpp"

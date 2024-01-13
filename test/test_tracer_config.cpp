@@ -24,8 +24,10 @@
 #include "mocks/loggers.h"
 #include "test.h"
 #ifdef _MSC_VER
-#include <winbase.h>  // SetEnvironmentVariable
+// clang-format off
 #include <windows.h>
+#include <winbase.h>  // SetEnvironmentVariable
+// clang-format on
 #else
 #include <stdlib.h>  // setenv, unsetenv
 #endif
