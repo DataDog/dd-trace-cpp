@@ -145,27 +145,27 @@ jobs:
 workflows:
   pull-request:
     jobs:
-    # - format
-    # - shellcheck
+    - format
+    - shellcheck
     - test-windows-bazel:
         matrix:
           parameters:
             bazelrc: [".bazelrc.absl", ".bazelrc.std"]
-    # - test-cmake:
-    #     matrix:
-    #       parameters:
-    #         toolchain: ["gnu", "llvm"]
-    #         sanitize: ["on", "off"]
-    #         arch: ["amd64", "arm64"]
-    # - test-bazel:
-    #     matrix:
-    #       parameters:
-    #         arch: ["amd64", "arm64"]
-    #         toolchain: ["gnu", "llvm"]
-    #         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
-    # - coverage
-    # - system-tests:
-    #     filters:
-    #       branches:
-    #         only:
-    #           - main
+    - test-cmake:
+        matrix:
+          parameters:
+            toolchain: ["gnu", "llvm"]
+            sanitize: ["on", "off"]
+            arch: ["amd64", "arm64"]
+    - test-bazel:
+        matrix:
+          parameters:
+            arch: ["amd64", "arm64"]
+            toolchain: ["gnu", "llvm"]
+            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
+    - coverage
+    - system-tests:
+        filters:
+          branches:
+            only:
+              - main
