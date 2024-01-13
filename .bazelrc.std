@@ -1,0 +1,11 @@
+# In order to support both Unixen and Windows, different styles of compiler
+# flags must be used.
+#
+# This .bazelrc file specifies different compiler flags for Linux/Darwin versus
+# Windows.
+
+build --enable_platform_specific_config
+
+build:linux --cxxopt='-std=c++17' --cxxopt='-Wall' --cxxopt='-Wextra' --cxxopt='-pedantic'
+build:macos --cxxopt='-std=c++17' --cxxopt='-Wall' --cxxopt='-Wextra' --cxxopt='-pedantic'
+build:windows --cxxopt='/std:c++17' --linkopt='ws2_32.lib'

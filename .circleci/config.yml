@@ -31,13 +31,19 @@ jobs:
     - run: find bin/ -executable -type f -print0 | xargs -0 shellcheck
 
   test-windows-bazel:
+    parameters:
+      # `bazelrc` is the path to the .bazelrc file to use in the build/test.
+      # The repository has two flavors: one that uses Abseil types (for use with
+      # Envoy), and one that uses std types.
+      bazelrc:
+        type: string
     executor: windows/server-2022
     environment:
       MAKE_JOB_COUNT: 4
     steps:
     - checkout
     - run: choco install -y bazelisk
-    - run: bazelisk test --jobs $env:MAKE_JOB_COUNT dd_trace_cpp_test
+    - run: bazelisk --bazelrc=<< parameters.bazelrc >> test --jobs $env:MAKE_JOB_COUNT dd_trace_cpp_test
 
   build-bazel:
     parameters:
@@ -136,7 +142,10 @@ workflows:
     jobs:
     # - format
     # - shellcheck
-    - test-windows-bazel
+    - test-windows-bazel:
+        matrix:
+          parameters:
+            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
     # - test-cmake:
     #     matrix:
     #       parameters:
