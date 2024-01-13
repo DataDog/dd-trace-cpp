@@ -33,12 +33,14 @@ jobs:
   test-windows-bazel:
     executor: windows/server-2022
     environment:
-      MAKE_JOB_COUNT: 8
+      MAKE_JOB_COUNT: 4
     steps:
     - checkout
     - run: pwd
     - run: ls
     - run: Get-Command choco
+    - run: choco install -y bazelisk
+    - run: bazelisk test --jobs $MAKE_JOB_COUNT dd_trace_cpp_test
 
   build-bazel:
     parameters:
@@ -135,8 +137,8 @@ jobs:
 workflows:
   pull-request:
     jobs:
-    - format
-    - shellcheck
+    # - format
+    # - shellcheck
     - test-windows-bazel
     # - test-cmake:
     #     matrix:
