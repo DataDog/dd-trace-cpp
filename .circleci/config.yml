@@ -45,18 +45,23 @@ jobs:
     - run: choco install -y bazelisk
     - run: bazelisk --bazelrc=<< parameters.bazelrc >> test --jobs $env:MAKE_JOB_COUNT dd_trace_cpp_test
 
-  build-bazel:
+  test-bazel:
     parameters:
       toolchain:
         type: string
       arch:
+        type: string
+      # `bazelrc` is the path to the .bazelrc file to use in the build/test.
+      # The repository has two flavors: one that uses Abseil types (for use with
+      # Envoy), and one that uses std types.
+      bazelrc:
         type: string
     executor: docker-<< parameters.arch >>
     environment:
       MAKE_JOB_COUNT: 8
     steps:
     - checkout
-    - run: bin/with-toolchain << parameters.toolchain >> bazelisk build --jobs $MAKE_JOB_COUNT dd_trace_cpp
+    - run: bin/with-toolchain << parameters.toolchain >> bazelisk --bazelrc=<< parameters.bazelrc >> test --jobs $MAKE_JOB_COUNT dd_trace_cpp_test
 
   test-cmake:
     parameters:
@@ -152,11 +157,12 @@ workflows:
     #         toolchain: ["gnu", "llvm"]
     #         sanitize: ["on", "off"]
     #         arch: ["amd64", "arm64"]
-    # - build-bazel:
+    # - test-bazel:
     #     matrix:
     #       parameters:
     #         arch: ["amd64", "arm64"]
     #         toolchain: ["gnu", "llvm"]
+    #         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
     # - coverage
     # - system-tests:
     #     filters:
