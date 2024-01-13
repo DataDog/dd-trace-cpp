@@ -121,17 +121,26 @@ cc_test(
 
         # wrapper around Catch2
         "test/test.cpp",
+        "test/test.h",
+        "test/catch.hpp",
 
         # mocks
         "test/mocks/collectors.cpp",
+        "test/mocks/collectors.h",
         "test/mocks/dict_readers.cpp",
+        "test/mocks/dict_readers.h",
         "test/mocks/dict_writers.cpp",
+        "test/mocks/dict_writers.h",
         "test/mocks/event_schedulers.cpp",
+        "test/mocks/event_schedulers.h",
         "test/mocks/http_clients.cpp",
+        "test/mocks/http_clients.h",
         "test/mocks/loggers.cpp",
+        "test/mocks/loggers.h",
 
         # utilities
         "test/matchers.cpp",
+        "test/matchers.h",
 
         # test cases
         "test/test_cerr_logger.cpp",
@@ -152,7 +161,6 @@ cc_test(
         "test/test_tracer.cpp",
         "test/test_trace_sampler.cpp",
     ],
-    includes = ["test"],
     deps = [
         "dd_trace_cpp",
     ],
