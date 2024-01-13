@@ -36,9 +36,6 @@ jobs:
       MAKE_JOB_COUNT: 4
     steps:
     - checkout
-    - run: pwd
-    - run: ls
-    - run: Get-Command choco
     - run: choco install -y bazelisk
     - run: bazelisk test --jobs $env:MAKE_JOB_COUNT dd_trace_cpp_test
 
