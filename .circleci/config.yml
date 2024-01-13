@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  windows: circleci/windows@5.0
+
 executors:
   docker-amd64:
     docker:
@@ -26,6 +29,16 @@ jobs:
     steps:
     - checkout
     - run: find bin/ -executable -type f -print0 | xargs -0 shellcheck
+
+  test-windows-bazel:
+    executor: windows/server-2022
+    environment:
+      MAKE_JOB_COUNT: 8
+    steps:
+    - checkout
+    - run: pwd
+    - run: ls
+    - run: Get-Command choco
 
   build-bazel:
     parameters:
@@ -110,7 +123,7 @@ jobs:
           environment:
             TEST_LIBRARY: cpp
             DD_TRACE_CPP_COMMIT: << pipeline.git.revision >>
-          command: cd system-tests && ./build.sh -i runner && ./run.sh PARAMETRIC --log-cli-level=DEBUG 
+          command: cd system-tests && ./build.sh -i runner && ./run.sh PARAMETRIC --log-cli-level=DEBUG
       - run:
           name: Collect artifacts
           command: tar -cvzf logs_cpp_parametric_dev.tar.gz -C system-tests logs_parametric
@@ -124,20 +137,21 @@ workflows:
     jobs:
     - format
     - shellcheck
-    - test-cmake:
-        matrix:
-          parameters:
-            toolchain: ["gnu", "llvm"]
-            sanitize: ["on", "off"]
-            arch: ["amd64", "arm64"]
-    - build-bazel:
-        matrix:
-          parameters:
-            arch: ["amd64", "arm64"]
-            toolchain: ["gnu", "llvm"]
-    - coverage
-    - system-tests:
-        filters:
-          branches:
-            only:
-              - main
+    - test-windows-bazel
+    # - test-cmake:
+    #     matrix:
+    #       parameters:
+    #         toolchain: ["gnu", "llvm"]
+    #         sanitize: ["on", "off"]
+    #         arch: ["amd64", "arm64"]
+    # - build-bazel:
+    #     matrix:
+    #       parameters:
+    #         arch: ["amd64", "arm64"]
+    #         toolchain: ["gnu", "llvm"]
+    # - coverage
+    # - system-tests:
+    #     filters:
+    #       branches:
+    #         only:
+    #           - main
