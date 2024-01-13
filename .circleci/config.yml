@@ -40,7 +40,7 @@ jobs:
     - run: ls
     - run: Get-Command choco
     - run: choco install -y bazelisk
-    - run: bazelisk test --jobs $MAKE_JOB_COUNT dd_trace_cpp_test
+    - run: bazelisk test --jobs $env:MAKE_JOB_COUNT dd_trace_cpp_test
 
   build-bazel:
     parameters:
