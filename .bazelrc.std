@@ -3,6 +3,10 @@
 #
 # This .bazelrc file specifies different compiler flags for Linux/Darwin versus
 # Windows.
+#
+# This bazelrc does _not_ define the `DD_USE_ABSEIL_FOR_ENVOY` preprocessor
+# macro, and so the resulting library will use `std::string_view` and
+# `std::optional` instead of their Abseil equivalents.
 
 build --enable_platform_specific_config
 

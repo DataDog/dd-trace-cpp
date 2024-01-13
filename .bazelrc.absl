@@ -3,6 +3,10 @@
 #
 # This .bazelrc file specifies different compiler flags for Linux/Darwin versus
 # Windows.
+#
+# This bazelrc defines the `DD_USE_ABSEIL_FOR_ENVOY` preprocessor macro, and so
+# the resulting library will use `absl::string_view` and `absl::optional`
+# instead of their standard (`std`) equivalents.
 
 build --enable_platform_specific_config
 
