@@ -17,14 +17,15 @@ namespace {
 template <typename Integer>
 Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
   Integer value;
-  const auto status = std::from_chars(input.begin(), input.end(), value, base);
+  const char* const end = input.data() + input.size();
+  const auto status = std::from_chars(input.data(), end, value, base);
   if (status.ec == std::errc::invalid_argument) {
     std::string message;
     message += "Is not a valid integer: \"";
     append(message, input);
     message += '\"';
     return Error{Error::INVALID_INTEGER, std::move(message)};
-  } else if (status.ptr != input.end()) {
+  } else if (status.ptr != end) {
     std::string message;
     message += "Integer has trailing characters in: \"";
     append(message, input);
@@ -47,16 +48,15 @@ StringView strip(StringView input) {
   const auto not_whitespace = [](unsigned char ch) {
     return !std::isspace(ch);
   };
-  const char* const begin =
-      std::find_if(input.begin(), input.end(), not_whitespace);
-  const char* const end =
+  const auto begin = std::find_if(input.begin(), input.end(), not_whitespace);
+  const auto end =
       std::find_if(input.rbegin(), std::make_reverse_iterator(begin),
                    not_whitespace)
           .base();
 
   assert(begin <= end);
 
-  return StringView{begin, std::size_t(end - begin)};
+  return range(begin, end);
 }
 
 Expected<std::uint64_t> parse_uint64(StringView input, int base) {

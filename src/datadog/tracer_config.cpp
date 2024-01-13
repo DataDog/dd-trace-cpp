@@ -38,9 +38,9 @@ std::vector<StringView> parse_list(StringView input) {
     return items;
   }
 
-  const char *const end = input.end();
+  const char *const end = input.data() + input.size();
 
-  const char *current = input.begin();
+  const char *current = input.data();
   const char *begin_delim;
   do {
     const char *begin_item =

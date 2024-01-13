@@ -12,8 +12,9 @@ namespace datadog {
 namespace tracing {
 
 // Return a `string_view` over the specified range of characters `[begin, end)`.
-inline StringView range(const char* begin, const char* end) {
-  return StringView{begin, std::size_t(end - begin)};
+template <typename CharIter1, typename CharIter2>
+StringView range(CharIter1 begin, CharIter2 end) {
+  return StringView{&*begin, std::size_t(end - begin)};
 }
 
 // Remove leading and trailing whitespace (as determined by `std::isspace`) from

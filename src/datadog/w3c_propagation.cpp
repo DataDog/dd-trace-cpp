@@ -68,8 +68,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
 
   const auto to_string_view = [](const auto& submatch) {
     assert(submatch.first <= submatch.second);
-    return StringView{submatch.first,
-                      std::size_t(submatch.second - submatch.first)};
+    return range(submatch.first, submatch.second);
   };
 
   const auto version = to_string_view(match[1]);
@@ -110,8 +109,8 @@ struct PartiallyParsedTracestate {
 Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
   Optional<PartiallyParsedTracestate> result;
 
-  const char* const begin = tracestate.begin();
-  const char* const end = tracestate.end();
+  const char* const begin = tracestate.data();
+  const char* const end = begin + tracestate.size();
   const char* pair_begin = begin;
   while (pair_begin != end) {
     const char* const pair_end = std::find(pair_begin, end, ',');
@@ -174,8 +173,8 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
 // - `sampling_priority`
 // - `additional_datadog_w3c_tracestate`
 void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
-  const char* const begin = datadog_value.begin();
-  const char* const end = datadog_value.end();
+  const char* const begin = datadog_value.data();
+  const char* const end = begin + datadog_value.size();
   const char* pair_begin = begin;
   while (pair_begin != end) {
     const char* const pair_end = std::find(pair_begin, end, ';');
