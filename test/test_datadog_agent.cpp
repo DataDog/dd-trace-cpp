@@ -14,19 +14,19 @@ using namespace datadog::tracing;
 
 TEST_CASE("CollectorResponse") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.set_service_name("testsvc");
   const auto logger =
       std::make_shared<MockLogger>(std::cerr, MockLogger::ERRORS_ONLY);
   const auto event_scheduler = std::make_shared<MockEventScheduler>();
   const auto http_client = std::make_shared<MockHTTPClient>();
-  config.logger = logger;
-  config.agent.event_scheduler = event_scheduler;
-  config.agent.http_client = http_client;
+  config.set_logger(logger);
+  config.set_event_scheduler(event_scheduler);
+  config.set_http_client(http_client);
   // Tests currently only cover sending traces to the agent.
   // Submiting telemetry performs essentially the same steps, but may be added
   // in the future.
-  config.report_telemetry = false;
-  auto finalized = finalize_config(config);
+  config.enable_telemetry(false);
+  auto finalized = config.finalize();
   REQUIRE(finalized);
 
   SECTION("empty object is valid") {

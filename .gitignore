@@ -1,3 +1,8 @@
 /bazel-*
 /.build/
 /.coverage/
+/.idea/
+/.cache/
+/.vscode/
+
+__pycache__/

@@ -3,6 +3,7 @@
 #include "catch.hpp"
 #include "datadog/json_fwd.hpp"
 #include "datadog/remote_config.h"
+#include "datadog/trace_sampler_config.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
@@ -26,9 +27,9 @@ REMOTE_CONFIG_TEST("first payload") {
   };
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.defaults.environment = "test";
-  ConfigManager config_manager(*finalize_config(config));
+  config.set_service_name("testsvc");
+  config.set_environment("test");
+  ConfigManager config_manager(*config.finalize());
 
   RemoteConfigurationManager rc(tracer_signature, config_manager);
 
@@ -59,10 +60,14 @@ REMOTE_CONFIG_TEST("response processing") {
   };
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.defaults.environment = "test";
-  config.trace_sampler.sample_rate = 1.0;
-  ConfigManager config_manager(*finalize_config(config));
+  config.set_service_name("testsvc");
+  config.set_environment("test");
+
+  TraceSamplerConfig trace_sampler;
+  trace_sampler.sample_rate = 1.0;
+
+  config.set_trace_sampler(trace_sampler);
+  ConfigManager config_manager(*config.finalize());
 
   RemoteConfigurationManager rc(tracer_signature, config_manager);
 

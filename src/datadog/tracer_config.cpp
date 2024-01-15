@@ -6,9 +6,12 @@
 #include <cstddef>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "cerr_logger.h"
+#include "collector.h"
+#include "datadog/propagation_style.h"
 #include "datadog_agent.h"
 #include "environment.h"
 #include "json.hpp"
@@ -38,12 +41,12 @@ std::vector<StringView> parse_list(StringView input) {
     return items;
   }
 
-  const char *const end = input.end();
+  const char* const end = input.end();
 
-  const char *current = input.begin();
-  const char *begin_delim;
+  const char* current = input.begin();
+  const char* begin_delim;
   do {
-    const char *begin_item =
+    const char* begin_item =
         std::find_if(current, end, [](uchar ch) { return !std::isspace(ch); });
     begin_delim = std::find_if(begin_item, end, [](uchar ch) {
       return std::isspace(ch) || ch == ',';
@@ -51,7 +54,7 @@ std::vector<StringView> parse_list(StringView input) {
 
     items.emplace_back(begin_item, std::size_t(begin_delim - begin_item));
 
-    const char *end_delim = std::find_if(
+    const char* end_delim = std::find_if(
         begin_delim, end, [](uchar ch) { return !std::isspace(ch); });
 
     if (end_delim != end && *end_delim == ',') {
@@ -86,7 +89,7 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
   };
 
   // Style names are separated by spaces, or a comma, or some combination.
-  for (const StringView &item : parse_list(input)) {
+  for (const StringView& item : parse_list(input)) {
     if (const auto style = parse_propagation_style(item)) {
       styles.push_back(*style);
     } else {
@@ -96,7 +99,8 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
       message += "\" in list \"";
       append(message, input);
       message +=
-          "\".  The following styles are supported: Datadog, B3, tracecontext.";
+          "\".  The following styles are supported: Datadog, B3,"
+          "tracecontext.";
       return Error{Error::UNKNOWN_PROPAGATION_STYLE, std::move(message)};
     }
 
@@ -113,7 +117,7 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
   std::unordered_map<std::string, std::string> tags;
 
   // Within a tag, the key and value are separated by a colon (":").
-  for (const StringView &token : parse_list(input)) {
+  for (const StringView& token : parse_list(input)) {
     const auto separator = std::find(token.begin(), token.end(), ':');
     if (separator == token.end()) {
       std::string message;
@@ -146,7 +150,7 @@ Optional<std::vector<PropagationStyle>> styles_from_env(
   }
 
   auto styles = parse_propagation_styles(*styles_env);
-  if (auto *error = styles.if_error()) {
+  if (auto* error = styles.if_error()) {
     std::string prefix;
     prefix += "Unable to parse ";
     append(prefix, name(env_var));
@@ -162,11 +166,12 @@ std::string json_quoted(StringView text) {
   return nlohmann::json(std::move(unquoted)).dump();
 }
 
-Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
-                                           const TracerConfig &config,
-                                           Logger &logger) {
+Expected<void> finalize_propagation_styles(
+    FinalizedTracerConfig& result,
+    const std::vector<PropagationStyle>& extraction_styles,
+    const std::vector<PropagationStyle>& injection_styles, Logger& logger) {
   namespace env = environment;
-  // Print a warning if a questionable combination of environment variables is
+  // Print a warning if a questionable combination of environment variables
   // defined.
   const auto ts = env::DD_TRACE_PROPAGATION_STYLE;
   const auto tse = env::DD_TRACE_PROPAGATION_STYLE_EXTRACT;
@@ -188,7 +193,8 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
     si  |  x     x     x     x     x
   */
   // In each pair, the first would be overridden by the second.
-  const std::pair<env::Variable, env::Variable> questionable_combinations[] = {
+  const std::pair<env::Variable, env::Variable> questionable_combinations[] =
+  {
            {ts, tse}, {ts, se},  {ts, tsi}, {ts, si},
 
                       {se, tse}, /* ok */   /* ok */
@@ -217,7 +223,7 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
     return message;
   };
 
-  for (const auto &[var, var_override] : questionable_combinations) {
+  for (const auto& [var, var_override] : questionable_combinations) {
     const auto value = lookup(var);
     if (!value) {
       continue;
@@ -241,12 +247,12 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
     result.extraction_styles =
         value_or(styles_from_env(env::DD_TRACE_PROPAGATION_STYLE_EXTRACT),
                  styles_from_env(env::DD_PROPAGATION_STYLE_EXTRACT),
-                 global_styles, config.extraction_styles);
+                 global_styles, extraction_styles);
     result.injection_styles =
         value_or(styles_from_env(env::DD_TRACE_PROPAGATION_STYLE_INJECT),
                  styles_from_env(env::DD_PROPAGATION_STYLE_INJECT),
-                 global_styles, config.injection_styles);
-  } catch (Error &error) {
+                 global_styles, injection_styles);
+  } catch (Error& error) {
     return std::move(error);
   }
 
@@ -264,20 +270,183 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
 
 }  // namespace
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
-  return finalize_config(config, default_clock);
+TracerConfig::TracerConfig() {
+  // Default values
+  config.report_traces = true;
+  config.report_telemetry = true;
+  config.report_hostname = false;
+  config.tags_header_size = 512;
+  config.log_on_startup = true;
+  config.trace_id_128_bit = true;
+  config.injection_styles = {PropagationStyle::DATADOG, PropagationStyle::W3C};
+  config.extraction_styles = {PropagationStyle::DATADOG, PropagationStyle::W3C};
+  config.delegate_trace_sampling = false;
 }
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
-                                                const Clock &clock) {
-  FinalizedTracerConfig result;
+TracerConfig& TracerConfig::set_service_name(std::string service_name) {
+  config.defaults.service = std::move(service_name);
+  return *this;
+}
 
+TracerConfig& TracerConfig::set_service_type(std::string service_type) {
+  config.defaults.service_type = std::move(service_type);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_environment(std::string environment) {
+  config.defaults.environment = std::move(environment);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_version(std::string version) {
+  config.defaults.version = std::move(version);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_span_default_name(
+    std::string default_span_name) {
+  config.defaults.name = std::move(default_span_name);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_tags(
+    std::unordered_map<std::string, std::string> tags) {
+  config.defaults.tags = std::move(tags);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_datadog_agent_url(std::string url) {
+  agent_config.url = std::move(url);
+  return *this;
+}
+
+TracerConfig& TracerConfig::enable_traces(bool report_traces) {
+  config.report_traces = report_traces;
+  return *this;
+}
+
+TracerConfig& TracerConfig::enable_telemetry(bool report_telemetry) {
+  config.report_telemetry = report_telemetry;
+  return *this;
+}
+
+TracerConfig& TracerConfig::enable_128bit_trace_id(
+    bool report_128bit_trace_id) {
+  config.trace_id_128_bit = report_128bit_trace_id;
+  return *this;
+}
+
+TracerConfig& TracerConfig::log_configuration_on_startup(bool log_on_startup) {
+  config.log_on_startup = log_on_startup;
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_injection_styles(
+    std::vector<PropagationStyle> injection_styles) {
+  config.injection_styles = std::move(injection_styles);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_extraction_styles(
+    std::vector<PropagationStyle> extraction_styles) {
+  config.extraction_styles = std::move(extraction_styles);
+  return *this;
+}
+
+TracerConfig& TracerConfig::enable_hostname_in_span(bool report_hostname) {
+  config.report_hostname = report_hostname;
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_http_client(
+    std::shared_ptr<HTTPClient> http_client) {
+  agent_config.http_client = std::move(http_client);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_event_scheduler(
+    std::shared_ptr<EventScheduler> event_scheduler) {
+  agent_config.event_scheduler = std::move(event_scheduler);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_flush_interval(
+    std::chrono::milliseconds flush_interval) {
+  agent_config.flush_interval_milliseconds = flush_interval.count();
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_request_timeout(
+    std::chrono::milliseconds request_timeout) {
+  agent_config.request_timeout_milliseconds = request_timeout.count();
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_shutdown_timeout(
+    std::chrono::milliseconds shutdown_timeout) {
+  agent_config.shutdown_timeout_milliseconds = shutdown_timeout.count();
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_collector(
+    std::shared_ptr<Collector> collector) {
+  config.collector = std::move(collector);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_trace_sampler(
+    TraceSamplerConfig trace_sampler) {
+  trace_sampler_ = std::move(trace_sampler);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_span_sampler(SpanSamplerConfig trace_sampler) {
+  span_sampler_ = std::move(trace_sampler);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_sampling_delegation(
+    bool enable_sampling_deleation) {
+  config.delegate_trace_sampling = enable_sampling_deleation;
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_max_tags_header_size(
+    std::size_t max_tags_header_size) {
+  config.tags_header_size = max_tags_header_size;
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_logger(std::shared_ptr<Logger> logger) {
+  config.logger = std::move(logger);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_runtime_id(RuntimeID runtime_id) {
+  config.runtime_id = std::move(runtime_id);
+  return *this;
+}
+
+TracerConfig& TracerConfig::set_remote_configuration_poll_interval(
+    std::chrono::seconds poll_interval) {
+  agent_config.remote_configuration_poll_interval_seconds =
+      poll_interval.count();
+  return *this;
+}
+
+Expected<FinalizedTracerConfig> TracerConfig::finalize() const {
+  return finalize(default_clock);
+}
+
+Expected<FinalizedTracerConfig> TracerConfig::finalize(
+    const Clock& clock) const {
+  FinalizedTracerConfig result(config);
   result.clock = clock;
-  result.defaults = config.defaults;
 
   if (auto service_env = lookup(environment::DD_SERVICE)) {
     assign(result.defaults.service, *service_env);
   }
+
   if (result.defaults.service.empty()) {
     return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
   }
@@ -285,95 +454,72 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
   if (auto environment_env = lookup(environment::DD_ENV)) {
     assign(result.defaults.environment, *environment_env);
   }
+
   if (auto version_env = lookup(environment::DD_VERSION)) {
     assign(result.defaults.version, *version_env);
   }
 
   if (auto tags_env = lookup(environment::DD_TAGS)) {
     auto tags = parse_tags(*tags_env);
-    if (auto *error = tags.if_error()) {
+    if (auto* error = tags.if_error()) {
       std::string prefix;
       prefix += "Unable to parse ";
       append(prefix, name(environment::DD_TAGS));
       prefix += " environment variable: ";
       return error->with_prefix(prefix);
     }
+
     result.defaults.tags = std::move(*tags);
   }
 
-  if (config.logger) {
-    result.logger = config.logger;
-  } else {
-    result.logger = std::make_shared<CerrLogger>();
-  }
-
-  result.log_on_startup = config.log_on_startup;
   if (auto startup_env = lookup(environment::DD_TRACE_STARTUP_LOGS)) {
     result.log_on_startup = !falsy(*startup_env);
   }
 
-  bool report_traces = config.report_traces;
   if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
-    report_traces = !falsy(*enabled_env);
+    result.report_traces = !falsy(*enabled_env);
   }
 
-  if (!report_traces) {
-    result.collector = std::make_shared<NullCollector>();
-  } else if (!config.collector) {
-    auto finalized = finalize_config(config.agent, result.logger, clock);
-    if (auto *error = finalized.if_error()) {
-      return std::move(*error);
-    }
-    result.collector = *finalized;
-  } else {
-    result.collector = config.collector;
+  auto finalized = finalize_config(agent_config, result.logger, clock);
+  if (auto* error = finalized.if_error()) {
+    return std::move(*error);
   }
+  result.agent_config = std::move(*finalized);
 
-  bool report_telemetry = config.report_telemetry;
   if (auto enabled_env =
           lookup(environment::DD_INSTRUMENTATION_TELEMETRY_ENABLED)) {
-    report_telemetry = !falsy(*enabled_env);
+    result.report_telemetry = !falsy(*enabled_env);
   }
-  result.report_telemetry = report_telemetry;
 
-  result.delegate_trace_sampling = config.delegate_trace_sampling;
   if (auto trace_delegate_sampling_env =
           lookup(environment::DD_TRACE_DELEGATE_SAMPLING)) {
     result.delegate_trace_sampling = !falsy(*trace_delegate_sampling_env);
   }
 
-  if (auto trace_sampler_config = finalize_config(config.trace_sampler)) {
+  if (auto trace_sampler_config = finalize_config(trace_sampler_)) {
     result.trace_sampler = std::move(*trace_sampler_config);
   } else {
     return std::move(trace_sampler_config.error());
   }
 
   if (auto span_sampler_config =
-          finalize_config(config.span_sampler, *result.logger)) {
+          finalize_config(span_sampler_, *result.logger)) {
     result.span_sampler = std::move(*span_sampler_config);
   } else {
     return std::move(span_sampler_config.error());
   }
 
   auto maybe_error =
-      finalize_propagation_styles(result, config, *result.logger);
+      finalize_propagation_styles(result, config.extraction_styles,
+                                  config.injection_styles, *result.logger);
   if (!maybe_error) {
     return maybe_error.error();
   }
 
-  result.report_hostname = config.report_hostname;
-  result.tags_header_size = config.tags_header_size;
-
   if (auto enabled_env =
           lookup(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)) {
     result.trace_id_128_bit = !falsy(*enabled_env);
-  } else {
-    result.trace_id_128_bit = config.trace_id_128_bit;
   }
-
-  result.runtime_id = config.runtime_id;
-  result.integration_name = config.integration_name;
-  result.integration_version = config.integration_version;
 
   return result;
 }

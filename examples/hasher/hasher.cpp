@@ -132,10 +132,10 @@ int sha256_traced(Digest &digest, const fs::path &path,
 
 int main() {
   dd::TracerConfig config;
-  config.defaults.service = "dd-trace-cpp-example";
-  config.defaults.environment = "dev";
+  config.set_service_name("dd-trace-cpp-example");
+  config.set_environment("dev");
 
-  auto validated = dd::finalize_config(config);
+  auto validated = config.finalize();
   if (auto *error = validated.if_error()) {
     std::cerr << "Invalid config: " << *error << '\n';
     return 1;

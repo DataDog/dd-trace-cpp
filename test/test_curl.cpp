@@ -146,14 +146,14 @@ TEST_CASE("parse response headers and body", "[curl]") {
     // It's still good to test that everything works with this mock
     // `CurlLibrary` in place, though.
     TracerConfig config;
-    config.defaults.service = "testsvc";
-    config.logger = logger;
-    config.agent.http_client = client;
+    config.set_service_name("testsvc");
+    config.set_logger(logger);
+    config.set_http_client(client);
     // The http client is a mock that only expects a single request, so
     // force only tracing to be sent and exclude telemetry.
-    config.report_telemetry = false;
+    config.enable_telemetry(true);
 
-    const auto finalized = finalize_config(config);
+    const auto finalized = config.finalize();
     REQUIRE(finalized);
     Tracer tracer{*finalized};
 

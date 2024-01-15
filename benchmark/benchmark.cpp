@@ -1,12 +1,11 @@
 #include <benchmark/benchmark.h>
-
 #include <datadog/collector.h>
-#include <datadog/json.hpp>
 #include <datadog/logger.h>
 #include <datadog/span_data.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <datadog/json.hpp>
 #include <memory>
 
 #include "hasher.h"
@@ -35,9 +34,7 @@ struct SerializingCollector : public dd::Collector {
   }
 
   nlohmann::json config_json() const override {
-    return nlohmann::json::object({
-        {"type", "SerializingCollector"}
-    });
+    return nlohmann::json::object({{"type", "SerializingCollector"}});
   }
 };
 
@@ -47,10 +44,11 @@ struct SerializingCollector : public dd::Collector {
 void BM_TraceTinyCCSource(benchmark::State& state) {
   for (auto _ : state) {
     dd::TracerConfig config;
-    config.defaults.service = "benchmark";
-    config.logger = std::make_shared<NullLogger>();
-    config.collector = std::make_shared<SerializingCollector>();
-    const auto valid_config = dd::finalize_config(config);
+    config.set_service_name("benchmark");
+    config.set_logger(std::make_shared<NullLogger>());
+    config.set_collector(std::make_shared<SerializingCollector>());
+    const auto valid_config = config.finalize();
+
     dd::Tracer tracer{*valid_config};
     // Note: This assumes that the benchmark is run from the repository root.
     sha256_traced("benchmark/tinycc", tracer);
@@ -58,6 +56,6 @@ void BM_TraceTinyCCSource(benchmark::State& state) {
 }
 BENCHMARK(BM_TraceTinyCCSource);
 
-} // namespace
+}  // namespace
 
 BENCHMARK_MAIN();

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 
+#include "datadog/null_collector.h"
 #include "datadog/runtime_id.h"
 #include "datadog/trace_sampler_config.h"
 #include "datadog_agent.h"
@@ -55,20 +56,20 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       tags_header_max_size_(config.tags_header_size),
       config_manager_(config),
       sampling_delegation_enabled_(config.delegate_trace_sampling) {
-  if (auto* collector =
-          std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
-    collector_ = *collector;
+  if (!config.report_traces) {
+    collector_ = std::make_shared<NullCollector>();
   } else {
-    auto& agent_config =
-        std::get<FinalizedDatadogAgentConfig>(config.collector);
+    if (config.collector) {
+      collector_ = config.collector;
+    } else {
+      auto agent = std::make_shared<DatadogAgent>(
+          config.agent_config, tracer_telemetry_, config.logger, signature_,
+          config_manager_);
+      collector_ = agent;
 
-    auto agent = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
-                                                config.logger, signature_,
-                                                config_manager_);
-    collector_ = agent;
-
-    if (tracer_telemetry_->enabled()) {
-      agent->send_app_started();
+      if (tracer_telemetry_->enabled()) {
+        agent->send_app_started();
+      }
     }
   }
 
