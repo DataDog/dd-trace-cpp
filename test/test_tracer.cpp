@@ -23,6 +23,7 @@
 #include <ctime>
 #include <iosfwd>
 #include <stdexcept>
+#include <utility>
 
 #include "matchers.h"
 #include "mocks/collectors.h"
@@ -1701,4 +1702,20 @@ TEST_CASE("heterogeneous extraction") {
   span->inject(writer);
 
   REQUIRE(writer.items == test_case.expected_injected_headers);
+}
+
+TEST_CASE("move semantics") {
+  // Verify that `Tracer` can be moved.
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.logger = std::make_shared<NullLogger>();
+  config.collector = std::make_shared<MockCollector>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer1{*finalized_config};
+
+  // This must compile.
+  Tracer tracer2{std::move(tracer1)};
+  (void)tracer2;
 }

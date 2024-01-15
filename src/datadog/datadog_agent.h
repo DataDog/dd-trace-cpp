@@ -66,7 +66,7 @@ class DatadogAgent : public Collector {
   DatadogAgent(const FinalizedDatadogAgentConfig&,
                const std::shared_ptr<TracerTelemetry>&,
                const std::shared_ptr<Logger>&, const TracerSignature& id,
-               ConfigManager& config_manager);
+               const std::shared_ptr<ConfigManager>& config_manager);
   ~DatadogAgent();
 
   Expected<void> send(

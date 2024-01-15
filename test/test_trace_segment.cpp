@@ -1,3 +1,4 @@
+#include <datadog/optional.h>
 #include <datadog/platform_util.h>
 #include <datadog/rate.h>
 #include <datadog/tags.h>
@@ -446,3 +447,24 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
   }
 }  // span finalizers
+
+TEST_CASE("independent of Tracer") {
+  // This test verifies that a `TraceSegment` (via the `Span`s that refer to it)
+  // can continue to operate even after the `Tracer` that created it is
+  // destroyed.
+  //
+  // Primarily, the test checks that the code doesn't crash in this scenario.
+  TracerConfig config;
+  config.defaults.service = "testsvc";
+  config.defaults.name = "do.thing";
+  config.logger = std::make_shared<NullLogger>();
+
+  auto maybe_tracer = finalize_config(config);
+  REQUIRE(maybe_tracer);
+  Optional<Tracer> tracer{*maybe_tracer};
+
+  Span root = tracer->create_span();
+  Span child = root.create_child();
+
+  tracer.reset();
+}

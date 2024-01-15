@@ -36,6 +36,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config)
 Tracer::Tracer(const FinalizedTracerConfig& config,
                const std::shared_ptr<const IDGenerator>& generator)
     : logger_(config.logger),
+      config_manager_(std::make_shared<ConfigManager>(config)),
       collector_(/* see constructor body */),
       defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       runtime_id_(config.runtime_id ? *config.runtime_id
@@ -53,7 +54,6 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       extraction_styles_(config.extraction_styles),
       hostname_(config.report_hostname ? get_hostname() : nullopt),
       tags_header_max_size_(config.tags_header_size),
-      config_manager_(config),
       sampling_delegation_enabled_(config.delegate_trace_sampling) {
   if (auto* collector =
           std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
@@ -94,7 +94,7 @@ nlohmann::json Tracer::config_json() const {
   });
   // clang-format on
 
-  config.merge_patch(config_manager_.config_json());
+  config.merge_patch(config_manager_->config_json());
 
   if (hostname_) {
     config["hostname"] = *hostname_;
@@ -122,7 +122,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   tracer_telemetry_->metrics().tracer.trace_segments_created_new.inc();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_,
-      config_manager_.get_trace_sampler(), span_sampler_, defaults_,
+      config_manager_->get_trace_sampler(), span_sampler_, defaults_,
       runtime_id_, sampling_delegation_enabled_,
       false /* sampling_decision_was_delegated_to_me */, injection_styles_,
       hostname_, nullopt /* origin */, tags_header_max_size_,
@@ -293,7 +293,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   tracer_telemetry_->metrics().tracer.trace_segments_created_continued.inc();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_,
-      config_manager_.get_trace_sampler(), span_sampler_, defaults_,
+      config_manager_->get_trace_sampler(), span_sampler_, defaults_,
       runtime_id_, sampling_delegation_enabled_, delegate_sampling_decision,
       injection_styles_, hostname_, std::move(origin), tags_header_max_size_,
       std::move(trace_tags), std::move(sampling_decision),

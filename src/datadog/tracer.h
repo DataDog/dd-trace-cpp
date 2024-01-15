@@ -10,6 +10,9 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
+#include <cstddef>
+#include <memory>
+
 #include "clock.h"
 #include "config_manager.h"
 #include "error.h"
@@ -32,6 +35,7 @@ class SpanSampler;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
+  std::shared_ptr<ConfigManager> config_manager_;
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<const SpanDefaults> defaults_;
   RuntimeID runtime_id_;
@@ -44,7 +48,6 @@ class Tracer {
   std::vector<PropagationStyle> extraction_styles_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
-  ConfigManager config_manager_;
   bool sampling_delegation_enabled_;
 
  public:

@@ -1,5 +1,6 @@
 #include "remote_config.h"
 
+#include <cassert>
 #include <cstdint>
 #include <type_traits>
 #include <unordered_set>
@@ -64,10 +65,13 @@ ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
 }  // namespace
 
 RemoteConfigurationManager::RemoteConfigurationManager(
-    const TracerSignature& tracer_signature, ConfigManager& config_manager)
+    const TracerSignature& tracer_signature,
+    const std::shared_ptr<ConfigManager>& config_manager)
     : tracer_signature_(tracer_signature),
       config_manager_(config_manager),
-      client_id_(uuid()) {}
+      client_id_(uuid()) {
+  assert(config_manager_);
+}
 
 bool RemoteConfigurationManager::is_new_config(
     StringView config_path, const nlohmann::json& config_meta) {
@@ -215,11 +219,11 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
 }
 
 void RemoteConfigurationManager::apply_config(Configuration config) {
-  config_manager_.update(config.content);
+  config_manager_->update(config.content);
 }
 
 void RemoteConfigurationManager::revert_config(Configuration) {
-  config_manager_.reset();
+  config_manager_->reset();
 }
 
 }  // namespace tracing
