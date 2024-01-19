@@ -41,10 +41,10 @@ struct SerializingCollector : public dd::Collector {
   }
 };
 
-// The benchmark `BM_TraceTinyCCSource`, for each iteration over `state`,
+// The benchmark `BM_TraceHashTinyCCSource`, for each iteration over `state`,
 // creates a trace whose shape is the same as the file system tree under
 // `./tinycc`. It's similar to what is done in `../example`.
-void BM_TraceTinyCCSource(benchmark::State& state) {
+void BM_TraceHashTinyCCSource(benchmark::State& state) {
   for (auto _ : state) {
     dd::TracerConfig config;
     config.defaults.service = "benchmark";
@@ -56,7 +56,18 @@ void BM_TraceTinyCCSource(benchmark::State& state) {
     sha256_traced("benchmark/tinycc", tracer);
   }
 }
-BENCHMARK(BM_TraceTinyCCSource);
+BENCHMARK(BM_TraceHashTinyCCSource);
+
+// The benchmark `BM_HashTinyCCSource`, for each iteration over `state`, does
+// what `BM_TraceHashTinyCCSource` does, but without any tracing.
+void BM_HashTinyCCSource(benchmark::State& state) {
+  for (auto _ : state) {
+    // Note: This assumes that the benchmark is run from the repository root.
+    sha256_untraced("benchmark/tinycc");
+  }
+}
+BENCHMARK(BM_HashTinyCCSource);
+
 
 } // namespace
 

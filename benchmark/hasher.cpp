@@ -153,3 +153,45 @@ void sha256_traced(const fs::path &path, dd::Tracer &tracer) {
     root.set_tag("sha256_hex", hex_digest);
   }
 }
+
+int sha256_untraced(Digest &digest, const fs::path &path) try {
+  if (fs::is_directory(path)) {
+    // Directory: Calculate hash of children, and then combine them.
+    std::vector<std::pair<fs::path, Digest>> children;
+    const auto options = fs::directory_options::skip_permission_denied;
+    for (const auto &entry : fs::directory_iterator(path, options)) {
+      if (!(entry.is_regular_file() || entry.is_directory())) {
+        continue;
+      }
+      Digest hash;
+      const fs::path &child = entry;
+      if (sha256_untraced(hash, child)) {
+        return 1;
+      }
+      children.emplace_back(child, hash);
+    }
+    digest = sha256(children);
+    return 0;
+  } else if (fs::is_regular_file(path)) {
+    // Regular file: Calculate hash of file contents.
+    return sha256(digest, path);
+  } else {
+    // Other kind of file (neither directory nor regular file): Ignore.
+    return 1;
+  }
+} catch (const fs::filesystem_error &) {
+  return 1;
+} catch (const std::ios_base::failure &) {
+  return 1;
+}
+
+void sha256_untraced(const fs::path &path) {
+  if (!fs::exists(path)) {
+    return;
+  }
+
+  Digest digest;
+  if (!sha256_untraced(digest, path)) {
+    (void)hex(digest);
+  }
+}
