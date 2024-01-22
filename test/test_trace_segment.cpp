@@ -31,16 +31,16 @@ Rate assert_rate(double rate) {
 
 TEST_CASE("TraceSegment accessors") {
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
+  config.collector(collector);
 
   auto logger = std::make_shared<MockLogger>();
-  config.set_logger(logger);
+  config.logger(logger);
 
   SECTION("hostname") {
     bool report_hostname = GENERATE(true, false);
-    config.enable_hostname_in_span(report_hostname);
+    config.report_hostname(report_hostname);
 
     auto finalized = config.finalize();
     REQUIRE(finalized);
@@ -57,13 +57,13 @@ TEST_CASE("TraceSegment accessors") {
 
   SECTION("defaults") {
     // config.defaults.name = "wobble";
-    config.set_service_type("fake");
-    config.set_version("v0");
-    config.set_environment("test");
+    config.service_type("fake");
+    config.service_version("v0");
+    config.service_environment("test");
 
     const std::unordered_map<std::string, std::string> tags{{"hello", "world"},
                                                             {"foo", "bar"}};
-    config.set_tags(tags);
+    config.tags(tags);
 
     auto finalized = config.finalize();
     REQUIRE(finalized);
@@ -146,11 +146,11 @@ TEST_CASE("TraceSegment accessors") {
 
 TEST_CASE("When Collector::send fails, TraceSegment logs the error.") {
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   const auto collector = std::make_shared<FailureCollector>();
-  config.set_collector(collector);
+  config.collector(collector);
   const auto logger = std::make_shared<MockLogger>();
-  config.set_logger(logger);
+  config.logger(logger);
 
   auto finalized = config.finalize();
   REQUIRE(finalized);
@@ -167,10 +167,10 @@ TEST_CASE("When Collector::send fails, TraceSegment logs the error.") {
 
 TEST_CASE("TraceSegment finalization of spans") {
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
-  config.set_logger(std::make_shared<MockLogger>());
+  config.collector(collector);
+  config.logger(std::make_shared<MockLogger>());
 
   SECTION("root span") {
     SECTION(
@@ -272,7 +272,7 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
 
     SECTION("hostname") {
-      config.enable_hostname_in_span(true);
+      config.report_hostname(true);
       auto finalized = config.finalize();
       REQUIRE(finalized);
       Tracer tracer{*finalized};
@@ -333,7 +333,7 @@ TEST_CASE("TraceSegment finalization of spans") {
         collector->response
             .sample_rate_by_key[CollectorResponse::key_of_default_rate] =
             assert_rate(1.0);
-        config.set_collector(collector);
+        config.collector(collector);
 
         auto finalized = config.finalize();
         REQUIRE(finalized);
@@ -374,7 +374,7 @@ TEST_CASE("TraceSegment finalization of spans") {
           trace_sampler.rules.push_back(rule);
         }
 
-        config.set_trace_sampler(trace_sampler);
+        config.trace_sampler(trace_sampler);
         auto finalized = config.finalize();
         REQUIRE(finalized);
         Tracer tracer{*finalized};

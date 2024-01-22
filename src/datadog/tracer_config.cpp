@@ -283,49 +283,58 @@ TracerConfig::TracerConfig() {
   config.delegate_trace_sampling = false;
 }
 
-TracerConfig& TracerConfig::set_service_name(std::string service_name) {
+TracerConfig& TracerConfig::service_name(std::string service_name) {
   config.defaults.service = std::move(service_name);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_service_type(std::string service_type) {
+TracerConfig& TracerConfig::service_type(std::string service_type) {
   config.defaults.service_type = std::move(service_type);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_environment(std::string environment) {
+TracerConfig& TracerConfig::service_environment(std::string environment) {
   config.defaults.environment = std::move(environment);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_version(std::string version) {
+TracerConfig& TracerConfig::service_version(std::string version) {
   config.defaults.version = std::move(version);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_span_default_name(
-    std::string default_span_name) {
+TracerConfig& TracerConfig::span_default_name(std::string default_span_name) {
   config.defaults.name = std::move(default_span_name);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_tags(
+TracerConfig& TracerConfig::tags(
     std::unordered_map<std::string, std::string> tags) {
   config.defaults.tags = std::move(tags);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_datadog_agent_url(std::string url) {
+TracerConfig& TracerConfig::integration_name(std::string name) {
+  config.integration_name = std::move(name);
+  return *this;
+}
+
+TracerConfig& TracerConfig::integration_version(std::string version) {
+  config.integration_version = std::move(version);
+  return *this;
+}
+
+TracerConfig& TracerConfig::datadog_agent_url(std::string url) {
   agent_config.url = std::move(url);
   return *this;
 }
 
-TracerConfig& TracerConfig::enable_traces(bool report_traces) {
+TracerConfig& TracerConfig::report_traces(bool report_traces) {
   config.report_traces = report_traces;
   return *this;
 }
 
-TracerConfig& TracerConfig::enable_telemetry(bool report_telemetry) {
+TracerConfig& TracerConfig::report_telemetry(bool report_telemetry) {
   config.report_telemetry = report_telemetry;
   return *this;
 }
@@ -341,93 +350,91 @@ TracerConfig& TracerConfig::log_configuration_on_startup(bool log_on_startup) {
   return *this;
 }
 
-TracerConfig& TracerConfig::set_injection_styles(
+TracerConfig& TracerConfig::injection_styles(
     std::vector<PropagationStyle> injection_styles) {
   config.injection_styles = std::move(injection_styles);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_extraction_styles(
+TracerConfig& TracerConfig::extraction_styles(
     std::vector<PropagationStyle> extraction_styles) {
   config.extraction_styles = std::move(extraction_styles);
   return *this;
 }
 
-TracerConfig& TracerConfig::enable_hostname_in_span(bool report_hostname) {
+TracerConfig& TracerConfig::report_hostname(bool report_hostname) {
   config.report_hostname = report_hostname;
   return *this;
 }
 
-TracerConfig& TracerConfig::set_http_client(
+TracerConfig& TracerConfig::http_client(
     std::shared_ptr<HTTPClient> http_client) {
   agent_config.http_client = std::move(http_client);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_event_scheduler(
+TracerConfig& TracerConfig::event_scheduler(
     std::shared_ptr<EventScheduler> event_scheduler) {
   agent_config.event_scheduler = std::move(event_scheduler);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_flush_interval(
+TracerConfig& TracerConfig::flush_interval(
     std::chrono::milliseconds flush_interval) {
   agent_config.flush_interval_milliseconds = flush_interval.count();
   return *this;
 }
 
-TracerConfig& TracerConfig::set_request_timeout(
+TracerConfig& TracerConfig::request_timeout(
     std::chrono::milliseconds request_timeout) {
   agent_config.request_timeout_milliseconds = request_timeout.count();
   return *this;
 }
 
-TracerConfig& TracerConfig::set_shutdown_timeout(
+TracerConfig& TracerConfig::shutdown_timeout(
     std::chrono::milliseconds shutdown_timeout) {
   agent_config.shutdown_timeout_milliseconds = shutdown_timeout.count();
   return *this;
 }
 
-TracerConfig& TracerConfig::set_collector(
-    std::shared_ptr<Collector> collector) {
+TracerConfig& TracerConfig::collector(std::shared_ptr<Collector> collector) {
   config.collector = std::move(collector);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_trace_sampler(
-    TraceSamplerConfig trace_sampler) {
+TracerConfig& TracerConfig::trace_sampler(TraceSamplerConfig trace_sampler) {
   trace_sampler_ = std::move(trace_sampler);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_span_sampler(SpanSamplerConfig trace_sampler) {
+TracerConfig& TracerConfig::span_sampler(SpanSamplerConfig trace_sampler) {
   span_sampler_ = std::move(trace_sampler);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_sampling_delegation(
+TracerConfig& TracerConfig::delegate_trace_sampling(
     bool enable_sampling_deleation) {
   config.delegate_trace_sampling = enable_sampling_deleation;
   return *this;
 }
 
-TracerConfig& TracerConfig::set_max_tags_header_size(
+TracerConfig& TracerConfig::max_tags_header_size(
     std::size_t max_tags_header_size) {
   config.tags_header_size = max_tags_header_size;
   return *this;
 }
 
-TracerConfig& TracerConfig::set_logger(std::shared_ptr<Logger> logger) {
+TracerConfig& TracerConfig::logger(std::shared_ptr<Logger> logger) {
   config.logger = std::move(logger);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_runtime_id(RuntimeID runtime_id) {
+TracerConfig& TracerConfig::runtime_id(RuntimeID runtime_id) {
   config.runtime_id = std::move(runtime_id);
   return *this;
 }
 
-TracerConfig& TracerConfig::set_remote_configuration_poll_interval(
+TracerConfig& TracerConfig::remote_configuration_poll_interval(
     std::chrono::seconds poll_interval) {
   agent_config.remote_configuration_poll_interval_seconds =
       poll_interval.count();

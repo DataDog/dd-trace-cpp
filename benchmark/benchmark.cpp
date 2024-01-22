@@ -44,9 +44,9 @@ struct SerializingCollector : public dd::Collector {
 void BM_TraceTinyCCSource(benchmark::State& state) {
   for (auto _ : state) {
     dd::TracerConfig config;
-    config.set_service_name("benchmark");
-    config.set_logger(std::make_shared<NullLogger>());
-    config.set_collector(std::make_shared<SerializingCollector>());
+    config.service_name("benchmark");
+    config.logger(std::make_shared<NullLogger>());
+    config.collector(std::make_shared<SerializingCollector>());
     const auto valid_config = config.finalize();
 
     dd::Tracer tracer{*valid_config};

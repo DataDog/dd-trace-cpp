@@ -53,18 +53,18 @@ using namespace datadog::tracing;
 // tracer.
 TEST_CASE("tracer span defaults") {
   TracerConfig config;
-  config.set_service_name("foosvc");
-  config.set_service_type("crawler");
-  config.set_environment("swamp");
-  config.set_version("first");
+  config.service_name("foosvc");
+  config.service_type("crawler");
+  config.service_environment("swamp");
+  config.service_version("first");
   // span_defaults.name = "test.thing";
-  config.set_tags(
+  config.tags(
       {{"some.thing", "thing value"}, {"another.thing", "another value"}});
 
   const auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
+  config.collector(collector);
   const auto logger = std::make_shared<MockLogger>();
-  config.set_logger(logger);
+  config.logger(logger);
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -249,10 +249,10 @@ TEST_CASE("tracer span defaults") {
 
 TEST_CASE("span extraction") {
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
-  config.set_logger(std::make_shared<NullLogger>());
+  config.collector(collector);
+  config.logger(std::make_shared<NullLogger>());
 
   SECTION(
       "extract_or_create yields a root span when there's no context to "
@@ -389,7 +389,7 @@ TEST_CASE("span extraction") {
     CAPTURE(test_case.line);
     CAPTURE(test_case.name);
 
-    config.set_extraction_styles(test_case.extraction_styles);
+    config.extraction_styles(test_case.extraction_styles);
     auto finalized_config = config.finalize();
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
@@ -520,7 +520,7 @@ TEST_CASE("span extraction") {
     CAPTURE(test_case.line);
     CAPTURE(test_case.name);
 
-    config.set_extraction_styles(test_case.extraction_styles);
+    config.extraction_styles(test_case.extraction_styles);
     auto finalized_config = config.finalize();
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
@@ -553,7 +553,7 @@ TEST_CASE("span extraction") {
   }
 
   SECTION("extraction can be disabled using the \"none\" style") {
-    config.set_extraction_styles({PropagationStyle::NONE});
+    config.extraction_styles({PropagationStyle::NONE});
 
     const auto finalized_config = config.finalize();
     REQUIRE(finalized_config);
@@ -659,7 +659,7 @@ TEST_CASE("span extraction") {
     CAPTURE(test_case.name);
     CAPTURE(test_case.line);
 
-    config.set_extraction_styles(
+    config.extraction_styles(
         {PropagationStyle::W3C, PropagationStyle::DATADOG});
     auto finalized_config = config.finalize();
     REQUIRE(finalized_config);
@@ -1006,7 +1006,7 @@ TEST_CASE("span extraction") {
   SECTION("inject an extracted span that delegated sampling") {
     auto delegate_trace_sampling = GENERATE(true, false);
 
-    config.set_sampling_delegation(delegate_trace_sampling);
+    config.delegate_trace_sampling(delegate_trace_sampling);
     auto finalized_config = config.finalize();
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
@@ -1043,9 +1043,9 @@ TEST_CASE("span extraction") {
 
 TEST_CASE("report hostname") {
   TracerConfig config;
-  config.set_service_name("testsvc");
-  config.set_collector(std::make_shared<NullCollector>());
-  config.set_logger(std::make_shared<NullLogger>());
+  config.service_name("testsvc");
+  config.collector(std::make_shared<NullCollector>());
+  config.logger(std::make_shared<NullLogger>());
 
   SECTION("is off by default") {
     auto finalized_config = config.finalize();
@@ -1055,7 +1055,7 @@ TEST_CASE("report hostname") {
   }
 
   SECTION("is available when enabled") {
-    config.enable_hostname_in_span(true);
+    config.report_hostname(true);
     auto finalized_config = config.finalize();
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
@@ -1074,19 +1074,19 @@ TEST_CASE("128-bit trace IDs") {
   };
 
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   config.enable_128bit_trace_id(true);
   const auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
+  config.collector(collector);
   const auto logger = std::make_shared<MockLogger>();
-  config.set_logger(logger);
+  config.logger(logger);
 
   std::vector<PropagationStyle> extraction_styles;
   extraction_styles.push_back(PropagationStyle::W3C);
   extraction_styles.push_back(PropagationStyle::DATADOG);
   extraction_styles.push_back(PropagationStyle::B3);
 
-  config.set_extraction_styles(extraction_styles);
+  config.extraction_styles(extraction_styles);
   const auto finalized = config.finalize(clock);
   REQUIRE(finalized);
   Tracer tracer{*finalized};
@@ -1197,13 +1197,13 @@ TEST_CASE(
   CAPTURE(test_case.name);
 
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   config.enable_128bit_trace_id(true);
   const auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
+  config.collector(collector);
   const auto logger = std::make_shared<MockLogger>();
-  config.set_logger(logger);
-  config.set_extraction_styles({PropagationStyle::W3C});
+  config.logger(logger);
+  config.extraction_styles({PropagationStyle::W3C});
 
   const auto finalized = config.finalize();
   REQUIRE(finalized);
@@ -1262,26 +1262,26 @@ TEST_CASE("_dd.is_sampling_decider") {
   const auto logger = std::make_shared<MockLogger>();
 
   TracerConfig config1;
-  config1.set_collector(collector);
-  config1.set_logger(logger);
-  config1.set_service_name("service1");
-  config1.set_sampling_delegation(true);
+  config1.collector(collector);
+  config1.logger(logger);
+  config1.service_name("service1");
+  config1.delegate_trace_sampling(true);
 
   TracerConfig config2;
-  config2.set_collector(collector);
-  config2.set_logger(logger);
-  config2.set_service_name("service2");
-  config2.set_sampling_delegation(true);
+  config2.collector(collector);
+  config2.logger(logger);
+  config2.service_name("service2");
+  config2.delegate_trace_sampling(true);
 
   TracerConfig config3;
-  config3.set_collector(collector);
-  config3.set_logger(logger);
-  config3.set_service_name("service3");
-  config3.set_sampling_delegation(service3_delegation_enabled);
+  config3.collector(collector);
+  config3.logger(logger);
+  config3.service_name("service3");
+  config3.delegate_trace_sampling(service3_delegation_enabled);
 
   TraceSamplerConfig trace_sampler;
   trace_sampler.sample_rate = 1;  ///< keep all traces
-  config3.set_trace_sampler(trace_sampler);
+  config3.trace_sampler(trace_sampler);
 
   auto valid_config = config1.finalize();
   REQUIRE(valid_config);
@@ -1498,38 +1498,38 @@ TEST_CASE("sampling delegation is not an override") {
   const std::vector<PropagationStyle> styles = {PropagationStyle::DATADOG};
 
   TracerConfig config1;
-  config1.set_collector(collector);
-  config1.set_logger(logger);
-  config1.set_service_name("service1");
-  config1.set_extraction_styles(styles);
-  config1.set_injection_styles(styles);
-  config1.set_sampling_delegation(service1_delegate);
+  config1.collector(collector);
+  config1.logger(logger);
+  config1.service_name("service1");
+  config1.extraction_styles(styles);
+  config1.injection_styles(styles);
+  config1.delegate_trace_sampling(service1_delegate);
 
   TraceSamplerConfig trace_sampler;
   trace_sampler.sample_rate = 1.0;  ///< as a default
   // `service1_sampling_priority` will be dealt with when service1 injects trace
   // context.
-  config1.set_trace_sampler(trace_sampler);
+  config1.trace_sampler(trace_sampler);
 
   TracerConfig config2;
-  config2.set_collector(collector);
-  config2.set_logger(logger);
-  config2.set_service_name("service2");
-  config2.set_extraction_styles(styles);
-  config2.set_injection_styles(styles);
-  config2.set_sampling_delegation(true);
+  config2.collector(collector);
+  config2.logger(logger);
+  config2.service_name("service2");
+  config2.extraction_styles(styles);
+  config2.injection_styles(styles);
+  config2.delegate_trace_sampling(true);
 
   TracerConfig config3;
-  config3.set_collector(collector);
-  config3.set_logger(logger);
-  config3.set_service_name("service3");
-  config3.set_extraction_styles(styles);
-  config3.set_injection_styles(styles);
-  config3.set_sampling_delegation(true);
+  config3.collector(collector);
+  config3.logger(logger);
+  config3.service_name("service3");
+  config3.extraction_styles(styles);
+  config3.injection_styles(styles);
+  config3.delegate_trace_sampling(true);
 
   TraceSamplerConfig trace_sampler3;
   trace_sampler3.sample_rate = service3_sample_rate;
-  config3.set_trace_sampler(trace_sampler3);
+  config3.trace_sampler(trace_sampler3);
 
   auto valid_config = config1.finalize();
   REQUIRE(valid_config);
@@ -1703,10 +1703,10 @@ TEST_CASE("heterogeneous extraction") {
   CAPTURE(test_case.expected_injected_headers);
 
   TracerConfig config;
-  config.set_service_name("testsvc");
-  config.set_extraction_styles(test_case.extraction_styles);
-  config.set_injection_styles(test_case.injection_styles);
-  config.set_logger(std::make_shared<NullLogger>());
+  config.service_name("testsvc");
+  config.extraction_styles(test_case.extraction_styles);
+  config.injection_styles(test_case.injection_styles);
+  config.logger(std::make_shared<NullLogger>());
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);

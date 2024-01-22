@@ -32,10 +32,10 @@ using namespace datadog::tracing;
 
 TEST_CASE("set_tag") {
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   const auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
-  config.set_logger(std::make_shared<MockLogger>());
+  config.collector(collector);
+  config.logger(std::make_shared<MockLogger>());
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -109,9 +109,9 @@ TEST_CASE("set_tag") {
 
 TEST_CASE("lookup_tag") {
   TracerConfig config;
-  config.set_service_name("testsvc");
-  config.set_collector(std::make_shared<MockCollector>());
-  config.set_logger(std::make_shared<MockLogger>());
+  config.service_name("testsvc");
+  config.collector(std::make_shared<MockCollector>());
+  config.logger(std::make_shared<MockLogger>());
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -154,9 +154,9 @@ TEST_CASE("lookup_tag") {
 
 TEST_CASE("remove_tag") {
   TracerConfig config;
-  config.set_service_name("testsvc");
-  config.set_collector(std::make_shared<MockCollector>());
-  config.set_logger(std::make_shared<MockLogger>());
+  config.service_name("testsvc");
+  config.collector(std::make_shared<MockCollector>());
+  config.logger(std::make_shared<MockLogger>());
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -183,10 +183,10 @@ TEST_CASE("remove_tag") {
 
 TEST_CASE("span duration") {
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
-  config.set_logger(std::make_shared<MockLogger>());
+  config.collector(collector);
+  config.logger(std::make_shared<MockLogger>());
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -267,10 +267,10 @@ TEST_CASE(".error() and .set_error*()") {
         false, nullopt, nullopt, nullopt}}));
 
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
-  config.set_logger(std::make_shared<MockLogger>());
+  config.collector(collector);
+  config.logger(std::make_shared<MockLogger>());
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -312,10 +312,10 @@ TEST_CASE("property setters and getters") {
   // corresponding getter method and in the resulting span data sent to the
   // collector.
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   auto collector = std::make_shared<MockCollector>();
-  config.set_collector(collector);
-  config.set_logger(std::make_shared<MockLogger>());
+  config.collector(collector);
+  config.logger(std::make_shared<MockLogger>());
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -366,11 +366,10 @@ TEST_CASE("property setters and getters") {
 // the interface of `Span`, so the test is here.
 TEST_CASE("injection") {
   TracerConfig config;
-  config.set_service_name("testsvc");
-  config.set_collector(std::make_shared<MockCollector>());
-  config.set_logger(std::make_shared<MockLogger>());
-  config.set_injection_styles(
-      {PropagationStyle::DATADOG, PropagationStyle::B3});
+  config.service_name("testsvc");
+  config.collector(std::make_shared<MockCollector>());
+  config.logger(std::make_shared<MockLogger>());
+  config.injection_styles({PropagationStyle::DATADOG, PropagationStyle::B3});
 
   auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -450,11 +449,11 @@ TEST_CASE("injection") {
 
 TEST_CASE("injection can be disabled using the \"none\" style") {
   TracerConfig config;
-  config.set_service_name("testsvc");
-  // config.set_default_span_name("spanny");
-  config.set_collector(std::make_shared<MockCollector>());
-  config.set_logger(std::make_shared<MockLogger>());
-  config.set_injection_styles({PropagationStyle::NONE});
+  config.service_name("testsvc");
+  config.span_default_name("spanny");
+  config.collector(std::make_shared<MockCollector>());
+  config.logger(std::make_shared<MockLogger>());
+  config.injection_styles({PropagationStyle::NONE});
 
   const auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -469,13 +468,13 @@ TEST_CASE("injection can be disabled using the \"none\" style") {
 
 TEST_CASE("injecting W3C traceparent header") {
   TracerConfig config;
-  config.set_service_name("testsvc");
-  config.set_collector(std::make_shared<NullCollector>());
-  config.set_logger(std::make_shared<NullLogger>());
-  config.set_injection_styles({PropagationStyle::W3C});
+  config.service_name("testsvc");
+  config.collector(std::make_shared<NullCollector>());
+  config.logger(std::make_shared<NullLogger>());
+  config.injection_styles({PropagationStyle::W3C});
 
   SECTION("extracted from W3C traceparent") {
-    config.set_extraction_styles({PropagationStyle::W3C});
+    config.extraction_styles({PropagationStyle::W3C});
     const auto finalized_config = config.finalize();
     REQUIRE(finalized_config);
 
@@ -574,20 +573,19 @@ TEST_CASE("injecting W3C tracestate header") {
   //   - at the extra fields (extracted from W3C)
 
   TracerConfig config;
-  config.set_service_name("testsvc");
+  config.service_name("testsvc");
   // The order of the extraction styles doesn't matter for this test, because
   // it'll either be one or the other in the test cases.
-  config.set_extraction_styles(
-      {PropagationStyle::DATADOG, PropagationStyle::W3C});
-  config.set_injection_styles({PropagationStyle::W3C});
+  config.extraction_styles({PropagationStyle::DATADOG, PropagationStyle::W3C});
+  config.injection_styles({PropagationStyle::W3C});
   // If one of these test cases results in a local sampling decision, let it be
   // "drop."
   TraceSamplerConfig trace_sampler;
   trace_sampler.sample_rate = 0.0;
-  config.set_trace_sampler(trace_sampler);
+  config.trace_sampler(trace_sampler);
   const auto logger = std::make_shared<MockLogger>();
-  config.set_logger(logger);
-  config.set_collector(std::make_shared<NullCollector>());
+  config.logger(logger);
+  config.collector(std::make_shared<NullCollector>());
 
   const auto finalized_config = config.finalize();
   REQUIRE(finalized_config);
@@ -708,10 +706,10 @@ TEST_CASE("injecting W3C tracestate header") {
 
 TEST_CASE("128-bit trace ID injection") {
   TracerConfig config;
-  config.set_service_name("testsvc");
-  config.set_logger(std::make_shared<MockLogger>());
+  config.service_name("testsvc");
+  config.logger(std::make_shared<MockLogger>());
   config.enable_128bit_trace_id(true);
-  config.set_injection_styles(
+  config.injection_styles(
       {PropagationStyle::W3C, PropagationStyle::DATADOG, PropagationStyle::B3});
 
   const auto finalized = config.finalize();
@@ -759,12 +757,12 @@ TEST_CASE("128-bit trace ID injection") {
 
 TEST_CASE("sampling delegation injection") {
   TracerConfig config;
-  config.set_service_name("testsvc");
-  config.set_logger(std::make_shared<MockLogger>());
-  config.set_collector(std::make_shared<NullCollector>());
+  config.service_name("testsvc");
+  config.logger(std::make_shared<MockLogger>());
+  config.collector(std::make_shared<NullCollector>());
 
   SECTION("configuration") {
-    config.set_sampling_delegation(true);
+    config.delegate_trace_sampling(true);
     const auto finalized = config.finalize();
     REQUIRE(finalized);
 
@@ -808,7 +806,7 @@ TEST_CASE("sampling delegation injection") {
   }
 
   SECTION("end-to-end") {
-    config.set_sampling_delegation(true);
+    config.delegate_trace_sampling(true);
     const auto finalized = config.finalize();
     REQUIRE(finalized);
 
