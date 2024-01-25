@@ -20,7 +20,7 @@ run apt-get update && apt-get install --yes software-properties-common && \
     apt-get update && apt-get upgrade --yes && \
     apt-get install --yes \
         wget build-essential clang sed gdb clang-format git ssh shellcheck \
-        libc++-dev libc++abi-dev
+        libc++-dev libc++abi-dev python3
 
 # bazelisk, a launcher for bazel. `bazelisk --help` will cause the latest
 # version to be downloaded.
@@ -35,3 +35,5 @@ run chmod +x /tmp/install-cmake && /tmp/install-cmake && rm /tmp/install-cmake
 # Coverage reporting.
 copy bin/install-lcov /tmp/install-lcov
 run chmod +x /tmp/install-lcov && /tmp/install-lcov && rm /tmp/install-lcov
+
+run apt-get clean -y
