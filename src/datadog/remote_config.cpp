@@ -87,7 +87,7 @@ ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
 
   if (auto tags_it = j.find("tracing_tags"); tags_it != j.cend()) {
     auto parsed_tags = parse_tags(*tags_it);
-    if (auto error = parsed_tags.if_error()) {
+    if (parsed_tags.if_error()) {
       // TODO: report to telemetry
     } else {
       config_update.tags = std::move(*parsed_tags);
