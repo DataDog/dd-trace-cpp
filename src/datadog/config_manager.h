@@ -25,6 +25,9 @@ class ConfigManager {
   std::shared_ptr<const SpanDefaults> default_span_defaults_;
   std::shared_ptr<const SpanDefaults> current_span_defaults_;
 
+  bool default_report_traces;
+  bool current_report_traces;
+
  public:
   ConfigManager(const FinalizedTracerConfig& config);
 
@@ -33,6 +36,8 @@ class ConfigManager {
 
   // Return the `SpanDefaults` consistent with the most recent configuration.
   std::shared_ptr<const SpanDefaults> get_span_defaults();
+
+  bool get_report_traces();
 
   // Apply the specified `conf` update.
   void update(const ConfigUpdate& conf);

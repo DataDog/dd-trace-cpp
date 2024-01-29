@@ -14,6 +14,7 @@ namespace tracing {
 // Configurations can be `nullopt` to signal the absence of a value from the
 // remote configuration value.
 struct ConfigUpdate {
+  Optional<bool> report_traces;
   Optional<TraceSamplerConfig> trace_sampler;
   Optional<std::unordered_map<std::string, std::string>> tags;
 };

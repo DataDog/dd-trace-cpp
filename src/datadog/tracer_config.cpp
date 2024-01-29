@@ -312,14 +312,12 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
     result.log_on_startup = !falsy(*startup_env);
   }
 
-  bool report_traces = config.report_traces;
+  result.report_traces = config.report_traces;
   if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
-    report_traces = !falsy(*enabled_env);
+    result.report_traces = !falsy(*enabled_env);
   }
 
-  if (!report_traces) {
-    result.collector = std::make_shared<NullCollector>();
-  } else if (!config.collector) {
+  if (!config.collector) {
     auto finalized = finalize_config(config.agent, result.logger, clock);
     if (auto *error = finalized.if_error()) {
       return std::move(*error);

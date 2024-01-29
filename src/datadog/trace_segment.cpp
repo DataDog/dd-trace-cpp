@@ -116,7 +116,7 @@ TraceSegment::TraceSegment(
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
-    std::unique_ptr<SpanData> local_root)
+    std::unique_ptr<SpanData> local_root, bool report_traces)
     : logger_(logger),
       collector_(collector),
       tracer_telemetry_(tracer_telemetry),
@@ -133,7 +133,8 @@ TraceSegment::TraceSegment(
       sampling_decision_(std::move(sampling_decision)),
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
-          std::move(additional_datadog_w3c_tracestate)) {
+          std::move(additional_datadog_w3c_tracestate)),
+      report_traces_(report_traces) {
   assert(logger_);
   assert(collector_);
   assert(tracer_telemetry_);
@@ -264,10 +265,12 @@ void TraceSegment::span_finished() {
     span.tags[tags::internal::runtime_id] = runtime_id_.string();
   }
 
-  const auto result = collector_->send(std::move(spans_), trace_sampler_);
-  if (auto* error = result.if_error()) {
-    logger_->log_error(
-        error->with_prefix("Error sending spans to collector: "));
+  if (report_traces_) {
+    const auto result = collector_->send(std::move(spans_), trace_sampler_);
+    if (auto* error = result.if_error()) {
+      logger_->log_error(
+          error->with_prefix("Error sending spans to collector: "));
+    }
   }
 
   tracer_telemetry_->metrics().tracer.trace_segments_closed.inc();

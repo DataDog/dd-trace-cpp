@@ -74,6 +74,9 @@ class TraceSegment {
   Optional<SamplingDecision> sampling_decision_;
   Optional<std::string> additional_w3c_tracestate_;
   Optional<std::string> additional_datadog_w3c_tracestate_;
+
+  bool report_traces_;
+
   // See `doc/sampling-delegation.md` for more information about
   // `struct SamplingDelegation`.
   struct SamplingDelegation {
@@ -109,7 +112,7 @@ class TraceSegment {
                Optional<SamplingDecision> sampling_decision,
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
-               std::unique_ptr<SpanData> local_root);
+               std::unique_ptr<SpanData> local_root, bool report_traces);
 
   const SpanDefaults& defaults() const;
   const Optional<std::string>& hostname() const;
