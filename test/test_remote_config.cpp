@@ -166,7 +166,7 @@ REMOTE_CONFIG_TEST("response processing") {
       "target_files": [
         {
           "path": "foo/APM_TRACING/30",
-          "raw": "eyAiaWQiOiAiODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2FmZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOCIsICJyZXZpc2lvbiI6IDE2OTgxNjcxMjYwNjQsICJzY2hlbWFfdmVyc2lvbiI6ICJ2MS4wLjAiLCAiYWN0aW9uIjogImVuYWJsZSIsICJsaWJfY29uZmlnIjogeyAibGlicmFyeV9sYW5ndWFnZSI6ICJhbGwiLCAibGlicmFyeV92ZXJzaW9uIjogImxhdGVzdCIsICJzZXJ2aWNlX25hbWUiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIsICJ0cmFjaW5nX2VuYWJsZWQiOiB0cnVlLCAidHJhY2luZ19zYW1wbGluZ19yYXRlIjogMC42IH0sICJzZXJ2aWNlX3RhcmdldCI6IHsgInNlcnZpY2UiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIgfSB9"
+          "raw": "eyAiaWQiOiAiODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2FmZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOCIsICJyZXZpc2lvbiI6IDE2OTgxNjcxMjYwNjQsICJzY2hlbWFfdmVyc2lvbiI6ICJ2MS4wLjAiLCAiYWN0aW9uIjogImVuYWJsZSIsICJsaWJfY29uZmlnIjogeyAibGlicmFyeV9sYW5ndWFnZSI6ICJhbGwiLCAibGlicmFyeV92ZXJzaW9uIjogImxhdGVzdCIsICJzZXJ2aWNlX25hbWUiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIsICJ0cmFjaW5nX2VuYWJsZWQiOiB0cnVlLCAidHJhY2luZ19zYW1wbGluZ19yYXRlIjogMC42LCAidHJhY2luZ190YWdzIjogWyJoZWxsbzp3b3JsZCIsICJmb286YmFyIl0gfSwgInNlcnZpY2VfdGFyZ2V0IjogeyAic2VydmljZSI6ICJ0ZXN0c3ZjIiwgImVudiI6ICJ0ZXN0IiB9IH0="
         }
       ]
     })";
@@ -180,10 +180,13 @@ REMOTE_CONFIG_TEST("response processing") {
     REQUIRE(!response_json.is_discarded());
 
     const auto old_trace_sampler = config_manager->get_trace_sampler();
+    const auto old_span_defaults = config_manager->get_span_defaults();
     rc.process_response(response_json);
     const auto new_trace_sampler = config_manager->get_trace_sampler();
+    const auto new_span_defaults = config_manager->get_span_defaults();
 
     CHECK(new_trace_sampler != old_trace_sampler);
+    CHECK(new_span_defaults != old_span_defaults);
 
     SECTION("reset confguration") {
       SECTION(

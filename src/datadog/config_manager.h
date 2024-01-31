@@ -10,6 +10,7 @@
 #include "clock.h"
 #include "config_update.h"
 #include "json.hpp"
+#include "span_defaults.h"
 #include "tracer_config.h"
 
 namespace datadog {
@@ -21,11 +22,17 @@ class ConfigManager {
   std::shared_ptr<TraceSampler> default_trace_sampler_;
   std::shared_ptr<TraceSampler> current_trace_sampler_;
 
+  std::shared_ptr<const SpanDefaults> default_span_defaults_;
+  std::shared_ptr<const SpanDefaults> current_span_defaults_;
+
  public:
   ConfigManager(const FinalizedTracerConfig& config);
 
   // Return the `TraceSampler` consistent with the most recent configuration.
   std::shared_ptr<TraceSampler> get_trace_sampler();
+
+  // Return the `SpanDefaults` consistent with the most recent configuration.
+  std::shared_ptr<const SpanDefaults> get_span_defaults();
 
   // Apply the specified `conf` update.
   void update(const ConfigUpdate& conf);

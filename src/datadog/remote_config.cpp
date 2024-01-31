@@ -29,6 +29,7 @@ namespace {
 // within the array.
 enum CapabilitiesFlag : uint64_t {
   APM_TRACING_SAMPLE_RATE = 1 << 12,
+  APM_TRACING_TAGS = 1 << 15
 };
 
 constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
@@ -43,10 +44,35 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
 }
 
 constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
-    capabilities_byte_array(APM_TRACING_SAMPLE_RATE);
+    capabilities_byte_array(APM_TRACING_SAMPLE_RATE | APM_TRACING_TAGS);
 
 constexpr StringView k_apm_product = "APM_TRACING";
 constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
+
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    const std::vector<StringView>& list_of_tags) {
+  std::unordered_map<std::string, std::string> tags;
+
+  // Within a tag, the key and value are separated by a colon (":").
+  for (const StringView& token : list_of_tags) {
+    const auto separator = std::find(token.begin(), token.end(), ':');
+    if (separator == token.end()) {
+      std::string message;
+      message += "Unable to parse a key/value from the tag text \"";
+      append(message, token);
+      message +=
+          "\" because it does not contain the separator character \":\".";
+      return Error{Error::TAG_MISSING_SEPARATOR, std::move(message)};
+    }
+
+    std::string key{token.begin(), separator};
+    std::string value{separator + 1, token.end()};
+    // If there are duplicate values, then the last one wins.
+    tags.insert_or_assign(std::move(key), std::move(value));
+  }
+
+  return tags;
+}
 
 ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
   ConfigUpdate config_update;
@@ -57,6 +83,15 @@ ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
     trace_sampler_cfg.sample_rate = *sampling_rate_it;
 
     config_update.trace_sampler = trace_sampler_cfg;
+  }
+
+  if (auto tags_it = j.find("tracing_tags"); tags_it != j.cend()) {
+    auto parsed_tags = parse_tags(*tags_it);
+    if (parsed_tags.if_error()) {
+      // TODO: report to telemetry
+    } else {
+      config_update.tags = std::move(*parsed_tags);
+    }
   }
 
   return config_update;

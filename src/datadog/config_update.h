@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "optional"
 #include "trace_sampler_config.h"
 
@@ -13,6 +15,7 @@ namespace tracing {
 // remote configuration value.
 struct ConfigUpdate {
   Optional<TraceSamplerConfig> trace_sampler;
+  Optional<std::unordered_map<std::string, std::string>> tags;
 };
 
 }  // namespace tracing
