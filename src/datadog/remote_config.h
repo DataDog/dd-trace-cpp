@@ -30,7 +30,7 @@ class RemoteConfigurationManager {
   // Represents the *current* state of the RemoteConfigurationManager.
   // It is also used to report errors to the remote source.
   struct State {
-    uint64_t targets_version = 1;
+    uint64_t targets_version = 0;
     std::string opaque_backend_state;
     Optional<std::string> error_message;
   };

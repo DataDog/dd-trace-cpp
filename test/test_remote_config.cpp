@@ -41,7 +41,7 @@ REMOTE_CONFIG_TEST("first payload") {
   CHECK(payload["client"]["client_tracer"]["service"] == "testsvc");
   CHECK(payload["client"]["client_tracer"]["env"] == "test");
   CHECK(payload["client"]["state"]["root_version"] == 1);
-  CHECK(payload["client"]["state"]["targets_version"] == 1);
+  CHECK(payload["client"]["state"]["targets_version"] == 0);
 }
 
 REMOTE_CONFIG_TEST("response processing") {
