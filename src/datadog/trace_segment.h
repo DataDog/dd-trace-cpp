@@ -32,6 +32,7 @@
 #include <utility>
 #include <vector>
 
+#include "config_manager.h"
 #include "expected.h"
 #include "metrics.h"
 #include "optional.h"
@@ -75,7 +76,7 @@ class TraceSegment {
   Optional<std::string> additional_w3c_tracestate_;
   Optional<std::string> additional_datadog_w3c_tracestate_;
 
-  bool report_traces_;
+  std::shared_ptr<ConfigManager> config_manager_;
 
   // See `doc/sampling-delegation.md` for more information about
   // `struct SamplingDelegation`.
@@ -103,6 +104,7 @@ class TraceSegment {
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
+               const std::shared_ptr<ConfigManager>& config_manager,
                const RuntimeID& runtime_id, bool sampling_delegation_enabled,
                bool sampling_decision_was_delegated_to_me,
                const std::vector<PropagationStyle>& injection_styles,
@@ -112,7 +114,7 @@ class TraceSegment {
                Optional<SamplingDecision> sampling_decision,
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
-               std::unique_ptr<SpanData> local_root, bool report_traces);
+               std::unique_ptr<SpanData> local_root);
 
   const SpanDefaults& defaults() const;
   const Optional<std::string>& hostname() const;

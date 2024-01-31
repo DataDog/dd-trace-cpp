@@ -107,6 +107,7 @@ TraceSegment::TraceSegment(
     const std::shared_ptr<TraceSampler>& trace_sampler,
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
+    const std::shared_ptr<ConfigManager>& config_manager,
     const RuntimeID& runtime_id, bool sampling_delegation_enabled,
     bool sampling_decision_was_delegated_to_me,
     const std::vector<PropagationStyle>& injection_styles,
@@ -116,7 +117,7 @@ TraceSegment::TraceSegment(
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
-    std::unique_ptr<SpanData> local_root, bool report_traces)
+    std::unique_ptr<SpanData> local_root)
     : logger_(logger),
       collector_(collector),
       tracer_telemetry_(tracer_telemetry),
@@ -134,13 +135,14 @@ TraceSegment::TraceSegment(
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)),
-      report_traces_(report_traces) {
+      config_manager_(config_manager) {
   assert(logger_);
   assert(collector_);
   assert(tracer_telemetry_);
   assert(trace_sampler_);
   assert(span_sampler_);
   assert(defaults_);
+  assert(config_manager_);
 
   sampling_delegation_.enabled = sampling_delegation_enabled;
   sampling_delegation_.decision_was_delegated_to_me =
@@ -265,7 +267,7 @@ void TraceSegment::span_finished() {
     span.tags[tags::internal::runtime_id] = runtime_id_.string();
   }
 
-  if (report_traces_) {
+  if (config_manager_->get_report_traces()) {
     const auto result = collector_->send(std::move(spans_), trace_sampler_);
     if (auto* error = result.if_error()) {
       logger_->log_error(
