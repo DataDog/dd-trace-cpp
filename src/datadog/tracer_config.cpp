@@ -12,7 +12,6 @@
 #include "datadog_agent.h"
 #include "environment.h"
 #include "json.hpp"
-#include "null_collector.h"
 #include "parse_util.h"
 #include "string_view.h"
 

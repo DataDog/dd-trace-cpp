@@ -12,22 +12,22 @@ ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
       current_trace_sampler_(default_trace_sampler_),
       default_span_defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       current_span_defaults_(default_span_defaults_),
-      default_report_traces(config.report_traces),
-      current_report_traces(default_report_traces) {}
+      default_report_traces_(config.report_traces),
+      current_report_traces_(default_report_traces_) {}
 
-std::shared_ptr<TraceSampler> ConfigManager::get_trace_sampler() {
+std::shared_ptr<TraceSampler> ConfigManager::trace_sampler() {
   std::lock_guard<std::mutex> lock(mutex_);
   return current_trace_sampler_;
 }
 
-std::shared_ptr<const SpanDefaults> ConfigManager::get_span_defaults() {
+std::shared_ptr<const SpanDefaults> ConfigManager::span_defaults() {
   std::lock_guard<std::mutex> lock(mutex_);
   return current_span_defaults_;
 }
 
-bool ConfigManager::get_report_traces() {
+bool ConfigManager::report_traces() {
   std::lock_guard<std::mutex> lock(mutex_);
-  return current_report_traces;
+  return current_report_traces_;
 }
 
 void ConfigManager::update(const ConfigUpdate& conf) {
@@ -56,9 +56,9 @@ void ConfigManager::update(const ConfigUpdate& conf) {
   }
 
   if (conf.report_traces) {
-    current_report_traces = *conf.report_traces;
+    current_report_traces_ = *conf.report_traces;
   } else {
-    current_report_traces = default_report_traces;
+    current_report_traces_ = default_report_traces_;
   }
 }
 
@@ -66,6 +66,7 @@ void ConfigManager::reset() {
   std::lock_guard<std::mutex> lock(mutex_);
   current_trace_sampler_ = default_trace_sampler_;
   current_span_defaults_ = default_span_defaults_;
+  current_report_traces_ = default_report_traces_;
 }
 
 nlohmann::json ConfigManager::config_json() const {
@@ -73,7 +74,7 @@ nlohmann::json ConfigManager::config_json() const {
   return nlohmann::json{
       {"default", to_json(*current_span_defaults_)},
       {"trace_sampler", current_trace_sampler_->config_json()},
-      {"report_traces", current_report_traces}};
+      {"report_traces", current_report_traces_}};
 }
 
 }  // namespace tracing

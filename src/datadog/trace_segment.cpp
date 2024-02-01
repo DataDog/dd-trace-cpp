@@ -267,7 +267,7 @@ void TraceSegment::span_finished() {
     span.tags[tags::internal::runtime_id] = runtime_id_.string();
   }
 
-  if (config_manager_->get_report_traces()) {
+  if (config_manager_->report_traces()) {
     const auto result = collector_->send(std::move(spans_), trace_sampler_);
     if (auto* error = result.if_error()) {
       logger_->log_error(

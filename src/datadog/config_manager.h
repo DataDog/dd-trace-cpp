@@ -25,19 +25,20 @@ class ConfigManager {
   std::shared_ptr<const SpanDefaults> default_span_defaults_;
   std::shared_ptr<const SpanDefaults> current_span_defaults_;
 
-  bool default_report_traces;
-  bool current_report_traces;
+  bool default_report_traces_;
+  bool current_report_traces_;
 
  public:
   ConfigManager(const FinalizedTracerConfig& config);
 
   // Return the `TraceSampler` consistent with the most recent configuration.
-  std::shared_ptr<TraceSampler> get_trace_sampler();
+  std::shared_ptr<TraceSampler> trace_sampler();
 
   // Return the `SpanDefaults` consistent with the most recent configuration.
-  std::shared_ptr<const SpanDefaults> get_span_defaults();
+  std::shared_ptr<const SpanDefaults> span_defaults();
 
-  bool get_report_traces();
+  // Return whether traces should be sent to the collector.
+  bool report_traces();
 
   // Apply the specified `conf` update.
   void update(const ConfigUpdate& conf);
