@@ -29,7 +29,8 @@ namespace {
 // within the array.
 enum CapabilitiesFlag : uint64_t {
   APM_TRACING_SAMPLE_RATE = 1 << 12,
-  APM_TRACING_TAGS = 1 << 15
+  APM_TRACING_TAGS = 1 << 15,
+  APM_TRACING_ENABLED = 1 << 19
 };
 
 constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
@@ -44,7 +45,8 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
 }
 
 constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
-    capabilities_byte_array(APM_TRACING_SAMPLE_RATE | APM_TRACING_TAGS);
+    capabilities_byte_array(APM_TRACING_SAMPLE_RATE | APM_TRACING_TAGS |
+                            APM_TRACING_ENABLED);
 
 constexpr StringView k_apm_product = "APM_TRACING";
 constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
@@ -91,6 +93,15 @@ ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
       // TODO: report to telemetry
     } else {
       config_update.tags = std::move(*parsed_tags);
+    }
+  }
+
+  if (auto tracing_enabled_it = j.find("tracing_enabled");
+      tracing_enabled_it != j.cend()) {
+    if (tracing_enabled_it->is_boolean()) {
+      config_update.report_traces = tracing_enabled_it->get<bool>();
+    } else {
+      // TODO: report to telemetry
     }
   }
 

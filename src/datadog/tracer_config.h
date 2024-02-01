@@ -166,6 +166,7 @@ class FinalizedTracerConfig {
   std::string integration_name;
   std::string integration_version;
   bool delegate_trace_sampling;
+  bool report_traces;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
