@@ -31,6 +31,7 @@
 #include "json.hpp"
 #include "metrics.h"
 #include "runtime_id.h"
+#include "tracer_config.h"
 #include "tracer_signature.h"
 
 namespace datadog {
@@ -49,6 +50,8 @@ class TracerTelemetry {
   std::string integration_name_;
   std::string integration_version_;
   uint64_t seq_id_ = 0;
+  // Track sequence id per configuration field.
+  std::unordered_map<ConfigName, std::size_t> config_seq_ids;
   // This structure contains all the metrics that are exposed by tracer
   // telemetry.
   struct {
@@ -99,6 +102,9 @@ class TracerTelemetry {
 
   nlohmann::json generate_telemetry_body(std::string request_type);
 
+  nlohmann::json generate_configuration_field(
+      const ConfigMetadata& config_metadata);
+
  public:
   TracerTelemetry(bool enabled, const Clock& clock,
                   const std::shared_ptr<Logger>& logger,
@@ -111,17 +117,21 @@ class TracerTelemetry {
   auto& metrics() { return metrics_; };
   // Constructs an `app-started` message using information provided when
   // constructed and the tracer_config value passed in.
-  std::string app_started();
-  // This is used to take a snapshot of the current state of metrics and collect
-  // timestamped "points" of values. These values are later submitted in
-  // `generate-metrics` messages.
+  std::string app_started(
+      const std::unordered_map<ConfigName, ConfigMetadata>& configurations);
+  // This is used to take a snapshot of the current state of metrics and
+  // collect timestamped "points" of values. These values are later submitted
+  // in `generate-metrics` messages.
   void capture_metrics();
-  // Constructs a messsage-batch containing `app-heartbeat`, and if metrics have
-  // been modified, a `generate-metrics` message.
+  // Constructs a messsage-batch containing `app-heartbeat`, and if metrics
+  // have been modified, a `generate-metrics` message.
   std::string heartbeat_and_telemetry();
   // Constructs a message-batch containing `app-closing`, and if metrics have
   // been modified, a `generate-metrics` message.
   std::string app_closing();
+  // Construct an `app-client-configuration-change` message.
+  std::string configuration_change(
+      const std::vector<ConfigMetadata>& new_configuration);
 };
 
 }  // namespace tracing

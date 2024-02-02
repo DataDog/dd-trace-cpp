@@ -35,7 +35,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
   SECTION("generates app-started message") {
     SECTION("Without a defined integration") {
-      auto app_started_message = tracer_telemetry.app_started();
+      auto app_started_message = tracer_telemetry.app_started({});
       auto app_started = nlohmann::json::parse(app_started_message);
       REQUIRE(app_started["request_type"] == "message-batch");
       REQUIRE(app_started["payload"].size() == 1);
@@ -45,7 +45,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
     SECTION("With an integration") {
       TracerTelemetry tracer_telemetry{
           true, clock, logger, tracer_signature, "nginx", "1.25.2"};
-      auto app_started_message = tracer_telemetry.app_started();
+      auto app_started_message = tracer_telemetry.app_started({});
       auto app_started = nlohmann::json::parse(app_started_message);
       REQUIRE(app_started["request_type"] == "message-batch");
       REQUIRE(app_started["payload"].size() == 2);

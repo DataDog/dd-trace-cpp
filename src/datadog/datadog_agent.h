@@ -73,7 +73,10 @@ class DatadogAgent : public Collector {
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) override;
 
-  void send_app_started();
+  void send_app_started(
+      const std::unordered_map<ConfigName, ConfigMetadata>& config_metadata);
+
+  void send_configuration_change(const std::vector<ConfigMetadata>& config);
 
   void get_and_apply_remote_configuration_updates();
 

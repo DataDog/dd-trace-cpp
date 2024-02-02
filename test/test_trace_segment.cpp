@@ -1,3 +1,4 @@
+#include <datadog/null_collector.h>
 #include <datadog/optional.h>
 #include <datadog/platform_util.h>
 #include <datadog/rate.h>
@@ -467,6 +468,7 @@ TEST_CASE("independent of Tracer") {
   TracerConfig config;
   config.service = "testsvc";
   config.name = "do.thing";
+  config.collector = std::make_shared<NullCollector>();
   config.logger = std::make_shared<NullLogger>();
 
   auto maybe_tracer = finalize_config(config);

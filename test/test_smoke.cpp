@@ -1,3 +1,4 @@
+#include <datadog/null_collector.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
@@ -12,6 +13,7 @@ TEST_CASE("smoke") {
   TracerConfig config;
   config.service = "testsvc";
   config.logger = std::make_shared<NullLogger>();
+  config.collector = std::make_shared<NullCollector>();
 
   auto maybe_config = finalize_config(config);
   REQUIRE(maybe_config);

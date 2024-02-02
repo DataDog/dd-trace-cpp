@@ -13,6 +13,7 @@
 #include "datadog_agent_config.h"
 #include "error.h"
 #include "expected.h"
+#include "json.hpp"
 #include "propagation_style.h"
 #include "runtime_id.h"
 #include "span_defaults.h"
@@ -42,7 +43,7 @@ struct TracerConfig {
   // Example: `prod`, `pre-prod` or `staging`.
   Optional<std::string> environment;
 
-  // Set the application version.
+  // Set the service version.
   //
   // Overriden by the `DD_VERSION` environment variable.
   // Example values: `1.2.3`, `6c44da20`, `2020.02.13`.
@@ -164,6 +165,79 @@ struct TracerConfig {
   Optional<bool> report_service_as_default;
 };
 
+enum class ConfigName : char {
+  SERVICE_NAME,
+  SERVICE_ENV,
+  SERVICE_VERSION,
+  REPORT_TRACES,
+  TAGS,
+  TRACE_SAMPLING_RATE,
+  EXTRACTION_STYLES,
+  INJECTION_STYLES,
+  STARTUP_LOGS,
+  REPORT_TELEMETRY,
+  DELEGATE_SAMPLING,
+  GENEREATE_128BIT_TRACE_IDS,
+  AGENT_URL,
+  RC_POLL_INTERVAL,
+  TRACE_SAMPLING_LIMIT,
+  TRACE_SAMPLING_RULES,
+  SPAN_SAMPLING_RULES,
+};
+
+inline std::string to_string(ConfigName name) {
+  switch (name) {
+    case ConfigName::SERVICE_NAME:
+      return "DD_SERVICE";
+    case ConfigName::SERVICE_ENV:
+      return "DD_ENV";
+    case ConfigName::REPORT_TRACES:
+      return "trace_enabled";
+    case ConfigName::TAGS:
+      return "trace_tags";
+    case ConfigName::TRACE_SAMPLING_RATE:
+      return "trace_sample_rate";
+    case ConfigName::SERVICE_VERSION:
+      return "DD_VERSION";
+    case ConfigName::EXTRACTION_STYLES:
+      return "DD_TRACE_PROPAGATION_STYLE_EXTRACT";
+    case ConfigName::INJECTION_STYLES:
+      return "DD_TRACE_PROPAGATION_STYLE_INJECT";
+    case ConfigName::STARTUP_LOGS:
+      return "DD_TRACE_STARTUP_LOGS";
+    case ConfigName::REPORT_TELEMETRY:
+      return "DD_INSTRUMENTATION_TELEMETRY_ENABLED";
+    case ConfigName::DELEGATE_SAMPLING:
+      return "DD_TRACE_DELEGATE_SAMPLING";
+    case ConfigName::GENEREATE_128BIT_TRACE_IDS:
+      return "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED";
+    case ConfigName::AGENT_URL:
+      return "DD_TRACE_AGENT_URL";
+    case ConfigName::RC_POLL_INTERVAL:
+      return "DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS";
+    case ConfigName::TRACE_SAMPLING_LIMIT:
+      return "DD_TRACE_RATE_LIMIT";
+    case ConfigName::SPAN_SAMPLING_RULES:
+      return "DD_SPAN_SAMPLING_RULES";
+    case ConfigName::TRACE_SAMPLING_RULES:
+      return "DD_TRACE_SAMPLING_RULES";
+  }
+
+  std::abort();
+}
+
+struct ConfigMetadata {
+  enum class Origin { ENVIRONMENT_VARIABLE, CODE, REMOTE_CONFIG, DEFAULT };
+  ConfigName name;
+  std::string value;
+  Origin origin;
+  Optional<Error> error;
+
+  ConfigMetadata() = default;
+  ConfigMetadata(ConfigName n, std::string v, Origin orig)
+      : name(n), value(std::move(v)), origin(orig), error(nullopt) {}
+};
+
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
 // a valid `TracerConfig` and accompanying environment.
 // `FinalizedTracerConfig` must be obtained by calling `finalize_config`.
@@ -197,6 +271,7 @@ class FinalizedTracerConfig final {
   std::string integration_version;
   bool delegate_trace_sampling;
   bool report_traces;
+  std::unordered_map<ConfigName, ConfigMetadata> metadata;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
