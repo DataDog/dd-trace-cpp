@@ -132,8 +132,8 @@ int sha256_traced(Digest &digest, const fs::path &path,
 
 int main() {
   dd::TracerConfig config;
-  config.defaults.service = "dd-trace-cpp-example";
-  config.defaults.environment = "dev";
+  config.service = "dd-trace-cpp-example";
+  config.environment = "dev";
 
   auto validated = dd::finalize_config(config);
   if (auto *error = validated.if_error()) {

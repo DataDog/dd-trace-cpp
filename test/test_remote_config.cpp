@@ -26,8 +26,8 @@ REMOTE_CONFIG_TEST("first payload") {
   };
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.defaults.environment = "test";
+  config.service = "testsvc";
+  config.environment = "test";
   const auto config_manager =
       std::make_shared<ConfigManager>(*finalize_config(config));
 
@@ -60,8 +60,8 @@ REMOTE_CONFIG_TEST("response processing") {
   };
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.defaults.environment = "test";
+  config.service = "testsvc";
+  config.environment = "test";
   config.trace_sampler.sample_rate = 1.0;
   config.report_traces = true;
   const auto config_manager =

@@ -10,7 +10,7 @@ using namespace datadog::tracing;
 
 TEST_CASE("smoke") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.logger = std::make_shared<NullLogger>();
 
   auto maybe_config = finalize_config(config);

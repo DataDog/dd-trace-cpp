@@ -5,7 +5,6 @@
 #include <cstddef>
 
 #include "default_http_client.h"
-#include "environment.h"
 #include "parse_util.h"
 #include "threaded_event_scheduler.h"
 
@@ -116,7 +115,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "milliseconds."};
   }
   result.flush_interval =
-      std::chrono::milliseconds(config.flush_interval_milliseconds);
+      std::chrono::milliseconds(*config.flush_interval_milliseconds);
 
   if (config.request_timeout_milliseconds <= 0) {
     return Error{Error::DATADOG_AGENT_INVALID_REQUEST_TIMEOUT,
@@ -125,7 +124,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   result.request_timeout =
-      std::chrono::milliseconds(config.request_timeout_milliseconds);
+      std::chrono::milliseconds(*config.request_timeout_milliseconds);
 
   if (config.shutdown_timeout_milliseconds <= 0) {
     return Error{Error::DATADOG_AGENT_INVALID_SHUTDOWN_TIMEOUT,
@@ -134,21 +133,10 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   result.shutdown_timeout =
-      std::chrono::milliseconds(config.shutdown_timeout_milliseconds);
+      std::chrono::milliseconds(*config.shutdown_timeout_milliseconds);
 
   int rc_poll_interval_seconds =
-      config.remote_configuration_poll_interval_seconds;
-
-  if (auto raw_rc_poll_interval_value =
-          lookup(environment::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS)) {
-    auto res = parse_int(*raw_rc_poll_interval_value, 10);
-    if (auto error = res.if_error()) {
-      return error->with_prefix(
-          "DatadogAgent: Remote Configuration poll interval error ");
-    }
-
-    rc_poll_interval_seconds = *res;
-  }
+      *config.remote_configuration_poll_interval_seconds;
 
   if (rc_poll_interval_seconds <= 0) {
     return Error{Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL,
@@ -159,21 +147,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.remote_configuration_poll_interval =
       std::chrono::seconds(rc_poll_interval_seconds);
 
-  auto env_host = lookup(environment::DD_AGENT_HOST);
-  auto env_port = lookup(environment::DD_TRACE_AGENT_PORT);
-
-  std::string configured_url = config.url;
-  if (auto url_env = lookup(environment::DD_TRACE_AGENT_URL)) {
-    assign(configured_url, *url_env);
-  } else if (env_host || env_port) {
-    configured_url.clear();
-    configured_url += "http://";
-    append(configured_url, env_host.value_or("localhost"));
-    configured_url += ':';
-    append(configured_url, env_port.value_or("8126"));
-  }
-
-  auto url = config.parse(configured_url);
+  auto url = config.parse(*config.url);
   if (auto* error = url.if_error()) {
     return std::move(*error);
   }

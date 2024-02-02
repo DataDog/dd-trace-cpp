@@ -18,8 +18,6 @@
 namespace datadog {
 namespace tracing {
 
-class Logger;
-
 struct SpanSamplerConfig {
   struct Rule : public SpanMatcher {
     double sample_rate = 1.0;
@@ -37,7 +35,7 @@ struct SpanSamplerConfig {
 
 class FinalizedSpanSamplerConfig {
   friend Expected<FinalizedSpanSamplerConfig> finalize_config(
-      const SpanSamplerConfig&, Logger&);
+      const SpanSamplerConfig&);
   friend class FinalizedTracerConfig;
 
   FinalizedSpanSamplerConfig() = default;
@@ -51,8 +49,7 @@ class FinalizedSpanSamplerConfig {
   std::vector<Rule> rules;
 };
 
-Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
-                                                     Logger&);
+Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&);
 
 nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule&);
 

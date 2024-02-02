@@ -53,13 +53,13 @@ using namespace datadog::tracing;
 // tracer.
 TEST_CASE("tracer span defaults") {
   TracerConfig config;
-  config.defaults.service = "foosvc";
-  config.defaults.service_type = "crawler";
-  config.defaults.environment = "swamp";
-  config.defaults.version = "first";
-  config.defaults.name = "test.thing";
-  config.defaults.tags = {{"some.thing", "thing value"},
-                          {"another.thing", "another value"}};
+  config.service = "foosvc";
+  config.service_type = "crawler";
+  config.environment = "swamp";
+  config.version = "first";
+  config.name = "test.thing";
+  config.tags = {{"some.thing", "thing value"},
+                 {"another.thing", "another value"}};
 
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
@@ -83,12 +83,12 @@ TEST_CASE("tracer span defaults") {
   overrides.tags = {{"different.thing", "different"},
                     {"another.thing", "different value"}};
 
-  REQUIRE(overrides.service != config.defaults.service);
-  REQUIRE(overrides.service_type != config.defaults.service_type);
-  REQUIRE(overrides.environment != config.defaults.environment);
-  REQUIRE(overrides.version != config.defaults.version);
-  REQUIRE(overrides.name != config.defaults.name);
-  REQUIRE(overrides.tags != config.defaults.tags);
+  REQUIRE(overrides.service != config.service);
+  REQUIRE(overrides.service_type != config.service_type);
+  REQUIRE(overrides.environment != config.environment);
+  REQUIRE(overrides.version != config.version);
+  REQUIRE(overrides.name != config.name);
+  REQUIRE(overrides.tags != config.tags);
 
   // Some of the sections below create a span from extracted trace context.
   const std::unordered_map<std::string, std::string> headers{
@@ -111,12 +111,12 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(root_ptr);
     const auto& root = *root_ptr;
 
-    REQUIRE(root.service == config.defaults.service);
-    REQUIRE(root.service_type == config.defaults.service_type);
-    REQUIRE(root.environment() == config.defaults.environment);
-    REQUIRE(root.version() == config.defaults.version);
-    REQUIRE(root.name == config.defaults.name);
-    REQUIRE_THAT(root.tags, ContainsSubset(config.defaults.tags));
+    REQUIRE(root.service == config.service);
+    REQUIRE(root.service_type == config.service_type);
+    REQUIRE(root.environment() == config.environment);
+    REQUIRE(root.version() == config.version);
+    REQUIRE(root.name == config.name);
+    REQUIRE_THAT(root.tags, ContainsSubset(*config.tags));
   }
 
   SECTION("can be overridden in a root span") {
@@ -159,12 +159,12 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(span_ptr);
     const auto& span = *span_ptr;
 
-    REQUIRE(span.service == config.defaults.service);
-    REQUIRE(span.service_type == config.defaults.service_type);
-    REQUIRE(span.environment() == config.defaults.environment);
-    REQUIRE(span.version() == config.defaults.version);
-    REQUIRE(span.name == config.defaults.name);
-    REQUIRE_THAT(span.tags, ContainsSubset(config.defaults.tags));
+    REQUIRE(span.service == config.service);
+    REQUIRE(span.service_type == config.service_type);
+    REQUIRE(span.environment() == config.environment);
+    REQUIRE(span.version() == config.version);
+    REQUIRE(span.name == config.name);
+    REQUIRE_THAT(span.tags, ContainsSubset(*config.tags));
   }
 
   SECTION("can be overridden in an extracted span") {
@@ -210,12 +210,12 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(child_ptr);
     const auto& child = *child_ptr;
 
-    REQUIRE(child.service == config.defaults.service);
-    REQUIRE(child.service_type == config.defaults.service_type);
-    REQUIRE(child.environment() == config.defaults.environment);
-    REQUIRE(child.version() == config.defaults.version);
-    REQUIRE(child.name == config.defaults.name);
-    REQUIRE_THAT(child.tags, ContainsSubset(config.defaults.tags));
+    REQUIRE(child.service == config.service);
+    REQUIRE(child.service_type == config.service_type);
+    REQUIRE(child.environment() == config.environment);
+    REQUIRE(child.version() == config.version);
+    REQUIRE(child.name == config.name);
+    REQUIRE_THAT(child.tags, ContainsSubset(*config.tags));
   }
 
   SECTION("can be overridden in a child span") {
@@ -248,7 +248,7 @@ TEST_CASE("tracer span defaults") {
 
 TEST_CASE("span extraction") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
@@ -1023,7 +1023,7 @@ TEST_CASE("span extraction") {
     span->inject(writer);
 
     CAPTURE(writer.items);
-    if (config.delegate_trace_sampling) {
+    if (*config.delegate_trace_sampling) {
       // If sampling delegation is enabled, then expect the delegation header to
       // have been injected.
       auto found = writer.items.find("x-datadog-delegate-trace-sampling");
@@ -1040,7 +1040,7 @@ TEST_CASE("span extraction") {
 
 TEST_CASE("report hostname") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.collector = std::make_shared<NullCollector>();
   config.logger = std::make_shared<NullLogger>();
 
@@ -1071,16 +1071,15 @@ TEST_CASE("128-bit trace IDs") {
   };
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.trace_id_128_bit = true;
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   const auto logger = std::make_shared<MockLogger>();
   config.logger = logger;
-  config.extraction_styles.clear();
-  config.extraction_styles.push_back(PropagationStyle::W3C);
-  config.extraction_styles.push_back(PropagationStyle::DATADOG);
-  config.extraction_styles.push_back(PropagationStyle::B3);
+  std::vector<PropagationStyle> extraction_styles{
+      PropagationStyle::W3C, PropagationStyle::DATADOG, PropagationStyle::B3};
+  config.extraction_styles = extraction_styles;
   const auto finalized = finalize_config(config, clock);
   REQUIRE(finalized);
   Tracer tracer{*finalized};
@@ -1191,14 +1190,14 @@ TEST_CASE(
   CAPTURE(test_case.name);
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.trace_id_128_bit = true;
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   const auto logger = std::make_shared<MockLogger>();
   config.logger = logger;
-  config.extraction_styles.clear();
-  config.extraction_styles.push_back(PropagationStyle::W3C);
+  std::vector<PropagationStyle> extraction_styles{PropagationStyle::W3C};
+  config.extraction_styles = extraction_styles;
   const auto finalized = finalize_config(config);
   REQUIRE(finalized);
   Tracer tracer{*finalized};
@@ -1258,19 +1257,19 @@ TEST_CASE("_dd.is_sampling_decider") {
   TracerConfig config1;
   config1.collector = collector;
   config1.logger = logger;
-  config1.defaults.service = "service1";
+  config1.service = "service1";
   config1.delegate_trace_sampling = true;
 
   TracerConfig config2;
   config2.collector = collector;
   config2.logger = logger;
-  config2.defaults.service = "service2";
+  config2.service = "service2";
   config2.delegate_trace_sampling = true;
 
   TracerConfig config3;
   config3.collector = collector;
   config3.logger = logger;
-  config3.defaults.service = "service3";
+  config3.service = "service3";
   config3.delegate_trace_sampling = service3_delegation_enabled;
   config3.trace_sampler.sample_rate = 1;  // keep all traces
   CAPTURE(config3.delegate_trace_sampling);
@@ -1493,7 +1492,7 @@ TEST_CASE("sampling delegation is not an override") {
   config1.collector = collector;
   config1.logger = logger;
   config1.extraction_styles = config1.injection_styles = styles;
-  config1.defaults.service = "service1";
+  config1.service = "service1";
   config1.delegate_trace_sampling = service1_delegate;
   config1.trace_sampler.sample_rate = 1.0;  // as a default
   // `service1_sampling_priority` will be dealt with when service1 injects trace
@@ -1503,14 +1502,14 @@ TEST_CASE("sampling delegation is not an override") {
   config2.collector = collector;
   config2.logger = logger;
   config2.extraction_styles = config1.injection_styles = styles;
-  config2.defaults.service = "service2";
+  config2.service = "service2";
   config2.delegate_trace_sampling = true;
 
   TracerConfig config3;
   config3.collector = collector;
   config3.logger = logger;
   config3.extraction_styles = config1.injection_styles = styles;
-  config3.defaults.service = "service3";
+  config3.service = "service3";
   config3.trace_sampler.sample_rate = service3_sample_rate;
 
   auto valid_config = finalize_config(config1);
@@ -1685,7 +1684,7 @@ TEST_CASE("heterogeneous extraction") {
   CAPTURE(test_case.expected_injected_headers);
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.extraction_styles = test_case.extraction_styles;
   config.injection_styles = test_case.injection_styles;
   config.logger = std::make_shared<NullLogger>();
@@ -1707,7 +1706,7 @@ TEST_CASE("heterogeneous extraction") {
 TEST_CASE("move semantics") {
   // Verify that `Tracer` can be moved.
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.logger = std::make_shared<NullLogger>();
   config.collector = std::make_shared<MockCollector>();
 

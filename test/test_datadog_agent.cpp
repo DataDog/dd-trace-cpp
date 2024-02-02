@@ -14,7 +14,7 @@ using namespace datadog::tracing;
 
 TEST_CASE("CollectorResponse") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto logger =
       std::make_shared<MockLogger>(std::cerr, MockLogger::ERRORS_ONLY);
   const auto event_scheduler = std::make_shared<MockEventScheduler>();

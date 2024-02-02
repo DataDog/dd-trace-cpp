@@ -109,8 +109,8 @@ void on_post_notes(const httplib::Request& request, httplib::Response& response)
 int main() {
   // Set up the Datadog tracer.  See `src/datadog/tracer_config.h`.
   dd::TracerConfig config;
-  config.defaults.service = "dd-trace-cpp-http-server-example-server";
-  config.defaults.service_type = "server";
+  config.service = "dd-trace-cpp-http-server-example-server";
+  config.service_type = "server";
 
   // `finalize_config` validates `config` and applies any settings from
   // environment variables, such as `DD_AGENT_HOST`.

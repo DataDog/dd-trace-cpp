@@ -28,7 +28,7 @@ struct TraceSamplerConfig {
 
   Optional<double> sample_rate;
   std::vector<Rule> rules;
-  double max_per_second = 200;
+  Optional<double> max_per_second;
 };
 
 class FinalizedTraceSamplerConfig {

@@ -152,7 +152,7 @@ TEST_CASE("TracerConfig::defaults") {
       REQUIRE(finalized.error().code == Error::SERVICE_NAME_REQUIRED);
     }
     SECTION("nonempty") {
-      config.defaults.service = "testsvc";
+      config.service = "testsvc";
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
     }
@@ -160,7 +160,7 @@ TEST_CASE("TracerConfig::defaults") {
 
   SECTION("DD_SERVICE overrides service") {
     const EnvGuard guard{"DD_SERVICE", "foosvc"};
-    config.defaults.service = "testsvc";
+    config.service = "testsvc";
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.service == "foosvc");
@@ -168,8 +168,8 @@ TEST_CASE("TracerConfig::defaults") {
 
   SECTION("DD_ENV overrides environment") {
     const EnvGuard guard{"DD_ENV", "prod"};
-    config.defaults.environment = "dev";
-    config.defaults.service = "required";
+    config.environment = "dev";
+    config.service = "required";
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.environment == "prod");
@@ -177,8 +177,8 @@ TEST_CASE("TracerConfig::defaults") {
 
   SECTION("DD_VERSION overrides version") {
     const EnvGuard guard{"DD_VERSION", "v2"};
-    config.defaults.version = "v1";
-    config.defaults.service = "required";
+    config.version = "v1";
+    config.service = "required";
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.version == "v2");
@@ -186,8 +186,8 @@ TEST_CASE("TracerConfig::defaults") {
 
   SECTION("DD_TRACE_DELEGATE_SAMPLING") {
     SECTION("is disabled by default") {
-      config.defaults.version = "v1";
-      config.defaults.service = "required";
+      config.version = "v1";
+      config.service = "required";
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
       REQUIRE(finalized->delegate_trace_sampling == false);
@@ -195,8 +195,8 @@ TEST_CASE("TracerConfig::defaults") {
 
     SECTION("setting is overridden by environment variable") {
       const EnvGuard guard{"DD_TRACE_DELEGATE_SAMPLING", "1"};
-      config.defaults.version = "v1";
-      config.defaults.service = "required";
+      config.version = "v1";
+      config.service = "required";
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
       REQUIRE(finalized->delegate_trace_sampling == true);
@@ -231,8 +231,8 @@ TEST_CASE("TracerConfig::defaults") {
     }));
 
     // This will be overriden by the DD_TAGS environment variable.
-    config.defaults.tags = {{"foo", "bar"}};
-    config.defaults.service = "required";
+    config.tags = std::unordered_map<std::string, std::string>{{"foo", "bar"}};
+    config.service = "required";
 
     CAPTURE(test_case.name);
     const EnvGuard guard{"DD_TAGS", test_case.dd_tags};
@@ -240,7 +240,6 @@ TEST_CASE("TracerConfig::defaults") {
     if (test_case.expected_error) {
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == *test_case.expected_error);
-
     } else {
       REQUIRE(finalized);
       REQUIRE(finalized->defaults.tags == test_case.expected_tags);
@@ -250,7 +249,7 @@ TEST_CASE("TracerConfig::defaults") {
 
 TEST_CASE("TracerConfig::log_on_startup") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto logger = std::make_shared<MockLogger>();
   config.logger = logger;
 
@@ -311,7 +310,7 @@ TEST_CASE("TracerConfig::log_on_startup") {
 
 TEST_CASE("TracerConfig::report_traces") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
@@ -380,7 +379,7 @@ TEST_CASE("TracerConfig::report_traces") {
 
 TEST_CASE("TracerConfig::agent") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
   SECTION("event_scheduler") {
     SECTION("default") {
@@ -577,7 +576,7 @@ TEST_CASE("TracerConfig::agent") {
 
 TEST_CASE("TracerConfig::trace_sampler") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
   SECTION("default is no rules") {
     auto finalized = finalize_config(config);
@@ -842,7 +841,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
 
 TEST_CASE("TracerConfig::span_sampler") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
   SECTION("default is no rules") {
     auto finalized = finalize_config(config);
@@ -1072,7 +1071,7 @@ TEST_CASE("TracerConfig::span_sampler") {
 
 TEST_CASE("TracerConfig propagation styles") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
   SECTION("default style is [Datadog, W3C]") {
     auto finalized = finalize_config(config);
@@ -1099,7 +1098,7 @@ TEST_CASE("TracerConfig propagation styles") {
 
   SECTION("injection_styles") {
     SECTION("need at least one") {
-      config.injection_styles.clear();
+      config.injection_styles = std::vector<PropagationStyle>{};
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_INJECTION_STYLE);
@@ -1191,7 +1190,7 @@ TEST_CASE("TracerConfig propagation styles") {
   // This section is very much like "injection_styles", above.
   SECTION("extraction_styles") {
     SECTION("need at least one") {
-      config.extraction_styles.clear();
+      config.extraction_styles = std::vector<PropagationStyle>{};
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_EXTRACTION_STYLE);
@@ -1293,9 +1292,13 @@ TEST_CASE("TracerConfig propagation styles") {
 
 TEST_CASE("configure 128-bit trace IDs") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
-  SECTION("defaults to true") { REQUIRE(config.trace_id_128_bit == true); }
+  SECTION("defaults to true") {
+    const auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    CHECK(finalized_config->trace_id_128_bit == true);
+  }
 
   SECTION("value honored in finalizer") {
     const auto value = GENERATE(true, false);
