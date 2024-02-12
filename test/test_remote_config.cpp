@@ -151,7 +151,8 @@ REMOTE_CONFIG_TEST("response processing") {
                               /* allow_exceptions = */ false);
 
     REQUIRE(!response_json.is_discarded());
-    rc.process_response(response_json);
+    const auto config_updated = rc.process_response(response_json);
+    CHECK(config_updated.empty());
 
     // Next payload should contains an error.
     const auto payload = rc.make_request_payload();
@@ -201,7 +202,8 @@ REMOTE_CONFIG_TEST("response processing") {
     const auto old_trace_sampler = config_manager->trace_sampler();
     const auto old_span_defaults = config_manager->span_defaults();
     const auto old_report_traces = config_manager->report_traces();
-    rc.process_response(response_json);
+    const auto config_updated = rc.process_response(response_json);
+    REQUIRE(config_updated.size() == 3);
     const auto new_trace_sampler = config_manager->trace_sampler();
     const auto new_span_defaults = config_manager->span_defaults();
     const auto new_report_traces = config_manager->report_traces();
@@ -227,7 +229,9 @@ REMOTE_CONFIG_TEST("response processing") {
 
         REQUIRE(!response_json.is_discarded());
 
-        rc.process_response(response_json);
+        const auto config_updated = rc.process_response(response_json);
+        REQUIRE(config_updated.size() == 3);
+
         const auto current_trace_sampler = config_manager->trace_sampler();
         const auto current_span_defaults = config_manager->span_defaults();
         const auto current_report_traces = config_manager->report_traces();
@@ -237,7 +241,9 @@ REMOTE_CONFIG_TEST("response processing") {
         CHECK(old_report_traces == current_report_traces);
       }
 
-      SECTION("missing configuration field -> field should be reset") {
+      SECTION(
+          "missing the trace_sampling_rate field -> only this field should be "
+          "reset") {
         // clang-format off
         const std::string json_input = R"({
           "targets": "ewogICAgInNpZ25lZCI6IHsKICAgICAgICAiY3VzdG9tIjogewogICAgICAgICAgICAiYWdlbnRfcmVmcmVzaF9pbnRlcnZhbCI6IDUsCiAgICAgICAgICAgICJvcGFxdWVfYmFja2VuZF9zdGF0ZSI6ICJleUoyWlhKemFXOXVJam95TENKemRHRjBaU0k2ZXlKbWFXeGxYMmhoYzJobGN5STZleUprWVhSaFpHOW5MekV3TURBeE1qVTROREF2UVZCTlgxUlNRVU5KVGtjdk9ESTNaV0ZqWmpoa1ltTXpZV0l4TkRNMFpETXlNV05pT0RGa1ptSm1OMkZtWlRZMU5HRTBZall4TVRGalpqRTJOakJpTnpGalkyWTRPVGM0TVRrek9DOHlPVEE0Tm1Ka1ltVTFNRFpsTmpoaU5UQm1NekExTlRneU0yRXpaR0UxWTJVd05USTRaakUyTkRCa05USmpaamc0TmpFNE1UWmhZV0U1Wm1ObFlXWTBJanBiSW05WVpESnBlVU16ZUM5b1JXc3hlWFZoWTFoR04xbHFjWEpwVGs5QldVdHVaekZ0V0UwMU5WWktUSGM5SWwxOWZYMD0iCiAgICAgICAgfSwKICAgICAgICAic3BlY192ZXJzaW9uIjogIjEuMC4wIiwKICAgICAgICAidGFyZ2V0cyI6IHsKICAgICAgICAgICAgImZvby9BUE1fVFJBQ0lORy8zMCI6IHsKICAgICAgICAgICAgICAgICJoYXNoZXMiOiB7CiAgICAgICAgICAgICAgICAgICAgInNoYTI1NiI6ICI2OWUzNDZiNWZmY2U4NDVlMjk5ODRlNzU5YjcxZDdiMDdjNTYxOTc5ZmFlOWU4MmVlZDA4MmMwMzhkODZlNmIwIgogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgICJsZW5ndGgiOiAzNzQKICAgICAgICAgICAgfQogICAgICAgIH0sCiAgICAgICAgInZlcnNpb24iOiA2NjIwNDMyMAogICAgfQp9",
@@ -245,7 +251,7 @@ REMOTE_CONFIG_TEST("response processing") {
           "target_files": [
             {
               "path": "foo/APM_TRACING/30",
-              "raw": "eyAiaWQiOiAiODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2FmZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOCIsICJyZXZpc2lvbiI6IDE2OTgxNjcxMjYwNjQsICJzY2hlbWFfdmVyc2lvbiI6ICJ2MS4wLjAiLCAiYWN0aW9uIjogImVuYWJsZSIsICJsaWJfY29uZmlnIjogeyAibGlicmFyeV9sYW5ndWFnZSI6ICJhbGwiLCAibGlicmFyeV92ZXJzaW9uIjogImxhdGVzdCIsICJzZXJ2aWNlX25hbWUiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIsICJ0cmFjaW5nX2VuYWJsZWQiOiB0cnVlIH0sICJzZXJ2aWNlX3RhcmdldCI6IHsgInNlcnZpY2UiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIgfSB9"
+              "raw": "eyAiaWQiOiAiODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2FmZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOCIsICJyZXZpc2lvbiI6IDE2OTgxNjcxMjYwNjQsICJzY2hlbWFfdmVyc2lvbiI6ICJ2MS4wLjAiLCAiYWN0aW9uIjogImVuYWJsZSIsICJsaWJfY29uZmlnIjogeyAibGlicmFyeV9sYW5ndWFnZSI6ICJhbGwiLCAibGlicmFyeV92ZXJzaW9uIjogImxhdGVzdCIsICJzZXJ2aWNlX25hbWUiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIsICJ0cmFjaW5nX2VuYWJsZWQiOiBmYWxzZSwgInRyYWNpbmdfdGFncyI6IFsiaGVsbG86d29ybGQiLCAiZm9vOmJhciJdIH0sICJzZXJ2aWNlX3RhcmdldCI6IHsgInNlcnZpY2UiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIgfSB9"
             }
           ]
         })";
@@ -258,7 +264,8 @@ REMOTE_CONFIG_TEST("response processing") {
 
         REQUIRE(!response_json.is_discarded());
 
-        rc.process_response(response_json);
+        const auto config_updated = rc.process_response(response_json);
+        REQUIRE(config_updated.size() == 1);
         const auto current_trace_sampler = config_manager->trace_sampler();
         CHECK(old_trace_sampler == current_trace_sampler);
       }
@@ -303,9 +310,10 @@ REMOTE_CONFIG_TEST("response processing") {
     REQUIRE(!response_json.is_discarded());
 
     const auto old_sampling_rate = config_manager->trace_sampler();
-    rc.process_response(response_json);
+    const auto config_updated = rc.process_response(response_json);
     const auto new_sampling_rate = config_manager->trace_sampler();
 
+    CHECK(config_updated.empty());
     CHECK(new_sampling_rate == old_sampling_rate);
   }
 }

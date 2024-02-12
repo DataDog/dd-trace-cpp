@@ -72,12 +72,15 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
     auto finalized_trace_sampler_cfg = finalize_config(trace_sampler_cfg);
     if (auto error = finalized_trace_sampler_cfg.if_error()) {
       trace_sampling_metadata.error = *error;
-    } else {
-      trace_sampler_ =
-          std::make_shared<TraceSampler>(*finalized_trace_sampler_cfg, clock_);
     }
 
-    telemetry_conf.emplace_back(std::move(trace_sampling_metadata));
+    auto trace_sampler =
+        std::make_shared<TraceSampler>(*finalized_trace_sampler_cfg, clock_);
+
+    if (trace_sampler != trace_sampler_.get()) {
+      trace_sampler_ = std::move(trace_sampler);
+      telemetry_conf.emplace_back(std::move(trace_sampling_metadata));
+    }
   } else {
     if (!trace_sampler_.is_default()) {
       trace_sampler_.reset();
@@ -93,15 +96,16 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
     auto parsed_tags = parse_tags(*conf.tags);
     if (auto error = parsed_tags.if_error()) {
       tags_metadata.error = *error;
-    } else {
+    }
+
+    if (*parsed_tags != span_defaults_.get()->tags) {
       auto new_span_defaults =
           std::make_shared<SpanDefaults>(*span_defaults_.get());
       new_span_defaults->tags = std::move(*parsed_tags);
 
       span_defaults_ = new_span_defaults;
+      telemetry_conf.emplace_back(std::move(tags_metadata));
     }
-
-    telemetry_conf.emplace_back(std::move(tags_metadata));
   } else {
     if (!span_defaults_.is_default()) {
       span_defaults_.reset();
@@ -110,10 +114,12 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
   }
 
   if (conf.report_traces) {
-    ConfigMetadata tags_metadata(ConfigName::REPORT_TRACES,
-                                 *conf.report_traces ? "true" : "false",
-                                 ConfigMetadata::Origin::REMOTE_CONFIG);
-    report_traces_ = *conf.report_traces;
+    if (conf.report_traces != report_traces_) {
+      report_traces_ = *conf.report_traces;
+      telemetry_conf.emplace_back(ConfigName::REPORT_TRACES,
+                                  *conf.report_traces ? "true" : "false",
+                                  ConfigMetadata::Origin::REMOTE_CONFIG);
+    }
   } else {
     if (!report_traces_.is_default()) {
       report_traces_.reset();

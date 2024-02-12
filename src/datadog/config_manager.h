@@ -33,15 +33,14 @@ class ConfigManager {
     }
 
     void reset() {
-      if (!is_default_value_) {
-        current_value_ = default_value_;
-        is_default_value_ = true;
-      }
+      current_value_ = default_value_;
+      is_default_value_ = true;
     }
 
     bool is_default() const { return is_default_value_; }
 
-    T get() const { return current_value_; }
+    T get() { return current_value_; }
+    const T& get() const { return current_value_; }
 
     operator T() const { return current_value_; }
 

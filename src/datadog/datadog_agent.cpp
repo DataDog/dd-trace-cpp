@@ -360,54 +360,33 @@ void DatadogAgent::flush() {
   }
 }
 
-void DatadogAgent::send_app_started(
-    const std::unordered_map<ConfigName, ConfigMetadata>& config_metadata) {
-  auto payload = tracer_telemetry_->app_started(config_metadata);
+void DatadogAgent::send_telemetry(std::string payload) {
   auto post_result =
       http_client_->post(telemetry_endpoint_, set_content_type_json,
                          std::move(payload), telemetry_on_response_,
                          telemetry_on_error_, clock_().tick + request_timeout_);
   if (auto* error = post_result.if_error()) {
-    logger_->log_error(error->with_prefix(
-        "Unexpected error submitting telemetry app-started event: "));
+    logger_->log_error(
+        error->with_prefix("Unexpected error submitting telemetry event: "));
   }
+}
+
+void DatadogAgent::send_app_started(
+    const std::unordered_map<ConfigName, ConfigMetadata>& config_metadata) {
+  send_telemetry(tracer_telemetry_->app_started(config_metadata));
 }
 
 void DatadogAgent::send_heartbeat_and_telemetry() {
-  auto payload = tracer_telemetry_->heartbeat_and_telemetry();
-  auto post_result =
-      http_client_->post(telemetry_endpoint_, set_content_type_json,
-                         std::move(payload), telemetry_on_response_,
-                         telemetry_on_error_, clock_().tick + request_timeout_);
-  if (auto* error = post_result.if_error()) {
-    logger_->log_error(error->with_prefix(
-        "Unexpected error submitting telemetry app-heartbeat event: "));
-  }
+  send_telemetry(tracer_telemetry_->heartbeat_and_telemetry());
 }
 
 void DatadogAgent::send_app_closing() {
-  auto payload = tracer_telemetry_->app_closing();
-  auto post_result =
-      http_client_->post(telemetry_endpoint_, set_content_type_json,
-                         std::move(payload), telemetry_on_response_,
-                         telemetry_on_error_, clock_().tick + request_timeout_);
-  if (auto* error = post_result.if_error()) {
-    logger_->log_error(error->with_prefix(
-        "Unexpected error submitting telemetry app-closing event: "));
-  }
+  send_telemetry(tracer_telemetry_->app_closing());
 }
 
 void DatadogAgent::send_configuration_change(
     const std::vector<ConfigMetadata>& config) {
-  auto payload = tracer_telemetry_->configuration_change(config);
-  auto post_result =
-      http_client_->post(telemetry_endpoint_, set_content_type_json,
-                         std::move(payload), telemetry_on_response_,
-                         telemetry_on_error_, clock_().tick + request_timeout_);
-  if (auto* error = post_result.if_error()) {
-    logger_->log_error(error->with_prefix(
-        "Unexpected error submitting telemetry configuration-change event: "));
-  }
+  send_telemetry(tracer_telemetry_->configuration_change(config));
 }
 
 void DatadogAgent::get_and_apply_remote_configuration_updates() {

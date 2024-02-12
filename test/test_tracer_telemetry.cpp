@@ -39,7 +39,10 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
       auto app_started = nlohmann::json::parse(app_started_message);
       REQUIRE(app_started["request_type"] == "message-batch");
       REQUIRE(app_started["payload"].size() == 1);
-      CHECK(app_started["payload"][0]["request_type"] == "app-started");
+
+      auto& app_started_payload = app_started["payload"][0];
+      CHECK(app_started_payload["request_type"] == "app-started");
+      CHECK(app_started_payload["payload"]["configuration"].empty());
     }
 
     SECTION("With an integration") {
@@ -55,6 +58,90 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
       for (const auto& payload : app_started["payload"]) {
         CHECK(expected.find(payload["request_type"]) != expected.cend());
+      }
+    }
+
+    SECTION("With configuration") {
+      std::unordered_map<ConfigName, ConfigMetadata> configuration{
+          {ConfigName::SERVICE_NAME,
+           ConfigMetadata(ConfigName::SERVICE_NAME, "foo",
+                          ConfigMetadata::Origin::CODE)}};
+
+      auto app_started_message = tracer_telemetry.app_started(configuration);
+
+      auto app_started = nlohmann::json::parse(app_started_message);
+      REQUIRE(app_started["request_type"] == "message-batch");
+      REQUIRE(app_started["payload"].is_array());
+      REQUIRE(app_started["payload"].size() == 1);
+
+      auto& app_started_payload = app_started["payload"][0];
+      CHECK(app_started_payload["request_type"] == "app-started");
+
+      auto cfg_payload = app_started_payload["payload"]["configuration"];
+      REQUIRE(cfg_payload.is_array());
+      REQUIRE(cfg_payload.size() == 1);
+
+      // clang-format off
+      const auto expected_conf = nlohmann::json({
+        {"name", "DD_SERVICE"},
+        {"value", "foo"},
+        {"seq_id", 1},
+        {"origin", "code"},
+      });
+      // clang-format on
+
+      CHECK(cfg_payload[0] == expected_conf);
+
+      SECTION("generates a configuration change event") {
+        SECTION("empty configuration generate a valid payload") {
+          auto config_change_message = nlohmann::json::parse(
+              tracer_telemetry.configuration_change({}), nullptr, false);
+          REQUIRE(config_change_message.is_discarded() == false);
+
+          CHECK(config_change_message["request_type"] ==
+                "app-client-configuration-change");
+          CHECK(config_change_message["payload"]["configuration"].is_array());
+          CHECK(config_change_message["payload"]["configuration"].empty());
+        }
+
+        SECTION("valid configurations update") {
+          const std::vector<ConfigMetadata> new_config{
+              {ConfigName::SERVICE_NAME, "increase seq_id",
+               ConfigMetadata::Origin::ENVIRONMENT_VARIABLE},
+              {ConfigName::REPORT_TRACES, "", ConfigMetadata::Origin::DEFAULT,
+               Error{Error::Code::OTHER, "empty field"}}};
+
+          auto config_change_message = nlohmann::json::parse(
+              tracer_telemetry.configuration_change(new_config), nullptr,
+              false);
+          REQUIRE(config_change_message.is_discarded() == false);
+
+          CHECK(config_change_message["request_type"] ==
+                "app-client-configuration-change");
+          CHECK(config_change_message["payload"]["configuration"].is_array());
+          CHECK(config_change_message["payload"]["configuration"].size() == 2);
+
+          const std::unordered_map<std::string, nlohmann::json> expected_json{
+              {"DD_SERVICE", nlohmann::json{{"name", "DD_SERVICE"},
+                                            {"value", "increase seq_id"},
+                                            {"seq_id", 2},
+                                            {"origin", "env_var"}}},
+              {"trace_enabled",
+               nlohmann::json{{"name", "trace_enabled"},
+                              {"value", ""},
+                              {"seq_id", 1},
+                              {"origin", "default"},
+                              {"error",
+                               {{"code", Error::Code::OTHER},
+                                {"message", "empty field"}}}}}};
+
+          for (const auto& conf :
+               config_change_message["payload"]["configuration"]) {
+            auto expected_conf = expected_json.find(conf["name"]);
+            REQUIRE(expected_conf != expected_json.cend());
+            CHECK(expected_conf->second == conf);
+          }
+        }
       }
     }
   }

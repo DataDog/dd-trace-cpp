@@ -234,8 +234,9 @@ struct ConfigMetadata {
   Optional<Error> error;
 
   ConfigMetadata() = default;
-  ConfigMetadata(ConfigName n, std::string v, Origin orig)
-      : name(n), value(std::move(v)), origin(orig), error(nullopt) {}
+  ConfigMetadata(ConfigName n, std::string v, Origin orig,
+                 Optional<Error> err = nullopt)
+      : name(n), value(std::move(v)), origin(orig), error(err) {}
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from

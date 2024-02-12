@@ -59,6 +59,7 @@ class DatadogAgent : public Collector {
   RemoteConfigurationManager remote_config_;
 
   void flush();
+  void send_telemetry(std::string);
   void send_heartbeat_and_telemetry();
   void send_app_closing();
 
