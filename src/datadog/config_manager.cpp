@@ -67,7 +67,6 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
 
     TraceSamplerConfig trace_sampler_cfg;
     trace_sampler_cfg.sample_rate = *conf.trace_sampling_rate;
-    trace_sampler_cfg.max_per_second = 200;
 
     auto finalized_trace_sampler_cfg = finalize_config(trace_sampler_cfg);
     if (auto error = finalized_trace_sampler_cfg.if_error()) {

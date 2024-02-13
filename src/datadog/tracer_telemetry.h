@@ -49,8 +49,9 @@ class TracerTelemetry {
   std::string hostname_;
   std::string integration_name_;
   std::string integration_version_;
+  // Track sequence id per payload generated
   uint64_t seq_id_ = 0;
-  // Track sequence id per configuration field.
+  // Track sequence id per configuration field
   std::unordered_map<ConfigName, std::size_t> config_seq_ids;
   // This structure contains all the metrics that are exposed by tracer
   // telemetry.
