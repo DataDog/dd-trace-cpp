@@ -1297,15 +1297,15 @@ TEST_CASE("configure 128-bit trace IDs") {
   SECTION("defaults to true") {
     const auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
-    CHECK(finalized_config->trace_id_128_bit == true);
+    CHECK(finalized_config->generate_128bit_trace_ids == true);
   }
 
   SECTION("value honored in finalizer") {
     const auto value = GENERATE(true, false);
-    config.trace_id_128_bit = value;
+    config.generate_128bit_trace_ids = value;
     const auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_id_128_bit == value);
+    REQUIRE(finalized->generate_128bit_trace_ids == value);
   }
 
   SECTION("value overridden by DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED") {
@@ -1332,16 +1332,16 @@ TEST_CASE("configure 128-bit trace IDs") {
     EnvGuard guard{"DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED",
                    test_case.env_value};
 
-    config.trace_id_128_bit = true;
-    CAPTURE(config.trace_id_128_bit);
+    config.generate_128bit_trace_ids = true;
+    CAPTURE(config.generate_128bit_trace_ids);
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
+    REQUIRE(finalized->generate_128bit_trace_ids == test_case.expected_value);
 
-    config.trace_id_128_bit = false;
-    CAPTURE(config.trace_id_128_bit);
+    config.generate_128bit_trace_ids = false;
+    CAPTURE(config.generate_128bit_trace_ids);
     finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
+    REQUIRE(finalized->generate_128bit_trace_ids == test_case.expected_value);
   }
 }

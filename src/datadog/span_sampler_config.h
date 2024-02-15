@@ -11,6 +11,7 @@
 
 #include "expected.h"
 #include "json_fwd.hpp"
+#include "logger.h"
 #include "optional.h"
 #include "rate.h"
 #include "span_matcher.h"
@@ -35,7 +36,7 @@ struct SpanSamplerConfig {
 
 class FinalizedSpanSamplerConfig {
   friend Expected<FinalizedSpanSamplerConfig> finalize_config(
-      const SpanSamplerConfig&);
+      const SpanSamplerConfig&, Logger&);
   friend class FinalizedTracerConfig;
 
   FinalizedSpanSamplerConfig() = default;
@@ -49,7 +50,8 @@ class FinalizedSpanSamplerConfig {
   std::vector<Rule> rules;
 };
 
-Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&);
+Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
+                                                     Logger& logger);
 
 nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule&);
 

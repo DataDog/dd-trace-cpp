@@ -705,7 +705,7 @@ TEST_CASE("128-bit trace ID injection") {
   TracerConfig config;
   config.service = "testsvc";
   config.logger = std::make_shared<MockLogger>();
-  config.trace_id_128_bit = true;
+  config.generate_128bit_trace_ids = true;
 
   std::vector<PropagationStyle> injection_styles{
       PropagationStyle::W3C, PropagationStyle::DATADOG, PropagationStyle::B3};

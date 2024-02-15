@@ -1072,7 +1072,7 @@ TEST_CASE("128-bit trace IDs") {
 
   TracerConfig config;
   config.service = "testsvc";
-  config.trace_id_128_bit = true;
+  config.generate_128bit_trace_ids = true;
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   const auto logger = std::make_shared<MockLogger>();
@@ -1191,7 +1191,7 @@ TEST_CASE(
 
   TracerConfig config;
   config.service = "testsvc";
-  config.trace_id_128_bit = true;
+  config.generate_128bit_trace_ids = true;
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   const auto logger = std::make_shared<MockLogger>();

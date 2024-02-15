@@ -116,11 +116,11 @@ struct TracerConfig {
   // `gethostname` with traces sent to the collector.
   Optional<bool> report_hostname;
 
-  // `tags_header_size` is the maximum allowed size, in bytes, of the serialized
-  // value of the "X-Datadog-Tags" header used when injecting trace context for
-  // propagation.  If the serialized value of the header would exceed
-  // `tags_header_size`, the header will be omitted instead.
-  Optional<std::size_t> tags_header_size;
+  // `max_tags_header_size` is the maximum allowed size, in bytes, of the
+  // serialized value of the "X-Datadog-Tags" header used when injecting trace
+  // context for propagation.  If the serialized value of the header would
+  // exceed `tags_header_size`, the header will be omitted instead.
+  Optional<std::size_t> max_tags_header_size;
 
   // `logger` specifies how the tracer will issue diagnostic messages.  If
   // `logger` is null, then it defaults to a logger that inserts into
@@ -137,7 +137,7 @@ struct TracerConfig {
   // IDs.  If true, the tracer will generate 128-bit trace IDs. If false, the
   // tracer will generate 64-bit trace IDs. `trace_id_128_bit` is overridden by
   // the `DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED` environment variable.
-  Optional<bool> trace_id_128_bit;
+  Optional<bool> generate_128bit_trace_ids;
 
   // `runtime_id` denotes the current run of the application in which the tracer
   // is embedded. If `runtime_id` is not specified, then it defaults to a
@@ -155,34 +155,12 @@ struct TracerConfig {
   Optional<std::string> integration_version;
 };
 
-struct TracerDefaultConfig final {
-  bool log_on_startup = true;
-  bool report_traces = true;
-  bool report_hostname = false;
-  bool report_telemetry = true;
-  bool delegate_trace_sampling = false;
-  bool generate_128bit_trace_ids = true;
-  std::string service_type = "web";
-  std::size_t max_tags_header_size = 512;
-  std::vector<PropagationStyle> injection_styles = {PropagationStyle::DATADOG,
-                                                    PropagationStyle::W3C};
-  std::vector<PropagationStyle> extraction_styles = {PropagationStyle::DATADOG,
-                                                     PropagationStyle::W3C};
-
-  std::string agent_url = "http://localhost:8126";
-  int flush_interval_milliseconds = 2000;
-  int request_timeout_milliseconds = 2000;
-  int shutdown_timeout_milliseconds = 2000;
-  int remote_configuration_poll_interval_seconds = 5;
-};
-
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
 // a valid `TracerConfig` and accompanying environment.
 // `FinalizedTracerConfig` must be obtained by calling `finalize_config`.
 class FinalizedTracerConfig final {
   friend Expected<FinalizedTracerConfig> finalize_config(
-      const TracerConfig& config, const TracerDefaultConfig& default_config,
-      const Clock& clock);
+      const TracerConfig& config, const Clock& clock);
   FinalizedTracerConfig() = default;
 
  public:
@@ -202,7 +180,7 @@ class FinalizedTracerConfig final {
   std::size_t tags_header_size;
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
-  bool trace_id_128_bit;
+  bool generate_128bit_trace_ids;
   bool report_telemetry;
   Optional<RuntimeID> runtime_id;
   Clock clock;
@@ -221,11 +199,6 @@ class FinalizedTracerConfig final {
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config);
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config,
                                                 const Clock& clock);
-Expected<FinalizedTracerConfig> finalize_config(
-    const TracerConfig& config, const TracerDefaultConfig& default_config);
-Expected<FinalizedTracerConfig> finalize_config(
-    const TracerConfig& config, const TracerDefaultConfig& default_config,
-    const Clock& clock);
 
 }  // namespace tracing
 }  // namespace datadog
