@@ -153,6 +153,15 @@ struct TracerConfig {
   // library.
   // Example: "1.2.3", "6c44da20", "2020.02.13"
   Optional<std::string> integration_version;
+
+  // This field allows for overriding the service name origin to default.
+  //
+  // Mainly exist for integration configurations purposes.
+  // For instance, the default service name for the nginx integration will
+  // resolve as 'nginx'. Without this customization, it would be reported as a
+  // programmatic value in Datadog's Active Configuration, whereas it is
+  // actually the default value for the integration.
+  Optional<bool> report_service_as_default;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
