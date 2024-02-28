@@ -72,7 +72,7 @@ void ConfigManager::reset() {
 nlohmann::json ConfigManager::config_json() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return nlohmann::json{
-      {"default", to_json(*current_span_defaults_)},
+      {"defaults", to_json(*current_span_defaults_)},
       {"trace_sampler", current_trace_sampler_->config_json()},
       {"report_traces", current_report_traces_}};
 }
