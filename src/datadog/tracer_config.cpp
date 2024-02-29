@@ -22,31 +22,6 @@ namespace {
 
 std::string to_string(bool b) { return b ? "true" : "false"; }
 
-// TODO: use `to_chars`
-// std::string to_string(double d) {
-//   std::stringstream stream;
-//   stream << std::fixed << std::setprecision(1) << d;
-//   return stream.str();
-// }
-//
-// std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
-//   nlohmann::json res;
-//   for (const auto &r : rules) {
-//     res.emplace_back(r.to_json());
-//   }
-//
-//   return res.dump();
-// }
-//
-// std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
-//   nlohmann::json res;
-//   for (const auto &r : rules) {
-//     res.emplace_back(r.to_json());
-//   }
-//
-//   return res.dump();
-// }
-
 std::string join_propagation_styles(
     const std::vector<PropagationStyle> &values) {
   auto to_string = [](PropagationStyle style) {
@@ -318,19 +293,6 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   return env_cfg;
 }
 
-// TODO: Use SFINAE w/ is_trivially_constructible?
-template <typename T, typename U>
-std::pair<ConfigMetadata::Origin, T> pick(const Optional<T> &env,
-                                          const Optional<T> &user,
-                                          U default_v) {
-  if (env) {
-    return {ConfigMetadata::Origin::ENVIRONMENT_VARIABLE, *env};
-  } else if (user) {
-    return {ConfigMetadata::Origin::CODE, *user};
-  }
-  return {ConfigMetadata::Origin::DEFAULT, default_v};
-}
-
 }  // namespace
 
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
@@ -342,18 +304,19 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   auto logger =
       user_config.logger ? user_config.logger : std::make_shared<CerrLogger>();
 
-  auto env = load_tracer_env_config(*logger);
-  if (auto error = env.if_error()) {
+  Expected<TracerConfig> env_config = load_tracer_env_config(*logger);
+  if (auto error = env_config.if_error()) {
     return *error;
   }
 
   FinalizedTracerConfig final_config;
   final_config.clock = clock;
+  final_config.logger = logger;
 
   ConfigMetadata::Origin origin;
 
   std::tie(origin, final_config.defaults.service) =
-      pick(env->service, user_config.service, "");
+      pick(env_config->service, user_config.service, "");
 
   if (final_config.defaults.service.empty()) {
     return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
@@ -363,25 +326,25 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       ConfigName::SERVICE_NAME, final_config.defaults.service, origin);
 
   final_config.defaults.service_type =
-      value_or(env->service_type, user_config.service_type, "web");
+      value_or(env_config->service_type, user_config.service_type, "web");
 
   // DD_ENV
   std::tie(origin, final_config.defaults.environment) =
-      pick(env->environment, user_config.environment, "");
+      pick(env_config->environment, user_config.environment, "");
   final_config.metadata[ConfigName::SERVICE_ENV] = ConfigMetadata(
       ConfigName::SERVICE_ENV, final_config.defaults.environment, origin);
 
   // DD_VERSION
   std::tie(origin, final_config.defaults.version) =
-      pick(env->version, user_config.version, "");
+      pick(env_config->version, user_config.version, "");
   final_config.metadata[ConfigName::SERVICE_VERSION] = ConfigMetadata(
       ConfigName::SERVICE_VERSION, final_config.defaults.version, origin);
 
-  final_config.defaults.name = value_or(env->name, user_config.name, "");
+  final_config.defaults.name = value_or(env_config->name, user_config.name, "");
 
   // DD_TAGS
   std::tie(origin, final_config.defaults.tags) =
-      pick(env->tags, user_config.tags,
+      pick(env_config->tags, user_config.tags,
            std::unordered_map<std::string, std::string>{});
   final_config.metadata[ConfigName::TAGS] = ConfigMetadata(
       ConfigName::TAGS, join_tags(final_config.defaults.tags), origin);
@@ -391,7 +354,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       PropagationStyle::DATADOG, PropagationStyle::W3C};
 
   std::tie(origin, final_config.extraction_styles) =
-      pick(env->extraction_styles, user_config.extraction_styles,
+      pick(env_config->extraction_styles, user_config.extraction_styles,
            default_propagation_styles);
   if (final_config.extraction_styles.empty()) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
@@ -403,7 +366,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   // Injection Styles
   std::tie(origin, final_config.injection_styles) =
-      pick(env->injection_styles, user_config.injection_styles,
+      pick(env_config->injection_styles, user_config.injection_styles,
            default_propagation_styles);
   if (final_config.injection_styles.empty()) {
     return Error{Error::MISSING_SPAN_INJECTION_STYLE,
@@ -415,50 +378,52 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   // Startup Logs
   std::tie(origin, final_config.log_on_startup) =
-      pick(env->log_on_startup, user_config.log_on_startup, true);
+      pick(env_config->log_on_startup, user_config.log_on_startup, true);
   final_config.metadata[ConfigName::STARTUP_LOGS] = ConfigMetadata(
       ConfigName::STARTUP_LOGS, to_string(final_config.log_on_startup), origin);
 
   // Report traces
   std::tie(origin, final_config.report_traces) =
-      pick(env->report_traces, user_config.report_traces, true);
+      pick(env_config->report_traces, user_config.report_traces, true);
   final_config.metadata[ConfigName::REPORT_TRACES] = ConfigMetadata(
       ConfigName::REPORT_TRACES, to_string(final_config.report_traces), origin);
 
   // Report telemetry
   std::tie(origin, final_config.report_telemetry) =
-      pick(env->report_telemetry, user_config.report_telemetry, true);
+      pick(env_config->report_telemetry, user_config.report_telemetry, true);
   final_config.metadata[ConfigName::REPORT_TELEMETRY] =
       ConfigMetadata(ConfigName::REPORT_TELEMETRY,
                      to_string(final_config.report_traces), origin);
 
   // Report hostname
   final_config.report_hostname =
-      value_or(env->report_hostname, user_config.report_hostname, false);
+      value_or(env_config->report_hostname, user_config.report_hostname, false);
 
   // Delegate Sampling
-  std::tie(origin, final_config.delegate_trace_sampling) = pick(
-      env->delegate_trace_sampling, user_config.delegate_trace_sampling, false);
+  std::tie(origin, final_config.delegate_trace_sampling) =
+      pick(env_config->delegate_trace_sampling,
+           user_config.delegate_trace_sampling, false);
   final_config.metadata[ConfigName::DELEGATE_SAMPLING] =
       ConfigMetadata(ConfigName::DELEGATE_SAMPLING,
                      to_string(final_config.delegate_trace_sampling), origin);
 
   // Tags Header Size
   final_config.tags_header_size = value_or(
-      env->max_tags_header_size, user_config.max_tags_header_size, 512);
+      env_config->max_tags_header_size, user_config.max_tags_header_size, 512);
 
   // 128b Trace Ids
   std::tie(origin, final_config.generate_128bit_trace_ids) =
-      pick(env->generate_128bit_trace_ids,
+      pick(env_config->generate_128bit_trace_ids,
            user_config.generate_128bit_trace_ids, true);
   final_config.metadata[ConfigName::GENEREATE_128BIT_TRACE_IDS] =
       ConfigMetadata(ConfigName::DELEGATE_SAMPLING,
                      to_string(final_config.delegate_trace_sampling), origin);
 
+  // Integration name & version
   final_config.integration_name =
-      value_or(env->integration_name, user_config.integration_name, "");
-  final_config.integration_version =
-      value_or(env->integration_version, user_config.integration_version, "");
+      value_or(env_config->integration_name, user_config.integration_name, "");
+  final_config.integration_version = value_or(
+      env_config->integration_version, user_config.integration_version, "");
 
   if (user_config.runtime_id) {
     final_config.runtime_id = user_config.runtime_id;
@@ -471,12 +436,14 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       return std::move(*error);
     }
     final_config.collector = *finalized;
+    final_config.metadata.merge(finalized->metadata);
   } else {
     final_config.collector = user_config.collector;
   }
 
   if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
     final_config.trace_sampler = std::move(*trace_sampler_config);
+    final_config.metadata.merge(trace_sampler_config->metadata);
   } else {
     return std::move(trace_sampler_config.error());
   }
@@ -484,6 +451,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   if (auto span_sampler_config =
           finalize_config(user_config.span_sampler, *logger)) {
     final_config.span_sampler = std::move(*span_sampler_config);
+    final_config.metadata.merge(span_sampler_config->metadata);
   } else {
     return std::move(span_sampler_config.error());
   }

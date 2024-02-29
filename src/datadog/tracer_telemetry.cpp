@@ -9,20 +9,18 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-std::string to_string(ConfigName name) {
+std::string to_string(datadog::tracing::ConfigName name) {
   switch (name) {
     case ConfigName::SERVICE_NAME:
       return "DD_SERVICE";
     case ConfigName::SERVICE_ENV:
       return "DD_ENV";
+    case ConfigName::SERVICE_VERSION:
+      return "DD_VERSION";
     case ConfigName::REPORT_TRACES:
       return "trace_enabled";
     case ConfigName::TAGS:
       return "trace_tags";
-    case ConfigName::TRACE_SAMPLING_RATE:
-      return "trace_sample_rate";
-    case ConfigName::SERVICE_VERSION:
-      return "DD_VERSION";
     case ConfigName::EXTRACTION_STYLES:
       return "DD_TRACE_PROPAGATION_STYLE_EXTRACT";
     case ConfigName::INJECTION_STYLES:
@@ -39,6 +37,8 @@ std::string to_string(ConfigName name) {
       return "DD_TRACE_AGENT_URL";
     case ConfigName::RC_POLL_INTERVAL:
       return "DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS";
+    case ConfigName::TRACE_SAMPLING_RATE:
+      return "trace_sample_rate";
     case ConfigName::TRACE_SAMPLING_LIMIT:
       return "DD_TRACE_RATE_LIMIT";
     case ConfigName::SPAN_SAMPLING_RULES:

@@ -17,6 +17,7 @@
 #include <variant>
 
 #include "clock.h"
+#include "config.h"
 #include "expected.h"
 #include "http_client.h"
 #include "string_view.h"
@@ -76,6 +77,7 @@ class FinalizedDatadogAgentConfig {
   std::chrono::steady_clock::duration request_timeout;
   std::chrono::steady_clock::duration shutdown_timeout;
   std::chrono::steady_clock::duration remote_configuration_poll_interval;
+  std::unordered_map<ConfigName, ConfigMetadata> metadata;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(

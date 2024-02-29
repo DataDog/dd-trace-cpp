@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "clock.h"
+#include "config.h"
 #include "datadog_agent_config.h"
 #include "error.h"
 #include "expected.h"
@@ -163,39 +164,6 @@ struct TracerConfig {
   // programmatic value in Datadog's Active Configuration, whereas it is
   // actually the default value for the integration.
   Optional<bool> report_service_as_default;
-};
-
-enum class ConfigName : char {
-  SERVICE_NAME,
-  SERVICE_ENV,
-  SERVICE_VERSION,
-  REPORT_TRACES,
-  TAGS,
-  TRACE_SAMPLING_RATE,
-  EXTRACTION_STYLES,
-  INJECTION_STYLES,
-  STARTUP_LOGS,
-  REPORT_TELEMETRY,
-  DELEGATE_SAMPLING,
-  GENEREATE_128BIT_TRACE_IDS,
-  AGENT_URL,
-  RC_POLL_INTERVAL,
-  TRACE_SAMPLING_LIMIT,
-  TRACE_SAMPLING_RULES,
-  SPAN_SAMPLING_RULES,
-};
-
-struct ConfigMetadata {
-  enum class Origin { ENVIRONMENT_VARIABLE, CODE, REMOTE_CONFIG, DEFAULT };
-  ConfigName name;
-  std::string value;
-  Origin origin;
-  Optional<Error> error;
-
-  ConfigMetadata() = default;
-  ConfigMetadata(ConfigName n, std::string v, Origin orig,
-                 Optional<Error> err = nullopt)
-      : name(n), value(std::move(v)), origin(orig), error(err) {}
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from

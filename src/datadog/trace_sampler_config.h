@@ -7,8 +7,10 @@
 // `TraceSamplerConfig` is specified as the `trace_sampler` property of
 // `TracerConfig`.
 
+#include <unordered_map>
 #include <vector>
 
+#include "config.h"
 #include "expected.h"
 #include "json_fwd.hpp"
 #include "optional.h"
@@ -45,6 +47,8 @@ class FinalizedTraceSamplerConfig {
 
   std::vector<Rule> rules;
   double max_per_second;
+
+  std::unordered_map<ConfigName, ConfigMetadata> metadata;
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(

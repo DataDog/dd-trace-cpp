@@ -28,10 +28,10 @@
 #include <vector>
 
 #include "clock.h"
+#include "config.h"
 #include "json.hpp"
 #include "metrics.h"
 #include "runtime_id.h"
-#include "tracer_config.h"
 #include "tracer_signature.h"
 
 namespace datadog {
