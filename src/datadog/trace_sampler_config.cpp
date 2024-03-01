@@ -145,7 +145,7 @@ TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
     const TraceSamplerConfig &config) {
-  auto env_config = load_trace_sampler_env_config();
+  Expected<TraceSamplerConfig> env_config = load_trace_sampler_env_config();
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -187,14 +187,14 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   Optional<double> sample_rate;
   if (env_config->sample_rate) {
     sample_rate = env_config->sample_rate;
-    result.metadata[ConfigName::TRACE_SAMPLING_RATE] =
-        ConfigMetadata(ConfigName::TRACE_SAMPLING_RATE, to_string(rules),
-                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
+        ConfigName::TRACE_SAMPLING_RATE, std::to_string(*sample_rate),
+        ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
   } else if (config.sample_rate) {
     sample_rate = config.sample_rate;
-    result.metadata[ConfigName::TRACE_SAMPLING_RATE] =
-        ConfigMetadata(ConfigName::TRACE_SAMPLING_RATE, to_string(rules),
-                       ConfigMetadata::Origin::CODE);
+    result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
+        ConfigName::TRACE_SAMPLING_RATE, std::to_string(*sample_rate),
+        ConfigMetadata::Origin::CODE);
   }
 
   // If `sample_rate` was specified, then it translates to a "catch-all" rule

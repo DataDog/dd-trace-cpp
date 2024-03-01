@@ -14,7 +14,6 @@
 #include "datadog_agent_config.h"
 #include "error.h"
 #include "expected.h"
-#include "json.hpp"
 #include "propagation_style.h"
 #include "runtime_id.h"
 #include "span_defaults.h"

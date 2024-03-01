@@ -76,7 +76,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   if (auto flush_interval_milliseconds =
           value_or(env_config->flush_interval_milliseconds,
-                   user_config.flush_interval_milliseconds, 200);
+                   user_config.flush_interval_milliseconds, 2000);
       flush_interval_milliseconds > 0) {
     result.flush_interval =
         std::chrono::milliseconds(flush_interval_milliseconds);
@@ -88,7 +88,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   if (auto request_timeout_milliseconds =
           value_or(env_config->request_timeout_milliseconds,
-                   user_config.request_timeout_milliseconds, 200);
+                   user_config.request_timeout_milliseconds, 2000);
       request_timeout_milliseconds > 0) {
     result.request_timeout =
         std::chrono::milliseconds(request_timeout_milliseconds);
@@ -100,7 +100,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   if (auto shutdown_timeout_milliseconds =
           value_or(env_config->shutdown_timeout_milliseconds,
-                   user_config.shutdown_timeout_milliseconds, 200);
+                   user_config.shutdown_timeout_milliseconds, 2000);
       shutdown_timeout_milliseconds > 0) {
     result.shutdown_timeout =
         std::chrono::milliseconds(shutdown_timeout_milliseconds);

@@ -19,25 +19,25 @@ namespace tracing {
 class ConfigManager {
   template <typename T>
   class DynamicConf {
-    T default_value_;
+    T original_value_;
     T current_value_;
-    bool is_default_value_;
+    bool is_original_value_;
 
    public:
     explicit DynamicConf(T v)
-        : default_value_(v), current_value_(v), is_default_value_(true) {}
+        : original_value_(v), current_value_(v), is_original_value_(true) {}
 
     void update(T new_v) {
       current_value_ = new_v;
-      is_default_value_ = false;
+      is_original_value_ = false;
     }
 
     void reset() {
-      current_value_ = default_value_;
-      is_default_value_ = true;
+      current_value_ = original_value_;
+      is_original_value_ = true;
     }
 
-    bool is_default() const { return is_default_value_; }
+    bool is_original_value() const { return is_original_value_; }
 
     T get() { return current_value_; }
     const T& get() const { return current_value_; }

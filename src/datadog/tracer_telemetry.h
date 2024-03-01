@@ -13,6 +13,7 @@
 // - `app-heartbeat`
 // - `generate-metrics`
 // - `app-closing`
+// - `app-client-configuration-change`
 //
 // `app-started` messages are sent as part of initializing the tracer.
 //
@@ -25,6 +26,8 @@
 // last `app-heartbeat` event, a `generate-metrics` message is also included in
 // the batch.
 //
+// `app-client-configuration-change` messages are sent as soon as the tracer
+// configuration has been updated by a Remote Configuration event.
 #include <vector>
 
 #include "clock.h"

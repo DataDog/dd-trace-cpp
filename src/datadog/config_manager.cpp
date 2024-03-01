@@ -3,34 +3,11 @@
 #include <sstream>
 
 #include "parse_util.h"
+#include "string_util.h"
 #include "trace_sampler.h"
 
 namespace datadog {
 namespace tracing {
-namespace {
-
-std::string join(const std::vector<StringView>& values,
-                 const char* const separator) {
-  if (values.empty()) return {};
-  auto it = values.cbegin();
-
-  std::string res{*it};
-  for (++it; it != values.cend(); ++it) {
-    res += separator;
-    append(res, *it);
-  }
-
-  return res;
-}
-
-// TODO: use `to_chars`
-std::string to_string(double d) {
-  std::stringstream stream;
-  stream << std::fixed << std::setprecision(1) << d;
-  return stream.str();
-}
-
-}  // namespace
 
 ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
     : clock_(config.clock),
@@ -76,16 +53,15 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
     auto trace_sampler =
         std::make_shared<TraceSampler>(*finalized_trace_sampler_cfg, clock_);
 
-    if (trace_sampler != trace_sampler_.get()) {
-      trace_sampler_ = std::move(trace_sampler);
-      telemetry_conf.emplace_back(std::move(trace_sampling_metadata));
-    }
-  } else {
-    if (!trace_sampler_.is_default()) {
-      trace_sampler_.reset();
-      telemetry_conf.emplace_back(
-          default_config_metadata_[ConfigName::TRACE_SAMPLING_RATE]);
-    }
+    // This reset rate limiting and `TraceSampler` has no `operator==`.
+    // TODO: Instead of creating another `TraceSampler`, we should
+    // update the default sampling rate
+    trace_sampler_ = std::move(trace_sampler);
+    telemetry_conf.emplace_back(std::move(trace_sampling_metadata));
+  } else if (!trace_sampler_.is_original_value()) {
+    trace_sampler_.reset();
+    telemetry_conf.emplace_back(
+        default_config_metadata_[ConfigName::TRACE_SAMPLING_RATE]);
   }
 
   if (conf.tags) {
@@ -105,26 +81,22 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
       span_defaults_ = new_span_defaults;
       telemetry_conf.emplace_back(std::move(tags_metadata));
     }
-  } else {
-    if (!span_defaults_.is_default()) {
-      span_defaults_.reset();
-      telemetry_conf.emplace_back(default_config_metadata_[ConfigName::TAGS]);
-    }
+  } else if (!span_defaults_.is_original_value()) {
+    span_defaults_.reset();
+    telemetry_conf.emplace_back(default_config_metadata_[ConfigName::TAGS]);
   }
 
   if (conf.report_traces) {
     if (conf.report_traces != report_traces_) {
       report_traces_ = *conf.report_traces;
       telemetry_conf.emplace_back(ConfigName::REPORT_TRACES,
-                                  *conf.report_traces ? "true" : "false",
+                                  to_string(*conf.report_traces),
                                   ConfigMetadata::Origin::REMOTE_CONFIG);
     }
-  } else {
-    if (!report_traces_.is_default()) {
-      report_traces_.reset();
-      telemetry_conf.emplace_back(
-          default_config_metadata_[ConfigName::REPORT_TRACES]);
-    }
+  } else if (!report_traces_.is_original_value()) {
+    report_traces_.reset();
+    telemetry_conf.emplace_back(
+        default_config_metadata_[ConfigName::REPORT_TRACES]);
   }
 
   return telemetry_conf;
@@ -134,18 +106,18 @@ std::vector<ConfigMetadata> ConfigManager::reset() {
   std::vector<ConfigMetadata> config_metadata;
 
   std::lock_guard<std::mutex> lock(mutex_);
-  if (!trace_sampler_.is_default()) {
+  if (!trace_sampler_.is_original_value()) {
     trace_sampler_.reset();
     config_metadata.emplace_back(
         default_config_metadata_[ConfigName::TRACE_SAMPLING_RATE]);
   }
 
-  if (!span_defaults_.is_default()) {
+  if (!span_defaults_.is_original_value()) {
     span_defaults_.reset();
     config_metadata.emplace_back(default_config_metadata_[ConfigName::TAGS]);
   }
 
-  if (!report_traces_.is_default()) {
+  if (!report_traces_.is_original_value()) {
     report_traces_.reset();
     config_metadata.emplace_back(
         default_config_metadata_[ConfigName::REPORT_TRACES]);

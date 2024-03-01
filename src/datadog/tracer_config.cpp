@@ -14,62 +14,12 @@
 #include "environment.h"
 #include "json.hpp"
 #include "parse_util.h"
+#include "string_util.h"
 #include "string_view.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
-
-std::string to_string(bool b) { return b ? "true" : "false"; }
-
-std::string join_propagation_styles(
-    const std::vector<PropagationStyle> &values) {
-  auto to_string = [](PropagationStyle style) {
-    switch (style) {
-      case PropagationStyle::B3:
-        return "B3";
-      case PropagationStyle::DATADOG:
-        return "Datadog";
-      case PropagationStyle::W3C:
-        return "W3C";
-      case PropagationStyle::NONE:
-        return "None";
-    }
-    return "";  ///< unlikely
-  };
-
-  if (values.empty()) return {};
-  auto it = values.cbegin();
-
-  std::string res{to_string(*it)};
-  for (++it; it != values.cend(); ++it) {
-    res += ',';
-    res += to_string(*it);
-  }
-
-  return res;
-}
-
-std::string join_tags(
-    const std::unordered_map<std::string, std::string> &values) {
-  if (values.empty()) return {};
-
-  auto it = values.cbegin();
-
-  std::string res;
-  res += it->first;
-  res += ":";
-  res += it->second;
-
-  for (++it; it != values.cend(); ++it) {
-    res += ",";
-    res += it->first;
-    res += ":";
-    res += it->second;
-  }
-
-  return res;
-}
 
 bool falsy(StringView text) {
   auto lower = std::string{text};
@@ -411,12 +361,12 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.tags_header_size = value_or(
       env_config->max_tags_header_size, user_config.max_tags_header_size, 512);
 
-  // 128b Trace Ids
+  // 128b Trace IDs
   std::tie(origin, final_config.generate_128bit_trace_ids) =
       pick(env_config->generate_128bit_trace_ids,
            user_config.generate_128bit_trace_ids, true);
   final_config.metadata[ConfigName::GENEREATE_128BIT_TRACE_IDS] =
-      ConfigMetadata(ConfigName::DELEGATE_SAMPLING,
+      ConfigMetadata(ConfigName::GENEREATE_128BIT_TRACE_IDS,
                      to_string(final_config.delegate_trace_sampling), origin);
 
   // Integration name & version
@@ -442,16 +392,16 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   }
 
   if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
-    final_config.trace_sampler = std::move(*trace_sampler_config);
     final_config.metadata.merge(trace_sampler_config->metadata);
+    final_config.trace_sampler = std::move(*trace_sampler_config);
   } else {
     return std::move(trace_sampler_config.error());
   }
 
   if (auto span_sampler_config =
           finalize_config(user_config.span_sampler, *logger)) {
-    final_config.span_sampler = std::move(*span_sampler_config);
     final_config.metadata.merge(span_sampler_config->metadata);
+    final_config.span_sampler = std::move(*span_sampler_config);
   } else {
     return std::move(span_sampler_config.error());
   }

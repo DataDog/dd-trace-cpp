@@ -83,7 +83,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
       // clang-format off
       const auto expected_conf = nlohmann::json({
-        {"name", "DD_SERVICE"},
+        {"name", "service"},
         {"value", "foo"},
         {"seq_id", 1},
         {"origin", "code"},
@@ -122,10 +122,10 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
           CHECK(config_change_message["payload"]["configuration"].size() == 2);
 
           const std::unordered_map<std::string, nlohmann::json> expected_json{
-              {"DD_SERVICE", nlohmann::json{{"name", "DD_SERVICE"},
-                                            {"value", "increase seq_id"},
-                                            {"seq_id", 2},
-                                            {"origin", "env_var"}}},
+              {"service", nlohmann::json{{"name", "service"},
+                                         {"value", "increase seq_id"},
+                                         {"seq_id", 2},
+                                         {"origin", "env_var"}}},
               {"trace_enabled",
                nlohmann::json{{"name", "trace_enabled"},
                               {"value", ""},

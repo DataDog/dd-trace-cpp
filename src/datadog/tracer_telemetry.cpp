@@ -12,39 +12,39 @@ namespace {
 std::string to_string(datadog::tracing::ConfigName name) {
   switch (name) {
     case ConfigName::SERVICE_NAME:
-      return "DD_SERVICE";
+      return "service";
     case ConfigName::SERVICE_ENV:
-      return "DD_ENV";
+      return "env";
     case ConfigName::SERVICE_VERSION:
-      return "DD_VERSION";
+      return "application_version";
     case ConfigName::REPORT_TRACES:
       return "trace_enabled";
     case ConfigName::TAGS:
       return "trace_tags";
     case ConfigName::EXTRACTION_STYLES:
-      return "DD_TRACE_PROPAGATION_STYLE_EXTRACT";
+      return "trace_propagation_style_extract";
     case ConfigName::INJECTION_STYLES:
-      return "DD_TRACE_PROPAGATION_STYLE_INJECT";
+      return "trace_propagation_style_inject";
     case ConfigName::STARTUP_LOGS:
-      return "DD_TRACE_STARTUP_LOGS";
+      return "trace_startup_logs_enabled";
     case ConfigName::REPORT_TELEMETRY:
-      return "DD_INSTRUMENTATION_TELEMETRY_ENABLED";
+      return "instrumentation_telemetry_enabled";
     case ConfigName::DELEGATE_SAMPLING:
       return "DD_TRACE_DELEGATE_SAMPLING";
     case ConfigName::GENEREATE_128BIT_TRACE_IDS:
-      return "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED";
+      return "trace_128_bits_id_enabled";
     case ConfigName::AGENT_URL:
-      return "DD_TRACE_AGENT_URL";
+      return "trace_agent_url";
     case ConfigName::RC_POLL_INTERVAL:
-      return "DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS";
+      return "remote_config_poll_interval";
     case ConfigName::TRACE_SAMPLING_RATE:
       return "trace_sample_rate";
     case ConfigName::TRACE_SAMPLING_LIMIT:
-      return "DD_TRACE_RATE_LIMIT";
+      return "trace_rate_limit";
     case ConfigName::SPAN_SAMPLING_RULES:
-      return "DD_SPAN_SAMPLING_RULES";
+      return "span_sample_rules";
     case ConfigName::TRACE_SAMPLING_RULES:
-      return "DD_TRACE_SAMPLING_RULES";
+      return "trace_sample_rules";
   }
 
   std::abort();
