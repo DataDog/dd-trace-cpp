@@ -1,6 +1,7 @@
 #include "span.h"
 
 #include <cassert>
+#include <iostream>
 #include <string>
 
 #include "datadog/sampling_mechanism.h"
@@ -30,6 +31,7 @@ Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
 }
 
 Span::~Span() {
+  std::cout << "Span::~Span called\n";
   if (!trace_segment_) {
     // We were moved from.
     return;

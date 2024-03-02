@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 
 // This component provides a class, `Tracer`, that instantiates the mechanisms
 // necessary for tracing, and provides member functions for creating spans.
@@ -56,6 +57,7 @@ class Tracer {
   explicit Tracer(const FinalizedTracerConfig& config);
   Tracer(const FinalizedTracerConfig& config,
          const std::shared_ptr<const IDGenerator>& generator);
+  ~Tracer() { std::cout << "Tracer::~Tracer called\n"; }
 
   // Create a new trace and return the root span of the trace.  Optionally
   // specify a `config` indicating the attributes of the root span.
