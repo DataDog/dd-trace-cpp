@@ -40,12 +40,35 @@ class LuaWriter : public dd::DictWriter {
   }
 };
 
-// TRACER
-void* tracer_new() {
-  dd::TracerConfig config;
-  config.defaults.service = "luajit-dmehala";
+// TRACER CONFIG
+void* tracer_config_new() { return new dd::TracerConfig; }
+void tracer_config_free(void* p) {
+  dd::TracerConfig* cfg = (dd::TracerConfig*)p;
+  delete cfg;
+}
 
-  const auto validated_config = dd::finalize_config(config);
+void tracer_config_set(void* p, int opt, void* value) {
+  dd::TracerConfig* cfg = (dd::TracerConfig*)p;
+  if (opt == 0) {
+    const char* service = (const char*)value;
+    cfg->defaults.service = service;
+  } else if (opt == 1) {
+    const char* env = (const char*)value;
+    cfg->defaults.environment = env;
+  } else if (opt == 2) {
+    const char* version = (const char*)value;
+    cfg->defaults.version = version;
+  } else if (opt == 3) {
+    const char* agent_url = (const char*)value;
+    cfg->agent.url = agent_url;
+  }
+}
+
+// TRACER
+void* tracer_new(void* p) {
+  dd::TracerConfig* config = (dd::TracerConfig*)p;
+
+  const auto validated_config = dd::finalize_config(*config);
   return new dd::Tracer{*validated_config};
 }
 

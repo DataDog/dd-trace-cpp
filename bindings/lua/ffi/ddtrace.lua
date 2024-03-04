@@ -1,72 +1,125 @@
 local ffi = require("ffi")
 
 ffi.cdef [[
+  typedef struct TracerConfig TracerConfig;
+  typedef struct Tracer Tracer;
+  typedef struct Span Span;
   typedef const char* (*ReaderFunc)(const char*);
   typedef void (*WriterFunc)(const char*, const char*);
 
+  // Tracer Config
+  TracerConfig* tracer_config_new();
+  void tracer_config_free(TracerConfig*);
+  void tracer_config_set(TracerConfig*, int, void*);
+
   // Tracer
-  void* tracer_new();
-  void tracer_free(void*);
-  void* tracer_create_span(void*, const char*);
-  void* tracer_extract_or_create_span(void*, ReaderFunc);
+  Tracer* tracer_new(TracerConfig*);
+  void tracer_free(Tracer*);
+  Span* tracer_create_span(Tracer*, const char*);
+  Span* tracer_extract_or_create_span(Tracer*, ReaderFunc);
 
   // Span
-  void span_free(void*);
-  void span_set_tag(void*, const char*, const char*);
-  void span_inject(void*, WriterFunc);
-  void* span_create_child(void*, const char*);
-  void span_finish(void*);
+  void span_free(Span*);
+  void span_set_tag(Span*, const char*, const char*);
+  void span_inject(Span*, WriterFunc);
+  Span* span_create_child(Span*, const char*);
+  void span_finish(Span*);
 ]]
 
 local lib_ddtrace = ffi.load("ddtrace.so")
 
-local function make_tracer()
-  return ffi.gc(lib_ddtrace.tracer_new(), lib_ddtrace.tracer_free)
+local function make_tracer(lua_config)
+  assert(lua_config == nil or type(lua_config) == "table")
+
+  local options = {
+    ["service"] = 0,
+    ["env"] = 1,
+    ["version"] = 2,
+    ["agent_url"] = 3,
+  }
+
+  local config = ffi.gc(lib_ddtrace.tracer_config_new(), lib_ddtrace.tracer_config_free)
+  for k, v in pairs(lua_config) do
+    if k == "service" then
+      if type(v) ~= "string" then
+        return nil
+        -- goto error
+      end
+      config:set(options.service, ffi.cast("void*", v))
+    elseif k == "env" then
+      if type(v) ~= "string" then
+        return nil
+      end
+      config:set(options.env, ffi.cast("void*", v))
+    elseif k == "version" then
+      if type(v) ~= "string" then
+        return nil
+      end
+      config:set(options.version, ffi.cast("void*", v))
+    elseif k == "agent_url" then
+      if type(v) ~= "string" then
+        return nil
+      end
+      config:set(options.agent_url, ffi.cast("void*", v))
+    end
+  end
+
+  -- return lib_ddtrace.tracer_new(config)
+  return ffi.gc(lib_ddtrace.tracer_new(config), lib_ddtrace.tracer_free)
+
+  -- goto ::error::
+  -- return nil
 end
 
-local function create_span(tracer, name)
-  return ffi.gc(lib_ddtrace.tracer_create_span(tracer, name), lib_ddtrace.span_free)
+local tracer_config_index = {
+  set = lib_ddtrace.tracer_config_set
+}
+
+local tracer_config_mt = ffi.metatype("TracerConfig", {
+  __index = tracer_config_index
+})
+
+local function create_span_gc(self, name)
+  local span = lib_ddtrace.tracer_create_span(self, name)
+  return ffi.gc(span, lib_ddtrace.span_free)
 end
 
-local function set_tag(span, key, value)
-  lib_ddtrace.span_set_tag(span, key, value)
+local function extract_or_create_span_gc(self, f)
+  return ffi.gc(lib_ddtrace.tracer_extract_or_create_span(self, f), lib_ddtrace.span_free)
 end
 
-local function extract_or_create_span(tracer, reader_cb)
-  return ffi.gc(lib_ddtrace.tracer_extract_or_create_span(tracer, reader_cb), lib_ddtrace.span_free)
+local function create_child_gc(self, name)
+  return ffi.gc(lib_ddtrace.span_create_child(self, name), lib_ddtrace.span_free)
 end
 
-local function inject_span(span, writer_cb)
-  lib_ddtrace.span_inject(span, writer_cb)
-end
+-- TODO: Find a way to tie span lifecycle to the tracer
 
-local function create_child(span, name)
-  return ffi.gc(lib_ddtrace.span_create_child(span, name), lib_ddtrace.span_free)
-end
+local tracer_index = {
+  create_span = lib_ddtrace.tracer_create_span,
+  extract_or_create_span = lib_ddtrace.tracer_extract_or_create_span,
 
-local function finish_span(span)
-  lib_ddtrace.span_finish(span)
-end
+  -- create_span = create_span_gc,
+  -- extract_or_create_span = extract_or_create_span_gc,
+  -- HACK to avoid tracer to be GC before spans
+  terminate = lib_ddtrace.tracer_free
+  -- extract_or_create_span = lib_ddtrace.tracer_extract_or_create_span,
+}
 
-local tracer = make_tracer()
-local span = create_span(tracer, "root-span")
-set_tag(span, "team", "apm-proxy")
-set_tag(span, "user", "dmehala")
+local tracer_mt = ffi.metatype("Tracer", {
+  __index = tracer_index
+})
 
-local lua_reader = function(key)
-  print("[reader] key: " .. ffi.string(key))
-  -- return "a"
-  return nil
-end
+local span_index = {
+  create_child = lib_ddtrace.span_create_child,
+  inject_span = lib_ddtrace.span_inject,
+  set_tag = lib_ddtrace.span_set_tag,
+  finish = lib_ddtrace.span_free
+}
 
-local lua_writer = function(key, value)
-  -- print("hello")
-  print("[writer] key: " .. ffi.string(key) .. ", value: " .. ffi.string(value))
-end
+local span_mt = ffi.metatype("Span", {
+  __index = span_index
+})
 
-local child = create_child(span, "child_span")
-finish_span(child)
-finish_span(span)
-
--- local extracted_span = extract_or_create_span(tracer, lua_reader)
--- inject_span(extracted_span, lua_writer)
+return {
+  make_tracer = make_tracer,
+}
