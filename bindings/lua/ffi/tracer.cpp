@@ -44,6 +44,10 @@ class LuaWriter : public dd::DictWriter {
 void* tracer_config_new() { return new dd::TracerConfig; }
 void tracer_config_free(void* p) {
   dd::TracerConfig* cfg = (dd::TracerConfig*)p;
+  cfg->defaults.tags.emplace("bindings.language", "luajit");
+  // cfg->defaults.tags.emplace("bindings.version", lua_version);
+  // cfg->integration_name = "lua";
+  // cfg->integration_version = lua_version;
   delete cfg;
 }
 
@@ -87,11 +91,16 @@ void* tracer_create_span(void* p, const char* name) {
   return buffer;
 }
 
-void* tracer_extract_or_create_span(void* p, ReaderFunc lua_reader) {
+void* tracer_extract_or_create_span(void* p, ReaderFunc lua_reader,
+                                    const char* name, const char* resource) {
   dd::Tracer* tracer = (dd::Tracer*)p;
 
+  dd::SpanConfig span_config;
+  span_config.name = name;
+  span_config.resource = resource;
+
   LuaReader reader(lua_reader);
-  auto maybe_span = tracer->extract_or_create_span(reader);
+  auto maybe_span = tracer->extract_or_create_span(reader, span_config);
   if (auto error = maybe_span.if_error()) {
     return nullptr;
   }
@@ -109,6 +118,16 @@ void span_free(void* p) {
 void span_set_tag(void* p, const char* const key, const char* value) {
   dd::Span* span = (dd::Span*)p;
   span->set_tag(key, value);
+}
+
+void span_set_error(void* p, bool b) {
+  dd::Span* span = (dd::Span*)p;
+  span->set_error(b);
+}
+
+void span_set_error_message(void* p, const char* msg) {
+  dd::Span* span = (dd::Span*)p;
+  span->set_error_message(msg);
 }
 
 void span_inject(void* p, WriterFunc lua_writer) {

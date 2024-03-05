@@ -17,11 +17,14 @@ void tracer_config_set(void*, int, void*);
 void* tracer_new(void*);
 void tracer_free(void*);
 void* tracer_create_span(void*, const char*);
-void* tracer_extract_or_create_span(void*, ReaderFunc);
+void* tracer_extract_or_create_span(void*, ReaderFunc, const char*,
+                                    const char*);
 
 // Span
 void span_free(void*);
 void span_set_tag(void*, const char*, const char*);
+void span_set_error(void*, bool);
+void span_set_error_message(void*, const char*);
 void span_inject(void*, WriterFunc);
 void* span_create_child(void*, const char*);
 void span_finish(void*);

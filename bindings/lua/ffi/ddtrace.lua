@@ -16,11 +16,13 @@ ffi.cdef [[
   Tracer* tracer_new(TracerConfig*);
   void tracer_free(Tracer*);
   Span* tracer_create_span(Tracer*, const char*);
-  Span* tracer_extract_or_create_span(Tracer*, ReaderFunc);
+  Span* tracer_extract_or_create_span(Tracer*, ReaderFunc, const char*, const char*);
 
   // Span
   void span_free(Span*);
   void span_set_tag(Span*, const char*, const char*);
+  void span_set_error(void*, bool);
+  void span_set_error_message(void*, const char*);
   void span_inject(Span*, WriterFunc);
   Span* span_create_child(Span*, const char*);
   void span_finish(Span*);
@@ -71,6 +73,8 @@ local function make_tracer(lua_config)
   -- return nil
 end
 
+-- TRACER
+
 local tracer_config_index = {
   set = lib_ddtrace.tracer_config_set
 }
@@ -92,28 +96,51 @@ local function create_child_gc(self, name)
   return ffi.gc(lib_ddtrace.span_create_child(self, name), lib_ddtrace.span_free)
 end
 
--- TODO: Find a way to tie span lifecycle to the tracer
+local function extract(tracer, callback, span_options)
+  local reader = function(key)
+    return callback(ffi.string(key))
+  end
 
+  return lib_ddtrace.tracer_extract_or_create_span(tracer, reader, span_options.name, span_options.resource)
+end
+
+-- TODO: Find a way to tie span lifecycle to the tracer?
 local tracer_index = {
   create_span = lib_ddtrace.tracer_create_span,
-  extract_or_create_span = lib_ddtrace.tracer_extract_or_create_span,
-
-  -- create_span = create_span_gc,
-  -- extract_or_create_span = extract_or_create_span_gc,
-  -- HACK to avoid tracer to be GC before spans
-  terminate = lib_ddtrace.tracer_free
-  -- extract_or_create_span = lib_ddtrace.tracer_extract_or_create_span,
+  extract_or_create_span = extract,
 }
 
 local tracer_mt = ffi.metatype("Tracer", {
   __index = tracer_index
 })
 
+-- SPAN
+
+local function finish_span(span)
+  ffi.gc(span, nil)
+  lib_ddtrace.span_free(span)
+end
+
+local function set_tag(span, tag, value)
+  lib_ddtrace.span_set_tag(span, tag, tostring(value))
+end
+
+local function inject(span, callback)
+  local writer = function(key, value)
+    callback(ffi.string(key), ffi.string(value))
+  end
+
+  lib_ddtrace.span_inject(span, writer)
+end
+
 local span_index = {
   create_child = lib_ddtrace.span_create_child,
-  inject_span = lib_ddtrace.span_inject,
-  set_tag = lib_ddtrace.span_set_tag,
-  finish = lib_ddtrace.span_free
+  inject_span = inject,
+  set_tag = set_tag,
+  set_error = lib_ddtrace.span_set_error,
+  set_error_message = lib_ddtrace.span_set_error_message,
+  finish = lib_ddtrace.span_free,
+  -- finish = finish_span,
 }
 
 local span_mt = ffi.metatype("Span", {
