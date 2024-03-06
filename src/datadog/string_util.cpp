@@ -57,17 +57,17 @@ std::string join_propagation_styles(
 }
 
 std::string join_tags(
-    const std::unordered_map<std::string, std::string>& values) {
-  if (values.empty()) return {};
+    const std::unordered_map<std::string, std::string>& tagset) {
+  if (tagset.empty()) return {};
 
-  auto it = values.cbegin();
+  auto it = tagset.cbegin();
 
   std::string res;
   res += it->first;
   res += ":";
   res += it->second;
 
-  for (++it; it != values.cend(); ++it) {
+  for (++it; it != tagset.cend(); ++it) {
     res += ",";
     res += it->first;
     res += ":";
