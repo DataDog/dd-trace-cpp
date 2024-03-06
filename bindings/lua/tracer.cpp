@@ -146,6 +146,25 @@ static int create_child(lua_State *L) {
   return 1;
 }
 
+static int set_tag(lua_State *L) {
+  dd::Span *span = checkspan(L);
+
+  dd::StringView key = luaL_checkstring(L, 2);
+  dd::StringView value = luaL_checkstring(L, 3);
+
+  span->set_tag(key, value);
+  return 0;
+}
+
+static int set_error(lua_State *L) {
+  dd::Span *span = checkspan(L);
+
+  bool error = luaL_checkinteger(L, 2) != 0;
+  span->set_error(error);
+
+  return 0;
+}
+
 class LuaReader : public datadog::tracing::DictReader {
  private:
   lua_State *L_;
@@ -234,6 +253,8 @@ static const struct luaL_Reg span_methods[] = {
     {"finish", finish},
     {"create_child", create_child},
     {"inject", inject_span},
+    {"set_tag", set_tag},
+    {"set_error", set_error},
     {NULL, NULL}       /* sentinel */
 };
 // clang-format on
