@@ -62,8 +62,7 @@ std::string join_tags(
 
   auto it = tagset.cbegin();
 
-  std::string res;
-  res += it->first;
+  std::string res{it->first};
   res += ":";
   res += it->second;
 
