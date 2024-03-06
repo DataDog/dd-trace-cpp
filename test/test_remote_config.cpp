@@ -212,7 +212,7 @@ REMOTE_CONFIG_TEST("response processing") {
     CHECK(new_span_defaults != old_span_defaults);
     CHECK(new_report_traces != old_report_traces);
 
-    SECTION("reset confguration") {
+    SECTION("reset configuration") {
       SECTION(
           "missing from client_configs -> all configurations should be reset") {
         // clang-format off

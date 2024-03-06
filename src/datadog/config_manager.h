@@ -10,6 +10,7 @@
 #include "clock.h"
 #include "config_update.h"
 #include "json.hpp"
+#include "optional.h"
 #include "span_defaults.h"
 #include "tracer_config.h"
 
@@ -17,43 +18,50 @@ namespace datadog {
 namespace tracing {
 
 class ConfigManager {
+  // A template class for managing dynamic configuration values.
+  //
+  // This class allows storing and managing dynamic configuration values. It
+  // maintains an original value and a current value, allowing for updates and
+  // resets.
+  //
+  // Additionally, it provides methods for accessing the current value and
+  // checking whether it has been modified from its original state.
   template <typename T>
-  class DynamicConf {
+  class DynamicConfig {
     T original_value_;
-    T current_value_;
-    bool is_original_value_;
+    Optional<T> current_value_ = nullopt;
 
    public:
-    explicit DynamicConf(T v)
-        : original_value_(v), current_value_(v), is_original_value_(true) {}
+    // Constructs a DynamicConf object with the given initial value
+    explicit DynamicConfig(T original_value)
+        : original_value_(original_value) {}
 
-    void update(T new_v) {
-      current_value_ = new_v;
-      is_original_value_ = false;
+    // Resets the current value of the configuration to the original value
+    void reset() { current_value_ = nullopt; }
+
+    // Returns whether the current value is the original value
+    bool is_original_value() const { return !current_value_.has_value(); }
+
+    const T& value() const {
+      return current_value_.has_value() ? *current_value_ : original_value_;
     }
 
-    void reset() {
-      current_value_ = original_value_;
-      is_original_value_ = true;
-    }
-
-    bool is_original_value() const { return is_original_value_; }
-
-    T get() { return current_value_; }
-    const T& get() const { return current_value_; }
-
-    operator T() const { return current_value_; }
-
-    void operator=(const T& rhs) { update(rhs); }
+    // Updates the current value of the configuration
+    void operator=(const T& rhs) { current_value_ = rhs; }
   };
 
   mutable std::mutex mutex_;
   Clock clock_;
-  std::unordered_map<ConfigName, ConfigMetadata> default_config_metadata_;
+  std::unordered_map<ConfigName, ConfigMetadata> default_metadata_;
 
-  DynamicConf<std::shared_ptr<TraceSampler>> trace_sampler_;
-  DynamicConf<std::shared_ptr<const SpanDefaults>> span_defaults_;
-  DynamicConf<bool> report_traces_;
+  DynamicConfig<std::shared_ptr<TraceSampler>> trace_sampler_;
+  DynamicConfig<std::shared_ptr<const SpanDefaults>> span_defaults_;
+  DynamicConfig<bool> report_traces_;
+
+ private:
+  template <typename T>
+  void reset_config(ConfigName name, T& conf,
+                    std::vector<ConfigMetadata>& metadata);
 
  public:
   ConfigManager(const FinalizedTracerConfig& config);

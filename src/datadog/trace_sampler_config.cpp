@@ -6,6 +6,7 @@
 #include "environment.h"
 #include "json.hpp"
 #include "parse_util.h"
+#include "string_util.h"
 
 namespace datadog {
 namespace tracing {
@@ -188,12 +189,12 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   if (env_config->sample_rate) {
     sample_rate = env_config->sample_rate;
     result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
-        ConfigName::TRACE_SAMPLING_RATE, std::to_string(*sample_rate),
+        ConfigName::TRACE_SAMPLING_RATE, to_string(*sample_rate, 1),
         ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
   } else if (config.sample_rate) {
     sample_rate = config.sample_rate;
     result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
-        ConfigName::TRACE_SAMPLING_RATE, std::to_string(*sample_rate),
+        ConfigName::TRACE_SAMPLING_RATE, to_string(*sample_rate, 1),
         ConfigMetadata::Origin::CODE);
   }
 
