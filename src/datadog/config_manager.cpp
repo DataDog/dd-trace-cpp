@@ -110,7 +110,7 @@ std::vector<ConfigMetadata> ConfigManager::reset() { return update({}); }
 nlohmann::json ConfigManager::config_json() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return nlohmann::json{
-      {"default", to_json(*span_defaults_.value())},
+      {"defaults", to_json(*span_defaults_.value())},
       {"trace_sampler", trace_sampler_.value()->config_json()},
       {"report_traces", report_traces_.value()}};
 }
