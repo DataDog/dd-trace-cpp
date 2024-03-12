@@ -13,6 +13,15 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
+  nlohmann::json res;
+  for (const auto &r : rules) {
+    res.emplace_back(r.to_json());
+  }
+
+  return res.dump();
+}
+
 // `env_var` is the name of the environment variable from which `rules_raw` was
 // obtained.  It's used for error messages.
 Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
@@ -207,7 +216,7 @@ SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(
     const SpanSamplerConfig &user_config, Logger &logger) {
-  auto env_config = load_span_sampler_env_config(logger);
+  Expected<SpanSamplerConfig> env_config = load_span_sampler_env_config(logger);
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -217,8 +226,14 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   std::vector<SpanSamplerConfig::Rule> rules;
   if (!env_config->rules.empty()) {
     rules = env_config->rules;
+    result.metadata[ConfigName::SPAN_SAMPLING_RULES] =
+        ConfigMetadata(ConfigName::SPAN_SAMPLING_RULES, to_string(rules),
+                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
   } else if (!user_config.rules.empty()) {
     rules = user_config.rules;
+    result.metadata[ConfigName::SPAN_SAMPLING_RULES] =
+        ConfigMetadata(ConfigName::SPAN_SAMPLING_RULES, to_string(rules),
+                       ConfigMetadata::Origin::CODE);
   }
 
   for (const auto &rule : rules) {

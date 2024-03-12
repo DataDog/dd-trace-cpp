@@ -62,17 +62,17 @@ class RemoteConfigurationManager {
 
   // Handles the response received from a remote source and udates the internal
   // state accordingly.
-  void process_response(const nlohmann::json& json);
+  std::vector<ConfigMetadata> process_response(const nlohmann::json& json);
 
  private:
   // Tell if a `config_path` is a new configuration update.
   bool is_new_config(StringView config_path, const nlohmann::json& config_meta);
 
   // Apply a remote configuration.
-  void apply_config(Configuration config);
+  std::vector<ConfigMetadata> apply_config(Configuration config);
 
   // Revert a remote configuration.
-  void revert_config(Configuration config);
+  std::vector<ConfigMetadata> revert_config(Configuration config);
 };
 
 }  // namespace tracing

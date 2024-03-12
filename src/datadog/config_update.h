@@ -15,8 +15,8 @@ namespace tracing {
 // remote configuration value.
 struct ConfigUpdate {
   Optional<bool> report_traces;
-  Optional<TraceSamplerConfig> trace_sampler;
-  Optional<std::unordered_map<std::string, std::string>> tags;
+  Optional<double> trace_sampling_rate;
+  Optional<std::vector<StringView>> tags;
 };
 
 }  // namespace tracing

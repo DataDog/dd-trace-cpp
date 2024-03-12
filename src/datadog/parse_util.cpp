@@ -47,9 +47,9 @@ StringView strip(StringView input) {
   const auto not_whitespace = [](unsigned char ch) {
     return !std::isspace(ch);
   };
-  const char* const begin =
+  const char *const begin =
       std::find_if(input.begin(), input.end(), not_whitespace);
-  const char* const end =
+  const char *const end =
       std::find_if(input.rbegin(), std::make_reverse_iterator(begin),
                    not_whitespace)
           .base();
@@ -107,9 +107,74 @@ bool starts_with(StringView subject, StringView prefix) {
          prefix.end();
 }
 
-void to_lower(std::string& text) {
+void to_lower(std::string &text) {
   std::transform(text.begin(), text.end(), text.begin(),
                  [](unsigned char ch) { return std::tolower(ch); });
+}
+
+// List items are separated by an optional comma (",") and any amount of
+// whitespace.
+// Leading and trailing whitespace is ignored.
+std::vector<StringView> parse_list(StringView input) {
+  using uchar = unsigned char;
+
+  input = strip(input);
+  std::vector<StringView> items;
+  if (input.empty()) {
+    return items;
+  }
+
+  const char *const end = input.end();
+
+  const char *current = input.begin();
+  const char *begin_delim;
+  do {
+    const char *begin_item =
+        std::find_if(current, end, [](uchar ch) { return !std::isspace(ch); });
+    begin_delim = std::find_if(begin_item, end, [](uchar ch) {
+      return std::isspace(ch) || ch == ',';
+    });
+
+    items.emplace_back(begin_item, std::size_t(begin_delim - begin_item));
+
+    const char *end_delim = std::find_if(
+        begin_delim, end, [](uchar ch) { return !std::isspace(ch); });
+
+    if (end_delim != end && *end_delim == ',') {
+      ++end_delim;
+    }
+
+    current = end_delim;
+  } while (begin_delim != end);
+
+  return items;
+}
+
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    std::vector<StringView> list) {
+  std::unordered_map<std::string, std::string> tags;
+
+  for (const StringView &token : list) {
+    const auto separator = std::find(token.begin(), token.end(), ':');
+    if (separator == token.end()) {
+      std::string message;
+      message += "Unable to parse a key/value from the tag text \"";
+      append(message, token);
+      // message +=
+      //     "\" because it does not contain the separator character \":\".  "
+      //     "Error occurred in list of tags \"";
+      // append(message, input);
+      message += ".";
+      return Error{Error::TAG_MISSING_SEPARATOR, std::move(message)};
+    }
+
+    std::string key{token.begin(), separator};
+    std::string value{separator + 1, token.end()};
+    // If there are duplicate values, then the last one wins.
+    tags.insert_or_assign(std::move(key), std::move(value));
+  }
+
+  return tags;
 }
 
 }  // namespace tracing

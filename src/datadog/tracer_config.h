@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "clock.h"
+#include "config.h"
 #include "datadog_agent_config.h"
 #include "error.h"
 #include "expected.h"
@@ -42,7 +43,7 @@ struct TracerConfig {
   // Example: `prod`, `pre-prod` or `staging`.
   Optional<std::string> environment;
 
-  // Set the application version.
+  // Set the service version.
   //
   // Overriden by the `DD_VERSION` environment variable.
   // Example values: `1.2.3`, `6c44da20`, `2020.02.13`.
@@ -197,6 +198,7 @@ class FinalizedTracerConfig final {
   std::string integration_version;
   bool delegate_trace_sampling;
   bool report_traces;
+  std::unordered_map<ConfigName, ConfigMetadata> metadata;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

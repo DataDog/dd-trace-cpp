@@ -46,7 +46,7 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
 Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& user_config,
     const std::shared_ptr<Logger>& logger, const Clock& clock) {
-  auto env_config = load_datadog_agent_env_config();
+  Expected<DatadogAgentConfig> env_config = load_datadog_agent_env_config();
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -76,7 +76,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   if (auto flush_interval_milliseconds =
           value_or(env_config->flush_interval_milliseconds,
-                   user_config.flush_interval_milliseconds, 200);
+                   user_config.flush_interval_milliseconds, 2000);
       flush_interval_milliseconds > 0) {
     result.flush_interval =
         std::chrono::milliseconds(flush_interval_milliseconds);
@@ -88,7 +88,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   if (auto request_timeout_milliseconds =
           value_or(env_config->request_timeout_milliseconds,
-                   user_config.request_timeout_milliseconds, 200);
+                   user_config.request_timeout_milliseconds, 2000);
       request_timeout_milliseconds > 0) {
     result.request_timeout =
         std::chrono::milliseconds(request_timeout_milliseconds);
@@ -100,7 +100,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   if (auto shutdown_timeout_milliseconds =
           value_or(env_config->shutdown_timeout_milliseconds,
-                   user_config.shutdown_timeout_milliseconds, 200);
+                   user_config.shutdown_timeout_milliseconds, 2000);
       shutdown_timeout_milliseconds > 0) {
     result.shutdown_timeout =
         std::chrono::milliseconds(shutdown_timeout_milliseconds);
@@ -122,13 +122,15 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "positive number of seconds."};
   }
 
-  auto url =
-      value_or(env_config->url, user_config.url, "http://localhost:8126");
+  const auto [origin, url] =
+      pick(env_config->url, user_config.url, "http://localhost:8126");
   auto parsed_url = HTTPClient::URL::parse(url);
   if (auto* error = parsed_url.if_error()) {
     return std::move(*error);
   }
   result.url = *parsed_url;
+  result.metadata[ConfigName::AGENT_URL] =
+      ConfigMetadata(ConfigName::AGENT_URL, url, origin);
 
   return result;
 }

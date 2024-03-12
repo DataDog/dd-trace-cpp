@@ -67,7 +67,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     collector_ = agent;
 
     if (tracer_telemetry_->enabled()) {
-      agent->send_app_started();
+      agent->send_app_started(config.metadata);
     }
   }
 

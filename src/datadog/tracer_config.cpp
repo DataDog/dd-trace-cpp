@@ -14,6 +14,7 @@
 #include "environment.h"
 #include "json.hpp"
 #include "parse_util.h"
+#include "string_util.h"
 #include "string_view.h"
 
 namespace datadog {
@@ -24,44 +25,6 @@ bool falsy(StringView text) {
   auto lower = std::string{text};
   to_lower(lower);
   return lower == "0" || lower == "false" || lower == "no";
-}
-
-// List items are separated by an optional comma (",") and any amount of
-// whitespace.
-// Leading and trailing whitespace is ignored.
-std::vector<StringView> parse_list(StringView input) {
-  using uchar = unsigned char;
-
-  input = strip(input);
-  std::vector<StringView> items;
-  if (input.empty()) {
-    return items;
-  }
-
-  const char *const end = input.end();
-
-  const char *current = input.begin();
-  const char *begin_delim;
-  do {
-    const char *begin_item =
-        std::find_if(current, end, [](uchar ch) { return !std::isspace(ch); });
-    begin_delim = std::find_if(begin_item, end, [](uchar ch) {
-      return std::isspace(ch) || ch == ',';
-    });
-
-    items.emplace_back(begin_item, std::size_t(begin_delim - begin_item));
-
-    const char *end_delim = std::find_if(
-        begin_delim, end, [](uchar ch) { return !std::isspace(ch); });
-
-    if (end_delim != end && *end_delim == ',') {
-      ++end_delim;
-    }
-
-    current = end_delim;
-  } while (begin_delim != end);
-
-  return items;
 }
 
 Expected<std::vector<PropagationStyle>> parse_propagation_styles(
@@ -106,33 +69,6 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
   }
 
   return styles;
-}
-
-Expected<std::unordered_map<std::string, std::string>> parse_tags(
-    StringView input) {
-  std::unordered_map<std::string, std::string> tags;
-
-  // Within a tag, the key and value are separated by a colon (":").
-  for (const StringView &token : parse_list(input)) {
-    const auto separator = std::find(token.begin(), token.end(), ':');
-    if (separator == token.end()) {
-      std::string message;
-      message += "Unable to parse a key/value from the tag text \"";
-      append(message, token);
-      message +=
-          "\" because it does not contain the separator character \":\".  "
-          "Error occurred in list of tags \"";
-      append(message, input);
-      message += "\".";
-      return Error{Error::TAG_MISSING_SEPARATOR, std::move(message)};
-    }
-    std::string key{token.begin(), separator};
-    std::string value{separator + 1, token.end()};
-    // If there are duplicate values, then the last one wins.
-    tags.insert_or_assign(std::move(key), std::move(value));
-  }
-
-  return tags;
 }
 
 // Return a `std::vector<PropagationStyle>` parsed from the specified `env_var`.
@@ -268,7 +204,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     if (!value_override) {
       continue;
     }
-    // TODO: log
+
     const auto var_name = name(var);
     const auto var_name_override = name(var_override);
 
@@ -318,70 +254,129 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   auto logger =
       user_config.logger ? user_config.logger : std::make_shared<CerrLogger>();
 
-  auto env = load_tracer_env_config(*logger);
-  if (auto error = env.if_error()) {
+  Expected<TracerConfig> env_config = load_tracer_env_config(*logger);
+  if (auto error = env_config.if_error()) {
     return *error;
   }
 
   FinalizedTracerConfig final_config;
-
   final_config.clock = clock;
   final_config.logger = logger;
-  final_config.defaults.service =
-      value_or(env->service, user_config.service, "");
-  final_config.defaults.service_type =
-      value_or(env->service_type, user_config.service_type, "web");
-  final_config.defaults.environment =
-      value_or(env->environment, user_config.environment, "");
-  final_config.defaults.version =
-      value_or(env->version, user_config.version, "");
-  final_config.defaults.name = value_or(env->name, user_config.name, "");
-  final_config.defaults.tags =
-      value_or(env->tags, user_config.tags,
-               std::unordered_map<std::string, std::string>{});
-  final_config.extraction_styles =
-      value_or(env->extraction_styles, user_config.extraction_styles,
-               std::vector<PropagationStyle>{PropagationStyle::DATADOG,
-                                             PropagationStyle::W3C});
-  final_config.injection_styles =
-      value_or(env->injection_styles, user_config.injection_styles,
-               std::vector<PropagationStyle>{PropagationStyle::DATADOG,
-                                             PropagationStyle::W3C});
-  final_config.log_on_startup =
-      value_or(env->log_on_startup, user_config.log_on_startup, true);
-  final_config.report_traces =
-      value_or(env->report_traces, user_config.report_traces, true);
-  final_config.report_telemetry =
-      value_or(env->report_telemetry, user_config.report_telemetry, true);
-  final_config.report_hostname =
-      value_or(env->report_hostname, user_config.report_hostname, false);
-  final_config.delegate_trace_sampling = value_or(
-      env->delegate_trace_sampling, user_config.delegate_trace_sampling, false);
-  final_config.tags_header_size = value_or(
-      env->max_tags_header_size, user_config.max_tags_header_size, 512);
-  final_config.generate_128bit_trace_ids =
-      value_or(env->generate_128bit_trace_ids,
-               user_config.generate_128bit_trace_ids, true);
-  final_config.integration_name =
-      value_or(env->integration_name, user_config.integration_name, "");
-  final_config.integration_version =
-      value_or(env->integration_version, user_config.integration_version, "");
 
-  if (user_config.runtime_id) {
-    final_config.runtime_id = user_config.runtime_id;
-  }
+  ConfigMetadata::Origin origin;
+
+  std::tie(origin, final_config.defaults.service) =
+      pick(env_config->service, user_config.service, "");
 
   if (final_config.defaults.service.empty()) {
     return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
   }
 
+  final_config.metadata[ConfigName::SERVICE_NAME] = ConfigMetadata(
+      ConfigName::SERVICE_NAME, final_config.defaults.service, origin);
+
+  final_config.defaults.service_type =
+      value_or(env_config->service_type, user_config.service_type, "web");
+
+  // DD_ENV
+  std::tie(origin, final_config.defaults.environment) =
+      pick(env_config->environment, user_config.environment, "");
+  final_config.metadata[ConfigName::SERVICE_ENV] = ConfigMetadata(
+      ConfigName::SERVICE_ENV, final_config.defaults.environment, origin);
+
+  // DD_VERSION
+  std::tie(origin, final_config.defaults.version) =
+      pick(env_config->version, user_config.version, "");
+  final_config.metadata[ConfigName::SERVICE_VERSION] = ConfigMetadata(
+      ConfigName::SERVICE_VERSION, final_config.defaults.version, origin);
+
+  final_config.defaults.name = value_or(env_config->name, user_config.name, "");
+
+  // DD_TAGS
+  std::tie(origin, final_config.defaults.tags) =
+      pick(env_config->tags, user_config.tags,
+           std::unordered_map<std::string, std::string>{});
+  final_config.metadata[ConfigName::TAGS] = ConfigMetadata(
+      ConfigName::TAGS, join_tags(final_config.defaults.tags), origin);
+
+  // Extraction Styles
+  const std::vector<PropagationStyle> default_propagation_styles{
+      PropagationStyle::DATADOG, PropagationStyle::W3C};
+
+  std::tie(origin, final_config.extraction_styles) =
+      pick(env_config->extraction_styles, user_config.extraction_styles,
+           default_propagation_styles);
   if (final_config.extraction_styles.empty()) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
                  "At least one extraction style must be specified."};
   }
+  final_config.metadata[ConfigName::EXTRACTION_STYLES] = ConfigMetadata(
+      ConfigName::EXTRACTION_STYLES,
+      join_propagation_styles(final_config.extraction_styles), origin);
+
+  // Injection Styles
+  std::tie(origin, final_config.injection_styles) =
+      pick(env_config->injection_styles, user_config.injection_styles,
+           default_propagation_styles);
   if (final_config.injection_styles.empty()) {
     return Error{Error::MISSING_SPAN_INJECTION_STYLE,
                  "At least one injection style must be specified."};
+  }
+  final_config.metadata[ConfigName::INJECTION_STYLES] = ConfigMetadata(
+      ConfigName::INJECTION_STYLES,
+      join_propagation_styles(final_config.injection_styles), origin);
+
+  // Startup Logs
+  std::tie(origin, final_config.log_on_startup) =
+      pick(env_config->log_on_startup, user_config.log_on_startup, true);
+  final_config.metadata[ConfigName::STARTUP_LOGS] = ConfigMetadata(
+      ConfigName::STARTUP_LOGS, to_string(final_config.log_on_startup), origin);
+
+  // Report traces
+  std::tie(origin, final_config.report_traces) =
+      pick(env_config->report_traces, user_config.report_traces, true);
+  final_config.metadata[ConfigName::REPORT_TRACES] = ConfigMetadata(
+      ConfigName::REPORT_TRACES, to_string(final_config.report_traces), origin);
+
+  // Report telemetry
+  std::tie(origin, final_config.report_telemetry) =
+      pick(env_config->report_telemetry, user_config.report_telemetry, true);
+  final_config.metadata[ConfigName::REPORT_TELEMETRY] =
+      ConfigMetadata(ConfigName::REPORT_TELEMETRY,
+                     to_string(final_config.report_traces), origin);
+
+  // Report hostname
+  final_config.report_hostname =
+      value_or(env_config->report_hostname, user_config.report_hostname, false);
+
+  // Delegate Sampling
+  std::tie(origin, final_config.delegate_trace_sampling) =
+      pick(env_config->delegate_trace_sampling,
+           user_config.delegate_trace_sampling, false);
+  final_config.metadata[ConfigName::DELEGATE_SAMPLING] =
+      ConfigMetadata(ConfigName::DELEGATE_SAMPLING,
+                     to_string(final_config.delegate_trace_sampling), origin);
+
+  // Tags Header Size
+  final_config.tags_header_size = value_or(
+      env_config->max_tags_header_size, user_config.max_tags_header_size, 512);
+
+  // 128b Trace IDs
+  std::tie(origin, final_config.generate_128bit_trace_ids) =
+      pick(env_config->generate_128bit_trace_ids,
+           user_config.generate_128bit_trace_ids, true);
+  final_config.metadata[ConfigName::GENEREATE_128BIT_TRACE_IDS] =
+      ConfigMetadata(ConfigName::GENEREATE_128BIT_TRACE_IDS,
+                     to_string(final_config.delegate_trace_sampling), origin);
+
+  // Integration name & version
+  final_config.integration_name =
+      value_or(env_config->integration_name, user_config.integration_name, "");
+  final_config.integration_version = value_or(
+      env_config->integration_version, user_config.integration_version, "");
+
+  if (user_config.runtime_id) {
+    final_config.runtime_id = user_config.runtime_id;
   }
 
   if (!user_config.collector) {
@@ -391,11 +386,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       return std::move(*error);
     }
     final_config.collector = *finalized;
+    final_config.metadata.merge(finalized->metadata);
   } else {
     final_config.collector = user_config.collector;
   }
 
   if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
+    final_config.metadata.merge(trace_sampler_config->metadata);
     final_config.trace_sampler = std::move(*trace_sampler_config);
   } else {
     return std::move(trace_sampler_config.error());
@@ -403,6 +400,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   if (auto span_sampler_config =
           finalize_config(user_config.span_sampler, *logger)) {
+    final_config.metadata.merge(span_sampler_config->metadata);
     final_config.span_sampler = std::move(*span_sampler_config);
   } else {
     return std::move(span_sampler_config.error());
