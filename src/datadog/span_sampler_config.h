@@ -54,7 +54,7 @@ class FinalizedSpanSamplerConfig {
 };
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
-                                                     Logger& logger);
+                                                     Logger&);
 
 nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule&);
 

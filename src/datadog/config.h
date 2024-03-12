@@ -32,7 +32,7 @@ struct ConfigMetadata {
   enum class Origin : char {
     ENVIRONMENT_VARIABLE,  // Originating from environment variables
     CODE,                  // Defined in code
-    REMOTE_CONFIG,         // Retrieeved from remote configuration
+    REMOTE_CONFIG,         // Retrieved from remote configuration
     DEFAULT                // Default value
   };
 
@@ -48,7 +48,7 @@ struct ConfigMetadata {
   ConfigMetadata() = default;
   ConfigMetadata(ConfigName n, std::string v, Origin orig,
                  Optional<Error> err = nullopt)
-      : name(n), value(std::move(v)), origin(orig), error(err) {}
+      : name(n), value(std::move(v)), origin(orig), error(std::move(err)) {}
 };
 
 // Return a pair containing the configuration origin and value of a

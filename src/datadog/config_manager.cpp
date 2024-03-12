@@ -1,7 +1,5 @@
 #include "config_manager.h"
 
-#include <sstream>
-
 #include "parse_util.h"
 #include "string_util.h"
 #include "trace_sampler.h"
