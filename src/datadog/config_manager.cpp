@@ -107,16 +107,7 @@ void ConfigManager::reset_config(ConfigName name, T& conf,
   metadata.emplace_back(default_metadata_[name]);
 }
 
-std::vector<ConfigMetadata> ConfigManager::reset() {
-  std::vector<ConfigMetadata> metadata;
-
-  std::lock_guard<std::mutex> lock(mutex_);
-  reset_config(ConfigName::TRACE_SAMPLING_RATE, trace_sampler_, metadata);
-  reset_config(ConfigName::TAGS, span_defaults_, metadata);
-  reset_config(ConfigName::REPORT_TRACES, report_traces_, metadata);
-
-  return metadata;
-}
+std::vector<ConfigMetadata> ConfigManager::reset() { return update({}); }
 
 nlohmann::json ConfigManager::config_json() const {
   std::lock_guard<std::mutex> lock(mutex_);

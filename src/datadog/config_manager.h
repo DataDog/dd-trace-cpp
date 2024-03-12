@@ -18,7 +18,7 @@ namespace datadog {
 namespace tracing {
 
 class ConfigManager {
-  // A template class for managing dynamic configuration values.
+  // A class template for managing dynamic configuration values.
   //
   // This class allows storing and managing dynamic configuration values. It
   // maintains an original value and a current value, allowing for updates and
@@ -26,14 +26,14 @@ class ConfigManager {
   //
   // Additionally, it provides methods for accessing the current value and
   // checking whether it has been modified from its original state.
-  template <typename T>
+  template <typename Value>
   class DynamicConfig {
-    T original_value_;
-    Optional<T> current_value_ = nullopt;
+    Value original_value_;
+    Optional<Value> current_value_;
 
    public:
     // Constructs a DynamicConf object with the given initial value
-    explicit DynamicConfig(T original_value)
+    explicit DynamicConfig(Value original_value)
         : original_value_(original_value) {}
 
     // Resets the current value of the configuration to the original value
@@ -42,12 +42,12 @@ class ConfigManager {
     // Returns whether the current value is the original value
     bool is_original_value() const { return !current_value_.has_value(); }
 
-    const T& value() const {
+    const Value& value() const {
       return current_value_.has_value() ? *current_value_ : original_value_;
     }
 
     // Updates the current value of the configuration
-    void operator=(const T& rhs) { current_value_ = rhs; }
+    void operator=(const Value& rhs) { current_value_ = rhs; }
   };
 
   mutable std::mutex mutex_;

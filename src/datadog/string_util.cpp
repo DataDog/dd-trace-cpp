@@ -5,6 +5,26 @@
 
 namespace datadog {
 namespace tracing {
+namespace {
+
+template <typename Sequence, typename Func>
+std::string join(const Sequence& elements, StringView separator,
+                 Func&& append_element) {
+  auto iter = std::begin(elements);
+  const auto end = std::end(elements);
+  std::string result;
+  if (iter == end) {
+    return result;
+  }
+  append_element(result, *iter);
+  for (++iter; iter != end; ++iter) {
+    append(result, separator);
+    append_element(result, *iter);
+  }
+  return result;
+}
+
+}  // namespace
 
 std::string to_string(bool b) { return b ? "true" : "false"; }
 
@@ -14,66 +34,40 @@ std::string to_string(double d, size_t precision) {
   return stream.str();
 }
 
-std::string join(const std::vector<StringView>& values,
-                 const char* const separator) {
-  if (values.empty()) return {};
-  auto it = values.cbegin();
-
-  std::string res{*it};
-  for (++it; it != values.cend(); ++it) {
-    res += separator;
-    append(res, *it);
-  }
-
-  return res;
+std::string join(const std::vector<StringView>& values, StringView separator) {
+  return join(values, separator, [](std::string& result, StringView value) {
+    append(result, value);
+  });
 }
 
 std::string join_propagation_styles(
     const std::vector<PropagationStyle>& values) {
-  auto to_string = [](PropagationStyle style) {
+  return join(values, ",", [](std::string& result, PropagationStyle style) {
     switch (style) {
       case PropagationStyle::B3:
-        return "b3";
+        result += "b3";
+        break;
       case PropagationStyle::DATADOG:
-        return "datadog";
+        result += "datadog";
+        break;
       case PropagationStyle::W3C:
-        return "tracecontext";
+        result += "tracecontext";
+        break;
       case PropagationStyle::NONE:
-        return "none";
+        result += "none";
+        break;
     }
-    return "";  ///< unlikely
-  };
-
-  if (values.empty()) return "";
-  auto it = values.cbegin();
-
-  std::string res{to_string(*it)};
-  for (++it; it != values.cend(); ++it) {
-    res += ',';
-    res += to_string(*it);
-  }
-
-  return res;
+  });
 }
 
 std::string join_tags(
-    const std::unordered_map<std::string, std::string>& tagset) {
-  if (tagset.empty()) return {};
-
-  auto it = tagset.cbegin();
-
-  std::string res{it->first};
-  res += ":";
-  res += it->second;
-
-  for (++it; it != tagset.cend(); ++it) {
-    res += ",";
-    res += it->first;
-    res += ":";
-    res += it->second;
-  }
-
-  return res;
+    const std::unordered_map<std::string, std::string>& values) {
+  return join(values, ",", [](std::string& result, const auto& entry) {
+    const auto& [key, value] = entry;
+    result += key;
+    result += ':';
+    result += value;
+  });
 }
 
 }  // namespace tracing

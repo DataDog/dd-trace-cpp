@@ -8,16 +8,15 @@
 namespace datadog {
 namespace tracing {
 
-// Converts a boolean value to a string
-// The resulted string is either `true` or `false`
+// Return a string representation of the specified boolean `value`.
+// The result is "true" for `true` and "false" for `false`.
 std::string to_string(bool b);
 
 // Converts a double value to a string
 std::string to_string(double d, size_t precision);
 
 // Joins elements of a vector into a single string with a specified separator
-std::string join(const std::vector<StringView>& values,
-                 const char* const separator);
+std::string join(const std::vector<StringView>& values, StringView separator);
 
 // Joins propagation styles into a single comma-separated string
 std::string join_propagation_styles(const std::vector<PropagationStyle>&);
