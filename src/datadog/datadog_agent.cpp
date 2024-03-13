@@ -147,7 +147,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 }  // namespace
 
 DatadogAgent::DatadogAgent(
-    const FinalizedDatadogAgentConfig& config,
+    FinalizedDatadogAgentConfig& config,
     const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
     const std::shared_ptr<Logger>& logger,
     const TracerSignature& tracer_signature,
@@ -165,7 +165,7 @@ DatadogAgent::DatadogAgent(
       flush_interval_(config.flush_interval),
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
-      remote_config_(tracer_signature, config_manager) {
+      remote_config_(tracer_signature, config_manager, logger) {
   assert(logger_);
   assert(tracer_telemetry_);
   if (tracer_telemetry_->enabled()) {
@@ -203,6 +203,15 @@ DatadogAgent::DatadogAgent(
           }
         });
   }
+
+  for (auto&& l : config.rem_cfg_listeners) {
+    remote_config_.add_listener(std::move(l));
+  }
+  config.rem_cfg_listeners.clear();
+  for (auto &&l : config.rem_cfg_end_listeners) {
+    remote_config_.add_config_end_listener(std::move(l));
+  }
+  config.rem_cfg_end_listeners.clear();
 
   cancel_remote_configuration_task_ =
       event_scheduler_->schedule_recurring_event(
@@ -421,7 +430,7 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
           return;
         }
 
-        const auto response_json =
+        auto response_json =
             nlohmann::json::parse(/* input = */ response_body,
                                   /* parser_callback = */ nullptr,
                                   /* allow_exceptions = */ false);
@@ -436,7 +445,7 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
           // TODO (during Active Configuration): `process_response` should
           // return a list of configuration update and should be consumed by
           // telemetry.
-          remote_config_.process_response(response_json);
+          remote_config_.process_response(std::move(response_json));
         }
       };
 

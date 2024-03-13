@@ -1,40 +1,44 @@
 #include "remote_config.h"
 
 #include <cassert>
-#include <cstdint>
+#include <charconv>
+#include <exception>
+#include <regex>
+#include <stdexcept>
+#include <string_view>
 #include <type_traits>
 #include <unordered_set>
 
 #include "base64.h"
-#include "datadog/string_view.h"
+#include "config_manager.h"
+#include "config_update.h"
 #include "json.hpp"
 #include "random.h"
+#include "string_view.h"
 #include "version.h"
 
 using namespace nlohmann::literals;
+using namespace std::literals;
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 namespace {
 
-// The ".client.capabilities" field of the remote config request payload
-// describes which parts of the library's configuration are supported for remote
-// configuration.
-//
-// It's a bitset, 64 bits wide, where each bit indicates whether the library
-// supports a particular feature for remote configuration.
-//
-// The bitset is encoded in the request as a JSON array of 8 integers, where
-// each integer is one byte from the 64 bits. The bytes are in big-endian order
-// within the array.
-enum CapabilitiesFlag : uint64_t {
-  APM_TRACING_SAMPLE_RATE = 1 << 12,
-};
+template <typename V, typename H>
+nlohmann::json::array_t subscribed_products_to_json(
+    const std::unordered_map<remote_config::Product, V, H>& products) {
+  nlohmann::json::array_t res;
+  res.reserve(products.size());
+  for (auto&& [p, _] : products) {
+    res.emplace_back(p.name());
+  }
+  return res;
+}
 
-constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
-    uint64_t in) {
+// Big-endian serialization of the capabilities set
+constexpr std::array<uint8_t, sizeof(remote_config::CapabilitiesSet)>
+capabilities_byte_array(uint64_t in) {
   std::size_t j = sizeof(in) - 1;
-  std::array<uint8_t, sizeof(uint64_t)> res{};
+  std::array<uint8_t, sizeof(remote_config::CapabilitiesSet)> res{};
   for (std::size_t i = 0; i < sizeof(in); ++i) {
     res[j--] = in >> (i * 8);
   }
@@ -42,44 +46,101 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
   return res;
 }
 
-constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
-    capabilities_byte_array(APM_TRACING_SAMPLE_RATE);
-
-constexpr StringView k_apm_product = "APM_TRACING";
-constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
-
-ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
-  ConfigUpdate config_update;
-
-  if (auto sampling_rate_it = j.find("tracing_sampling_rate");
-      sampling_rate_it != j.cend()) {
-    TraceSamplerConfig trace_sampler_cfg;
-    trace_sampler_cfg.sample_rate = *sampling_rate_it;
-
-    config_update.trace_sampler = trace_sampler_cfg;
+template <typename K, typename H>
+auto subscribed_capabilities(
+    const std::unordered_map<K, remote_config::ProductState, H>&
+        product_states) {
+  remote_config::CapabilitiesSet cap{};
+  for (auto&& [_, pstate] : product_states) {
+    cap |= pstate.subscribed_capabilities();
   }
-
-  return config_update;
+  return capabilities_byte_array(cap.value());
 }
 
+// Built-in, subscribed-by-default APM_TRACING product listener.
+// It builds a ConfigUpdate from the remote config response and calls
+// ConfigManager::update with it
+class TracingProductListener : public remote_config::ProductListener {
+ public:
+  TracingProductListener(const TracerSignature& tracer_signature,
+                         std::shared_ptr<ConfigManager> config_manager)
+      : remote_config::
+            ProductListener{remote_config::Product::KnownProducts::APM_TRACING},
+        tracer_signature_(tracer_signature),
+        config_manager_(std::move(config_manager)) {}
+
+  void on_config_update(const remote_config::ParsedConfigKey& key,
+                        const std::string& file_contents) override {
+    const auto config_json = nlohmann::json::parse(file_contents);
+
+    if (!service_env_match(config_json)) {
+      return;
+    }
+
+    ConfigUpdate const dyn_config =
+        parse_dynamic_config(config_json.at("lib_config"));
+
+    config_manager_->update(dyn_config);
+    applied_configs_.emplace(key);
+  }
+
+  void on_config_remove(const remote_config::ParsedConfigKey& key) override {
+    if (applied_configs_.erase(key) > 0) {
+      config_manager_->reset();
+    }
+  }
+
+  remote_config::CapabilitiesSet capabilities() const override {
+    return remote_config::Capability::APM_TRACING_SAMPLE_RATE;
+  }
+
+ private:
+  bool service_env_match(const nlohmann::json& config_json) {
+    const auto& targeted_service = config_json.find("service_target");
+    if (targeted_service == config_json.cend() ||
+        !targeted_service->is_object()) {
+      return false;
+    }
+    return targeted_service->at("service").get<std::string_view>() ==
+               tracer_signature_.default_service &&
+           targeted_service->at("env").get<std::string_view>() ==
+               tracer_signature_.default_environment;
+  }
+
+  static ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
+    ConfigUpdate config_update;
+
+    if (auto sampling_rate_it = j.find("tracing_sampling_rate");
+        sampling_rate_it != j.cend()) {
+      TraceSamplerConfig trace_sampler_cfg;
+      trace_sampler_cfg.sample_rate = *sampling_rate_it;
+
+      config_update.trace_sampler = trace_sampler_cfg;
+    }
+
+    return config_update;
+  }
+
+  const TracerSignature& tracer_signature_;  // NOLINT
+  std::shared_ptr<ConfigManager> config_manager_;
+  std::unordered_set<remote_config::ParsedConfigKey,
+                     remote_config::ParsedConfigKey::Hash>
+      applied_configs_;
+};
 }  // namespace
 
 RemoteConfigurationManager::RemoteConfigurationManager(
     const TracerSignature& tracer_signature,
-    const std::shared_ptr<ConfigManager>& config_manager)
+    const std::shared_ptr<ConfigManager>& config_manager,
+    std::shared_ptr<Logger> logger)
     : tracer_signature_(tracer_signature),
       config_manager_(config_manager),
-      client_id_(uuid()) {
+      client_id_(uuid()),
+      logger_{std::move(logger)} {
   assert(config_manager_);
-}
-
-bool RemoteConfigurationManager::is_new_config(
-    StringView config_path, const nlohmann::json& config_meta) {
-  auto it = applied_config_.find(std::string{config_path});
-  if (it == applied_config_.cend()) return true;
-
-  return it->second.hash !=
-         config_meta.at("/hashes/sha256"_json_pointer).get<StringView>();
+  auto tracing_listener = std::make_unique<TracingProductListener>(
+      tracer_signature, config_manager_);
+  add_listener(std::move(tracing_listener));
 }
 
 nlohmann::json RemoteConfigurationManager::make_request_payload() {
@@ -87,144 +148,583 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
   auto j = nlohmann::json{
     {"client", {
       {"id", client_id_},
-      {"products", nlohmann::json::array({k_apm_product})},
+      {"products", subscribed_products_to_json(product_states_)},
       {"is_tracer", true},
-      {"capabilities", k_apm_capabilities},
+      {"capabilities", subscribed_capabilities(product_states_)},
       {"client_tracer", {
         {"runtime_id", tracer_signature_.runtime_id.string()},
         {"language", tracer_signature_.library_language},
         {"tracer_version", tracer_signature_.library_version},
         {"service", tracer_signature_.default_service},
-        {"env", tracer_signature_.default_environment}
+        {"env", tracer_signature_.default_environment},
+        // missing: tags, extra_services, app_version
       }},
       {"state", {
         {"root_version", 1},
-        {"targets_version", state_.targets_version},
-        {"backend_client_state", state_.opaque_backend_state}
+        {"targets_version", next_client_state_.targets_version},
+        {"config_states", serialize_config_states()},
+        {"has_error", next_client_state_.error.has_value()},
+        {"error", next_client_state_.error.value_or("")},
+        {"backend_client_state", next_client_state_.backend_client_state},
       }}
-    }}
+    }},
+    {"cached_target_files", serialize_cached_target_files()},
   };
   // clang-format on
-
-  if (!applied_config_.empty()) {
-    auto config_states = nlohmann::json::array();
-    for (const auto& [_, config] : applied_config_) {
-      config_states.emplace_back(nlohmann::json{{"id", config.id},
-                                                {"version", config.version},
-                                                {"product", k_apm_product}});
-    }
-
-    j["config_states"] = config_states;
-  }
-
-  if (state_.error_message) {
-    j["has_error"] = true;
-    j["error"] = *state_.error_message;
-  }
 
   return j;
 }
 
-void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
-  state_.error_message = nullopt;
+nlohmann::json::array_t RemoteConfigurationManager::serialize_config_states()
+    const {
+  auto&& config_states_nonser = next_client_state_.config_states;
+
+  nlohmann::json::array_t config_states{};
+  config_states.reserve(config_states_nonser.size());
+
+  for (const std::shared_ptr<remote_config::ConfigState>& cfg_state :
+       config_states_nonser) {
+    if (!cfg_state) {
+      continue;  // should not happen
+    }
+    const remote_config::ConfigState& cs = *cfg_state;
+    // clang-format off
+    config_states.emplace_back(nlohmann::json{
+        {"id", cs.id},
+        {"version", cs.version},
+        {"product", cs.product.name()},
+        {"apply_state", static_cast<std::underlying_type_t<decltype(cs.apply_state)>>(cs.apply_state)},
+        {"apply_error", cs.apply_error},
+    });
+    // clang-format on
+  }
+  return config_states;
+}
+
+nlohmann::json RemoteConfigurationManager::serialize_cached_target_files()
+    const {
+  nlohmann::json::array_t cached_target_files;
+
+  for (auto&& [_, pstate] : product_states_) {
+    pstate.for_each_cached_target_file(
+        [&cached_target_files](const remote_config::CachedTargetFile& ctf) {
+          nlohmann::json::array_t hashes;
+          for (auto&& target_file_hash : ctf.hashes) {
+            hashes.emplace_back(
+                nlohmann::json{{"algorithm", target_file_hash.algorithm},
+                               {"hash", target_file_hash.hash}});
+          }
+          cached_target_files.emplace_back(nlohmann::json{
+              {"path", ctf.path},
+              {"length", ctf.length},
+              {"hashes", std::move(hashes)},
+          });
+        });
+  }
+
+  if (cached_target_files.empty()) {
+    // system tests expect (expected?) a null in this case
+    // can't use {}-initialization (creates an array)
+    return nullptr;
+  }
+
+  return cached_target_files;
+}
+
+void RemoteConfigurationManager::process_response(nlohmann::json&& json) {
+  std::optional<remote_config::RemoteConfigResponse> resp;
+  std::vector<std::string> errors;
 
   try {
-    const auto targets = nlohmann::json::parse(
-        base64_decode(json.at("targets").get<StringView>()));
-
-    state_.targets_version = targets.at("/signed/version"_json_pointer);
-    state_.opaque_backend_state =
-        targets.at("/signed/custom/opaque_backend_state"_json_pointer);
-
-    const auto client_configs_it = json.find("client_configs");
-
-    // `client_configs` is absent => remove previously applied configuration if
-    // any applied.
-    if (client_configs_it == json.cend()) {
-      if (!applied_config_.empty()) {
-        std::for_each(applied_config_.cbegin(), applied_config_.cend(),
-                      [this](const auto it) { revert_config(it.second); });
-        applied_config_.clear();
-      }
+    auto maybe_resp =
+        remote_config::RemoteConfigResponse::from_json(std::move(json));
+    if (!maybe_resp) {
+      logger_->log_debug(
+          "Remote Configuration response is empty (no change)"sv);
       return;
     }
 
-    // Keep track of config path received to know which ones to revert.
-    std::unordered_set<std::string> visited_config;
-    visited_config.reserve(client_configs_it->size());
+    logger_->log_debug("Got nonempty Remote Configuration response"sv);
+    resp.emplace(std::move(*maybe_resp));
+    resp->validate();
 
-    for (const auto& client_config : *client_configs_it) {
-      auto config_path = client_config.get<StringView>();
-      visited_config.emplace(config_path);
-
-      const auto& config_metadata =
-          targets.at("/signed/targets"_json_pointer).at(config_path);
-      if (!contains(config_path, k_apm_product_path_substring) ||
-          !is_new_config(config_path, config_metadata)) {
-        continue;
-      }
-
-      const auto& target_files = json.at("/target_files"_json_pointer);
-      auto target_it = std::find_if(
-          target_files.cbegin(), target_files.cend(),
-          [&config_path](const nlohmann::json& j) {
-            return j.at("/path"_json_pointer).get<StringView>() == config_path;
-          });
-
-      if (target_it == target_files.cend()) {
-        state_.error_message =
-            "Missing configuration from Remote Configuration response: No "
-            "target file having path \"";
-        append(*state_.error_message, config_path);
-        *state_.error_message += '\"';
-        return;
-      }
-
-      const auto config_json = nlohmann::json::parse(
-          base64_decode(target_it.value().at("raw").get<StringView>()));
-
-      const auto& targeted_service = config_json.at("service_target");
-      if (targeted_service.at("service").get<StringView>() !=
-              tracer_signature_.default_service ||
-          targeted_service.at("env").get<StringView>() !=
-              tracer_signature_.default_environment) {
-        continue;
-      }
-
-      Configuration new_config;
-      new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
-      new_config.id = config_json.at("id");
-      new_config.version = config_json.at("revision");
-      new_config.content = parse_dynamic_config(config_json.at("lib_config"));
-
-      apply_config(new_config);
-      applied_config_[std::string{config_path}] = new_config;
-    }
-
-    // Applied configuration not present must be reverted.
-    for (auto it = applied_config_.cbegin(); it != applied_config_.cend();) {
-      if (!visited_config.count(it->first)) {
-        revert_config(it->second);
-        it = applied_config_.erase(it);
-      } else {
-        it++;
+    // check if the backend returned configuration for unscribed products
+    for (const remote_config::ParsedConfigKey& key : resp->client_configs()) {
+      if (product_states_.find(key.product()) == product_states_.cend()) {
+        throw remote_config::reportable_error(
+            "Remote Configuration response contains unknown/unsubscribed "
+            "product: " +
+            std::string{key.product().name()});
       }
     }
+
+    bool applied_any = false;
+    // Apply the configuration is applied product-by-product.
+    // ProductState::apply will inspect the returned client_configs and process
+    // those that pertain to the product in question.
+    for (auto&& [product, pstate] : product_states_) {
+      try {
+        applied_any = pstate.apply(*resp) || applied_any;
+      } catch (const remote_config::reportable_error& e) {
+        logger_->log_error(std::string{"Failed to apply configuration for "} +
+                           std::string{product.name()} + ": " + e.what());
+        errors.emplace_back(e.what());
+      } catch (...) {
+        std::terminate();
+      }
+    }
+
+    if (applied_any) {
+      // Now call the "end listeners", which are necessary because
+      // AppSec has its configuration split across different products
+      for (auto&& listener : config_end_listeners_) {
+        try {
+          listener();
+        } catch (const std::exception& e) {
+          logger_->log_error(
+              std::string{
+                  "Failed to call Remote Configuration end listener: "} +
+              e.what());
+          errors.emplace_back(e.what());
+        }
+      }
+    }
+
   } catch (const nlohmann::json::exception& e) {
     std::string error_message = "Ill-formatted Remote Configuration response: ";
     error_message += e.what();
+    errors.emplace_back(std::move(error_message));
+  } catch (const std::exception& e) {
+    errors.emplace_back(e.what());
+  }
 
-    state_.error_message = std::move(error_message);
+  if (resp) {
+    update_next_state({std::ref(*resp)}, build_error_message(errors));
+  } else {
+    update_next_state({}, build_error_message(errors));
   }
 }
 
-void RemoteConfigurationManager::apply_config(Configuration config) {
-  config_manager_->update(config.content);
+void RemoteConfigurationManager::add_listener(
+    std::unique_ptr<remote_config::ProductListener> listener) {  auto product = listener->product();
+  auto ps_it = product_states_.find(product);
+  if (ps_it == product_states_.cend()) {
+    ps_it = product_states_.emplace(product, product).first;
+  }
+  ps_it->second.add_listener(std::move(listener));
 }
 
-void RemoteConfigurationManager::revert_config(Configuration) {
-  config_manager_->reset();
+void RemoteConfigurationManager::add_config_end_listener(
+    std::function<void()> listener) {
+  config_end_listeners_.emplace_back(std::move(listener));
 }
 
-}  // namespace tracing
-}  // namespace datadog
+Optional<std::string> RemoteConfigurationManager::build_error_message(
+    std::vector<std::string>& errors) {
+  if (errors.empty()) {
+    return std::nullopt;
+  }
+  if (errors.size() == 1) {
+    return {std::move(errors.front())};
+  }
+
+  std::string msg{"Failed to apply configuration due to multiple errors: "};
+  for (auto&& e : errors) {
+    msg += e;
+    msg += "; ";
+  }
+  return {std::move(msg)};
+}
+
+void RemoteConfigurationManager::update_next_state(
+    Optional<std::reference_wrapper<const remote_config::RemoteConfigResponse>>
+        rcr,
+    Optional<std::string> error) {
+  uint64_t const new_targets_version =
+      rcr ? rcr->get().targets_version() : next_client_state_.targets_version;
+
+  std::vector<std::shared_ptr<remote_config::ConfigState>> config_states;
+  for (auto&& [p, pstate] : product_states_) {
+    pstate.add_config_states_to(config_states);
+  }
+
+  next_client_state_ = ClientState{
+      // if there was a global error, we did not apply the configurations fully
+      // the system tests expect here the targets version not to be updated
+      next_client_state_.root_version,
+      error ? next_client_state_.targets_version : new_targets_version,
+      config_states,
+      std::move(error),
+      rcr ? rcr->get().opaque_backend_state()
+          : next_client_state_.backend_client_state,
+  };
+}
+
+namespace remote_config {
+
+namespace {
+template <typename SubMatch>
+StringView submatch_to_sv(const SubMatch& sub_match) {
+  return StringView{&*sub_match.first,
+                    static_cast<std::size_t>(sub_match.length())};
+}
+};  // namespace
+
+void ParsedConfigKey::parse_config_key() {
+  std::regex const rgx{"(?:datadog/(\\d+)|employee)/([^/]+)/([^/]+)/([^/]+)"};
+  std::smatch smatch;
+  if (!std::regex_match(key_, smatch, rgx)) {
+    throw reportable_error("Invalid config key: " + key_);
+  }
+
+  if (key_[0] == 'd') {
+    source_ = "datadog"sv;
+    auto [ptr, ec] =
+        std::from_chars(&*smatch[1].first, &*smatch[1].second, org_id_);
+    if (ec != std::errc{} || ptr != &*smatch[1].second) {
+      throw reportable_error("Invalid org_id in config key " + key_ + ": " +
+                             std::string{submatch_to_sv(smatch[1])});
+    }
+  } else {
+    source_ = "employee"sv;
+    org_id_ = 0;
+  }
+
+  StringView const product_sv{submatch_to_sv(smatch[2])};
+  product_ = &Product::KnownProducts::for_name(product_sv);
+
+  config_id_ = submatch_to_sv(smatch[3]);
+  name_ = submatch_to_sv(smatch[4]);
+}
+
+RemoteConfigResponse::RemoteConfigResponse(nlohmann::json full_response,
+                                           nlohmann::json targets)
+    : json_{std::move(full_response)},
+      targets_{std::move(targets)},
+      targets_signed_{targets_.at("signed"sv)} {}
+
+std::optional<RemoteConfigResponse> RemoteConfigResponse::from_json(
+    nlohmann::json&& json) {
+  const auto targets_encoded = json.find("targets"sv);
+  if (targets_encoded == json.cend()) {
+    // empty response -> no change
+    return std::nullopt;
+  }
+
+  if (!targets_encoded->is_string()) {
+    throw reportable_error(
+        "Invalid Remote Configuration response: targets (encoded) is not a "
+        "string");
+  }
+
+  if (targets_encoded->get<std::string_view>().empty()) {
+    // empty response -> no change
+    return std::nullopt;
+  }
+
+  // if targets is not empty, we need targets.signed
+  std::string decoded = base64_decode(targets_encoded->get<std::string_view>());
+  if (decoded.empty()) {
+    throw reportable_error(
+        "Invalid Remote Configuration response: invalid base64 data for "
+        "targets");
+  }
+  auto targets = nlohmann::json::parse(decoded);
+
+  auto t_signed = targets.find("signed"sv);
+  if (t_signed == targets.cend()) {
+    throw reportable_error(
+        "Invalid Remote Configuration response: missing "
+        "signed targets with nonempty \"targets\"");
+  }
+
+  return RemoteConfigResponse{std::move(json), std::move(targets)};
+}
+
+void RemoteConfigResponse::verify_targets_presence() const {
+  // files referred to in target_files need to exist in targets.signed.targets
+  auto target_files = json_.find("target_files"sv);
+  if (target_files == json_.cend()) {
+    return;
+  }
+
+  if (!target_files->is_array()) {
+    throw reportable_error(
+        "Invalid Remote Configuration response: target_files is not an array");
+  }
+
+  for (auto it = target_files->begin(); it != target_files->end(); ++it) {
+    auto path = it->find("path"sv);
+    if (path == it->cend() || !path->is_string()) {
+      throw reportable_error(
+          "Invalid Remote Configuration response: missing "
+          "path in element of target_files");
+    }
+
+    auto path_sv = path->get<std::string_view>();
+    if (!get_target(path_sv)) {
+      throw reportable_error(
+          "Invalid Remote Configuration response: "
+          "target_files[...].path (" +
+          std::string{path_sv} +
+          ") is a key not present in targets.signed.targets");
+    }
+  }
+}
+
+void RemoteConfigResponse::verify_client_configs() {
+  auto &&client_cfgs = json_.find("client_configs"sv);
+  if (client_cfgs == json_.end()) {
+    return;
+  }
+  if (!client_cfgs->is_array()) {
+    throw reportable_error(
+        "Invalid Remote Configuration response: client_configs is no array");
+  }
+  for (auto&& [_, cc] : client_cfgs->items()) {
+    if (!cc.is_string()) {
+      throw reportable_error(
+          "Invalid Remote Configuration response: client_configs "
+          "should be an array of strings");
+    }
+    client_configs_.emplace_back(cc.get<std::string>());
+  }
+}
+
+Optional<ConfigTarget> RemoteConfigResponse::get_target(StringView key) const {
+  auto&& targets = targets_signed_.at("targets"sv);
+  auto&& target = targets.find(key);
+  if (target == targets.cend()) {
+    return {};
+  }
+  return ConfigTarget{*target};
+}
+
+Optional<std::string> RemoteConfigResponse::get_file_contents(
+    const ParsedConfigKey& key) const {
+  auto&& target_files = json_.find("target_files"sv);
+  if (target_files == json_.cend() || !target_files->is_array()) {
+    return {};
+  }
+
+  Optional<ConfigTarget> target = get_target(key);
+  if (!target) {
+    throw std::runtime_error("targets.signed.targets[" +
+                             std::string{key.full_key()} +
+                             "] was expected to exist at this point");
+  }
+
+  for (auto&& file : *target_files) {
+    auto&& path = file.at("path"sv).get<std::string>();
+    if (path != key.full_key()) {
+      continue;
+    }
+
+    // TODO check sha256 hash
+    auto expected_len = target->length();
+    if (expected_len == 0) {
+      return {{}};
+    }
+
+    const auto raw = file.at("raw"sv).get<std::string_view>();
+    auto decoded = base64_decode(raw);
+    if (decoded.empty()) {
+      throw reportable_error(
+          "Invalid Remote Configuration response: target_files[...].raw "
+          "is not a valid base64 string");
+    }
+    if (decoded.length() != expected_len) {
+      throw reportable_error(
+          "Invalid Remote Configuration response: target_files[...].raw "
+          "length (after decoding) does not match the length in "
+          "targets.signed.targets. "
+          "Expected " +
+          std::to_string(expected_len) + ", got " +
+          std::to_string(decoded.length()));
+    }
+    return {std::move(decoded)};
+  }
+
+  return {};
+}
+
+bool ProductState::apply(const RemoteConfigResponse& response) {
+  const std::vector<std::string> errors;
+  std::unordered_set<const ParsedConfigKey*> processed_keys;
+  bool changes_detected = false;
+  for (auto&& key : response.client_configs()) {
+    if (key.product() != product_) {
+      continue;
+    }
+
+    try {
+      const ConfigTarget cfg_target = get_target_or_throw(response, key);
+      processed_keys.emplace(&key);
+
+      if (is_target_changed(key, cfg_target)) {
+        changes_detected = true;
+        const std::string content = get_file_contents_or_throw(response, key);
+        call_listeners_apply(response, key, content);
+      }
+    } catch (const reportable_error&) {
+      throw;
+    } catch (const nlohmann::json::exception& e) {
+      // if these happen, the response is prob malformed, so it's a global error
+      throw reportable_error("JSON error processing key " +
+                             std::string{key.full_key()} + ": " + e.what());
+    } catch (const std::exception& e) {
+      // should not happen; errors are caught in call_listeners_apply
+      throw reportable_error("Failed to apply configuration for " +
+                             std::string{key.full_key()} + ": " + e.what());
+    } catch (...) {
+      std::terminate();
+    }
+  }
+
+  // Process removed configuration
+  // per_key_state_ is a map whose keys are the ones we know about
+  // processed_keys are the ones we saw in the response
+  // So find the ones we know about but didn't see in the response
+  for (auto it{per_key_state_.cbegin()}; it != per_key_state_.cend();) {
+    bool found{};
+    const ParsedConfigKey& key = it->first;
+    for (auto&& pk : processed_keys) {
+      if (*pk == key) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      changes_detected = true;
+      it = call_listeners_remove(it);
+    } else {
+      it++;
+    }
+  }
+
+  return changes_detected;
+}
+
+void ProductState::call_listeners_apply(const RemoteConfigResponse& resp,
+                                        const ParsedConfigKey& key,
+                                        const std::string& file_contents) {
+  try {
+    for (auto&& l : listeners_) {
+      l->on_config_update(key, file_contents);
+    }
+
+    update_config_state(resp, key, {});
+  } catch (const reportable_error&) {
+    throw;
+  } catch (const std::exception& e) {
+    update_config_state(resp, key, {{e.what()}});
+  } catch (...) {
+    std::terminate();
+  }
+}
+
+ProductState::per_key_state_citerator_t ProductState::call_listeners_remove(
+    ProductState::per_key_state_citerator_t it) {
+  const ParsedConfigKey& key = it->first;
+  try {
+    for (auto&& l : listeners_) {
+      l->on_config_remove(key);
+    }
+  } catch (const reportable_error&) {
+    throw;
+  } catch (const std::exception& e) {
+    // no way to report errors removing a config, as its config_state entry will
+    // not be included in the next request. Report it globally
+    throw reportable_error("Failed to remove configuration for " +
+                           std::string{key.full_key()} + ": " + e.what());
+  } catch (...) {
+    std::terminate();
+  }
+
+  return per_key_state_.erase(it);
+}
+
+ConfigTarget ProductState::get_target_or_throw(
+    const RemoteConfigResponse& response, const ParsedConfigKey& key) {
+  auto&& target = response.get_target(key);
+  if (!target) {
+    throw reportable_error("Told to apply config for " +
+                           std::string{key.full_key()} +
+                           ", but no corresponding entry exists in "
+                           "targets.targets_signed.targets");
+  }
+  return *target;
+}
+
+std::string ProductState::get_file_contents_or_throw(
+    const RemoteConfigResponse& response, const ParsedConfigKey& key) {
+  Optional<std::string> maybe_content = response.get_file_contents(key);
+  if (!maybe_content) {
+    throw reportable_error(
+        "Told to apply config for " + std::string{key.full_key()} +
+        ", but content not present when it was expected to be (because the new "
+        "hash differs from the one last seen, if any)");
+  }
+  return std::move(*maybe_content);
+}
+
+void ProductState::update_config_state(const RemoteConfigResponse& response,
+                                       const ParsedConfigKey& key,
+                                       Optional<std::string> error) try {
+  Optional<ConfigTarget> config_target = response.get_target(key);
+  assert(config_target.has_value());
+
+  ConfigState new_config_state{
+      std::string{key.config_id()},
+      config_target->version(),
+      key.product(),
+      error ? ConfigState::ApplyState::Error
+            : ConfigState::ApplyState::Acknowledged,
+      error ? std::move(*error) : std::string{},
+  };
+  CachedTargetFile new_ctf = config_target->to_cached_target_file(key);
+
+  auto&& state = per_key_state_[key];
+  if (!state.config_state) {
+    state.config_state =
+        std::make_shared<ConfigState>(std::move(new_config_state));
+  } else {
+    *state.config_state = std::move(new_config_state);
+  }
+  state.cached_target_file = std::move(new_ctf);
+} catch (const std::exception& e) {
+  throw reportable_error("Failed to update config state from for " +
+                         std::string{key.full_key()} + ": " + e.what());
+}
+
+CachedTargetFile ConfigTarget::to_cached_target_file(
+    const ParsedConfigKey& key) const {
+  auto length = json_.at(std::string_view{"length"}).get<std::uint64_t>();
+  std::vector<CachedTargetFile::TargetFileHash> hashes;
+
+  auto&& hashes_json = json_.at(std::string_view{"hashes"});
+  if (!hashes_json.is_object()) {
+    throw reportable_error(
+        "Invalid Remote Configuration response in config_target: "
+        "hashes is not an object");
+  }
+  hashes.reserve(hashes_json.size());
+  bool found_sha256 = false;
+  for (auto&& [algo, hash] : hashes_json.items()) {
+    if (algo == "sha256"sv) {
+      found_sha256 = true;
+    }
+    hashes.emplace_back(
+        CachedTargetFile::TargetFileHash{algo, hash.get<std::string>()});
+  }
+  if (!found_sha256) {
+    throw reportable_error(
+        "Invalid Remote Configuration response in config_target: "
+        "missing sha256 hash for " + std::string{key.full_key()});
+  }
+
+  return {std::string{key.full_key()}, length, std::move(hashes)};
+}
+}  // namespace remote_config
+
+}  // namespace datadog::tracing

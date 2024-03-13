@@ -85,7 +85,7 @@ Expected<HTTPClient::URL> DatadogAgentConfig::parse(StringView input) {
 }
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
+    DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
     const Clock& clock) {
   FinalizedDatadogAgentConfig result;
 
@@ -158,6 +158,9 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   result.remote_configuration_poll_interval =
       std::chrono::seconds(rc_poll_interval_seconds);
+
+  result.rem_cfg_listeners = std::move(config.rem_cfg_listeners);
+  result.rem_cfg_end_listeners = std::move(config.rem_cfg_end_listeners);
 
   auto env_host = lookup(environment::DD_AGENT_HOST);
   auto env_port = lookup(environment::DD_TRACE_AGENT_PORT);

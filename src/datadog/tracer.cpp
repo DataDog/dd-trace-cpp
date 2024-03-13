@@ -30,10 +30,10 @@
 namespace datadog {
 namespace tracing {
 
-Tracer::Tracer(const FinalizedTracerConfig& config)
+Tracer::Tracer(FinalizedTracerConfig& config)
     : Tracer(config, default_id_generator(config.trace_id_128_bit)) {}
 
-Tracer::Tracer(const FinalizedTracerConfig& config,
+Tracer::Tracer(FinalizedTracerConfig& config,
                const std::shared_ptr<const IDGenerator>& generator)
     : logger_(config.logger),
       config_manager_(std::make_shared<ConfigManager>(config)),

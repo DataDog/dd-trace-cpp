@@ -264,11 +264,11 @@ Expected<void> finalize_propagation_styles(FinalizedTracerConfig &result,
 
 }  // namespace
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
+Expected<FinalizedTracerConfig> finalize_config(TracerConfig &config) {
   return finalize_config(config, default_clock);
 }
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
+Expected<FinalizedTracerConfig> finalize_config(TracerConfig &config,
                                                 const Clock &clock) {
   FinalizedTracerConfig result;
 
@@ -324,7 +324,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
     if (auto *error = finalized.if_error()) {
       return std::move(*error);
     }
-    result.collector = *finalized;
+    result.collector = std::move(*finalized);
   } else {
     result.collector = config.collector;
   }

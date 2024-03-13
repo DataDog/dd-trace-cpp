@@ -54,8 +54,8 @@ class Tracer {
   // Create a tracer configured using the specified `config`, and optionally:
   // - using the specified `generator` to create trace IDs and span IDs
   // - using the specified `clock` to get the current time.
-  explicit Tracer(const FinalizedTracerConfig& config);
-  Tracer(const FinalizedTracerConfig& config,
+  explicit Tracer(FinalizedTracerConfig& config);
+  Tracer(FinalizedTracerConfig& config,
          const std::shared_ptr<const IDGenerator>& generator);
 
   // Create a new trace and return the root span of the trace.  Optionally

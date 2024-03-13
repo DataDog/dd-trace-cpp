@@ -63,7 +63,7 @@ class DatadogAgent : public Collector {
   void send_app_closing();
 
  public:
-  DatadogAgent(const FinalizedDatadogAgentConfig&,
+  DatadogAgent(FinalizedDatadogAgentConfig&,
                const std::shared_ptr<TracerTelemetry>&,
                const std::shared_ptr<Logger>&, const TracerSignature& id,
                const std::shared_ptr<ConfigManager>& config_manager);

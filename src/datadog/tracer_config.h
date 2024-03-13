@@ -139,7 +139,7 @@ struct TracerConfig {
 // `FinalizedTracerConfig` must be obtained by calling `finalize_config`.
 class FinalizedTracerConfig {
   friend Expected<FinalizedTracerConfig> finalize_config(
-      const TracerConfig& config, const Clock& clock);
+      TracerConfig& config, const Clock& clock);
   FinalizedTracerConfig() = default;
 
  public:
@@ -174,8 +174,8 @@ class FinalizedTracerConfig {
 // Optionally specify a `clock` used to calculate span start times, span
 // durations, and timeouts.  If `clock` is not specified, then `default_clock`
 // is used.
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config);
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config,
+Expected<FinalizedTracerConfig> finalize_config(TracerConfig& config);
+Expected<FinalizedTracerConfig> finalize_config(TracerConfig& config,
                                                 const Clock& clock);
 
 }  // namespace tracing
