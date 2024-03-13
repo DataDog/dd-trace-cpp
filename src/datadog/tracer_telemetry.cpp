@@ -7,6 +7,50 @@
 
 namespace datadog {
 namespace tracing {
+namespace {
+
+std::string to_string(datadog::tracing::ConfigName name) {
+  switch (name) {
+    case ConfigName::SERVICE_NAME:
+      return "service";
+    case ConfigName::SERVICE_ENV:
+      return "env";
+    case ConfigName::SERVICE_VERSION:
+      return "application_version";
+    case ConfigName::REPORT_TRACES:
+      return "trace_enabled";
+    case ConfigName::TAGS:
+      return "trace_tags";
+    case ConfigName::EXTRACTION_STYLES:
+      return "trace_propagation_style_extract";
+    case ConfigName::INJECTION_STYLES:
+      return "trace_propagation_style_inject";
+    case ConfigName::STARTUP_LOGS:
+      return "trace_startup_logs_enabled";
+    case ConfigName::REPORT_TELEMETRY:
+      return "instrumentation_telemetry_enabled";
+    case ConfigName::DELEGATE_SAMPLING:
+      return "DD_TRACE_DELEGATE_SAMPLING";
+    case ConfigName::GENEREATE_128BIT_TRACE_IDS:
+      return "trace_128_bits_id_enabled";
+    case ConfigName::AGENT_URL:
+      return "trace_agent_url";
+    case ConfigName::RC_POLL_INTERVAL:
+      return "remote_config_poll_interval";
+    case ConfigName::TRACE_SAMPLING_RATE:
+      return "trace_sample_rate";
+    case ConfigName::TRACE_SAMPLING_LIMIT:
+      return "trace_rate_limit";
+    case ConfigName::SPAN_SAMPLING_RULES:
+      return "span_sample_rules";
+    case ConfigName::TRACE_SAMPLING_RULES:
+      return "trace_sample_rules";
+  }
+
+  std::abort();
+}
+
+}  // namespace
 
 TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
                                  const std::shared_ptr<Logger>& logger,
@@ -83,12 +127,59 @@ nlohmann::json TracerTelemetry::generate_telemetry_body(
   });
 }
 
-std::string TracerTelemetry::app_started() {
+nlohmann::json TracerTelemetry::generate_configuration_field(
+    const ConfigMetadata& config_metadata) {
+  // NOTE(@dmehala): `seq_id` should start at 1 so that the go backend can
+  // detect between non set fields.
+  config_seq_ids[config_metadata.name] += 1;
+  auto seq_id = config_seq_ids[config_metadata.name];
+
+  auto j = nlohmann::json{{"name", to_string(config_metadata.name)},
+                          {"value", config_metadata.value},
+                          {"seq_id", seq_id}};
+
+  switch (config_metadata.origin) {
+    case ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
+      j["origin"] = "env_var";
+      break;
+    case ConfigMetadata::Origin::CODE:
+      j["origin"] = "code";
+      break;
+    case ConfigMetadata::Origin::REMOTE_CONFIG:
+      j["origin"] = "remote_config";
+      break;
+    case ConfigMetadata::Origin::DEFAULT:
+      j["origin"] = "default";
+      break;
+  }
+
+  if (config_metadata.error) {
+    // clang-format off
+      j["error"] = {
+        {"code", config_metadata.error->code},
+        {"message", config_metadata.error->message}
+      };
+    // clang-format on
+  }
+
+  return j;
+}
+
+std::string TracerTelemetry::app_started(
+    const std::unordered_map<ConfigName, ConfigMetadata>& configurations) {
+  auto configuration_json = nlohmann::json::array();
+  for (const auto& [_, config_metadata] : configurations) {
+    // if (config_metadata.value.empty()) continue;
+
+    configuration_json.emplace_back(
+        generate_configuration_field(config_metadata));
+  }
+
   // clang-format off
   auto app_started_msg = nlohmann::json{
     {"request_type", "app-started"},
     {"payload", nlohmann::json{
-      {"configuration", nlohmann::json::array()}
+      {"configuration", configuration_json}
     }}
   };
 
@@ -239,6 +330,23 @@ std::string TracerTelemetry::app_closing() {
   telemetry_body["payload"] = batch_payloads;
   auto message_batch_payload = telemetry_body.dump();
   return message_batch_payload;
+}
+
+std::string TracerTelemetry::configuration_change(
+    const std::vector<ConfigMetadata>& new_configuration) {
+  auto configuration_json = nlohmann::json::array();
+  for (const auto& config_metadata : new_configuration) {
+    // if (config_metadata.value.empty()) continue;
+    configuration_json.emplace_back(
+        generate_configuration_field(config_metadata));
+  }
+
+  auto configuration_change =
+      generate_telemetry_body("app-client-configuration-change");
+  configuration_change["payload"] =
+      nlohmann::json{{"configuration", configuration_json}};
+
+  return configuration_change.dump();
 }
 
 }  // namespace tracing

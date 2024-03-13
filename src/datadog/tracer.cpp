@@ -31,7 +31,7 @@ namespace datadog {
 namespace tracing {
 
 Tracer::Tracer(const FinalizedTracerConfig& config)
-    : Tracer(config, default_id_generator(config.trace_id_128_bit)) {}
+    : Tracer(config, default_id_generator(config.generate_128bit_trace_ids)) {}
 
 Tracer::Tracer(const FinalizedTracerConfig& config,
                const std::shared_ptr<const IDGenerator>& generator)
@@ -67,7 +67,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     collector_ = agent;
 
     if (tracer_telemetry_->enabled()) {
-      agent->send_app_started();
+      agent->send_app_started(config.metadata);
     }
   }
 

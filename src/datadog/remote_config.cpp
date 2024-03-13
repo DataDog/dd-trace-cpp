@@ -51,57 +51,22 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
 constexpr StringView k_apm_product = "APM_TRACING";
 constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
 
-Expected<std::unordered_map<std::string, std::string>> parse_tags(
-    const std::vector<StringView>& list_of_tags) {
-  std::unordered_map<std::string, std::string> tags;
-
-  // Within a tag, the key and value are separated by a colon (":").
-  for (const StringView& token : list_of_tags) {
-    const auto separator = std::find(token.begin(), token.end(), ':');
-    if (separator == token.end()) {
-      std::string message;
-      message += "Unable to parse a key/value from the tag text \"";
-      append(message, token);
-      message +=
-          "\" because it does not contain the separator character \":\".";
-      return Error{Error::TAG_MISSING_SEPARATOR, std::move(message)};
-    }
-
-    std::string key{token.begin(), separator};
-    std::string value{separator + 1, token.end()};
-    // If there are duplicate values, then the last one wins.
-    tags.insert_or_assign(std::move(key), std::move(value));
-  }
-
-  return tags;
-}
-
 ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
   ConfigUpdate config_update;
 
   if (auto sampling_rate_it = j.find("tracing_sampling_rate");
       sampling_rate_it != j.cend()) {
-    TraceSamplerConfig trace_sampler_cfg;
-    trace_sampler_cfg.sample_rate = *sampling_rate_it;
-
-    config_update.trace_sampler = trace_sampler_cfg;
+    config_update.trace_sampling_rate = *sampling_rate_it;
   }
 
   if (auto tags_it = j.find("tracing_tags"); tags_it != j.cend()) {
-    auto parsed_tags = parse_tags(*tags_it);
-    if (parsed_tags.if_error()) {
-      // TODO: report to telemetry
-    } else {
-      config_update.tags = std::move(*parsed_tags);
-    }
+    config_update.tags = *tags_it;
   }
 
   if (auto tracing_enabled_it = j.find("tracing_enabled");
       tracing_enabled_it != j.cend()) {
     if (tracing_enabled_it->is_boolean()) {
       config_update.report_traces = tracing_enabled_it->get<bool>();
-    } else {
-      // TODO: report to telemetry
     }
   }
 
@@ -171,7 +136,11 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
   return j;
 }
 
-void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
+std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
+    const nlohmann::json& json) {
+  std::vector<ConfigMetadata> config_update;
+  config_update.reserve(8);
+
   state_.error_message = nullopt;
 
   try {
@@ -189,10 +158,12 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
     if (client_configs_it == json.cend()) {
       if (!applied_config_.empty()) {
         std::for_each(applied_config_.cbegin(), applied_config_.cend(),
-                      [this](const auto it) { revert_config(it.second); });
+                      [this, &config_update](const auto it) {
+                        config_update = revert_config(it.second);
+                      });
         applied_config_.clear();
       }
-      return;
+      return config_update;
     }
 
     // Keep track of config path received to know which ones to revert.
@@ -223,7 +194,7 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
             "target file having path \"";
         append(*state_.error_message, config_path);
         *state_.error_message += '\"';
-        return;
+        return config_update;
       }
 
       const auto config_json = nlohmann::json::parse(
@@ -243,14 +214,14 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
       new_config.version = config_json.at("revision");
       new_config.content = parse_dynamic_config(config_json.at("lib_config"));
 
-      apply_config(new_config);
+      config_update = apply_config(new_config);
       applied_config_[std::string{config_path}] = new_config;
     }
 
     // Applied configuration not present must be reverted.
     for (auto it = applied_config_.cbegin(); it != applied_config_.cend();) {
       if (!visited_config.count(it->first)) {
-        revert_config(it->second);
+        config_update = revert_config(it->second);
         it = applied_config_.erase(it);
       } else {
         it++;
@@ -261,15 +232,20 @@ void RemoteConfigurationManager::process_response(const nlohmann::json& json) {
     error_message += e.what();
 
     state_.error_message = std::move(error_message);
+    return config_update;
   }
+
+  return config_update;
 }
 
-void RemoteConfigurationManager::apply_config(Configuration config) {
-  config_manager_->update(config.content);
+std::vector<ConfigMetadata> RemoteConfigurationManager::apply_config(
+    Configuration config) {
+  return config_manager_->update(config.content);
 }
 
-void RemoteConfigurationManager::revert_config(Configuration) {
-  config_manager_->reset();
+std::vector<ConfigMetadata> RemoteConfigurationManager::revert_config(
+    Configuration) {
+  return config_manager_->reset();
 }
 
 }  // namespace tracing

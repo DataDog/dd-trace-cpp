@@ -7,18 +7,19 @@
 // `SpanSamplerConfig` is specified as the `span_sampler` property of
 // `TracerConfig`.
 
+#include <unordered_map>
 #include <vector>
 
+#include "config.h"
 #include "expected.h"
 #include "json_fwd.hpp"
+#include "logger.h"
 #include "optional.h"
 #include "rate.h"
 #include "span_matcher.h"
 
 namespace datadog {
 namespace tracing {
-
-class Logger;
 
 struct SpanSamplerConfig {
   struct Rule : public SpanMatcher {
@@ -49,6 +50,7 @@ class FinalizedSpanSamplerConfig {
   };
 
   std::vector<Rule> rules;
+  std::unordered_map<ConfigName, ConfigMetadata> metadata;
 };
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
