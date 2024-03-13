@@ -34,7 +34,7 @@ class ConfigManager {
    public:
     // Constructs a DynamicConf object with the given initial value
     explicit DynamicConfig(Value original_value)
-        : original_value_(original_value) {}
+        : original_value_(std::move(original_value)) {}
 
     // Resets the current value of the configuration to the original value
     void reset() { current_value_ = nullopt; }
