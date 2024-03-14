@@ -42,3 +42,5 @@ target_link_libraries(tests dd_trace_cpp-static ${COVERAGE_LIBRARIES})
 if(BUILD_COVERAGE)
     target_link_options(tests PRIVATE -fprofile-arcs -ftest-coverage)
 endif()
+
+add_subdirectory(system-tests)
