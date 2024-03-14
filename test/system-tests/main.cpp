@@ -32,7 +32,32 @@ std::optional<uint16_t> get_port() {
   }
 }
 
-int main() {
+void print_usage(std::string_view app) {
+  // clang-format off
+  std::cout << app << "\n\n"
+            << "Usage: HTTP server for parametric system tests\n\n"
+            << "-h, --help\t\tPrint this help message.\n"
+            << "-v, --version\t\tPrint the version of dd-trace-cpp.\n\n"
+            << "Environment variables:\n\n"
+            << "APM_TEST_CLIENT_SERVER_PORT\tDefines port to use."
+            << "\n";
+  // clang-format on
+}
+
+int main(int argc, char* argv[]) {
+  if (argc > 1) {
+    for (int i = 0; i < argc; ++i) {
+      const std::string_view arg{argv[i]};
+      if (arg == "-h" || arg == "--help") {
+        print_usage(argv[0]);
+        return 0;
+      } else if (arg == "-v" || arg == "--version") {
+        std::cout << datadog::tracing::tracer_version << "\n";
+        return 0;
+      }
+    }
+  }
+
   auto logger = make_logger();
 
   auto port = get_port();
