@@ -4,7 +4,9 @@
 #include <iomanip>
 #include <iostream>
 
-void DeveloperNoiseLogger::developer_noise(bool enabled) { developer_noise_ = enabled; }
+void DeveloperNoiseLogger::developer_noise(bool enabled) {
+  developer_noise_ = enabled;
+}
 
 void DeveloperNoiseLogger::log_info(datadog::tracing::StringView message) {
   if (developer_noise_) {
@@ -12,12 +14,17 @@ void DeveloperNoiseLogger::log_info(datadog::tracing::StringView message) {
   }
 }
 
-void DeveloperNoiseLogger::log_error(const LogFunc& insert_to_stream) { make_noise("ERROR", insert_to_stream); }
+void DeveloperNoiseLogger::log_error(const LogFunc& insert_to_stream) {
+  make_noise("ERROR", insert_to_stream);
+}
 
-void DeveloperNoiseLogger::log_startup(const LogFunc& insert_to_stream) { make_noise("INFO", insert_to_stream); }
+void DeveloperNoiseLogger::log_startup(const LogFunc& insert_to_stream) {
+  make_noise("INFO", insert_to_stream);
+}
 
-void DeveloperNoiseLogger::make_noise(std::string_view level, const LogFunc& insert_to_stream) {
-  std::time_t t = std::time(0); // get time now
+void DeveloperNoiseLogger::make_noise(std::string_view level,
+                                      const LogFunc& insert_to_stream) {
+  std::time_t t = std::time(0);  // get time now
   auto now = std::localtime(&t);
 
   std::lock_guard<std::mutex> lock(mutex_);
@@ -28,8 +35,8 @@ void DeveloperNoiseLogger::make_noise(std::string_view level, const LogFunc& ins
 }
 
 std::shared_ptr<DeveloperNoiseLogger> make_logger() {
-  // Initialize a logger that handles errors from the library as well as comforting developer-noise
-  // from the tracing service.
+  // Initialize a logger that handles errors from the library as well as
+  // comforting developer-noise from the tracing service.
   auto logger = std::make_shared<DeveloperNoiseLogger>();
 
   // Enable developer noise when a specific environment variable is set.

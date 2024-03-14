@@ -1,23 +1,23 @@
 #pragma once
 
+#include <datadog/logger.h>
+
 #include <memory>
 #include <mutex>
 #include <sstream>
-
-#include <datadog/logger.h>
 
 class DeveloperNoiseLogger : public datadog::tracing::Logger {
   bool developer_noise_ = false;
   std::mutex mutex_;
 
-public:
+ public:
   void developer_noise(bool enabled);
   void log_info(datadog::tracing::StringView message);
   void log_error(const LogFunc&) override;
   void log_startup(const LogFunc&) override;
-  using Logger::log_error; // other overloads of log_error
+  using Logger::log_error;  // other overloads of log_error
 
-private:
+ private:
   void make_noise(std::string_view level, const LogFunc&);
 };
 
