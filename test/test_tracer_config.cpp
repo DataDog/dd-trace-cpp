@@ -4,6 +4,7 @@
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
+#include <stdlib.h>  // setenv (windows/unix), unsetenv (unix), _putenv_s (windows)
 
 #include <cmath>
 #include <cstddef>
@@ -23,14 +24,6 @@
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
-#ifdef _MSC_VER
-// clang-format off
-#include <windows.h>
-#include <winbase.h>  // SetEnvironmentVariable
-// clang-format on
-#else
-#include <stdlib.h>  // setenv, unsetenv
-#endif
 
 namespace datadog {
 namespace tracing {
@@ -51,10 +44,6 @@ namespace {
 class EnvGuard {
   std::string name_;
   Optional<std::string> former_value_;
-#ifdef _MSC_VER
-  // maximum size of an environment variable value on Windows
-  char buffer_[32767];
-#endif
 
  public:
   EnvGuard(std::string name, std::string value) : name_(std::move(name)) {
@@ -73,22 +62,11 @@ class EnvGuard {
     }
   }
 
-  const char* get_value() {
-#ifdef _MSC_VER
-    const DWORD rc =
-        GetEnvironmentVariable(name_.c_str(), buffer_, sizeof buffer_);
-    if (rc == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
-      return nullptr;
-    }
-    return buffer_;
-#else
-    return std::getenv(name_.c_str());
-#endif
-  }
+  const char* get_value() { return std::getenv(name_.c_str()); }
 
   void set_value(const std::string& value) {
 #ifdef _MSC_VER
-    REQUIRE(::SetEnvironmentVariable(name_.c_str(), value.c_str()));
+    ::_putenv_s(name_.c_str(), value.c_str());
 #else
     const bool overwrite = true;
     ::setenv(name_.c_str(), value.c_str(), overwrite);
@@ -97,7 +75,7 @@ class EnvGuard {
 
   void unset() {
 #ifdef _MSC_VER
-    REQUIRE(::SetEnvironmentVariable(name_.c_str(), NULL));
+    ::_putenv_s(name_.c_str(), "");
 #else
     ::unsetenv(name_.c_str());
 #endif
