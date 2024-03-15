@@ -5,12 +5,16 @@ cmake_minimum_required(VERSION 3.24)
 project(dd-trace-cpp)
 
 option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
-option(BUILD_HASHER_EXAMPLE "Build the example program examples/hasher" OFF)
+option(BUILD_EXAMPLES "Build example programs" OFF)
 option(BUILD_TESTING "Build the unit tests (test/)" OFF)
+option(BUILD_FUZZERS "Build fuzzers" OFF)
+option(BUILD_BENCHMARK "Build benchmark binaries" OFF)
 option(SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
-option(FUZZ_W3C_PROPAGATION "Build a fuzzer for W3C propagation" OFF)
 
-set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+endif ()
+
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -32,7 +36,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # But there's one exception: libfuzzer is built with libstdc++ on Ubuntu,
     # and so won't link to libc++. So, if any of the FUZZ_* variables are set,
     # keep to libstdc++ (the default on most systems).
-    if (NOT ${FUZZ_W3C_PROPAGATION})
+    if (NOT ${BUILD_FUZZERS})
       add_compile_options(-stdlib=libc++)
       add_link_options(-stdlib=libc++)
     endif ()
@@ -45,11 +49,12 @@ function(add_sanitizers)
   add_link_options(-fsanitize=undefined)
 endfunction()
 
-if(FUZZ_W3C_PROPAGATION)
+if(BUILD_FUZZERS)
+  set(BUILD_TESTING OFF)
   add_compile_options(-fsanitize=fuzzer)
   add_link_options(-fsanitize=fuzzer)
   add_sanitizers()
-  add_subdirectory(fuzz/w3c-propagation)
+  add_subdirectory(fuzz)
 endif()
 
 if (SANITIZE)
@@ -82,8 +87,10 @@ endif()
 
 add_library(dd_trace_cpp-objects OBJECT)
 target_sources(dd_trace_cpp-objects PRIVATE
+    src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
+    src/datadog/config_manager.cpp
     src/datadog/collector_response.cpp
     src/datadog/curl.cpp
     src/datadog/datadog_agent_config.cpp
@@ -94,6 +101,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/error.cpp
     src/datadog/extraction_util.cpp
     src/datadog/glob.cpp
+    src/datadog/http_client.cpp
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
@@ -105,6 +113,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp
     src/datadog/rate.cpp
+    src/datadog/remote_config.cpp
     src/datadog/runtime_id.cpp
     src/datadog/span.cpp
     src/datadog/span_data.cpp
@@ -112,8 +121,9 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/span_matcher.cpp
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp
-    src/datadog/tag_propagation.cpp
+    src/datadog/string_util.cpp
     src/datadog/tags.cpp
+    src/datadog/tag_propagation.cpp
     src/datadog/threaded_event_scheduler.cpp
     src/datadog/tracer_config.cpp
     src/datadog/tracer_telemetry.cpp
@@ -132,8 +142,12 @@ target_sources(dd_trace_cpp-objects PUBLIC
   TYPE HEADERS
   BASE_DIRS src/
   FILES
+  src/datadog/base64.h
+  src/datadog/config.h
   src/datadog/cerr_logger.h
   src/datadog/clock.h
+  src/datadog/config_manager.h
+  src/datadog/config_update.h
   src/datadog/collector.h
   src/datadog/collector_response.h
   # src/datadog/curl.h except for curl.h
@@ -152,6 +166,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/hex.h
   src/datadog/http_client.h
   src/datadog/id_generator.h
+  src/datadog/injection_options.h
   src/datadog/json_fwd.hpp
   src/datadog/json.hpp
   src/datadog/limiter.h
@@ -165,6 +180,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/propagation_style.h
   src/datadog/random.h
   src/datadog/rate.h
+  src/datadog/remote_config.h
   src/datadog/runtime_id.h
   src/datadog/sampling_decision.h
   src/datadog/sampling_mechanism.h
@@ -177,11 +193,13 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/span_matcher.h
   src/datadog/span_sampler_config.h
   src/datadog/span_sampler.h
+  src/datadog/string_util.h
   src/datadog/string_view.h
   src/datadog/tag_propagation.h
   src/datadog/tags.h
   src/datadog/threaded_event_scheduler.h
   src/datadog/tracer_config.h
+  src/datadog/tracer_signature.h
   src/datadog/tracer_telemetry.h
   src/datadog/tracer.h
   src/datadog/trace_id.h
@@ -199,7 +217,6 @@ find_package(Threads REQUIRED)
 target_link_libraries(dd_trace_cpp-objects
   PUBLIC
     libcurl
-  PUBLIC
     Threads::Threads
     ${COVERAGE_LIBRARIES}
     ${COREFOUNDATION_LIBRARY}
@@ -226,8 +243,9 @@ if(BUILD_TESTING)
   add_subdirectory(test)
 endif()
 
-# Each example has its own build flag.
-add_subdirectory(examples)
+if(BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 if(BUILD_BENCHMARK)
   add_subdirectory(benchmark)

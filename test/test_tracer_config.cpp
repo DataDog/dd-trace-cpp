@@ -6,6 +6,7 @@
 #include <datadog/tracer_config.h>
 #include <stdlib.h>  // setenv (windows/unix), unsetenv (unix), _putenv_s (windows)
 
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
@@ -151,7 +152,7 @@ TEST_CASE("TracerConfig::defaults") {
       REQUIRE(finalized.error().code == Error::SERVICE_NAME_REQUIRED);
     }
     SECTION("nonempty") {
-      config.defaults.service = "testsvc";
+      config.service = "testsvc";
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
     }
@@ -159,7 +160,7 @@ TEST_CASE("TracerConfig::defaults") {
 
   SECTION("DD_SERVICE overrides service") {
     const EnvGuard guard{"DD_SERVICE", "foosvc"};
-    config.defaults.service = "testsvc";
+    config.service = "testsvc";
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.service == "foosvc");
@@ -167,8 +168,8 @@ TEST_CASE("TracerConfig::defaults") {
 
   SECTION("DD_ENV overrides environment") {
     const EnvGuard guard{"DD_ENV", "prod"};
-    config.defaults.environment = "dev";
-    config.defaults.service = "required";
+    config.environment = "dev";
+    config.service = "required";
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.environment == "prod");
@@ -176,11 +177,30 @@ TEST_CASE("TracerConfig::defaults") {
 
   SECTION("DD_VERSION overrides version") {
     const EnvGuard guard{"DD_VERSION", "v2"};
-    config.defaults.version = "v1";
-    config.defaults.service = "required";
+    config.version = "v1";
+    config.service = "required";
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->defaults.version == "v2");
+  }
+
+  SECTION("DD_TRACE_DELEGATE_SAMPLING") {
+    SECTION("is disabled by default") {
+      config.version = "v1";
+      config.service = "required";
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->delegate_trace_sampling == false);
+    }
+
+    SECTION("setting is overridden by environment variable") {
+      const EnvGuard guard{"DD_TRACE_DELEGATE_SAMPLING", "1"};
+      config.version = "v1";
+      config.service = "required";
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      REQUIRE(finalized->delegate_trace_sampling == true);
+    }
   }
 
   SECTION("DD_TAGS") {
@@ -210,8 +230,8 @@ TEST_CASE("TracerConfig::defaults") {
     }));
 
     // This will be overriden by the DD_TAGS environment variable.
-    config.defaults.tags = {{"foo", "bar"}};
-    config.defaults.service = "required";
+    config.tags = std::unordered_map<std::string, std::string>{{"foo", "bar"}};
+    config.service = "required";
 
     CAPTURE(test_case.name);
     const EnvGuard guard{"DD_TAGS", test_case.dd_tags};
@@ -219,7 +239,6 @@ TEST_CASE("TracerConfig::defaults") {
     if (test_case.expected_error) {
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == *test_case.expected_error);
-
     } else {
       REQUIRE(finalized);
       REQUIRE(finalized->defaults.tags == test_case.expected_tags);
@@ -230,7 +249,7 @@ TEST_CASE("TracerConfig::defaults") {
 TEST_CASE("TracerConfig::log_on_startup") {
   TracerConfig config;
   config.agent.http_client = std::make_shared<MockHTTPClient>();
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto logger = std::make_shared<MockLogger>();
   config.logger = logger;
 
@@ -292,7 +311,7 @@ TEST_CASE("TracerConfig::log_on_startup") {
 TEST_CASE("TracerConfig::report_traces") {
   TracerConfig config;
   config.agent.http_client = std::make_shared<MockHTTPClient>();
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
@@ -361,8 +380,8 @@ TEST_CASE("TracerConfig::report_traces") {
 
 TEST_CASE("TracerConfig::agent") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
   config.agent.http_client = std::make_shared<MockHTTPClient>();
+  config.service = "testsvc";
 
   SECTION("event_scheduler") {
     SECTION("default") {
@@ -402,6 +421,57 @@ TEST_CASE("TracerConfig::agent") {
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code ==
               Error::DATADOG_AGENT_INVALID_FLUSH_INTERVAL);
+    }
+  }
+
+  SECTION("remote configuration poll interval") {
+    SECTION("cannot be zero") {
+      config.agent.remote_configuration_poll_interval_seconds = 0;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code ==
+              Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
+    }
+
+    SECTION("cannot be negative") {
+      config.agent.remote_configuration_poll_interval_seconds = -1337;
+      auto finalized = finalize_config(config);
+      REQUIRE(!finalized);
+      REQUIRE(finalized.error().code ==
+              Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
+    }
+
+    SECTION("override default value") {
+      SECTION("programmatically") {
+        config.agent.remote_configuration_poll_interval_seconds = 42;
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        const auto* const agent =
+            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+        REQUIRE(agent);
+        REQUIRE(agent->remote_configuration_poll_interval ==
+                std::chrono::seconds(42));
+      }
+
+      SECTION("environment variable") {
+        const EnvGuard env_guard{"DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS",
+                                 "15"};
+        auto finalized = finalize_config(config);
+        REQUIRE(finalized);
+        const auto* const agent =
+            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+        REQUIRE(agent);
+        REQUIRE(agent->remote_configuration_poll_interval ==
+                std::chrono::seconds(15));
+      }
+
+      SECTION("ill-formated environment variable is an error") {
+        const EnvGuard env_guard{"DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS",
+                                 "ddog"};
+        auto finalized = finalize_config(config);
+        REQUIRE(!finalized);
+        REQUIRE(finalized.error().code == Error::INVALID_INTEGER);
+      }
     }
   }
 
@@ -508,7 +578,7 @@ TEST_CASE("TracerConfig::agent") {
 TEST_CASE("TracerConfig::trace_sampler") {
   TracerConfig config;
   config.agent.http_client = std::make_shared<MockHTTPClient>();
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
   SECTION("default is no rules") {
     auto finalized = finalize_config(config);
@@ -772,7 +842,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
 TEST_CASE("TracerConfig::span_sampler") {
   TracerConfig config;
   config.agent.http_client = std::make_shared<MockHTTPClient>();
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
   SECTION("default is no rules") {
     auto finalized = finalize_config(config);
@@ -1008,7 +1078,7 @@ TEST_CASE("TracerConfig::span_sampler") {
 TEST_CASE("TracerConfig propagation styles") {
   TracerConfig config;
   config.agent.http_client = std::make_shared<MockHTTPClient>();
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
   SECTION("default style is [Datadog, W3C]") {
     auto finalized = finalize_config(config);
@@ -1035,7 +1105,7 @@ TEST_CASE("TracerConfig propagation styles") {
 
   SECTION("injection_styles") {
     SECTION("need at least one") {
-      config.injection_styles.clear();
+      config.injection_styles = std::vector<PropagationStyle>{};
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_INJECTION_STYLE);
@@ -1128,7 +1198,7 @@ TEST_CASE("TracerConfig propagation styles") {
   // This section is very much like "injection_styles", above.
   SECTION("extraction_styles") {
     SECTION("need at least one") {
-      config.extraction_styles.clear();
+      config.extraction_styles = std::vector<PropagationStyle>{};
       auto finalized = finalize_config(config);
       REQUIRE(!finalized);
       REQUIRE(finalized.error().code == Error::MISSING_SPAN_EXTRACTION_STYLE);
@@ -1231,16 +1301,20 @@ TEST_CASE("TracerConfig propagation styles") {
 TEST_CASE("configure 128-bit trace IDs") {
   TracerConfig config;
   config.agent.http_client = std::make_shared<MockHTTPClient>();
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
 
-  SECTION("defaults to true") { REQUIRE(config.trace_id_128_bit == true); }
+  SECTION("defaults to true") {
+    const auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    CHECK(finalized_config->generate_128bit_trace_ids == true);
+  }
 
   SECTION("value honored in finalizer") {
     const auto value = GENERATE(true, false);
-    config.trace_id_128_bit = value;
+    config.generate_128bit_trace_ids = value;
     const auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_id_128_bit == value);
+    REQUIRE(finalized->generate_128bit_trace_ids == value);
   }
 
   SECTION("value overridden by DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED") {
@@ -1266,14 +1340,16 @@ TEST_CASE("configure 128-bit trace IDs") {
     EnvGuard guard{"DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED",
                    test_case.env_value};
 
-    config.trace_id_128_bit = true;
+    config.generate_128bit_trace_ids = true;
+    CAPTURE(config.generate_128bit_trace_ids);
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
+    REQUIRE(finalized->generate_128bit_trace_ids == test_case.expected_value);
 
-    config.trace_id_128_bit = false;
+    config.generate_128bit_trace_ids = false;
+    CAPTURE(config.generate_128bit_trace_ids);
     finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_id_128_bit == test_case.expected_value);
+    REQUIRE(finalized->generate_128bit_trace_ids == test_case.expected_value);
   }
 }

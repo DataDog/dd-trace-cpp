@@ -13,7 +13,7 @@ int main() {
     namespace dd = datadog::tracing;
 
     dd::TracerConfig config;
-    config.defaults.service = "my-service";
+    config.service = "my-service";
 
     const auto validated_config = dd::finalize_config(config);
     if (!validated_config) {

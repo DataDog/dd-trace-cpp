@@ -9,7 +9,7 @@ digraph {
         rankdir="LR";
         graph[style=dotted];
 
-        proxy [label="Proxy\n(Node.js)"];
+        proxy [label="Proxy ⭐\n(C++)"];
         server [label="Server ⭐\n(C++)"];
         database [label="Database\n(Python)"];
         agent [label="Datadog Agent"];

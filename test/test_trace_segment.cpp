@@ -1,3 +1,5 @@
+#include <datadog/null_collector.h>
+#include <datadog/optional.h>
 #include <datadog/platform_util.h>
 #include <datadog/rate.h>
 #include <datadog/tags.h>
@@ -28,21 +30,22 @@ Rate assert_rate(double rate) {
 
 TEST_CASE("TraceSegment accessors") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<MockLogger>();
 
   SECTION("hostname") {
-    config.report_hostname = GENERATE(true, false);
+    const bool report_hostname = GENERATE(true, false);
 
+    config.report_hostname = report_hostname;
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     Tracer tracer{*finalized};
     auto span = tracer.create_span();
 
     auto hostname = span.trace_segment().hostname();
-    if (config.report_hostname) {
+    if (report_hostname) {
       REQUIRE(hostname);
     } else {
       REQUIRE(!hostname);
@@ -50,18 +53,27 @@ TEST_CASE("TraceSegment accessors") {
   }
 
   SECTION("defaults") {
-    config.defaults.name = "wobble";
-    config.defaults.service_type = "fake";
-    config.defaults.version = "v0";
-    config.defaults.environment = "test";
-    config.defaults.tags = {{"hello", "world"}, {"foo", "bar"}};
+    const std::unordered_map<std::string, std::string> tags{{"hello", "world"},
+                                                            {"foo", "bar"}};
+
+    config.name = "wobble";
+    config.service_type = "fake";
+    config.version = "v0";
+    config.environment = "test";
+    config.tags = tags;
 
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     Tracer tracer{*finalized};
     auto span = tracer.create_span();
 
-    REQUIRE(span.trace_segment().defaults() == config.defaults);
+    const auto span_default = span.trace_segment().defaults();
+    CHECK(span_default.service == "testsvc");
+    CHECK(span_default.name == "wobble");
+    CHECK(span_default.service_type == "fake");
+    CHECK(span_default.version == "v0");
+    CHECK(span_default.environment == "test");
+    CHECK(span_default.tags == tags);
   }
 
   SECTION("origin") {
@@ -132,7 +144,7 @@ TEST_CASE("TraceSegment accessors") {
 
 TEST_CASE("When Collector::send fails, TraceSegment logs the error.") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<FailureCollector>();
   config.collector = collector;
   const auto logger = std::make_shared<MockLogger>();
@@ -153,7 +165,7 @@ TEST_CASE("When Collector::send fails, TraceSegment logs the error.") {
 
 TEST_CASE("TraceSegment finalization of spans") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<MockLogger>();
@@ -446,3 +458,25 @@ TEST_CASE("TraceSegment finalization of spans") {
     }
   }
 }  // span finalizers
+
+TEST_CASE("independent of Tracer") {
+  // This test verifies that a `TraceSegment` (via the `Span`s that refer to it)
+  // can continue to operate even after the `Tracer` that created it is
+  // destroyed.
+  //
+  // Primarily, the test checks that the code doesn't crash in this scenario.
+  TracerConfig config;
+  config.service = "testsvc";
+  config.name = "do.thing";
+  config.collector = std::make_shared<NullCollector>();
+  config.logger = std::make_shared<NullLogger>();
+
+  auto maybe_tracer = finalize_config(config);
+  REQUIRE(maybe_tracer);
+  Optional<Tracer> tracer{*maybe_tracer};
+
+  Span root = tracer->create_span();
+  Span child = root.create_child();
+
+  tracer.reset();
+}

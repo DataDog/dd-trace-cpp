@@ -4,6 +4,7 @@
 
 #include <datadog/clock.h>
 #include <datadog/hex.h>
+#include <datadog/injection_options.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>
 #include <datadog/span.h>
@@ -17,6 +18,8 @@
 #include <functional>
 #include <string>
 
+#include "catch.hpp"
+#include "datadog/sampling_mechanism.h"
 #include "matchers.h"
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
@@ -29,7 +32,7 @@ using namespace datadog::tracing;
 
 TEST_CASE("set_tag") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<MockLogger>();
@@ -106,7 +109,7 @@ TEST_CASE("set_tag") {
 
 TEST_CASE("lookup_tag") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
   config.logger = std::make_shared<MockLogger>();
 
@@ -151,7 +154,7 @@ TEST_CASE("lookup_tag") {
 
 TEST_CASE("remove_tag") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
   config.logger = std::make_shared<MockLogger>();
 
@@ -180,7 +183,7 @@ TEST_CASE("remove_tag") {
 
 TEST_CASE("span duration") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<MockLogger>();
@@ -264,7 +267,7 @@ TEST_CASE(".error() and .set_error*()") {
         false, nullopt, nullopt, nullopt}}));
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<MockLogger>();
@@ -309,7 +312,7 @@ TEST_CASE("property setters and getters") {
   // corresponding getter method and in the resulting span data sent to the
   // collector.
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<MockLogger>();
@@ -363,7 +366,7 @@ TEST_CASE("property setters and getters") {
 // the interface of `Span`, so the test is here.
 TEST_CASE("injection") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
   config.logger = std::make_shared<MockLogger>();
   config.injection_styles = {PropagationStyle::DATADOG, PropagationStyle::B3};
@@ -393,6 +396,7 @@ TEST_CASE("injection") {
     REQUIRE(headers.at("x-datadog-trace-id") == "42");
     REQUIRE(headers.at("x-datadog-parent-id") == "42");
     REQUIRE(headers.at("x-datadog-sampling-priority") == "3");
+    REQUIRE(headers.count("x-datadog-delegate-trace-sampling") == 0);
     REQUIRE(headers.at("x-b3-traceid") == "000000000000002a");
     REQUIRE(headers.at("x-b3-spanid") == "000000000000002a");
     REQUIRE(headers.at("x-b3-sampled") == "1");
@@ -445,8 +449,8 @@ TEST_CASE("injection") {
 
 TEST_CASE("injection can be disabled using the \"none\" style") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.defaults.name = "spanny";
+  config.service = "testsvc";
+  config.name = "spanny";
   config.collector = std::make_shared<MockCollector>();
   config.logger = std::make_shared<MockLogger>();
   config.injection_styles = {PropagationStyle::NONE};
@@ -464,7 +468,7 @@ TEST_CASE("injection can be disabled using the \"none\" style") {
 
 TEST_CASE("injecting W3C traceparent header") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.collector = std::make_shared<NullCollector>();
   config.logger = std::make_shared<NullLogger>();
   config.injection_styles = {PropagationStyle::W3C};
@@ -569,7 +573,7 @@ TEST_CASE("injecting W3C tracestate header") {
   //   - at the extra fields (extracted from W3C)
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   // The order of the extraction styles doesn't matter for this test, because
   // it'll either be one or the other in the test cases.
   config.extraction_styles = {PropagationStyle::DATADOG, PropagationStyle::W3C};
@@ -700,14 +704,14 @@ TEST_CASE("injecting W3C tracestate header") {
 
 TEST_CASE("128-bit trace ID injection") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.logger = std::make_shared<MockLogger>();
-  config.trace_id_128_bit = true;
-  config.injection_styles.clear();
-  config.injection_styles.push_back(PropagationStyle::W3C);
-  config.injection_styles.push_back(PropagationStyle::DATADOG);
-  config.injection_styles.push_back(PropagationStyle::B3);
+  config.generate_128bit_trace_ids = true;
+
+  std::vector<PropagationStyle> injection_styles{
+      PropagationStyle::W3C, PropagationStyle::DATADOG, PropagationStyle::B3};
+  config.injection_styles = injection_styles;
 
   const auto finalized = finalize_config(config);
   REQUIRE(finalized);
@@ -750,4 +754,111 @@ TEST_CASE("128-bit trace ID injection") {
   found = writer.items.find("x-b3-traceid");
   REQUIRE(found != writer.items.end());
   REQUIRE(found->second == "deadbeefdeadbeefcafebabecafebabe");
+}
+
+TEST_CASE("sampling delegation injection") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.logger = std::make_shared<MockLogger>();
+  config.collector = std::make_shared<NullCollector>();
+
+  SECTION("configuration") {
+    config.delegate_trace_sampling = true;
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    Tracer tracer{*finalized};
+
+    SECTION("delegate_trace_sampling inject header") {
+      auto span = tracer.create_span();
+      MockDictWriter writer;
+      span.inject(writer);
+
+      auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+      REQUIRE(found != writer.items.cend());
+      REQUIRE(found->second == "delegate");
+    }
+
+    SECTION("injection option override sampling delegation configuration") {
+      const InjectionOptions options{/* delegate_sampling_decision=*/false};
+      auto span = tracer.create_span();
+      MockDictWriter writer;
+      span.inject(writer, options);
+
+      REQUIRE(0 == writer.items.count("x-datadog-delegate-trace-sampling"));
+    }
+  }
+
+  SECTION("injection options") {
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    Tracer tracer{*finalized};
+    MockDictWriter writer;
+    InjectionOptions options;
+
+    options.delegate_sampling_decision = true;
+    auto span = tracer.create_span();
+    span.inject(writer, options);
+
+    auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+    REQUIRE(found != writer.items.cend());
+    REQUIRE(found->second == "delegate");
+  }
+
+  SECTION("end-to-end") {
+    config.delegate_trace_sampling = true;
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    Tracer tracer{*finalized};
+
+    auto root_span = tracer.create_span();
+
+    MockDictWriter writer;
+    root_span.inject(writer);
+    auto found = writer.items.find("x-datadog-delegate-trace-sampling");
+    REQUIRE(found != writer.items.cend());
+    REQUIRE(found->second == "delegate");
+
+    MockDictReader reader(writer.items);
+    auto sub_span = tracer.extract_span(reader);
+    REQUIRE(!sub_span->trace_segment().sampling_decision());
+
+    MockDictWriter response_writer;
+    sub_span->trace_segment().write_sampling_delegation_response(
+        response_writer);
+    REQUIRE(1 ==
+            response_writer.items.count("x-datadog-trace-sampling-decision"));
+
+    MockDictReader response_reader(response_writer.items);
+    SECTION("default") {
+      REQUIRE(root_span.read_sampling_delegation_response(response_reader));
+
+      // If no manual sampling override was made locally, then expect that the
+      // decision read above will be the one applied.
+      auto root_sampling_decision =
+          root_span.trace_segment().sampling_decision();
+      REQUIRE(root_sampling_decision);
+      REQUIRE(root_sampling_decision->origin ==
+              SamplingDecision::Origin::DELEGATED);
+      REQUIRE(root_sampling_decision->priority ==
+              sub_span->trace_segment().sampling_decision()->priority);
+    }
+
+    SECTION("manual sampling override") {
+      root_span.trace_segment().override_sampling_priority(-1);
+      REQUIRE(root_span.read_sampling_delegation_response(response_reader));
+
+      // If `override_sampling_priority` was called on this segment, then any
+      // decision read above will not replace the override.
+      auto root_sampling_decision =
+          root_span.trace_segment().sampling_decision();
+      REQUIRE(root_sampling_decision);
+      REQUIRE(root_sampling_decision->origin ==
+              SamplingDecision::Origin::LOCAL);
+      REQUIRE(root_sampling_decision->mechanism ==
+              static_cast<int>(SamplingMechanism::MANUAL));
+    }
+  }
 }

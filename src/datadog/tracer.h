@@ -10,7 +10,11 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
+#include <cstddef>
+#include <memory>
+
 #include "clock.h"
+#include "config_manager.h"
 #include "error.h"
 #include "expected.h"
 #include "id_generator.h"
@@ -18,6 +22,7 @@
 #include "optional.h"
 #include "span.h"
 #include "tracer_config.h"
+#include "tracer_signature.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {
@@ -30,11 +35,11 @@ class SpanSampler;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
+  std::shared_ptr<ConfigManager> config_manager_;
   std::shared_ptr<Collector> collector_;
-  std::shared_ptr<const SpanDefaults> defaults_;
   RuntimeID runtime_id_;
+  TracerSignature signature_;
   std::shared_ptr<TracerTelemetry> tracer_telemetry_;
-  std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const IDGenerator> generator_;
   Clock clock_;
@@ -42,6 +47,7 @@ class Tracer {
   std::vector<PropagationStyle> extraction_styles_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
+  bool sampling_delegation_enabled_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:

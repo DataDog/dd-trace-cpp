@@ -35,14 +35,18 @@
 #include <charconv>
 #include <csignal>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <iterator>
 #include <ostream>
 #include <sstream>
 #include <stack>
+#include <stdexcept>
+#include <string>
 #include <system_error>
 
 #include "httplib.h"
+#include "tracingutil.h"
 
 // Alias the datadog namespace for brevity.
 namespace dd = datadog::tracing;
@@ -93,62 +97,6 @@ struct RequestTracingContext {
   dd::TimePoint request_start;
 };
 
-// `HeaderReader` adapts dd-trace-cpp's reader interface to the HTTP headers
-// object used by this app's HTTP library.
-//
-// dd-trace-cpp uses this to extract trace context from incoming HTTP request
-// headers.
-class HeaderReader : public dd::DictReader {
-  const httplib::Headers& headers_;
-  mutable std::string buffer_;
-
- public:
-  explicit HeaderReader(const httplib::Headers& headers) : headers_(headers) {}
-
-  std::optional<std::string_view> lookup(std::string_view key) const override {
-    // If there's no matching header, then return `std::nullopt`.
-    // If there is one matching header, then return a view of its value.
-    // If there are multiple matching headers, then join their values with
-    // commas and return a view of the result.
-    const auto [begin, end] = headers_.equal_range(std::string{key});
-    switch (std::distance(begin, end)) {
-      case 0:
-        return std::nullopt;
-      case 1:
-        return begin->second;
-    }
-    auto it = begin;
-    buffer_ = it->second;
-    ++it;
-    do {
-      buffer_ += ',';
-      buffer_ += it->second;
-      ++it;
-    } while (it != end);
-    return buffer_;
-  }
-
-  void visit(const std::function<void(std::string_view key, std::string_view value)>& visitor) const override {
-    for (const auto& [key, value] : headers_) {
-      visitor(key, value);
-    }
-  }
-};
-
-// `HeaderWriter` adapts dd-trace-cpp's writer interface to the HTTP headers
-// object used by this app's HTTP library.
-//
-// dd-trace-cpp uses this to inject trace context into outgoing HTTP request
-// headers.
-class HeaderWriter : public dd::DictWriter {
-  httplib::Headers& headers_;
-
- public:
-  explicit HeaderWriter(httplib::Headers& headers) : headers_(headers) {}
-
-  void set(std::string_view key, std::string_view value) override { headers_.emplace(key, value); }
-};
-
 // See the implementations of these functions, below `main`, for a description
 // of what they do.
 void on_request_begin(httplib::Request& request);
@@ -161,8 +109,8 @@ void on_post_notes(const httplib::Request& request, httplib::Response& response)
 int main() {
   // Set up the Datadog tracer.  See `src/datadog/tracer_config.h`.
   dd::TracerConfig config;
-  config.defaults.service = "dd-trace-cpp-http-server-example-server";
-  config.defaults.service_type = "server";
+  config.service = "dd-trace-cpp-http-server-example-server";
+  config.service_type = "server";
 
   // `finalize_config` validates `config` and applies any settings from
   // environment variables, such as `DD_AGENT_HOST`.
@@ -208,8 +156,12 @@ int main() {
   // has finished.
   // Here we finish (destroy) one of the `dd::Span` objects that we previously
   // created. We finish it by popping it off of the span stack.
-  server.set_post_routing_handler([](const httplib::Request& request, httplib::Response&) {
+  server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
+
+    tracingutil::HeaderWriter writer(response.headers);
+    context->spans.top().trace_segment().write_sampling_delegation_response(writer);
+
     context->spans.pop();
     return httplib::Server::HandlerResponse::Unhandled;
   });
@@ -254,7 +206,7 @@ void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tr
   config.name = "handle.request";
   config.start = context->request_start;
 
-  HeaderReader reader{request.headers};
+  tracingutil::HeaderReader reader{request.headers};
   auto maybe_span = tracer.extract_or_create_span(reader, config);
   if (dd::Error* error = maybe_span.if_error()) {
     std::cerr << "While extracting trace context from request: " << *error << '\n';
@@ -308,21 +260,21 @@ void on_sleep(const httplib::Request& request, httplib::Response& response) {
     return;
   }
 
-  const std::string_view raw = begin->second;
-  double seconds;
-  const auto result = std::from_chars(raw.begin(), raw.end(), seconds);
-  if (result.ec == std::errc::invalid_argument || result.ec == std::errc::result_out_of_range ||
-      result.ptr != raw.end() || seconds < 0) {
+  const std::string raw = begin->second;
+
+  try {
+    double seconds = std::stod(raw);
+    if (seconds < 0) throw std::exception();
+
+    using namespace std::chrono;
+    std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));
+  } catch (...) {
     response.status = 400;  // "bad request"
     const std::string message =
         "\"seconds\" query parameter must be a non-negative number in the range of an IEEE754 double.\n";
     span.set_error_message(message);
     response.set_content(message, "text/plain");
-    return;
   }
-
-  using namespace std::chrono;
-  std::this_thread::sleep_for(round<nanoseconds>(duration<double>(seconds)));
 }
 
 // `traced_get` is a wrapper around `httplib::Client::Get` that also creates a
@@ -337,7 +289,7 @@ httplib::Result traced_get(httplib::Client& client, const std::string& endpoint,
   span.set_resource_name("GET " + endpoint);
   // Could add tags here...
 
-  HeaderWriter writer{headers};
+  tracingutil::HeaderWriter writer{headers};
   span.inject(writer);
 
   return client.Get(endpoint, params, headers);

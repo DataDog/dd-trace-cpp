@@ -32,6 +32,7 @@
 #include <utility>
 #include <vector>
 
+#include "config_manager.h"
 #include "expected.h"
 #include "metrics.h"
 #include "optional.h"
@@ -45,6 +46,7 @@ namespace tracing {
 class Collector;
 class DictReader;
 class DictWriter;
+struct InjectionOptions;
 class Logger;
 struct SpanData;
 struct SpanDefaults;
@@ -73,7 +75,27 @@ class TraceSegment {
   Optional<SamplingDecision> sampling_decision_;
   Optional<std::string> additional_w3c_tracestate_;
   Optional<std::string> additional_datadog_w3c_tracestate_;
-  bool awaiting_delegated_sampling_decision_ = false;
+
+  std::shared_ptr<ConfigManager> config_manager_;
+
+  // See `doc/sampling-delegation.md` for more information about
+  // `struct SamplingDelegation`.
+  struct SamplingDelegation {
+    // This segment is configured to delegate its sampling decision.
+    bool enabled;
+    // The trace context from which the local root span was extracted delegated
+    // the sampling decision to this segment.
+    bool decision_was_delegated_to_me;
+    // This segment included a request for sampling delegation in outbound
+    // injected trace context (see `inject`).
+    bool sent_request_header;
+    // This segment received a (presumably delegated) sampling decision. See
+    // `read_sampling_delegation_response`.
+    bool received_matching_response_header;
+    // This segment conveyed a sampling decision back to a parent service that
+    // had previously requested a delegated sampling decision.
+    bool sent_response_header;
+  } sampling_delegation_ = {};
 
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
@@ -82,7 +104,9 @@ class TraceSegment {
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
-               const RuntimeID& runtime_id,
+               const std::shared_ptr<ConfigManager>& config_manager,
+               const RuntimeID& runtime_id, bool sampling_delegation_enabled,
+               bool sampling_decision_was_delegated_to_me,
                const std::vector<PropagationStyle>& injection_styles,
                const Optional<std::string>& hostname,
                Optional<std::string> origin, std::size_t tags_header_max_size,
@@ -100,13 +124,19 @@ class TraceSegment {
   Logger& logger() const;
 
   // Inject trace context for the specified `span` into the specified `writer`.
+  // Return whether the trace sampling decision was delegated.
   // This function is the implementation of `Span::inject`.
-  void inject(DictWriter& writer, const SpanData& span);
+  bool inject(DictWriter& writer, const SpanData& span);
+  bool inject(DictWriter& writer, const SpanData& span,
+              const InjectionOptions& options);
 
-  // These are for sampling delegation, not for trace propagation.
-  // TODO: Sampling delegation is not yet implemented.
-  Expected<void> extract(const DictReader& reader);
-  void inject(DictWriter& writer) const;
+  // Inject this segment's trace sampling decision into the specified `writer`,
+  // if appropriate.
+  void write_sampling_delegation_response(DictWriter& writer);
+
+  // Extract a trace sampling decision from the specified `reader` if it has
+  // one, and use the resulting decision, if appropriate.
+  Expected<void> read_sampling_delegation_response(const DictReader& reader);
 
   // Take ownership of the specified `span`.
   void register_span(std::unique_ptr<SpanData> span);
@@ -119,7 +149,7 @@ class TraceSegment {
   void override_sampling_priority(int priority);
 
  private:
-  // If `sampling_decision_` is not null, use `trace_sampler_` to make a
+  // If `sampling_decision_` is null, use `trace_sampler_` to make a
   // sampling decision and assign it to `sampling_decision_`.
   void make_sampling_decision_if_null();
   // Set or remove the `tags::internal::decision_maker` trace tag in

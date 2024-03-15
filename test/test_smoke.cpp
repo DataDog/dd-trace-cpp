@@ -1,3 +1,4 @@
+#include <datadog/null_collector.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
@@ -11,9 +12,10 @@ using namespace datadog::tracing;
 
 TEST_CASE("smoke") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.logger = std::make_shared<NullLogger>();
+  config.collector = std::make_shared<NullCollector>();
 
   auto maybe_config = finalize_config(config);
   REQUIRE(maybe_config);

@@ -1,11 +1,12 @@
 version: "3.2"
 services:
 
-    # The Node.js proxy that sits in front of the C++ server.
+    # The C++ proxy that sits in front of the C++ server.
     proxy:
         build:
-            context: ./proxy
-            dockerfile: ./Dockerfile
+            context: .
+            dockerfile: Dockerfile
+        command: /dd-trace-cpp/dist/bin/http-proxy-example
         ports:
             - "127.0.0.1:8000:80"
         environment:
@@ -17,8 +18,9 @@ services:
     # The C++ HTTP server to which we added Datadog tracing
     server:
         build:
-            context: ./server
-            dockerfile: ./Dockerfile
+            context: .
+            dockerfile: Dockerfile
+        command: /dd-trace-cpp/dist/bin/http-server-example
         environment:
             # This will override any value of `datadog::tracing::TracerConfig`'s
             # `.agent.url` in `server.cpp`.

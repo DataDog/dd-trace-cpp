@@ -25,26 +25,6 @@ class Logger;
 // incorrectly formatted, then return `nullopt`.
 Optional<std::uint64_t> parse_trace_id_high(const std::string& value);
 
-// Decode the specified `trace_tags` and integrate them into the specified
-// `result`. If an error occurs, add a `tags::internal::propagation_error` tag
-// to the specified `span_tags` and log a diagnostic using the specified
-// `logger`.
-void handle_trace_tags(StringView trace_tags, ExtractedData& result,
-                       std::unordered_map<std::string, std::string>& span_tags,
-                       Logger& logger);
-
-// Extract an ID from the specified `header`, which might be present in the
-// specified `headers`, and return the ID. If `header` is not present in
-// `headers`, then return `nullopt`. If an error occurs, return an `Error`.
-// Parse the ID with respect to the specified numeric `base`, e.g. `10` or `16`.
-// The specified `header_kind` and `style_name` are used in diagnostic messages
-// should an error occur.
-Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
-                                                    StringView header,
-                                                    StringView header_kind,
-                                                    StringView style_name,
-                                                    int base);
-
 // Return trace information parsed from the specified `headers` in the Datadog
 // propagation style. Use the specified `span_tags` and `logger` to report
 // warnings. If an error occurs, return an `Error`.

@@ -54,6 +54,8 @@
 namespace datadog {
 namespace tracing {
 
+struct InjectionOptions;
+class DictReader;
 class DictWriter;
 struct SpanConfig;
 struct SpanData;
@@ -65,6 +67,7 @@ class Span {
   std::function<std::uint64_t()> generate_span_id_;
   Clock clock_;
   Optional<std::chrono::steady_clock::time_point> end_time_;
+  mutable bool expecting_delegated_sampling_decision_;
 
  public:
   // Create a span whose properties are stored in the specified `data`, that is
@@ -156,8 +159,16 @@ class Span {
   void set_end_time(std::chrono::steady_clock::time_point);
 
   // Write information about this span and its trace into the specified `writer`
-  // for purposes of trace propagation.
+  // using all of the configured injection propagation styles.
   void inject(DictWriter& writer) const;
+  void inject(DictWriter& writer, const InjectionOptions& options) const;
+
+  // If this span is expecting a sampling decision that it previously delegated,
+  // then extract a sampling decision from the specified `reader`. Return an
+  // error if a sampling decision is present in `reader` but is invalid. Return
+  // success otherwise. The trace segment associated with this span might adopt
+  // the sampling decision from `reader`.
+  Expected<void> read_sampling_delegation_response(const DictReader& reader);
 
   // Return a reference to this span's trace segment.  The trace segment has
   // member functions that affect the trace as a whole, such as

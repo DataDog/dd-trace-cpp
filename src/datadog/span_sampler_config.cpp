@@ -8,11 +8,19 @@
 #include "environment.h"
 #include "expected.h"
 #include "json.hpp"
-#include "logger.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
+
+std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
+  nlohmann::json res;
+  for (const auto &r : rules) {
+    res.emplace_back(r.to_json());
+  }
+
+  return res.dump();
+}
 
 // `env_var` is the name of the environment variable from which `rules_raw` was
 // obtained.  It's used for error messages.
@@ -129,15 +137,8 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
   return rules;
 }
 
-}  // namespace
-
-SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
-
-Expected<FinalizedSpanSamplerConfig> finalize_config(
-    const SpanSamplerConfig &config, Logger &logger) {
-  FinalizedSpanSamplerConfig result;
-
-  std::vector<SpanSamplerConfig::Rule> rules = config.rules;
+Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
+  SpanSamplerConfig env_config;
 
   auto rules_env = lookup(environment::DD_SPAN_SAMPLING_RULES);
   if (rules_env) {
@@ -146,7 +147,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
     if (auto *error = maybe_rules.if_error()) {
       return std::move(*error);
     }
-    rules = std::move(*maybe_rules);
+    env_config.rules = std::move(*maybe_rules);
   }
 
   if (auto file_env = lookup(environment::DD_SPAN_SAMPLING_RULES_FILE)) {
@@ -202,8 +203,37 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
         return error->with_prefix(prefix);
       }
 
-      rules = std::move(*maybe_rules);
+      env_config.rules = std::move(*maybe_rules);
     }
+  }
+
+  return env_config;
+}
+
+}  // namespace
+
+SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
+
+Expected<FinalizedSpanSamplerConfig> finalize_config(
+    const SpanSamplerConfig &user_config, Logger &logger) {
+  Expected<SpanSamplerConfig> env_config = load_span_sampler_env_config(logger);
+  if (auto error = env_config.if_error()) {
+    return *error;
+  }
+
+  FinalizedSpanSamplerConfig result;
+
+  std::vector<SpanSamplerConfig::Rule> rules;
+  if (!env_config->rules.empty()) {
+    rules = env_config->rules;
+    result.metadata[ConfigName::SPAN_SAMPLING_RULES] =
+        ConfigMetadata(ConfigName::SPAN_SAMPLING_RULES, to_string(rules),
+                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+  } else if (!user_config.rules.empty()) {
+    rules = user_config.rules;
+    result.metadata[ConfigName::SPAN_SAMPLING_RULES] =
+        ConfigMetadata(ConfigName::SPAN_SAMPLING_RULES, to_string(rules),
+                       ConfigMetadata::Origin::CODE);
   }
 
   for (const auto &rule : rules) {

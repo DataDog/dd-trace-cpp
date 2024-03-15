@@ -31,6 +31,7 @@ const std::string trace_id_high = "_dd.p.tid";
 const std::string process_id = "process_id";
 const std::string language = "language";
 const std::string runtime_id = "runtime-id";
+const std::string sampling_decider = "_dd.is_sampling_decider";
 
 }  // namespace internal
 
