@@ -1,12 +1,6 @@
 #include "environment.h"
 
 #include <cstdlib>
-#ifdef _MSC_VER
-// clang-format off
-#include <windows.h>
-#include <winbase.h>  // GetEnvironmentVariable
-// clang-format on
-#endif
 
 #include "json.hpp"
 
@@ -16,20 +10,10 @@ namespace environment {
 namespace {
 
 Optional<std::string> get_env(const char *name) {
-#ifdef _MSC_VER
-  // maximum size of an environment variable value on Windows
-  char buffer[32767];
-  const DWORD rc = GetEnvironmentVariable(name, buffer, sizeof buffer);
-  if (rc == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
-    return nullopt;
-  }
-  return std::string(buffer, rc);  // `rc` is the length on success
-#else
   if (const char *value = std::getenv(name)) {
     return value;
   }
   return nullopt;
-#endif
 }
 
 }  // namespace
