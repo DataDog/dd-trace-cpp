@@ -84,7 +84,7 @@ class CurlLibrary {
 // nginx, libev, libuv, or libevent.
 // `class Curl` takes a `CurlEventLoop` in its constructor.
 class CurlEventLoop {
-public:
+ public:
   // Add the specified request `handle` to the event loop. Return an error if
   // the `handle` cannot be added. If the `handle` is successfully added,
   // register the specified `on_error` callback for when an error occurs in the
@@ -95,17 +95,28 @@ public:
   // The caller is responsible for freeing the `handle`. `handle` will be
   // removed from the event loop before one of `on_error` or `on_done` is
   // invoked. To remove the `handle` sooner, call `remove_handle`.
-  virtual Expected<void> add_handle(CURL *handle,
-                                    std::function<void(CURLcode)> on_error,
-                                    std::function<void()> on_done) = 0;
+  // TODO: mention destructor of the event loop.
+  //
+  // Note that a `CurlEventLoop` implementation might use the private data
+  // pointer property (`CURLINFO_PRIVATE`) of `handle` between when
+  // `add_handle` is called and when one of the following occurs: either of
+  // `on_error` or `on_done` is invoked, `add_handle` returns an error, or
+  // `remove_handle` is called. Any existing private data pointer will be
+  // restored afterward; but, other handlers registered with `handle`, such as
+  // `CURLOPT_HEADERFUNCTION` and `CURLOPT_WRITEFUNCTION`, must not access
+  // `handle`'s private data pointer. This restriction is to afford
+  // implementations of `CurlEventLoop` with limited state.
+  virtual Expected<void> add_handle(
+      CURL *handle, std::function<void(CURLcode) /*noexcept*/> on_error,
+      std::function<void() /*noexcept*/> on_done) = 0;
 
   // Remove the specified request `handle` from the event loop. Return an
   // error if one occurs.
   virtual Expected<void> remove_handle(CURL *handle) = 0;
 
   // Destroy this object. Any request handle that was previously added to the
-  // event loop via `add_handle` and that hasn't completed must first be
-  // removed via `remove_handle` by the caller.
+  // event loop via `add_handle` will be removed as if by a call to
+  // `remove_handle`.
   virtual ~CurlEventLoop() = default;
 
   // Wait until there are no more outstanding requests, or until the specified
@@ -122,17 +133,30 @@ class Curl : public HTTPClient {
  public:
   using ThreadGenerator = std::function<std::thread(std::function<void()> &&)>;
 
-  explicit Curl(const std::shared_ptr<Logger> &);
-  Curl(const std::shared_ptr<Logger> &, CurlLibrary &);
-  Curl(const std::shared_ptr<Logger> &, CurlLibrary &, const ThreadGenerator &);
+  // Create a `Curl` instance that:
+  //
+  // - uses the specified `logger` to log diagnostics,
+  // - uses the optionally specified `library` to access libcurl functions,
+  //   or uses a default library if one is not specified,
+  // - uses the optionally specified `event_loop` to dispatch curl handles, or
+  //   uses a default event loop if one is not specified,
+  // - and uses the optionally specified `make_thread` to spawn the event loop
+  //   thread if the default even loop is to be used, or uses a default thread
+  //   creation function if one is not specified.
+  //
+  // If `event_loop` is null, then the resulting `Curl` instance's member
+  // functions return an error and have no other effect. The behavior is
+  // undefined if `logger` is null or if `make_thread` contains no target.
+  explicit Curl(const std::shared_ptr<Logger> &logger);
+  Curl(const std::shared_ptr<Logger> &, CurlLibrary &library);
   Curl(const std::shared_ptr<Logger> &,
        const std::shared_ptr<CurlEventLoop> &event_loop);
+  Curl(const std::shared_ptr<Logger> &, const std::shared_ptr<CurlEventLoop> &,
+       CurlLibrary &);
   Curl(const std::shared_ptr<Logger> &,
-       const std::shared_ptr<CurlEventLoop> &event_loop, CurlLibrary &);
-  Curl(const std::shared_ptr<Logger> &,
-       const std::shared_ptr<CurlEventLoop> &event_loop, CurlLibrary &,
-       const ThreadGenerator &);
-  ~Curl();
+       const Curl::ThreadGenerator &make_thread, CurlLibrary &);
+
+  ~Curl() override;
 
   Curl(const Curl &) = delete;
 

@@ -217,11 +217,13 @@ TEST_CASE("bad std::thread means error mode") {
   // where calls to `post` always return an error.
   const auto logger = std::make_shared<MockLogger>();
   CurlLibrary libcurl;  // the default implementation
-  const auto client =
-      std::make_shared<Curl>(logger, libcurl, [](auto &&) -> std::thread {
+  const auto client = std::make_shared<Curl>(
+      logger,
+      [](auto &&) -> std::thread {
         throw std::system_error(
             std::make_error_code(std::errc::resource_unavailable_try_again));
-      });
+      },
+      libcurl);
   REQUIRE(logger->first_error().code == Error::CURL_HTTP_CLIENT_SETUP_FAILED);
 
   const auto ignore = [](auto &&...) {};
@@ -345,7 +347,7 @@ TEST_CASE("setopt failures") {
       values<TestCase>({CASE(CURLOPT_ERRORBUFFER), CASE(CURLOPT_HEADERDATA),
                         CASE(CURLOPT_HEADERFUNCTION), CASE(CURLOPT_HTTPHEADER),
                         CASE(CURLOPT_POST), CASE(CURLOPT_POSTFIELDS),
-                        CASE(CURLOPT_POSTFIELDSIZE), CASE(CURLOPT_PRIVATE),
+                        CASE(CURLOPT_POSTFIELDSIZE),
                         CASE(CURLOPT_UNIX_SOCKET_PATH), CASE(CURLOPT_URL),
                         CASE(CURLOPT_WRITEDATA), CASE(CURLOPT_WRITEFUNCTION)}));
 
