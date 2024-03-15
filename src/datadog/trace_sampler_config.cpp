@@ -226,7 +226,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     message +=
         "Trace sampling max_per_second must be greater than zero, but the "
         "following value was given: ";
-    message += std::to_string(*config.max_per_second);
+    message += std::to_string(max_per_second);
     return Error{Error::MAX_PER_SECOND_OUT_OF_RANGE, std::move(message)};
   }
   result.max_per_second = max_per_second;
