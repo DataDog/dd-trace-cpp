@@ -72,19 +72,19 @@ SpanSamplingTags span_sampling_tags(const SpanData& span) {
 
 SpanSamplerConfig::Rule by_service(StringView service) {
   SpanSamplerConfig::Rule rule;
-  rule.service = service;
+  assign(rule.service, service);
   return rule;
 }
 
 SpanSamplerConfig::Rule by_name(StringView name) {
   SpanSamplerConfig::Rule rule;
-  rule.name = name;
+  assign(rule.name, name);
   return rule;
 }
 
 SpanSamplerConfig::Rule by_resource(StringView resource) {
   SpanSamplerConfig::Rule rule;
-  rule.resource = resource;
+  assign(rule.resource, resource);
   return rule;
 }
 
@@ -98,7 +98,7 @@ SpanSamplerConfig::Rule by_tags(
 SpanSamplerConfig::Rule by_name_and_tags(
     StringView name, std::unordered_map<std::string, std::string> tags) {
   SpanSamplerConfig::Rule rule;
-  rule.name = name;
+  assign(rule.name, name);
   rule.tags = std::move(tags);
   return rule;
 }

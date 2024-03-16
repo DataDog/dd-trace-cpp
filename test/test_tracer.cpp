@@ -29,6 +29,7 @@
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
 #include "mocks/dict_writers.h"
+#include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
@@ -1685,6 +1686,7 @@ TEST_CASE("heterogeneous extraction") {
 
   TracerConfig config;
   config.service = "testsvc";
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.extraction_styles = test_case.extraction_styles;
   config.injection_styles = test_case.injection_styles;
   config.logger = std::make_shared<NullLogger>();

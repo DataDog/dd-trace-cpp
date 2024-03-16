@@ -50,7 +50,7 @@ struct MockHTTPClient : public HTTPClient {
       on_error_ = on_error;
       set_headers(request_headers);
     }
-    return post_error;
+    return Expected<void>(post_error);
   }
 
   void drain(std::chrono::steady_clock::time_point /*deadline*/) override {

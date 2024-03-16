@@ -4,6 +4,7 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
@@ -12,6 +13,7 @@ using namespace datadog::tracing;
 TEST_CASE("smoke") {
   TracerConfig config;
   config.service = "testsvc";
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.logger = std::make_shared<NullLogger>();
   config.collector = std::make_shared<NullCollector>();
 

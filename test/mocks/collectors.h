@@ -7,9 +7,9 @@
 #include <datadog/tags.h>
 #include <datadog/trace_sampler.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <map>
+#include <numeric>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -39,7 +39,7 @@ struct MockCollector : public Collector {
   }
 
   std::size_t span_count() const {
-    return std::accumulate(chunks.begin(), chunks.end(), 0,
+    return std::accumulate(chunks.begin(), chunks.end(), std::size_t(0),
                            [](std::size_t total, const auto& chunk) {
                              return total + chunk.size();
                            });

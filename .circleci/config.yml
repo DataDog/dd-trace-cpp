@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  windows: circleci/windows@5.0
+
 executors:
   docker-amd64:
     docker:
@@ -27,18 +30,38 @@ jobs:
     - checkout
     - run: find bin/ -executable -type f -print0 | xargs -0 shellcheck
 
-  build-bazel:
+  test-windows-bazel:
+    parameters:
+      # `bazelrc` is the path to the .bazelrc file to use in the build/test.
+      # The repository has two flavors: one that uses Abseil types (for use with
+      # Envoy), and one that uses std types.
+      bazelrc:
+        type: string
+    executor: windows/server-2022
+    environment:
+      MAKE_JOB_COUNT: 4
+    steps:
+    - checkout
+    - run: choco install -y bazelisk
+    - run: bazelisk --bazelrc=<< parameters.bazelrc >> test --jobs $env:MAKE_JOB_COUNT dd_trace_cpp_test
+
+  test-bazel:
     parameters:
       toolchain:
         type: string
       arch:
+        type: string
+      # `bazelrc` is the path to the .bazelrc file to use in the build/test.
+      # The repository has two flavors: one that uses Abseil types (for use with
+      # Envoy), and one that uses std types.
+      bazelrc:
         type: string
     executor: docker-<< parameters.arch >>
     environment:
       MAKE_JOB_COUNT: 8
     steps:
     - checkout
-    - run: bin/with-toolchain << parameters.toolchain >> bazelisk build --jobs $MAKE_JOB_COUNT dd_trace_cpp
+    - run: bin/with-toolchain << parameters.toolchain >> bazelisk --bazelrc=<< parameters.bazelrc >> test --jobs $MAKE_JOB_COUNT dd_trace_cpp_test
 
   test-cmake:
     parameters:
@@ -113,7 +136,7 @@ jobs:
             DD_TRACE_CPP_COMMIT: << pipeline.git.revision >>
           command: |
             echo "https://github.com/DataDog/dd-trace-cpp@$DD_TRACE_CPP_COMMIT" > ~/project/system-tests/binaries/cpp-load-from-git
-            cd system-tests && ./build.sh -i runner && ./run.sh PARAMETRIC --log-cli-level=DEBUG 
+            cd system-tests && ./build.sh -i runner && ./run.sh PARAMETRIC --log-cli-level=DEBUG
       - run:
           name: Collect artifacts
           command: tar -cvzf logs_cpp_parametric_dev.tar.gz -C system-tests logs_parametric
@@ -127,17 +150,22 @@ workflows:
     jobs:
     - format
     - shellcheck
+    - test-windows-bazel:
+        matrix:
+          parameters:
+            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
     - test-cmake:
         matrix:
           parameters:
             toolchain: ["gnu", "llvm"]
             sanitize: ["on", "off"]
             arch: ["amd64", "arm64"]
-    - build-bazel:
+    - test-bazel:
         matrix:
           parameters:
             arch: ["amd64", "arm64"]
             toolchain: ["gnu", "llvm"]
+            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
     - coverage
     - system-tests:
         filters:

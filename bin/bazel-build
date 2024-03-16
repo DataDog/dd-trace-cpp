@@ -5,3 +5,5 @@ set -e
 cd "$(dirname "$0")"/..
 
 bazelisk build dd_trace_cpp
+
+bazelisk "$@" test dd_trace_cpp_test

@@ -1,4 +1,5 @@
 /bazel-*
 /.build/
 /.coverage/
-MODULE.bazel.lock
+/MODULE.bazel
+/MODULE.bazel.lock

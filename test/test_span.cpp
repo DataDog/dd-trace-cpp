@@ -24,6 +24,7 @@
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
 #include "mocks/dict_writers.h"
+#include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
@@ -704,6 +705,7 @@ TEST_CASE("injecting W3C tracestate header") {
 TEST_CASE("128-bit trace ID injection") {
   TracerConfig config;
   config.service = "testsvc";
+  config.agent.http_client = std::make_shared<MockHTTPClient>();
   config.logger = std::make_shared<MockLogger>();
   config.generate_128bit_trace_ids = true;
 
