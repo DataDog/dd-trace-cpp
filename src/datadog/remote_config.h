@@ -52,14 +52,23 @@ enum class Capability : uint64_t {
   ASM_TRUSTED_IPS = 1 << 10,
   ASM_API_SECURITY_SAMPLE_RATE = 1 << 11,
   APM_TRACING_SAMPLE_RATE = 1 << 12,
-  APM_LOGS_INJECTION = 1 << 13,
-  APM_HTTP_HEADER_TAGS = 1 << 14,
-  APM_CUSTOM_TAGS = 1 << 15,
+  APM_TRACING_LOGS_INJECTION = 1 << 13,
+  APM_TRACING_HTTP_HEADER_TAGS = 1 << 14,
+  APM_TRACING_CUSTOM_TAGS = 1 << 15,
   ASM_PREPROCESSOR_OVERRIDES = 1 << 16,
   ASM_CUSTOM_DATA_SCANNERS = 1 << 17,
   ASM_EXCLUSION_DATA = 1 << 18,
   APM_TRACING_TRACING_ENABLED = 1 << 19,
   APM_TRACING_DATA_STREAMS_ENABLED = 1 << 20,
+  ASM_RASP_SQLI = 1 << 21,
+  ASM_RASP_LFI = 1 << 22,
+  ASM_RASP_SSRF = 1 << 23,
+  ASM_RASP_SHI = 1 << 24,
+  ASM_RASP_XXE = 1 << 25,
+  ASM_RASP_RCE = 1 << 26,
+  ASM_RASP_NOSQLI = 1 << 27,
+  ASM_RASP_XSS = 1 << 28,
+  APM_TRACING_SAMPLE_RULES = 1 << 29,
 };
 
 class CapabilitiesSet {
@@ -323,8 +332,10 @@ class ProductListener {
   ProductListener &operator=(ProductListener &&) = delete;
 
   virtual void on_config_update(const ParsedConfigKey &key,
-                                const std::string &content) = 0;
-  virtual void on_config_remove(const ParsedConfigKey &key) = 0;
+                                const std::string &content,
+                                std::vector<ConfigMetadata> &config_update) = 0;
+  virtual void on_config_remove(const ParsedConfigKey &key,
+                                std::vector<ConfigMetadata> &config_update) = 0;
   [[nodiscard]] virtual CapabilitiesSet capabilities() const = 0;
 
   Product product() const { return product_; }
@@ -356,14 +367,17 @@ class ProductState {
 
   // throws reportable_error for global errors. All other errors are considered
   // configuration apply errors
-  bool apply(const RemoteConfigResponse &response);
+  bool apply(const RemoteConfigResponse &response,
+             std::vector<ConfigMetadata> &config_update);
 
   void call_listeners_apply(const RemoteConfigResponse &resp,
+                            std::vector<ConfigMetadata> &config_update,
                             const ParsedConfigKey &key,
                             const std::string &file_contents);
 
   using per_key_state_citerator_t = decltype(per_key_state_)::const_iterator;
-  per_key_state_citerator_t call_listeners_remove(per_key_state_citerator_t it);
+  per_key_state_citerator_t call_listeners_remove(
+      std::vector<ConfigMetadata> &config_update, per_key_state_citerator_t it);
 
   void add_config_states_to(
       std::vector<std::shared_ptr<ConfigState>> &config_states) const {
@@ -453,7 +467,7 @@ class RemoteConfigurationManager {
 
   // Handles the response received from a remote source and udates the internal
   // state accordingly.
-  void process_response(nlohmann::json &&json);
+  std::vector<ConfigMetadata> process_response(nlohmann::json &&json);
 
  private:
   static Optional<std::string> build_error_message(

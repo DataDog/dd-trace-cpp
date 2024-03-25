@@ -29,8 +29,8 @@ REMOTE_CONFIG_TEST("first payload") {
   };
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.defaults.environment = "test";
+  config.service = "testsvc";
+  config.environment = "test";
   const auto config_manager =
       std::make_shared<ConfigManager>(*finalize_config(config));
 
@@ -44,7 +44,7 @@ REMOTE_CONFIG_TEST("first payload") {
   CHECK(payload.contains("error") == false);
   CHECK(payload["client"]["is_tracer"] == true);
   CHECK(payload["client"]["capabilities"] ==
-        std::vector{0, 0, 0, 0, 0, 0, 16, 0});
+        std::vector{0, 0, 0, 0, 0, 8, 144, 0});
   CHECK(payload["client"]["products"] ==
         std::vector<std::string>{"APM_TRACING"});
   CHECK(payload["client"]["client_tracer"]["language"] == "cpp");
@@ -73,9 +73,10 @@ REMOTE_CONFIG_TEST("response processing") {
   };
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
-  config.defaults.environment = "test";
+  config.service = "testsvc";
+  config.environment = "test";
   config.trace_sampler.sample_rate = 1.0;
+  config.report_traces = true;
   const auto config_manager =
       std::make_shared<ConfigManager>(*finalize_config(config));
 
@@ -85,10 +86,8 @@ REMOTE_CONFIG_TEST("response processing") {
   RemoteConfigurationManager rc(tracer_signature, config_manager, logger);
 
   SECTION("empty response") {
-    auto test_case = GENERATE(values<std::string_view>({
-        "{}",
-        R"({ "targets": "" })"
-    }));
+    auto test_case =
+        GENERATE(values<std::string_view>({"{}", R"({ "targets": "" })"}));
 
     CAPTURE(test_case);
     auto response_json = nlohmann::json::parse(test_case);
@@ -266,10 +265,9 @@ REMOTE_CONFIG_TEST("response processing") {
     // clang-format on
 
     CAPTURE(test_case);
-    auto response_json =
-        nlohmann::json::parse(/* input = */ test_case.first,
-                              /* parser_callback = */ nullptr,
-                              /* allow_exceptions = */ false);
+    auto response_json = nlohmann::json::parse(/* input = */ test_case.first,
+                                               /* parser_callback = */ nullptr,
+                                               /* allow_exceptions = */ false);
 
     REQUIRE(!response_json.is_discarded());
     rc.process_response(std::move(response_json));
@@ -307,7 +305,8 @@ REMOTE_CONFIG_TEST("response processing") {
     CAPTURE(test_case);
     auto response_json = nlohmann::json::parse(test_case.first);
 
-    rc.process_response(std::move(response_json));
+    const auto config_updated = rc.process_response(std::move(response_json));
+    CHECK(config_updated.empty());
 
     // Next payload should not contain global error.
     const auto payload = rc.make_request_payload();
@@ -335,30 +334,54 @@ REMOTE_CONFIG_TEST("response processing") {
 
   SECTION("valid remote configuration") {
     // clang-format off
+    // {
+    //     "lib_config": {
+    //         "library_language": "all",
+    //         "library_version": "latest",
+    //         "service_name": "testsvc",
+    //         "env": "test",
+    //         "tracing_enabled": false,
+    //         "tracing_sampling_rate": 0.6,
+    //         "tracing_tags": [
+    //             "hello:world",
+    //             "foo:bar"
+    //         ]
+    //     },
+    //     "service_target": {
+    //         "service": "testsvc",
+    //         "env": "test"
+    //     }
+    // }
     const std::string json_input = R"({
-      "targets": "ewogICAgInNpZ25lZCI6IHsKICAgICAgICAiY3VzdG9tIjogewogICAgICAgICAgICAiYWdlbnRfcmVmcmVzaF9pbnRlcnZhbCI6IDUsCiAgICAgICAgICAgICJvcGFxdWVfYmFja2VuZF9zdGF0ZSI6ICJleUoyWlhKemFXOXVJam95TENKemRHRjBaU0k2ZXlKbWFXeGxYMmhoYzJobGN5STZleUprWVhSaFpHOW5MekV3TURBeE1qVTROREF2UVZCTlgxUlNRVU5KVGtjdk9ESTNaV0ZqWmpoa1ltTXpZV0l4TkRNMFpETXlNV05pT0RGa1ptSm1OMkZtWlRZMU5HRTBZall4TVRGalpqRTJOakJpTnpGalkyWTRPVGM0TVRrek9DOHlPVEE0Tm1Ka1ltVTFNRFpsTmpoaU5UQm1NekExTlRneU0yRXpaR0UxWTJVd05USTRaakUyTkRCa05USmpaamc0TmpFNE1UWmhZV0U1Wm1ObFlXWTBJanBiSW05WVpESnBlVU16ZUM5b1JXc3hlWFZoWTFoR04xbHFjWEpwVGs5QldVdHVaekZ0V0UwMU5WWktUSGM5SWwxOWZYMD0iCiAgICAgICAgfSwKICAgICAgICAic3BlY192ZXJzaW9uIjogIjEuMC4wIiwKICAgICAgICAidGFyZ2V0cyI6IHsKICAgICAgICAgICAgImRhdGFkb2cvMi9BUE1fVFJBQ0lORy8zMC9uYW1lIjogewogICAgICAgICAgICAgICAgImhhc2hlcyI6IHsKICAgICAgICAgICAgICAgICAgICAic2hhMjU2IjogImExNzc3NjhiMjBiN2M3Zjg0NDkzNWNhZTY5YzVjNWVkODhlYWFlMjM0ZTAxODJhNzgzNTk5NzMzOWU1NTI0YmMiCiAgICAgICAgICAgICAgICB9LAoJCQkJImN1c3RvbSI6IHsgInYiOiA0MiB9LAogICAgICAgICAgICAgICAgImxlbmd0aCI6IDM4MQogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAidmVyc2lvbiI6IDY2MjA0MzIwCiAgICB9Cn0K",
+      "targets": "ewogICAgInNpZ25lZCI6IHsKICAgICAgICAiY3VzdG9tIjogewogICAgICAgICAgICAiYWdlbnRfcmVmcmVzaF9pbnRlcnZhbCI6IDUsCiAgICAgICAgICAgICJvcGFxdWVfYmFja2VuZF9zdGF0ZSI6ICJleUoyWlhKemFXOXVJam95TENKemRHRjBaU0k2ZXlKbWFXeGxYMmhoYzJobGN5STZleUprWVhSaFpHOW5MekV3TURBeE1qVTROREF2UVZCTlgxUlNRVU5KVGtjdk9ESTNaV0ZqWmpoa1ltTXpZV0l4TkRNMFpETXlNV05pT0RGa1ptSm1OMkZtWlRZMU5HRTBZall4TVRGalpqRTJOakJpTnpGalkyWTRPVGM0TVRrek9DOHlPVEE0Tm1Ka1ltVTFNRFpsTmpoaU5UQm1NekExTlRneU0yRXpaR0UxWTJVd05USTRaakUyTkRCa05USmpaamc0TmpFNE1UWmhZV0U1Wm1ObFlXWTBJanBiSW05WVpESnBlVU16ZUM5b1JXc3hlWFZoWTFoR04xbHFjWEpwVGs5QldVdHVaekZ0V0UwMU5WWktUSGM5SWwxOWZYMD0iCiAgICAgICAgfSwKICAgICAgICAic3BlY192ZXJzaW9uIjogIjEuMC4wIiwKICAgICAgICAidGFyZ2V0cyI6IHsKICAgICAgICAgICAgImRhdGFkb2cvMi9BUE1fVFJBQ0lORy8zMC9uYW1lIjogewogICAgICAgICAgICAgICAgImhhc2hlcyI6IHsKICAgICAgICAgICAgICAgICAgICAic2hhMjU2IjogImExNzc3NjhiMjBiN2M3Zjg0NDkzNWNhZTY5YzVjNWVkODhlYWFlMjM0ZTAxODJhNzgzNTk5NzMzOWU1NTI0YmMiCiAgICAgICAgICAgICAgICB9LAoJCQkJImN1c3RvbSI6IHsgInYiOiA0MiB9LAogICAgICAgICAgICAgICAgImxlbmd0aCI6IDQyNgogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAidmVyc2lvbiI6IDY2MjA0MzIwCiAgICB9Cn0K",
       "client_configs": ["datadog/2/APM_TRACING/30/name"],
       "target_files": [
         {
           "path": "datadog/2/APM_TRACING/30/name",
-          "raw": "eyAiaWQiOiAiODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2FmZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOCIsICJyZXZpc2lvbiI6IDE2OTgxNjcxMjYwNjQsICJzY2hlbWFfdmVyc2lvbiI6ICJ2MS4wLjAiLCAiYWN0aW9uIjogImVuYWJsZSIsICJsaWJfY29uZmlnIjogeyAibGlicmFyeV9sYW5ndWFnZSI6ICJhbGwiLCAibGlicmFyeV92ZXJzaW9uIjogImxhdGVzdCIsICJzZXJ2aWNlX25hbWUiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIsICJ0cmFjaW5nX2VuYWJsZWQiOiB0cnVlLCAidHJhY2luZ19zYW1wbGluZ19yYXRlIjogMC42IH0sICJzZXJ2aWNlX3RhcmdldCI6IHsgInNlcnZpY2UiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIgfSB9"
+          "raw": "eyAiaWQiOiAiODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2FmZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOCIsICJyZXZpc2lvbiI6IDE2OTgxNjcxMjYwNjQsICJzY2hlbWFfdmVyc2lvbiI6ICJ2MS4wLjAiLCAiYWN0aW9uIjogImVuYWJsZSIsICJsaWJfY29uZmlnIjogeyAibGlicmFyeV9sYW5ndWFnZSI6ICJhbGwiLCAibGlicmFyeV92ZXJzaW9uIjogImxhdGVzdCIsICJzZXJ2aWNlX25hbWUiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIsICJ0cmFjaW5nX2VuYWJsZWQiOiBmYWxzZSwgInRyYWNpbmdfc2FtcGxpbmdfcmF0ZSI6IDAuNiwgInRyYWNpbmdfdGFncyI6IFsiaGVsbG86d29ybGQiLCAiZm9vOmJhciJdIH0sICJzZXJ2aWNlX3RhcmdldCI6IHsgInNlcnZpY2UiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIgfSB9"
         }
       ]
     })";
     // clang-format on
 
-    auto response_json =
-        nlohmann::json::parse(/* input = */ json_input,
-                              /* parser_callback = */ nullptr,
-                              /* allow_exceptions = */ false);
+    auto response_json = nlohmann::json::parse(/* input = */ json_input,
+                                               /* parser_callback = */ nullptr,
+                                               /* allow_exceptions = */ false);
 
     REQUIRE(!response_json.is_discarded());
 
-    const auto old_trace_sampler = config_manager->get_trace_sampler();
-    rc.process_response(std::move(response_json));
-    const auto new_trace_sampler = config_manager->get_trace_sampler();
+    const auto old_trace_sampler = config_manager->trace_sampler();
+    const auto old_span_defaults = config_manager->span_defaults();
+    const auto old_report_traces = config_manager->report_traces();
+    const auto config_updated = rc.process_response(std::move(response_json));
+    REQUIRE(config_updated.size() == 3);
+    const auto new_trace_sampler = config_manager->trace_sampler();
+    const auto new_span_defaults = config_manager->span_defaults();
+    const auto new_report_traces = config_manager->report_traces();
 
     CHECK(new_trace_sampler != old_trace_sampler);
+    CHECK(new_span_defaults != old_span_defaults);
+    CHECK(new_report_traces != old_report_traces);
 
     SECTION("reset configuration") {
       SECTION(
@@ -378,20 +401,30 @@ REMOTE_CONFIG_TEST("response processing") {
 
         REQUIRE(!response_json.is_discarded());
 
-        rc.process_response(std::move(response_json));
-        const auto current_trace_sampler = config_manager->get_trace_sampler();
+        const auto config_updated =
+            rc.process_response(std::move(response_json));
+        REQUIRE(config_updated.size() == 3);
+
+        const auto current_trace_sampler = config_manager->trace_sampler();
+        const auto current_span_defaults = config_manager->span_defaults();
+        const auto current_report_traces = config_manager->report_traces();
+
         CHECK(old_trace_sampler == current_trace_sampler);
+        CHECK(old_span_defaults == current_span_defaults);
+        CHECK(old_report_traces == current_report_traces);
       }
 
-      SECTION("missing configuration field -> field should be reset") {
+      SECTION(
+          "missing the trace_sampling_rate field -> only this field should be "
+          "reset") {
         // clang-format off
         const std::string json_input = R"({
-          "targets": "ewogICAgInNpZ25lZCI6IHsKICAgICAgICAiY3VzdG9tIjogewogICAgICAgICAgICAiYWdlbnRfcmVmcmVzaF9pbnRlcnZhbCI6IDUsCiAgICAgICAgICAgICJvcGFxdWVfYmFja2VuZF9zdGF0ZSI6ICJleUoyWlhKemFXOXVJam95TENKemRHRjBaU0k2ZXlKbWFXeGxYMmhoYzJobGN5STZleUprWVhSaFpHOW5MekV3TURBeE1qVTROREF2UVZCTlgxUlNRVU5KVGtjdk9ESTNaV0ZqWmpoa1ltTXpZV0l4TkRNMFpETXlNV05pT0RGa1ptSm1OMkZtWlRZMU5HRTBZall4TVRGalpqRTJOakJpTnpGalkyWTRPVGM0TVRrek9DOHlPVEE0Tm1Ka1ltVTFNRFpsTmpoaU5UQm1NekExTlRneU0yRXpaR0UxWTJVd05USTRaakUyTkRCa05USmpaamc0TmpFNE1UWmhZV0U1Wm1ObFlXWTBJanBiSW05WVpESnBlVU16ZUM5b1JXc3hlWFZoWTFoR04xbHFjWEpwVGs5QldVdHVaekZ0V0UwMU5WWktUSGM5SWwxOWZYMD0iCiAgICAgICAgfSwKICAgICAgICAic3BlY192ZXJzaW9uIjogIjEuMC4wIiwKICAgICAgICAidGFyZ2V0cyI6IHsKICAgICAgICAgICAgImRhdGFkb2cvMi9BUE1fVFJBQ0lORy8zMC9uYW1lIjogewogICAgICAgICAgICAgICAgImhhc2hlcyI6IHsKICAgICAgICAgICAgICAgICAgICAic2hhMjU2IjogIjY5ZTM0NmI1ZmZjZTg0NWUyOTk4NGU3NTliNzFkN2IwN2M1NjE5NzlmYWU5ZTgyZWVkMDgyYzAzOGQ4NmU2YjAiCiAgICAgICAgICAgICAgICB9LAoJCQkJImN1c3RvbSI6IHsgInYiOiA0MiB9LAogICAgICAgICAgICAgICAgImxlbmd0aCI6IDM1MQogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAidmVyc2lvbiI6IDY2MjA0MzIwCiAgICB9Cn0K",
+          "targets": "ewogICAgInNpZ25lZCI6IHsKICAgICAgICAiY3VzdG9tIjogewogICAgICAgICAgICAiYWdlbnRfcmVmcmVzaF9pbnRlcnZhbCI6IDUsCiAgICAgICAgICAgICJvcGFxdWVfYmFja2VuZF9zdGF0ZSI6ICJleUoyWlhKemFXOXVJam95TENKemRHRjBaU0k2ZXlKbWFXeGxYMmhoYzJobGN5STZleUprWVhSaFpHOW5MekV3TURBeE1qVTROREF2UVZCTlgxUlNRVU5KVGtjdk9ESTNaV0ZqWmpoa1ltTXpZV0l4TkRNMFpETXlNV05pT0RGa1ptSm1OMkZtWlRZMU5HRTBZall4TVRGalpqRTJOakJpTnpGalkyWTRPVGM0TVRrek9DOHlPVEE0Tm1Ka1ltVTFNRFpsTmpoaU5UQm1NekExTlRneU0yRXpaR0UxWTJVd05USTRaakUyTkRCa05USmpaamc0TmpFNE1UWmhZV0U1Wm1ObFlXWTBJanBiSW05WVpESnBlVU16ZUM5b1JXc3hlWFZoWTFoR04xbHFjWEpwVGs5QldVdHVaekZ0V0UwMU5WWktUSGM5SWwxOWZYMD0iCiAgICAgICAgfSwKICAgICAgICAic3BlY192ZXJzaW9uIjogIjEuMC4wIiwKICAgICAgICAidGFyZ2V0cyI6IHsKICAgICAgICAgICAgImRhdGFkb2cvMi9BUE1fVFJBQ0lORy8zMC9uYW1lIjogewogICAgICAgICAgICAgICAgImhhc2hlcyI6IHsKICAgICAgICAgICAgICAgICAgICAic2hhMjU2IjogIjY5ZTM0NmI1ZmZjZTg0NWUyOTk4NGU3NTliNzFkN2IwN2M1NjE5NzlmYWU5ZTgyZWVkMDgyYzAzOGQ4NmU2YjAiCiAgICAgICAgICAgICAgICB9LAoJCQkJImN1c3RvbSI6IHsgInYiOiA0MiB9LAogICAgICAgICAgICAgICAgImxlbmd0aCI6IDM5NgogICAgICAgICAgICB9CiAgICAgICAgfSwKICAgICAgICAidmVyc2lvbiI6IDY2MjA0MzIwCiAgICB9Cn0K",
           "client_configs": ["datadog/2/APM_TRACING/30/name"],
           "target_files": [
             {
               "path": "datadog/2/APM_TRACING/30/name",
-              "raw": "eyAiaWQiOiAiODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2FmZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOCIsICJyZXZpc2lvbiI6IDE2OTgxNjcxMjYwNjQsICJzY2hlbWFfdmVyc2lvbiI6ICJ2MS4wLjAiLCAiYWN0aW9uIjogImVuYWJsZSIsICJsaWJfY29uZmlnIjogeyAibGlicmFyeV9sYW5ndWFnZSI6ICJhbGwiLCAibGlicmFyeV92ZXJzaW9uIjogImxhdGVzdCIsICJzZXJ2aWNlX25hbWUiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIsICJ0cmFjaW5nX2VuYWJsZWQiOiB0cnVlIH0sICJzZXJ2aWNlX3RhcmdldCI6IHsgInNlcnZpY2UiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIgfSB9"
+              "raw": "eyAiaWQiOiAiODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2FmZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOCIsICJyZXZpc2lvbiI6IDE2OTgxNjcxMjYwNjQsICJzY2hlbWFfdmVyc2lvbiI6ICJ2MS4wLjAiLCAiYWN0aW9uIjogImVuYWJsZSIsICJsaWJfY29uZmlnIjogeyAibGlicmFyeV9sYW5ndWFnZSI6ICJhbGwiLCAibGlicmFyeV92ZXJzaW9uIjogImxhdGVzdCIsICJzZXJ2aWNlX25hbWUiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIsICJ0cmFjaW5nX2VuYWJsZWQiOiBmYWxzZSwgInRyYWNpbmdfdGFncyI6IFsiaGVsbG86d29ybGQiLCAiZm9vOmJhciJdIH0sICJzZXJ2aWNlX3RhcmdldCI6IHsgInNlcnZpY2UiOiAidGVzdHN2YyIsICJlbnYiOiAidGVzdCIgfSB9"
             }
           ]
         })";
@@ -404,8 +437,10 @@ REMOTE_CONFIG_TEST("response processing") {
 
         REQUIRE(!response_json.is_discarded());
 
-        rc.process_response(std::move(response_json));
-        const auto current_trace_sampler = config_manager->get_trace_sampler();
+        const auto config_updated =
+            rc.process_response(std::move(response_json));
+        REQUIRE(config_updated.size() == 1);
+        const auto current_trace_sampler = config_manager->trace_sampler();
         CHECK(old_trace_sampler == current_trace_sampler);
       }
     }
@@ -441,17 +476,17 @@ REMOTE_CONFIG_TEST("response processing") {
 
     CAPTURE(test_case);
 
-    auto response_json =
-        nlohmann::json::parse(/* input = */ test_case,
-                              /* parser_callback = */ nullptr,
-                              /* allow_exceptions = */ false);
+    auto response_json = nlohmann::json::parse(/* input = */ test_case,
+                                               /* parser_callback = */ nullptr,
+                                               /* allow_exceptions = */ false);
 
     REQUIRE(!response_json.is_discarded());
 
-    const auto old_sampling_rate = config_manager->get_trace_sampler();
-    rc.process_response(std::move(response_json));
-    const auto new_sampling_rate = config_manager->get_trace_sampler();
+    const auto old_sampling_rate = config_manager->trace_sampler();
+    const auto config_updated = rc.process_response(std::move(response_json));
+    const auto new_sampling_rate = config_manager->trace_sampler();
 
+    CHECK(config_updated.empty());
     CHECK(new_sampling_rate == old_sampling_rate);
 
     auto subseq_payload = rc.make_request_payload();

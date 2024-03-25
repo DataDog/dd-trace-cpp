@@ -25,8 +25,8 @@ void hard_stop(int /*signal*/) { std::exit(0); }
 int main() {
   // Set up the Datadog tracer.  See `src/datadog/tracer_config.h`.
   dd::TracerConfig config;
-  config.defaults.service = "dd-trace-cpp-http-server-example-proxy";
-  config.defaults.service_type = "proxy";
+  config.service = "dd-trace-cpp-http-server-example-proxy";
+  config.service_type = "proxy";
 
   // `finalize_config` validates `config` and applies any settings from
   // environment variables, such as `DD_AGENT_HOST`.

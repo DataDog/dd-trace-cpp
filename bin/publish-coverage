@@ -19,14 +19,14 @@ echo "Using temporary directory: $temp_dir"
 cd "$temp_dir"
 
 # Clone directory structure of the most recent commit of one
-# branch (main).  Don't fetch any regular files.
+# branch (gh-pages).  Don't fetch any regular files.
 mkdir dd-trace-cpp-coverage
 cd dd-trace-cpp-coverage
 
 git init
 
-git config user.email "david.goffredo@datadoghq.com"
-git config user.name "David Goffredo (via script)"
+git config user.email "damien.mehala@datadoghq.com"
+git config user.name "Damien Mehala (via script)"
 
 git remote add origin 'git@github.com:DataDog/dd-trace-cpp-coverage.git'
 branch=gh-pages
@@ -50,6 +50,15 @@ hex_encode() {
 }
 
 cd "$tracer_dir"
+
+# Summary information about the coverage report is encoded in the directory name
+# that contains the report.
+#
+# It's a bit silly, but it has a couple of advantages:
+#
+# - Concurrent commits are trivial to merge, since they involve git trees only.
+# - The UI (browser) script that tabulates the summary information need not
+#  fetch any actual files: the directory listing is sufficient.
 
 commit_time_iso=$(git show -s --format=%cI)
 commit_hash_short=$(git rev-parse HEAD | head -c 7)

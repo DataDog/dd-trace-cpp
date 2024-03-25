@@ -70,7 +70,8 @@ class TracingProductListener : public remote_config::ProductListener {
         config_manager_(std::move(config_manager)) {}
 
   void on_config_update(const remote_config::ParsedConfigKey& key,
-                        const std::string& file_contents) override {
+                        const std::string& file_contents,
+                        std::vector<ConfigMetadata>& config_update) override {
     const auto config_json = nlohmann::json::parse(file_contents);
 
     if (!service_env_match(config_json)) {
@@ -80,18 +81,26 @@ class TracingProductListener : public remote_config::ProductListener {
     ConfigUpdate const dyn_config =
         parse_dynamic_config(config_json.at("lib_config"));
 
-    config_manager_->update(dyn_config);
+    std::vector<ConfigMetadata> metadata = config_manager_->update(dyn_config);
+    config_update.insert(config_update.end(), metadata.begin(), metadata.end());
     applied_configs_.emplace(key);
   }
 
-  void on_config_remove(const remote_config::ParsedConfigKey& key) override {
+  void on_config_remove(const remote_config::ParsedConfigKey& key,
+                        std::vector<ConfigMetadata>& config_update) override {
     if (applied_configs_.erase(key) > 0) {
-      config_manager_->reset();
+      std::vector<ConfigMetadata> metadata = config_manager_->reset();
+      config_update.insert(config_update.end(), metadata.begin(),
+                           metadata.end());
     }
   }
 
   remote_config::CapabilitiesSet capabilities() const override {
-    return remote_config::Capability::APM_TRACING_SAMPLE_RATE;
+    return {
+        remote_config::Capability::APM_TRACING_SAMPLE_RATE,
+        remote_config::Capability::APM_TRACING_CUSTOM_TAGS,
+        remote_config::Capability::APM_TRACING_TRACING_ENABLED,
+    };
   }
 
  private:
@@ -112,10 +121,18 @@ class TracingProductListener : public remote_config::ProductListener {
 
     if (auto sampling_rate_it = j.find("tracing_sampling_rate");
         sampling_rate_it != j.cend()) {
-      TraceSamplerConfig trace_sampler_cfg;
-      trace_sampler_cfg.sample_rate = *sampling_rate_it;
+      config_update.trace_sampling_rate = *sampling_rate_it;
+    }
 
-      config_update.trace_sampler = trace_sampler_cfg;
+    if (auto tags_it = j.find("tracing_tags"); tags_it != j.cend()) {
+      config_update.tags = *tags_it;
+    }
+
+    if (auto tracing_enabled_it = j.find("tracing_enabled");
+        tracing_enabled_it != j.cend()) {
+      if (tracing_enabled_it->is_boolean()) {
+        config_update.report_traces = tracing_enabled_it->get<bool>();
+      }
     }
 
     return config_update;
@@ -231,9 +248,11 @@ nlohmann::json RemoteConfigurationManager::serialize_cached_target_files()
   return cached_target_files;
 }
 
-void RemoteConfigurationManager::process_response(nlohmann::json&& json) {
+std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
+    nlohmann::json&& json) {
   std::optional<remote_config::RemoteConfigResponse> resp;
   std::vector<std::string> errors;
+  std::vector<ConfigMetadata> config_update;
 
   try {
     auto maybe_resp =
@@ -241,14 +260,14 @@ void RemoteConfigurationManager::process_response(nlohmann::json&& json) {
     if (!maybe_resp) {
       logger_->log_debug(
           "Remote Configuration response is empty (no change)"sv);
-      return;
+      return {};
     }
 
     logger_->log_debug("Got nonempty Remote Configuration response"sv);
     resp.emplace(std::move(*maybe_resp));
     resp->validate();
 
-    // check if the backend returned configuration for unscribed products
+    // check if the backend returned configuration for unsubscribed products
     for (const remote_config::ParsedConfigKey& key : resp->client_configs()) {
       if (product_states_.find(key.product()) == product_states_.cend()) {
         throw remote_config::reportable_error(
@@ -258,13 +277,15 @@ void RemoteConfigurationManager::process_response(nlohmann::json&& json) {
       }
     }
 
+    config_update.reserve(8);
+
     bool applied_any = false;
     // Apply the configuration is applied product-by-product.
     // ProductState::apply will inspect the returned client_configs and process
     // those that pertain to the product in question.
     for (auto&& [product, pstate] : product_states_) {
       try {
-        applied_any = pstate.apply(*resp) || applied_any;
+        applied_any = pstate.apply(*resp, config_update) || applied_any;
       } catch (const remote_config::reportable_error& e) {
         logger_->log_error(std::string{"Failed to apply configuration for "} +
                            std::string{product.name()} + ": " + e.what());
@@ -303,10 +324,13 @@ void RemoteConfigurationManager::process_response(nlohmann::json&& json) {
   } else {
     update_next_state({}, build_error_message(errors));
   }
+
+  return config_update;
 }
 
 void RemoteConfigurationManager::add_listener(
-    std::unique_ptr<remote_config::ProductListener> listener) {  auto product = listener->product();
+    std::unique_ptr<remote_config::ProductListener> listener) {
+  auto product = listener->product();
   auto ps_it = product_states_.find(product);
   if (ps_it == product_states_.cend()) {
     ps_it = product_states_.emplace(product, product).first;
@@ -473,7 +497,7 @@ void RemoteConfigResponse::verify_targets_presence() const {
 }
 
 void RemoteConfigResponse::verify_client_configs() {
-  auto &&client_cfgs = json_.find("client_configs"sv);
+  auto&& client_cfgs = json_.find("client_configs"sv);
   if (client_cfgs == json_.end()) {
     return;
   }
@@ -548,9 +572,11 @@ Optional<std::string> RemoteConfigResponse::get_file_contents(
   return {};
 }
 
-bool ProductState::apply(const RemoteConfigResponse& response) {
+bool ProductState::apply(const RemoteConfigResponse& response,
+                         std::vector<ConfigMetadata>& config_update) {
   const std::vector<std::string> errors;
   std::unordered_set<const ParsedConfigKey*> processed_keys;
+
   bool changes_detected = false;
   for (auto&& key : response.client_configs()) {
     if (key.product() != product_) {
@@ -564,7 +590,7 @@ bool ProductState::apply(const RemoteConfigResponse& response) {
       if (is_target_changed(key, cfg_target)) {
         changes_detected = true;
         const std::string content = get_file_contents_or_throw(response, key);
-        call_listeners_apply(response, key, content);
+        call_listeners_apply(response, config_update, key, content);
       }
     } catch (const reportable_error&) {
       throw;
@@ -596,7 +622,7 @@ bool ProductState::apply(const RemoteConfigResponse& response) {
     }
     if (!found) {
       changes_detected = true;
-      it = call_listeners_remove(it);
+      it = call_listeners_remove(config_update, it);
     } else {
       it++;
     }
@@ -605,12 +631,13 @@ bool ProductState::apply(const RemoteConfigResponse& response) {
   return changes_detected;
 }
 
-void ProductState::call_listeners_apply(const RemoteConfigResponse& resp,
-                                        const ParsedConfigKey& key,
-                                        const std::string& file_contents) {
+void ProductState::call_listeners_apply(
+    const RemoteConfigResponse& resp,
+    std::vector<ConfigMetadata>& config_update, const ParsedConfigKey& key,
+    const std::string& file_contents) {
   try {
     for (auto&& l : listeners_) {
-      l->on_config_update(key, file_contents);
+      l->on_config_update(key, file_contents, config_update);
     }
 
     update_config_state(resp, key, {});
@@ -624,11 +651,12 @@ void ProductState::call_listeners_apply(const RemoteConfigResponse& resp,
 }
 
 ProductState::per_key_state_citerator_t ProductState::call_listeners_remove(
+    std::vector<ConfigMetadata>& config_update,
     ProductState::per_key_state_citerator_t it) {
   const ParsedConfigKey& key = it->first;
   try {
     for (auto&& l : listeners_) {
-      l->on_config_remove(key);
+      l->on_config_remove(key, config_update);
     }
   } catch (const reportable_error&) {
     throw;
@@ -720,7 +748,8 @@ CachedTargetFile ConfigTarget::to_cached_target_file(
   if (!found_sha256) {
     throw reportable_error(
         "Invalid Remote Configuration response in config_target: "
-        "missing sha256 hash for " + std::string{key.full_key()});
+        "missing sha256 hash for " +
+        std::string{key.full_key()});
   }
 
   return {std::string{key.full_key()}, length, std::move(hashes)};

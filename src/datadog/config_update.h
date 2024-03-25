@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "optional"
 #include "trace_sampler_config.h"
 
@@ -12,7 +14,9 @@ namespace tracing {
 // Configurations can be `nullopt` to signal the absence of a value from the
 // remote configuration value.
 struct ConfigUpdate {
-  Optional<TraceSamplerConfig> trace_sampler;
+  Optional<bool> report_traces;
+  Optional<double> trace_sampling_rate;
+  Optional<std::vector<StringView>> tags;
 };
 
 }  // namespace tracing

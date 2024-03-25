@@ -146,7 +146,7 @@ TEST_CASE("parse response headers and body", "[curl]") {
     // It's still good to test that everything works with this mock
     // `CurlLibrary` in place, though.
     TracerConfig config;
-    config.defaults.service = "testsvc";
+    config.service = "testsvc";
     config.logger = logger;
     config.agent.http_client = client;
     // The http client is a mock that only expects a single request, so

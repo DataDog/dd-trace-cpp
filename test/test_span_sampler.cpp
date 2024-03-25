@@ -152,7 +152,7 @@ TEST_CASE("span rules matching") {
   }));
 
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
@@ -208,7 +208,7 @@ TEST_CASE("span rules matching") {
 
 TEST_CASE("span rules only on trace drop") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
@@ -244,7 +244,7 @@ TEST_CASE("span rules only on trace drop") {
 
 TEST_CASE("span rule sample rate") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
@@ -283,7 +283,7 @@ TEST_CASE("span rule sample rate") {
 
 TEST_CASE("span rule limiter") {
   TracerConfig config;
-  config.defaults.service = "testsvc";
+  config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();

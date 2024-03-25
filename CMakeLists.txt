@@ -101,6 +101,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/error.cpp
     src/datadog/extraction_util.cpp
     src/datadog/glob.cpp
+    src/datadog/http_client.cpp
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
@@ -120,6 +121,7 @@ target_sources(dd_trace_cpp-objects PRIVATE
     src/datadog/span_matcher.cpp
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp
+    src/datadog/string_util.cpp
     src/datadog/tags.cpp
     src/datadog/tag_propagation.cpp
     src/datadog/threaded_event_scheduler.cpp
@@ -141,6 +143,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   BASE_DIRS src/
   FILES
   src/datadog/base64.h
+  src/datadog/config.h
   src/datadog/cerr_logger.h
   src/datadog/clock.h
   src/datadog/config_manager.h
@@ -190,6 +193,7 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/span_matcher.h
   src/datadog/span_sampler_config.h
   src/datadog/span_sampler.h
+  src/datadog/string_util.h
   src/datadog/string_view.h
   src/datadog/tag_propagation.h
   src/datadog/tags.h
