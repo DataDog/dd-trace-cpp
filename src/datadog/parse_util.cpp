@@ -151,7 +151,6 @@ std::vector<StringView> parse_list(StringView input) {
   return items;
 }
 
-// TODO: normalize key and value
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
     std::vector<StringView> list) {
   std::unordered_map<std::string, std::string> tags;
