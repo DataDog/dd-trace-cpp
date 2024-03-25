@@ -73,7 +73,8 @@ enum class Capability : uint64_t {
 
 class CapabilitiesSet {
   std::underlying_type_t<Capability> value_{};
-  public:
+
+ public:
   CapabilitiesSet() = default;
   // NOLINTNEXTLINE
   CapabilitiesSet(Capability c) : value_{static_cast<decltype(value_)>(c)} {}
@@ -101,7 +102,21 @@ class Product {
 
   struct Hash {
     std::size_t operator()(const Product &p) const {
-      return std::hash<StringView>()(p.name_);
+#ifdef DD_USE_ABSEIL_FOR_ENVOY
+      // 64-bit FNV-1 hash
+      auto sv = p.name_;
+      static constexpr std::uint64_t offset_basis = 0xcbf29ce484222325;
+      static constexpr std::uint64_t prime = 0x100000001b3;
+
+      std::uint64_t hash = offset_basis;
+      for (char c : sv) {
+        hash ^= static_cast<std::uint8_t>(c);
+        hash *= prime;
+      }
+      return hash;
+#else
+      return std::hash<std::string_view>()(p.name_);
+#endif
     }
   };
 
@@ -173,7 +188,7 @@ class ParsedConfigKey {
     oth.config_id_ = {};
     oth.name_ = {};
   }
-  ParsedConfigKey& operator=(ParsedConfigKey&& oth) noexcept {
+  ParsedConfigKey &operator=(ParsedConfigKey &&oth) noexcept {
     if (&oth != this) {
       key_ = std::move(oth.key_);
       source_ = oth.source_;
@@ -231,7 +246,7 @@ struct CachedTargetFile {
   std::uint64_t length;
   std::vector<TargetFileHash> hashes;
 
-  bool empty() const { return hashes.empty(); } // NOLINT
+  bool empty() const { return hashes.empty(); }  // NOLINT
   StringView sha256() const {
     auto h = std::find_if(hashes.cbegin(), hashes.cend(), [](const auto &h) {
       return h.algorithm == "sha256";
@@ -283,7 +298,7 @@ class ConfigTarget {
 
 class RemoteConfigResponse {
  public:
-  static std::optional<RemoteConfigResponse> from_json(nlohmann::json &&json);
+  static Optional<RemoteConfigResponse> from_json(nlohmann::json &&json);
 
   void validate() {
     verify_targets_presence();
@@ -291,7 +306,7 @@ class RemoteConfigResponse {
   }
 
   uint64_t targets_version() const {
-    return targets_signed_.at("version").get<uint64_t>();
+    return targets_signed_.at(StringView{"version"}).get<uint64_t>();
   }
   std::string opaque_backend_state() const {
     return targets_signed_.at("/custom/opaque_backend_state"_json_pointer)
@@ -394,7 +409,7 @@ class ProductState {
     return caps;
   }
 
-  template<typename Func, typename ...Args>
+  template <typename Func, typename... Args>
   void for_each_cached_target_file(Func &&f, Args &&...args) const {
     for (auto &&[key, state] : per_key_state_) {
       if (state.cached_target_file.empty()) {
@@ -425,7 +440,6 @@ class ProductState {
     const CachedTargetFile &ctf = st->second.cached_target_file;
     return ctf.sha256() != new_target.sha256();
   }
-
 };
 }  // namespace remote_config
 
@@ -441,7 +455,7 @@ class RemoteConfigurationManager {
     uint64_t root_version = 1UL;
     uint64_t targets_version{};
     std::vector<std::shared_ptr<remote_config::ConfigState>> config_states;
-    std::optional<std::string> error;  // has_error + error
+    Optional<std::string> error;  // has_error + error
     std::string backend_client_state;
   };
 
@@ -480,7 +494,7 @@ class RemoteConfigurationManager {
       Optional<
           std::reference_wrapper<const remote_config::RemoteConfigResponse>>
           rcr,
-      std::optional<std::string> error);
+      Optional<std::string> error);
 };
 
 }  // namespace datadog::tracing

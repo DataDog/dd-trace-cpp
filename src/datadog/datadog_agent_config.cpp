@@ -44,8 +44,8 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
 }
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
-    DatadogAgentConfig& user_config,
-    const std::shared_ptr<Logger>& logger, const Clock& clock) {
+    DatadogAgentConfig& user_config, const std::shared_ptr<Logger>& logger,
+    const Clock& clock) {
   Expected<DatadogAgentConfig> env_config = load_datadog_agent_env_config();
   if (auto error = env_config.if_error()) {
     return *error;

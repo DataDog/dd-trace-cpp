@@ -5,7 +5,6 @@
 #include <exception>
 #include <regex>
 #include <stdexcept>
-#include <string_view>
 #include <type_traits>
 #include <unordered_set>
 
@@ -18,9 +17,13 @@
 #include "version.h"
 
 using namespace nlohmann::literals;
-using namespace std::literals;
 
 namespace datadog::tracing {
+
+inline StringView operator""_sv(const char* str, size_t len) noexcept {
+  return StringView{str, len};
+}
+
 namespace {
 
 template <typename V, typename H>
@@ -79,7 +82,7 @@ class TracingProductListener : public remote_config::ProductListener {
     }
 
     ConfigUpdate const dyn_config =
-        parse_dynamic_config(config_json.at("lib_config"));
+        parse_dynamic_config(config_json.at("lib_config"_sv));
 
     std::vector<ConfigMetadata> metadata = config_manager_->update(dyn_config);
     config_update.insert(config_update.end(), metadata.begin(), metadata.end());
@@ -105,30 +108,30 @@ class TracingProductListener : public remote_config::ProductListener {
 
  private:
   bool service_env_match(const nlohmann::json& config_json) {
-    const auto& targeted_service = config_json.find("service_target");
+    const auto& targeted_service = config_json.find("service_target"_sv);
     if (targeted_service == config_json.cend() ||
         !targeted_service->is_object()) {
       return false;
     }
-    return targeted_service->at("service").get<std::string_view>() ==
+    return targeted_service->at("service"_sv).get<StringView>() ==
                tracer_signature_.default_service &&
-           targeted_service->at("env").get<std::string_view>() ==
+           targeted_service->at("env"_sv).get<StringView>() ==
                tracer_signature_.default_environment;
   }
 
   static ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
     ConfigUpdate config_update;
 
-    if (auto sampling_rate_it = j.find("tracing_sampling_rate");
+    if (auto sampling_rate_it = j.find("tracing_sampling_rate"_sv);
         sampling_rate_it != j.cend()) {
       config_update.trace_sampling_rate = *sampling_rate_it;
     }
 
-    if (auto tags_it = j.find("tracing_tags"); tags_it != j.cend()) {
+    if (auto tags_it = j.find("tracing_tags"_sv); tags_it != j.cend()) {
       config_update.tags = *tags_it;
     }
 
-    if (auto tracing_enabled_it = j.find("tracing_enabled");
+    if (auto tracing_enabled_it = j.find("tracing_enabled"_sv);
         tracing_enabled_it != j.cend()) {
       if (tracing_enabled_it->is_boolean()) {
         config_update.report_traces = tracing_enabled_it->get<bool>();
@@ -250,7 +253,7 @@ nlohmann::json RemoteConfigurationManager::serialize_cached_target_files()
 
 std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     nlohmann::json&& json) {
-  std::optional<remote_config::RemoteConfigResponse> resp;
+  Optional<remote_config::RemoteConfigResponse> resp;
   std::vector<std::string> errors;
   std::vector<ConfigMetadata> config_update;
 
@@ -258,12 +261,11 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     auto maybe_resp =
         remote_config::RemoteConfigResponse::from_json(std::move(json));
     if (!maybe_resp) {
-      logger_->log_debug(
-          "Remote Configuration response is empty (no change)"sv);
+      logger_->log_debug("Remote Configuration response is empty (no change)");
       return {};
     }
 
-    logger_->log_debug("Got nonempty Remote Configuration response"sv);
+    logger_->log_debug("Got nonempty Remote Configuration response");
     resp.emplace(std::move(*maybe_resp));
     resp->validate();
 
@@ -346,7 +348,7 @@ void RemoteConfigurationManager::add_config_end_listener(
 Optional<std::string> RemoteConfigurationManager::build_error_message(
     std::vector<std::string>& errors) {
   if (errors.empty()) {
-    return std::nullopt;
+    return nullopt;
   }
   if (errors.size() == 1) {
     return {std::move(errors.front())};
@@ -402,7 +404,7 @@ void ParsedConfigKey::parse_config_key() {
   }
 
   if (key_[0] == 'd') {
-    source_ = "datadog"sv;
+    source_ = "datadog";
     auto [ptr, ec] =
         std::from_chars(&*smatch[1].first, &*smatch[1].second, org_id_);
     if (ec != std::errc{} || ptr != &*smatch[1].second) {
@@ -410,7 +412,7 @@ void ParsedConfigKey::parse_config_key() {
                              std::string{submatch_to_sv(smatch[1])});
     }
   } else {
-    source_ = "employee"sv;
+    source_ = "employee";
     org_id_ = 0;
   }
 
@@ -423,16 +425,16 @@ void ParsedConfigKey::parse_config_key() {
 
 RemoteConfigResponse::RemoteConfigResponse(nlohmann::json full_response,
                                            nlohmann::json targets)
-    : json_{std::move(full_response)},
-      targets_{std::move(targets)},
-      targets_signed_{targets_.at("signed"sv)} {}
+    : json_(std::move(full_response)),  // can't use {}-initialization
+      targets_(std::move(targets)),     // idem
+      targets_signed_{targets_.at("signed"_sv)} {}
 
-std::optional<RemoteConfigResponse> RemoteConfigResponse::from_json(
+Optional<RemoteConfigResponse> RemoteConfigResponse::from_json(
     nlohmann::json&& json) {
-  const auto targets_encoded = json.find("targets"sv);
+  const auto targets_encoded = json.find("targets"_sv);
   if (targets_encoded == json.cend()) {
     // empty response -> no change
-    return std::nullopt;
+    return nullopt;
   }
 
   if (!targets_encoded->is_string()) {
@@ -441,13 +443,13 @@ std::optional<RemoteConfigResponse> RemoteConfigResponse::from_json(
         "string");
   }
 
-  if (targets_encoded->get<std::string_view>().empty()) {
+  if (targets_encoded->get<StringView>().empty()) {
     // empty response -> no change
-    return std::nullopt;
+    return nullopt;
   }
 
   // if targets is not empty, we need targets.signed
-  std::string decoded = base64_decode(targets_encoded->get<std::string_view>());
+  std::string decoded = base64_decode(targets_encoded->get<StringView>());
   if (decoded.empty()) {
     throw reportable_error(
         "Invalid Remote Configuration response: invalid base64 data for "
@@ -455,7 +457,7 @@ std::optional<RemoteConfigResponse> RemoteConfigResponse::from_json(
   }
   auto targets = nlohmann::json::parse(decoded);
 
-  auto t_signed = targets.find("signed"sv);
+  auto t_signed = targets.find("signed"_sv);
   if (t_signed == targets.cend()) {
     throw reportable_error(
         "Invalid Remote Configuration response: missing "
@@ -467,7 +469,7 @@ std::optional<RemoteConfigResponse> RemoteConfigResponse::from_json(
 
 void RemoteConfigResponse::verify_targets_presence() const {
   // files referred to in target_files need to exist in targets.signed.targets
-  auto target_files = json_.find("target_files"sv);
+  auto target_files = json_.find("target_files"_sv);
   if (target_files == json_.cend()) {
     return;
   }
@@ -478,14 +480,14 @@ void RemoteConfigResponse::verify_targets_presence() const {
   }
 
   for (auto it = target_files->begin(); it != target_files->end(); ++it) {
-    auto path = it->find("path"sv);
+    auto path = it->find("path"_sv);
     if (path == it->cend() || !path->is_string()) {
       throw reportable_error(
           "Invalid Remote Configuration response: missing "
           "path in element of target_files");
     }
 
-    auto path_sv = path->get<std::string_view>();
+    auto path_sv = path->get<StringView>();
     if (!get_target(path_sv)) {
       throw reportable_error(
           "Invalid Remote Configuration response: "
@@ -497,7 +499,7 @@ void RemoteConfigResponse::verify_targets_presence() const {
 }
 
 void RemoteConfigResponse::verify_client_configs() {
-  auto&& client_cfgs = json_.find("client_configs"sv);
+  auto&& client_cfgs = json_.find("client_configs"_sv);
   if (client_cfgs == json_.end()) {
     return;
   }
@@ -516,19 +518,19 @@ void RemoteConfigResponse::verify_client_configs() {
 }
 
 Optional<ConfigTarget> RemoteConfigResponse::get_target(StringView key) const {
-  auto&& targets = targets_signed_.at("targets"sv);
+  auto&& targets = targets_signed_.at("targets"_sv);
   auto&& target = targets.find(key);
   if (target == targets.cend()) {
-    return {};
+    return nullopt;
   }
   return ConfigTarget{*target};
 }
 
 Optional<std::string> RemoteConfigResponse::get_file_contents(
     const ParsedConfigKey& key) const {
-  auto&& target_files = json_.find("target_files"sv);
+  auto&& target_files = json_.find("target_files"_sv);
   if (target_files == json_.cend() || !target_files->is_array()) {
-    return {};
+    return nullopt;
   }
 
   Optional<ConfigTarget> target = get_target(key);
@@ -539,7 +541,7 @@ Optional<std::string> RemoteConfigResponse::get_file_contents(
   }
 
   for (auto&& file : *target_files) {
-    auto&& path = file.at("path"sv).get<std::string>();
+    auto&& path = file.at("path"_sv).get<std::string>();
     if (path != key.full_key()) {
       continue;
     }
@@ -550,7 +552,7 @@ Optional<std::string> RemoteConfigResponse::get_file_contents(
       return {{}};
     }
 
-    const auto raw = file.at("raw"sv).get<std::string_view>();
+    const auto raw = file.at("raw"_sv).get<StringView>();
     auto decoded = base64_decode(raw);
     if (decoded.empty()) {
       throw reportable_error(
@@ -569,7 +571,7 @@ Optional<std::string> RemoteConfigResponse::get_file_contents(
     return {std::move(decoded)};
   }
 
-  return {};
+  return nullopt;
 }
 
 bool ProductState::apply(const RemoteConfigResponse& response,
@@ -727,10 +729,10 @@ void ProductState::update_config_state(const RemoteConfigResponse& response,
 
 CachedTargetFile ConfigTarget::to_cached_target_file(
     const ParsedConfigKey& key) const {
-  auto length = json_.at(std::string_view{"length"}).get<std::uint64_t>();
+  auto length = json_.at("length"_sv).get<std::uint64_t>();
   std::vector<CachedTargetFile::TargetFileHash> hashes;
 
-  auto&& hashes_json = json_.at(std::string_view{"hashes"});
+  auto&& hashes_json = json_.at("hashes"_sv);
   if (!hashes_json.is_object()) {
     throw reportable_error(
         "Invalid Remote Configuration response in config_target: "
@@ -739,7 +741,7 @@ CachedTargetFile ConfigTarget::to_cached_target_file(
   hashes.reserve(hashes_json.size());
   bool found_sha256 = false;
   for (auto&& [algo, hash] : hashes_json.items()) {
-    if (algo == "sha256"sv) {
+    if (algo == "sha256") {
       found_sha256 = true;
     }
     hashes.emplace_back(

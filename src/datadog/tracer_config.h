@@ -169,8 +169,8 @@ struct TracerConfig {
 // a valid `TracerConfig` and accompanying environment.
 // `FinalizedTracerConfig` must be obtained by calling `finalize_config`.
 class FinalizedTracerConfig final {
-  friend Expected<FinalizedTracerConfig> finalize_config(
-      TracerConfig& config, const Clock& clock);
+  friend Expected<FinalizedTracerConfig> finalize_config(TracerConfig& config,
+                                                         const Clock& clock);
   FinalizedTracerConfig() = default;
 
  public:

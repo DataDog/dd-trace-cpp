@@ -208,7 +208,7 @@ DatadogAgent::DatadogAgent(
     remote_config_.add_listener(std::move(l));
   }
   config.rem_cfg_listeners.clear();
-  for (auto &&l : config.rem_cfg_end_listeners) {
+  for (auto&& l : config.rem_cfg_end_listeners) {
     remote_config_.add_config_end_listener(std::move(l));
   }
   config.rem_cfg_end_listeners.clear();
