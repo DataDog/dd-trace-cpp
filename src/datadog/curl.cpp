@@ -225,7 +225,6 @@ class CurlImpl {
                                   void *user_data);
   static bool is_non_whitespace(unsigned char);
   static char to_lower(unsigned char);
-  static StringView trim(StringView);
 
  public:
   explicit CurlImpl(const std::shared_ptr<Logger> &, const Clock &,

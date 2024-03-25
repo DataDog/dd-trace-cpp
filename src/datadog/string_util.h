@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "propagation_style.h"
+#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -24,6 +25,8 @@ std::string join_propagation_styles(const std::vector<PropagationStyle>&);
 // Joins key-value pairs into a single comma-separated string
 std::string join_tags(
     const std::unordered_map<std::string, std::string>& values);
+
+StringView trim(StringView);
 
 }  // namespace tracing
 }  // namespace datadog

@@ -70,5 +70,12 @@ std::string join_tags(
   });
 }
 
+StringView trim(StringView str) {
+  str.remove_prefix(std::min(str.find_first_not_of(' '), str.size()));
+  const auto pos = str.find_last_not_of(' ');
+  if (pos != str.npos) str.remove_suffix(str.size() - pos - 1);
+  return str;
+}
+
 }  // namespace tracing
 }  // namespace datadog

@@ -41,6 +41,8 @@ bool starts_with(StringView subject, StringView prefix);
 // Convert the specified `text` to lower case in-place.
 void to_lower(std::string& text);
 
+std::vector<StringView> parse_tags_env(StringView input);
+
 // List items are separated by an optional comma (",") and any amount of
 // whitespace.
 // Leading and trailing whitespace are ignored.
@@ -49,11 +51,8 @@ std::vector<StringView> parse_list(StringView input);
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
     std::vector<StringView> list);
 
-inline Expected<std::unordered_map<std::string, std::string>> parse_tags(
-    StringView input) {
-  // Within a tag, the key and value are separated by a colon (":").
-  return parse_tags(parse_list(input));
-}
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    StringView input);
 
 }  // namespace tracing
 }  // namespace datadog
