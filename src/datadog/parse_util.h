@@ -41,8 +41,6 @@ bool starts_with(StringView subject, StringView prefix);
 // Convert the specified `text` to lower case in-place.
 void to_lower(std::string& text);
 
-std::vector<StringView> parse_tags_env(StringView input);
-
 // List items are separated by an optional comma (",") and any amount of
 // whitespace.
 // Leading and trailing whitespace are ignored.
