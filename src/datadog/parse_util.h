@@ -49,11 +49,8 @@ std::vector<StringView> parse_list(StringView input);
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
     std::vector<StringView> list);
 
-inline Expected<std::unordered_map<std::string, std::string>> parse_tags(
-    StringView input) {
-  // Within a tag, the key and value are separated by a colon (":").
-  return parse_tags(parse_list(input));
-}
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    StringView input);
 
 }  // namespace tracing
 }  // namespace datadog

@@ -11,7 +11,9 @@
 
 using namespace datadog::tracing;
 
-TEST_CASE("parse_int") {
+#define PARSE_UTIL_TEST(x) TEST_CASE(x, "[parse_util]")
+
+PARSE_UTIL_TEST("parse_int") {
   struct TestCase {
     int line;
     std::string name;
@@ -74,7 +76,7 @@ TEST_CASE("parse_int") {
 
 // This test case is similar to the one above, except that negative numbers are
 // not supported, and the underflow and overflow values are different.
-TEST_CASE("parse_uint64") {
+PARSE_UTIL_TEST("parse_uint64") {
   struct TestCase {
     int line;
     std::string name;
@@ -132,4 +134,102 @@ TEST_CASE("parse_uint64") {
     REQUIRE(!result);
     REQUIRE(result.error().code == expected);
   }
+}
+
+PARSE_UTIL_TEST("parse_tags") {
+  struct TestCase {
+    int line;
+    StringView name;
+    StringView input;
+    std::unordered_map<std::string, std::string> expected;
+  };
+
+  auto test_case = GENERATE(values<TestCase>({
+      {__LINE__,
+       "space separated tags",
+       "env:test aKey:aVal bKey:bVal cKey:",
+       {
+           {"env", "test"},
+           {"aKey", "aVal"},
+           {"bKey", "bVal"},
+           {"cKey", ""},
+       }},
+      {__LINE__,
+       "comma separated tags",
+       "env:test aKey:aVal bKey:bVal cKey:",
+       {
+           {"env", "test"},
+           {"aKey", "aVal"},
+           {"bKey", "bVal"},
+           {"cKey", ""},
+       }},
+      {__LINE__,
+       "mixed separator but comma first",
+       "env:test,aKey:aVal bKey:bVal cKey:",
+       {
+           {"env", "test"},
+           {"aKey", "aVal bKey:bVal cKey:"},
+       }},
+      {__LINE__,
+       "mixed separator but space first",
+       "env:test     bKey :bVal dKey: dVal cKey:",
+       {
+           {"env", "test"},
+           {"bKey", ""},
+           {"dKey", ""},
+           {"dVal", ""},
+           {"cKey", ""},
+       }},
+      {__LINE__,
+       "mixed separator but space first",
+       "env:keyWithA:Semicolon bKey:bVal cKey",
+       {
+           {"env", "keyWithA:Semicolon"},
+           {"bKey", "bVal"},
+           {"cKey", ""},
+       }},
+      // {__LINE__,
+      //  "mixed separator edge case",
+      //  "env:keyWith:  , ,   Lots:Of:Semicolons ",
+      //  {
+      //      {"env", "keyWith:"},
+      //      {"Lots", "Of:Semicolons"},
+      //  }},
+      {__LINE__,
+       "comma separated but some tags without value",
+       "a:b,c,d",
+       {
+           {"a", "b"},
+           {"c", ""},
+           {"d", ""},
+       }},
+      {__LINE__,
+       "one separator without value",
+       "a,1",
+       {
+           {"a", ""},
+           {"1", ""},
+       }},
+      {__LINE__,
+       "no separator",
+       "a:b:c:d",
+       {
+           {"a", "b:c:d"},
+       }},
+      {__LINE__,
+       "input is trimed",
+       "key1:val1, key2 : val2 ",
+       {
+           {"key1", "val1"},
+           {"key2", "val2"},
+       }},
+  }));
+
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.name);
+  CAPTURE(test_case.input);
+
+  const auto tags = parse_tags(test_case.input);
+  REQUIRE(tags);
+  CHECK(*tags == test_case.expected);
 }

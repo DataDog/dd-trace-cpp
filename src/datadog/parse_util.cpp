@@ -9,6 +9,7 @@
 #include <string>
 
 #include "error.h"
+#include "string_util.h"
 
 namespace datadog {
 namespace tracing {
@@ -154,27 +155,81 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
     std::vector<StringView> list) {
   std::unordered_map<std::string, std::string> tags;
 
+  std::string key;
+  std::string value;
+
   for (const StringView &token : list) {
     const auto separator = std::find(token.begin(), token.end(), ':');
+
     if (separator == token.end()) {
-      std::string message;
-      message += "Unable to parse a key/value from the tag text \"";
-      append(message, token);
-      // message +=
-      //     "\" because it does not contain the separator character \":\".  "
-      //     "Error occurred in list of tags \"";
-      // append(message, input);
-      message += ".";
-      return Error{Error::TAG_MISSING_SEPARATOR, std::move(message)};
+      key = std::string{trim(token)};
+    } else {
+      key = std::string{trim(range(token.begin(), separator))};
+      if (key.empty()) {
+        continue;
+      }
+      value = std::string{trim(range(separator + 1, token.end()))};
     }
 
-    std::string key{token.begin(), separator};
-    std::string value{separator + 1, token.end()};
     // If there are duplicate values, then the last one wins.
     tags.insert_or_assign(std::move(key), std::move(value));
   }
 
   return tags;
+}
+
+// This function scans the input string to identify a separator (',' or ' ').
+// Then, split tags using the identified separator and call `parse_tags` with
+// the resulting unordered_map.
+//
+// Why?
+// RFC: DD_TAGS - support space separation
+//   The trace agent parses DD_TAGS as a space separated list of tags. The
+//   tracers parse this as a comma-separated list. We need to have the tracers
+//   parse DD_TAGS as a space-separated list when possible so that the agent and
+//   tracers can use the same DD_TAGS strings while maintaining backwards
+//   compatibility with comma-separated lists.
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    StringView input) {
+  std::vector<StringView> tags;
+
+  size_t beg = 0;
+  const size_t end = input.size();
+
+  char separator = 0;
+  size_t i = beg;
+
+  for (; i < end; ++i) {
+    if (input[i] == ',') {
+      separator = ',';
+      break;
+    } else if (input[i] == ' ') {
+      separator = ' ';
+      break;
+    }
+  }
+
+  if (separator == 0) {
+    goto capture_all;
+  }
+
+  for (; i < end; ++i) {
+    if (input[i] == separator) {
+      auto tag = input.substr(beg, i - beg);
+      if (tag.size() > 0) {
+        tags.emplace_back(tag);
+      }
+      beg = i + 1;
+    }
+  }
+
+capture_all:
+  auto tag = input.substr(beg, i - beg);
+  if (tag.size() > 0) {
+    tags.emplace_back(tag);
+  }
+
+  return parse_tags(tags);
 }
 
 }  // namespace tracing
