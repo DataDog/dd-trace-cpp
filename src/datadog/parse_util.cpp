@@ -151,14 +151,15 @@ std::vector<StringView> parse_list(StringView input) {
   return items;
 }
 
+template <typename StrType>
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
-    std::vector<StringView> list) {
+    std::vector<StrType> list) {
   std::unordered_map<std::string, std::string> tags;
 
   std::string key;
   std::string value;
 
-  for (const StringView &token : list) {
+  for (const auto &token : list) {
     const auto separator = std::find(token.begin(), token.end(), ':');
 
     if (separator == token.end()) {
@@ -176,6 +177,14 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
   }
 
   return tags;
+}
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    const std::vector<StringView> &list) {
+  return parse_tags<StringView>(list);
+}
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    const std::vector<std::string> &list) {
+  return parse_tags<std::string>(list);
 }
 
 // This function scans the input string to identify a separator (',' or ' ').
