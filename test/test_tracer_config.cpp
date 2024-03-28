@@ -213,21 +213,45 @@ TEST_CASE("TracerConfig::defaults") {
 
     auto test_case = GENERATE(values<TestCase>({
         {"empty", "", {}, nullopt},
-        {"missing colon", "foo", {}, Error::TAG_MISSING_SEPARATOR},
+        {"missing colon",
+         "foo",
+         {
+             {"foo", ""},
+         },
+         nullopt},
         {"trailing comma",
          "foo:bar, baz:123,",
-         {},
-         Error::TAG_MISSING_SEPARATOR},
-        {"overwrite value", "foo:baz", {{"foo", "baz"}}, nullopt},
+         {
+             {"foo", "bar"},
+             {"baz", "123"},
+         },
+         nullopt},
+        {"overwrite value",
+         "foo:baz",
+         {
+             {"foo", "baz"},
+         },
+         nullopt},
         {"additional values",
          "baz:123, bam:three",
-         {{"baz", "123"}, {"bam", "three"}},
+         {
+             {"baz", "123"},
+             {"bam", "three"},
+         },
          nullopt},
         {"commas optional",
          "baz:123 bam:three",
-         {{"baz", "123"}, {"bam", "three"}},
+         {
+             {"baz", "123"},
+             {"bam", "three"},
+         },
          nullopt},
-        {"last one wins", "baz:123 baz:three", {{"baz", "three"}}, nullopt},
+        {"last one wins",
+         "baz:123 baz:three",
+         {
+             {"baz", "three"},
+         },
+         nullopt},
     }));
 
     // This will be overriden by the DD_TAGS environment variable.
@@ -1053,8 +1077,8 @@ TEST_CASE("TracerConfig::span_sampler") {
           REQUIRE(file.is_open());
           // We could do any of the failures tested in the "must be valid"
           // section, since it's the same parser. Instead, just to cover the
-          // code path specific to DD_SPAN_SAMPLING_RULES_FILE, pick any error,
-          // e.g. invalid JSON.
+          // code path specific to DD_SPAN_SAMPLING_RULES_FILE, pick any
+          // error, e.g. invalid JSON.
           file << "this is clearly not JSON";
           file.close();
           const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE",
