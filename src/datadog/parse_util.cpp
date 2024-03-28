@@ -1,5 +1,6 @@
 #include "parse_util.h"
 
+#include <algorithm>
 #include <cctype>
 #include <charconv>
 #include <cstddef>
