@@ -10,6 +10,7 @@ struct ManualScheduler : public datadog::tracing::EventScheduler {
   datadog::tracing::ThreadedEventScheduler scheduler_;
   std::function<void()> flush_traces = nullptr;
   std::function<void()> flush_telemetry = nullptr;
+  std::function<void()> poll_remote_configuration = nullptr;
 
   Cancel schedule_recurring_event(std::chrono::steady_clock::duration interval,
                                   std::function<void()> callback) override {
@@ -23,6 +24,10 @@ struct ManualScheduler : public datadog::tracing::EventScheduler {
     }
     if (flush_telemetry == nullptr) {
       flush_telemetry = callback;
+      scheduler_.schedule_recurring_event(interval, callback);
+    }
+    if (poll_remote_configuration == nullptr) {
+      poll_remote_configuration = callback;
       scheduler_.schedule_recurring_event(interval, callback);
     }
     return []() {};
