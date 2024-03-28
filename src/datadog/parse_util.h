@@ -47,7 +47,9 @@ void to_lower(std::string& text);
 std::vector<StringView> parse_list(StringView input);
 
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
-    std::vector<StringView> list);
+    const std::vector<std::string_view>& list);
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    const std::vector<std::string>& list);
 
 inline Expected<std::unordered_map<std::string, std::string>> parse_tags(
     StringView input) {

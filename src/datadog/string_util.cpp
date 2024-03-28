@@ -34,10 +34,17 @@ std::string to_string(double d, size_t precision) {
   return stream.str();
 }
 
-std::string join(const std::vector<StringView>& values, StringView separator) {
+template <typename StrType>
+std::string join(const std::vector<StrType>& values, StringView separator) {
   return join(values, separator, [](std::string& result, StringView value) {
     append(result, value);
   });
+}
+std::string join(const std::vector<StringView>& values, StringView separator) {
+  return join<StringView>(values, separator);
+}
+std::string join(const std::vector<std::string>& values, StringView separator) {
+  return join<std::string>(values, separator);
 }
 
 std::string join_propagation_styles(

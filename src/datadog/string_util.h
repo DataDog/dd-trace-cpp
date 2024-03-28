@@ -17,6 +17,7 @@ std::string to_string(double d, size_t precision);
 
 // Joins elements of a vector into a single string with a specified separator
 std::string join(const std::vector<StringView>& values, StringView separator);
+std::string join(const std::vector<std::string>& values, StringView separator);
 
 // Joins propagation styles into a single comma-separated string
 std::string join_propagation_styles(const std::vector<PropagationStyle>&);

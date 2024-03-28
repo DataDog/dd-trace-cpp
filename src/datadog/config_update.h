@@ -16,7 +16,7 @@ namespace tracing {
 struct ConfigUpdate {
   Optional<bool> report_traces;
   Optional<double> trace_sampling_rate;
-  Optional<std::vector<StringView>> tags;
+  Optional<std::vector<std::string>> tags;
 };
 
 }  // namespace tracing

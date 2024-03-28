@@ -128,7 +128,7 @@ class TracingProductListener : public remote_config::ProductListener {
     }
 
     if (auto tags_it = j.find("tracing_tags"_sv); tags_it != j.cend()) {
-      config_update.tags = *tags_it;
+      config_update.tags = tags_it->get<std::vector<std::string>>();
     }
 
     if (auto tracing_enabled_it = j.find("tracing_enabled"_sv);
@@ -322,9 +322,9 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
   }
 
   if (resp) {
-    update_next_state({std::ref(*resp)}, build_error_message(errors));
+    update_next_state({*resp}, build_error_message(errors));
   } else {
-    update_next_state({}, build_error_message(errors));
+    update_next_state(nullopt, build_error_message(errors));
   }
 
   return config_update;
@@ -394,7 +394,7 @@ StringView submatch_to_sv(const SubMatch& sub_match) {
   return StringView{&*sub_match.first,
                     static_cast<std::size_t>(sub_match.length())};
 }
-};  // namespace
+}  // namespace
 
 void ParsedConfigKey::parse_config_key() {
   std::regex const rgx{"(?:datadog/(\\d+)|employee)/([^/]+)/([^/]+)/([^/]+)"};
@@ -549,7 +549,7 @@ Optional<std::string> RemoteConfigResponse::get_file_contents(
     // TODO check sha256 hash
     auto expected_len = target->length();
     if (expected_len == 0) {
-      return {{}};
+      return {std::string{}};
     }
 
     const auto raw = file.at("raw"_sv).get<StringView>();
