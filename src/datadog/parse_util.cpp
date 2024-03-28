@@ -1,10 +1,9 @@
 #include "parse_util.h"
 
-#include <algorithm>
-#include <cassert>
 #include <cctype>
 #include <charconv>
-#include <iterator>
+#include <cstddef>
+#include <cstdint>
 #include <sstream>
 #include <string>
 
@@ -44,20 +43,10 @@ Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
 
 }  // namespace
 
-StringView strip(StringView input) {
-  const auto not_whitespace = [](unsigned char ch) {
-    return !std::isspace(ch);
-  };
-  const char *const begin =
-      std::find_if(input.begin(), input.end(), not_whitespace);
-  const char *const end =
-      std::find_if(input.rbegin(), std::make_reverse_iterator(begin),
-                   not_whitespace)
-          .base();
-
-  assert(begin <= end);
-
-  return StringView{begin, std::size_t(end - begin)};
+bool falsy(StringView input) {
+  auto lower = std::string{input};
+  to_lower(lower);
+  return lower == "0" || lower == "false" || lower == "no";
 }
 
 Expected<std::uint64_t> parse_uint64(StringView input, int base) {
@@ -99,27 +88,13 @@ Expected<double> parse_double(StringView input) {
   return value;
 }
 
-bool starts_with(StringView subject, StringView prefix) {
-  if (prefix.size() > subject.size()) {
-    return false;
-  }
-
-  return std::mismatch(subject.begin(), subject.end(), prefix.begin()).second ==
-         prefix.end();
-}
-
-void to_lower(std::string &text) {
-  std::transform(text.begin(), text.end(), text.begin(),
-                 [](unsigned char ch) { return std::tolower(ch); });
-}
-
 // List items are separated by an optional comma (",") and any amount of
 // whitespace.
 // Leading and trailing whitespace is ignored.
 std::vector<StringView> parse_list(StringView input) {
   using uchar = unsigned char;
 
-  input = strip(input);
+  input = trim(input);
   std::vector<StringView> items;
   if (input.empty()) {
     return items;

@@ -15,6 +15,10 @@ namespace tracing {
 Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
   DatadogAgentConfig env_config;
 
+  if (auto rc_enabled = lookup(environment::DD_REMOTE_CONFIGURATION_ENABLED)) {
+    env_config.remote_configuration_enabled = !falsy(*rc_enabled);
+  }
+
   if (auto raw_rc_poll_interval_value =
           lookup(environment::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS)) {
     auto res = parse_int(*raw_rc_poll_interval_value, 10);
@@ -121,6 +125,10 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "DatadogAgent: Remote Configuration poll interval must be a "
                  "positive number of seconds."};
   }
+
+  result.remote_configuration_enabled =
+      value_or(env_config->remote_configuration_enabled,
+               user_config.remote_configuration_enabled, true);
 
   const auto [origin, url] =
       pick(env_config->url, user_config.url, "http://localhost:8126");
