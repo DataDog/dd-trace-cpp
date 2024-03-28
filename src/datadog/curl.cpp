@@ -19,7 +19,7 @@
 #include "http_client.h"
 #include "json.hpp"
 #include "logger.h"
-#include "parse_util.h"
+#include "string_util.h"
 #include "string_view.h"
 
 namespace datadog {
@@ -438,8 +438,8 @@ std::size_t CurlImpl::on_read_header(char *data, std::size_t,
     return length;
   }
 
-  const auto key = strip(range(begin, colon));
-  const auto value = strip(range(colon + 1, end));
+  const auto key = trim(range(begin, colon));
+  const auto value = trim(range(colon + 1, end));
 
   std::string key_lower;
   key_lower.reserve(key.size());
