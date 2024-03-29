@@ -56,7 +56,8 @@ struct DatadogAgentConfig {
   Optional<int> request_timeout_milliseconds;
   // Maximum amount of time the process is allowed to wait before shutting down.
   Optional<int> shutdown_timeout_milliseconds;
-  // Enable the capability that allows to remotely configure and change the behavior of the tracer
+  // Enable the capability that allows to remotely configure and change the
+  // behavior of the tracer.
   Optional<bool> remote_configuration_enabled;
   // How often, in seconds, to query the Datadog Agent for remote configuration
   // updates.
