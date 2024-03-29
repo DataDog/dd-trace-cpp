@@ -156,8 +156,8 @@ REMOTE_CONFIG_TEST("response processing") {
 
     // Next payload should contains an error.
     const auto payload = rc.make_request_payload();
-    CHECK(payload.contains("error") == true);
-    CHECK(payload.contains("has_error") == true);
+    CHECK(payload.contains("/client/state/has_error"_json_pointer) == true);
+    CHECK(payload.contains("/client/state/error"_json_pointer) == true);
   }
 
   SECTION("valid remote configuration") {
@@ -211,6 +211,19 @@ REMOTE_CONFIG_TEST("response processing") {
     CHECK(new_trace_sampler != old_trace_sampler);
     CHECK(new_span_defaults != old_span_defaults);
     CHECK(new_report_traces != old_report_traces);
+
+    SECTION("config status is correctly applied") {
+      const auto payload = rc.make_request_payload();
+      const auto s = payload.dump(2);
+      REQUIRE(payload.contains("/client/state/config_states"_json_pointer) ==
+              true);
+
+      const auto& config_states =
+          payload.at("/client/state/config_states"_json_pointer);
+      REQUIRE(config_states.size() == 1);
+      CHECK(config_states[0]["product"] == "APM_TRACING");
+      CHECK(config_states[0]["apply_state"] == 2);
+    }
 
     SECTION("reset configuration") {
       SECTION(
@@ -315,5 +328,17 @@ REMOTE_CONFIG_TEST("response processing") {
 
     CHECK(config_updated.empty());
     CHECK(new_sampling_rate == old_sampling_rate);
+
+    // Verify next request set the config status
+    const auto payload = rc.make_request_payload();
+    REQUIRE(payload.contains("/client/state/config_states"_json_pointer) ==
+            true);
+
+    const auto& config_states =
+        payload.at("/client/state/config_states"_json_pointer);
+    REQUIRE(config_states.size() == 1);
+    CHECK(config_states[0]["product"] == "APM_TRACING");
+    CHECK(config_states[0]["apply_state"] == 3);
+    CHECK(config_states[0].contains("apply_state"));
   }
 }
