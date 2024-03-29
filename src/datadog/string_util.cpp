@@ -86,7 +86,7 @@ bool starts_with(StringView subject, StringView prefix) {
 }
 
 StringView trim(StringView str) {
-  str.remove_prefix(std::min(str.find_first_not_of(' '), str.size()));
+  str.remove_prefix(std::min(str.find_first_not_of(" \f\n\r\t\v"), str.size()));
   const auto pos = str.find_last_not_of(' ');
   if (pos != str.npos) str.remove_suffix(str.size() - pos - 1);
   return str;
