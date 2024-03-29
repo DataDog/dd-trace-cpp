@@ -42,6 +42,14 @@ class RemoteConfigurationManager {
     std::string hash;
     std::size_t version;
     ConfigUpdate content;
+
+    enum State : char {
+      unacknowledged = 1,
+      acknowledged = 2,
+      error = 3
+    } state = State::unacknowledged;
+
+    Optional<std::string> error_message;
   };
 
   TracerSignature tracer_signature_;

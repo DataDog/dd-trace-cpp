@@ -55,19 +55,18 @@ ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
   ConfigUpdate config_update;
 
   if (auto sampling_rate_it = j.find("tracing_sampling_rate");
-      sampling_rate_it != j.cend()) {
+      sampling_rate_it != j.cend() && sampling_rate_it->is_number()) {
     config_update.trace_sampling_rate = *sampling_rate_it;
   }
 
-  if (auto tags_it = j.find("tracing_tags"); tags_it != j.cend()) {
+  if (auto tags_it = j.find("tracing_tags");
+      tags_it != j.cend() && tags_it->is_array()) {
     config_update.tags = *tags_it;
   }
 
   if (auto tracing_enabled_it = j.find("tracing_enabled");
-      tracing_enabled_it != j.cend()) {
-    if (tracing_enabled_it->is_boolean()) {
-      config_update.report_traces = tracing_enabled_it->get<bool>();
-    }
+      tracing_enabled_it != j.cend() && tracing_enabled_it->is_boolean()) {
+    config_update.report_traces = tracing_enabled_it->get<bool>();
   }
 
   return config_update;
@@ -120,17 +119,26 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
   if (!applied_config_.empty()) {
     auto config_states = nlohmann::json::array();
     for (const auto& [_, config] : applied_config_) {
-      config_states.emplace_back(nlohmann::json{{"id", config.id},
-                                                {"version", config.version},
-                                                {"product", k_apm_product}});
+      nlohmann::json config_state = {
+          {"id", config.id},
+          {"version", config.version},
+          {"product", k_apm_product},
+          {"apply_state", config.state},
+      };
+
+      if (config.error_message) {
+        config_state["apply_error"] = *config.error_message;
+      }
+
+      config_states.emplace_back(std::move(config_state));
     }
 
-    j["config_states"] = config_states;
+    j["client"]["state"]["config_states"] = config_states;
   }
 
   if (state_.error_message) {
-    j["has_error"] = true;
-    j["error"] = *state_.error_message;
+    j["client"]["state"]["has_error"] = true;
+    j["client"]["state"]["error"] = *state_.error_message;
   }
 
   return j;
@@ -138,8 +146,8 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
 
 std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     const nlohmann::json& json) {
-  std::vector<ConfigMetadata> config_update;
-  config_update.reserve(8);
+  std::vector<ConfigMetadata> config_updates;
+  config_updates.reserve(8);
 
   state_.error_message = nullopt;
 
@@ -158,12 +166,14 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     if (client_configs_it == json.cend()) {
       if (!applied_config_.empty()) {
         std::for_each(applied_config_.cbegin(), applied_config_.cend(),
-                      [this, &config_update](const auto it) {
-                        config_update = revert_config(it.second);
+                      [this, &config_updates](const auto it) {
+                        auto updated = revert_config(it.second);
+                        config_updates.insert(config_updates.end(),
+                                              updated.begin(), updated.end());
                       });
         applied_config_.clear();
       }
-      return config_update;
+      return config_updates;
     }
 
     // Keep track of config path received to know which ones to revert.
@@ -194,34 +204,42 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
             "target file having path \"";
         append(*state_.error_message, config_path);
         *state_.error_message += '\"';
-        return config_update;
+        return config_updates;
       }
 
       const auto config_json = nlohmann::json::parse(
           base64_decode(target_it.value().at("raw").get<StringView>()));
+
+      Configuration new_config;
+      new_config.id = config_json.at("id");
+      new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
+      new_config.version = config_json.at("revision");
 
       const auto& targeted_service = config_json.at("service_target");
       if (targeted_service.at("service").get<StringView>() !=
               tracer_signature_.default_service ||
           targeted_service.at("env").get<StringView>() !=
               tracer_signature_.default_environment) {
-        continue;
+        new_config.state = Configuration::State::error;
+        new_config.error_message = "Wrong service targeted";
+      } else {
+        new_config.state = Configuration::State::acknowledged;
+        new_config.content = parse_dynamic_config(config_json.at("lib_config"));
+
+        auto updated = apply_config(new_config);
+        config_updates.insert(config_updates.end(), updated.begin(),
+                              updated.end());
       }
 
-      Configuration new_config;
-      new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
-      new_config.id = config_json.at("id");
-      new_config.version = config_json.at("revision");
-      new_config.content = parse_dynamic_config(config_json.at("lib_config"));
-
-      config_update = apply_config(new_config);
       applied_config_[std::string{config_path}] = new_config;
     }
 
     // Applied configuration not present must be reverted.
     for (auto it = applied_config_.cbegin(); it != applied_config_.cend();) {
       if (!visited_config.count(it->first)) {
-        config_update = revert_config(it->second);
+        auto updated = revert_config(it->second);
+        config_updates.insert(config_updates.end(), updated.begin(),
+                              updated.end());
         it = applied_config_.erase(it);
       } else {
         it++;
@@ -232,10 +250,10 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     error_message += e.what();
 
     state_.error_message = std::move(error_message);
-    return config_update;
+    return config_updates;
   }
 
-  return config_update;
+  return config_updates;
 }
 
 std::vector<ConfigMetadata> RemoteConfigurationManager::apply_config(

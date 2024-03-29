@@ -8,6 +8,8 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+constexpr StringView k_spaces_characters = " \f\n\r\t\v";
+
 template <typename Sequence, typename Func>
 std::string join(const Sequence& elements, StringView separator,
                  Func&& append_element) {
@@ -86,8 +88,9 @@ bool starts_with(StringView subject, StringView prefix) {
 }
 
 StringView trim(StringView str) {
-  str.remove_prefix(std::min(str.find_first_not_of(' '), str.size()));
-  const auto pos = str.find_last_not_of(' ');
+  str.remove_prefix(
+      std::min(str.find_first_not_of(k_spaces_characters), str.size()));
+  const auto pos = str.find_last_not_of(k_spaces_characters);
   if (pos != str.npos) str.remove_suffix(str.size() - pos - 1);
   return str;
 }
