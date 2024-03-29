@@ -46,9 +46,7 @@ class DatadogAgent : public Collector {
   HTTPClient::URL remote_configuration_endpoint_;
   std::shared_ptr<HTTPClient> http_client_;
   std::shared_ptr<EventScheduler> event_scheduler_;
-  EventScheduler::Cancel cancel_scheduled_flush_;
-  EventScheduler::Cancel cancel_telemetry_timer_;
-  EventScheduler::Cancel cancel_remote_configuration_task_;
+  std::vector<EventScheduler::Cancel> tasks_;
   std::chrono::steady_clock::duration flush_interval_;
   // Callbacks for submitting telemetry data
   HTTPClient::ResponseHandler telemetry_on_response_;

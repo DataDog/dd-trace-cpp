@@ -21,12 +21,6 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-bool falsy(StringView text) {
-  auto lower = std::string{text};
-  to_lower(lower);
-  return lower == "0" || lower == "false" || lower == "no";
-}
-
 Expected<std::vector<PropagationStyle>> parse_propagation_styles(
     StringView input) {
   std::vector<PropagationStyle> styles;

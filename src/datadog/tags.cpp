@@ -1,6 +1,6 @@
 #include "tags.h"
 
-#include "parse_util.h"
+#include "string_util.h"
 
 namespace datadog {
 namespace tracing {

@@ -10,6 +10,7 @@
 #include "hex.h"
 #include "parse_util.h"
 #include "propagation_style.h"
+#include "string_util.h"
 #include "tags.h"
 
 namespace datadog {
@@ -42,7 +43,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
     return nullopt;
   }
 
-  const auto traceparent = strip(*maybe_traceparent);
+  const auto traceparent = trim(*maybe_traceparent);
 
   // Note that leading and trailing whitespace was already removed above.
   // Note that match group 0 is the entire match.
@@ -117,7 +118,7 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
     const char* const pair_end = std::find(pair_begin, end, ',');
     // Note that since this `pair` is `strip`ped, `pair_begin` is not
     // necessarily equal to `pair.begin()` (similarly for the ends).
-    const auto pair = strip(range(pair_begin, pair_end));
+    const auto pair = trim(range(pair_begin, pair_end));
     if (pair.empty()) {
       pair_begin = pair_end == end ? end : pair_end + 1;
       continue;
@@ -261,7 +262,7 @@ void extract_tracestate(ExtractedData& result, const DictReader& headers) {
     return;
   }
 
-  const auto tracestate = strip(*maybe_tracestate);
+  const auto tracestate = trim(*maybe_tracestate);
   auto maybe_parsed = parse_tracestate(tracestate);
   if (!maybe_parsed) {
     // No "dd" entry in `tracestate`, so there's nothing to extract.

@@ -9,6 +9,14 @@
 namespace datadog {
 namespace tracing {
 
+// Return a `string_view` over the specified range of characters `[begin, end)`.
+inline StringView range(const char* begin, const char* end) {
+  return StringView{begin, std::size_t(end - begin)};
+}
+
+// Convert the specified `text` to lower case in-place.
+void to_lower(std::string& text);
+
 // Return a string representation of the specified boolean `value`.
 // The result is "true" for `true` and "false" for `false`.
 std::string to_string(bool b);
@@ -26,6 +34,11 @@ std::string join_propagation_styles(const std::vector<PropagationStyle>&);
 std::string join_tags(
     const std::unordered_map<std::string, std::string>& values);
 
+// Return whether the specified `prefix` is a prefix of the specified `subject`.
+bool starts_with(StringView subject, StringView prefix);
+
+// Remove leading and trailing whitespace (as determined by `std::isspace`) from
+// the specified `input`.
 StringView trim(StringView);
 
 }  // namespace tracing
