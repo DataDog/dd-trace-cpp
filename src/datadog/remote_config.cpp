@@ -146,8 +146,8 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
 
 std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     const nlohmann::json& json) {
-  std::vector<ConfigMetadata> config_update;
-  config_update.reserve(8);
+  std::vector<ConfigMetadata> config_updates;
+  config_updates.reserve(8);
 
   state_.error_message = nullopt;
 
@@ -166,12 +166,14 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     if (client_configs_it == json.cend()) {
       if (!applied_config_.empty()) {
         std::for_each(applied_config_.cbegin(), applied_config_.cend(),
-                      [this, &config_update](const auto it) {
-                        config_update = revert_config(it.second);
+                      [this, &config_updates](const auto it) {
+                        auto updated = revert_config(it.second);
+                        config_updates.insert(config_updates.end(),
+                                              updated.begin(), updated.end());
                       });
         applied_config_.clear();
       }
-      return config_update;
+      return config_updates;
     }
 
     // Keep track of config path received to know which ones to revert.
@@ -202,7 +204,7 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
             "target file having path \"";
         append(*state_.error_message, config_path);
         *state_.error_message += '\"';
-        return config_update;
+        return config_updates;
       }
 
       const auto config_json = nlohmann::json::parse(
@@ -224,7 +226,9 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
         new_config.state = Configuration::State::acknowledged;
         new_config.content = parse_dynamic_config(config_json.at("lib_config"));
 
-        config_update = apply_config(new_config);
+        auto updated = apply_config(new_config);
+        config_updates.insert(config_updates.end(), updated.begin(),
+                              updated.end());
       }
 
       applied_config_[std::string{config_path}] = new_config;
@@ -233,7 +237,9 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     // Applied configuration not present must be reverted.
     for (auto it = applied_config_.cbegin(); it != applied_config_.cend();) {
       if (!visited_config.count(it->first)) {
-        config_update = revert_config(it->second);
+        auto updated = revert_config(it->second);
+        config_updates.insert(config_updates.end(), updated.begin(),
+                              updated.end());
         it = applied_config_.erase(it);
       } else {
         it++;
@@ -244,10 +250,10 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     error_message += e.what();
 
     state_.error_message = std::move(error_message);
-    return config_update;
+    return config_updates;
   }
 
-  return config_update;
+  return config_updates;
 }
 
 std::vector<ConfigMetadata> RemoteConfigurationManager::apply_config(
