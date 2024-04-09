@@ -82,7 +82,7 @@ TEST_CASE("set_tag") {
     REQUIRE(span.tags.at("bonus") == "applied");
   }
 
-  SECTION("can't set internal tags directly") {
+  SECTION("set internal tags") {
     {
       auto span = tracer.create_span();
       span.set_tag("foo", "lemon");
@@ -100,9 +100,9 @@ TEST_CASE("set_tag") {
     REQUIRE(span_ptr);
     const auto& span = *span_ptr;
     REQUIRE(span.tags.at("foo") == "lemon");
-    REQUIRE(span.tags.count("_dd.secret.sauce") == 0);
+    REQUIRE(span.tags.at("_dd.secret.sauce") == "thousand islands");
     REQUIRE(span.tags.at("_dd_not_internal") == "");
-    REQUIRE(span.tags.count("_dd.chipmunk") == 0);
+    REQUIRE(span.tags.at("_dd.chipmunk") == "");
   }
 }
 
@@ -143,9 +143,10 @@ TEST_CASE("lookup_tag") {
     REQUIRE(span.lookup_tag("turtle.depth") == "all the way down");
   }
 
-  SECTION("internal tags redacted") {
+  SECTION("lookup internal tags") {
     auto span = tracer.create_span();
-    REQUIRE(!span.lookup_tag("_dd.this"));
+    span.set_tag("_dd.this", "purple");
+    REQUIRE(span.lookup_tag("_dd.this") == "purple");
     REQUIRE(!span.lookup_tag("_dd.that"));
     REQUIRE(!span.lookup_tag("_dd.the.other.thing"));
   }
@@ -177,6 +178,139 @@ TEST_CASE("remove_tag") {
 
     REQUIRE(!span.lookup_tag("mayfly"));
     REQUIRE(!span.lookup_tag("foo"));
+  }
+}
+
+TEST_CASE("set_metric") {
+  TracerConfig config;
+  config.service = "testsvc";
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  SECTION("metrics end up in the collector") {
+    {
+      auto span = tracer.create_span();
+      span.set_metric("foo", 5.0);
+      span.set_metric("foo.bar", 3.0);
+      span.set_metric("foo.baz", 1.0) ;
+    }
+
+    REQUIRE(collector->chunks.size() == 1);
+    const auto& chunk = collector->chunks.front();
+    REQUIRE(chunk.size() == 1);
+    const auto& span_ptr = chunk.front();
+    REQUIRE(span_ptr);
+    const auto& span = *span_ptr;
+    REQUIRE(span.numeric_tags.at("foo") == 5.0);
+    REQUIRE(span.numeric_tags.at("foo.bar") == 3.0);
+    REQUIRE(span.numeric_tags.at("foo.baz") == 1.0);
+  }
+
+  SECTION("metrics can be overwritten") {
+    {
+      auto span = tracer.create_span();
+      span.set_metric("color", 2.0);
+      span.set_metric("color", 1.0);
+      span.set_metric("bonus", 6.0);
+      span.set_metric("bonus", 5.0);
+    }
+
+    REQUIRE(collector->chunks.size() == 1);
+    const auto& chunk = collector->chunks.front();
+    REQUIRE(chunk.size() == 1);
+    const auto& span_ptr = chunk.front();
+    REQUIRE(span_ptr);
+    const auto& span = *span_ptr;
+    REQUIRE(span.numeric_tags.at("color") == 1.0);
+    REQUIRE(span.numeric_tags.at("bonus") == 5.0);
+  }
+
+  SECTION("set internal metrics") {
+    {
+      auto span = tracer.create_span();
+      span.set_metric("foo", 1.0);
+      span.set_metric("_dd.secret.sauce", 2.0);
+      span.set_metric("_dd_not_internal", 3.0);
+      span.set_metric("_dd.chipmunk", 4.0);
+    }
+
+    REQUIRE(collector->chunks.size() == 1);
+    const auto& chunk = collector->chunks.front();
+    REQUIRE(chunk.size() == 1);
+    const auto& span_ptr = chunk.front();
+    REQUIRE(span_ptr);
+    const auto& span = *span_ptr;
+    REQUIRE(span.numeric_tags.at("foo") == 1.0);
+    REQUIRE(span.numeric_tags.at("_dd.secret.sauce") == 2.0);
+    REQUIRE(span.numeric_tags.at("_dd_not_internal") == 3.0);
+    REQUIRE(span.numeric_tags.at("_dd.chipmunk") == 4.0);
+  }
+}
+
+TEST_CASE("lookup_metric") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.collector = std::make_shared<MockCollector>();
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  SECTION("not found is null") {
+    auto span = tracer.create_span();
+    REQUIRE(!span.lookup_metric("nope"));
+    REQUIRE(!span.lookup_metric("also nope"));
+  }
+
+  SECTION("lookup after set") {
+    auto span = tracer.create_span();
+    span.set_metric("color", 11.0);
+    span.set_metric("turtle.depth", 6.0);
+
+    REQUIRE(span.lookup_metric("color") == 11.0);
+    REQUIRE(span.lookup_metric("turtle.depth") == 6.0);
+  }
+
+  SECTION("lookup internal metrics") {
+    auto span = tracer.create_span();
+    span.set_metric("_dd.this", 33.0);
+    REQUIRE(span.lookup_metric("_dd.this") == 33.0);
+    REQUIRE(!span.lookup_metric("_dd.that"));
+    REQUIRE(!span.lookup_metric("_dd.the.other.thing"));
+  }
+}
+
+TEST_CASE("remove_metric") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.collector = std::make_shared<MockCollector>();
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  SECTION("doesn't have to be there already") {
+    auto span = tracer.create_span();
+    span.remove_metric("not even there");
+  }
+
+  SECTION("after removal, lookup yields null") {
+    auto span = tracer.create_span();
+    span.set_metric("mayfly", 10.0);
+    span.set_metric("foo", 11.0);
+
+    span.remove_metric("mayfly");
+    span.remove_metric("foo");
+
+    REQUIRE(!span.lookup_metric("mayfly"));
+    REQUIRE(!span.lookup_metric("foo"));
   }
 }
 
