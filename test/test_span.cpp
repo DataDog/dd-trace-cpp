@@ -197,7 +197,7 @@ TEST_CASE("set_metric") {
       auto span = tracer.create_span();
       span.set_metric("foo", 5.0);
       span.set_metric("foo.bar", 3.0);
-      span.set_metric("foo.baz", 1.0) ;
+      span.set_metric("foo.baz", 1.0);
     }
 
     REQUIRE(collector->chunks.size() == 1);

@@ -124,9 +124,7 @@ void Span::set_metric(StringView name, double value) {
   data_->numeric_tags.insert_or_assign(std::string(name), value);
 }
 
-void Span::remove_tag(StringView name) {
-  data_->tags.erase(std::string(name));
-}
+void Span::remove_tag(StringView name) { data_->tags.erase(std::string(name)); }
 
 void Span::remove_metric(StringView name) {
   data_->numeric_tags.erase(std::string(name));
