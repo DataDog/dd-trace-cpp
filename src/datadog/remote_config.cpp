@@ -90,11 +90,11 @@ class TracingProductListener : public remote_config::ProductListener {
   }
 
   void on_config_remove(const remote_config::ParsedConfigKey& key,
-                        std::vector<ConfigMetadata>& config_update) override {
+                        std::vector<ConfigMetadata>& config_updates) override {
     if (applied_configs_.erase(key) > 0) {
       std::vector<ConfigMetadata> metadata = config_manager_->reset();
-      config_update.insert(config_update.end(), metadata.begin(),
-                           metadata.end());
+      config_updates.insert(config_updates.end(), metadata.begin(),
+                            metadata.end());
     }
   }
 
@@ -123,19 +123,18 @@ class TracingProductListener : public remote_config::ProductListener {
     ConfigUpdate config_update;
 
     if (auto sampling_rate_it = j.find("tracing_sampling_rate"_sv);
-        sampling_rate_it != j.cend()) {
+        sampling_rate_it != j.cend() && sampling_rate_it->is_number()) {
       config_update.trace_sampling_rate = *sampling_rate_it;
     }
 
-    if (auto tags_it = j.find("tracing_tags"_sv); tags_it != j.cend()) {
+    if (auto tags_it = j.find("tracing_tags"_sv);
+        tags_it != j.cend() && tags_it->is_array()) {
       config_update.tags = tags_it->get<std::vector<std::string>>();
     }
 
     if (auto tracing_enabled_it = j.find("tracing_enabled"_sv);
-        tracing_enabled_it != j.cend()) {
-      if (tracing_enabled_it->is_boolean()) {
-        config_update.report_traces = tracing_enabled_it->get<bool>();
-      }
+        tracing_enabled_it != j.cend() && tracing_enabled_it->is_boolean()) {
+      config_update.report_traces = tracing_enabled_it->get<bool>();
     }
 
     return config_update;
@@ -255,7 +254,7 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     nlohmann::json&& json) {
   Optional<remote_config::RemoteConfigResponse> resp;
   std::vector<std::string> errors;
-  std::vector<ConfigMetadata> config_update;
+  std::vector<ConfigMetadata> config_updates;
 
   try {
     auto maybe_resp =
@@ -279,7 +278,7 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
       }
     }
 
-    config_update.reserve(8);
+    config_updates.reserve(8);
 
     bool applied_any = false;
     // Apply the configuration is applied product-by-product.
@@ -287,7 +286,7 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     // those that pertain to the product in question.
     for (auto&& [product, pstate] : product_states_) {
       try {
-        applied_any = pstate.apply(*resp, config_update) || applied_any;
+        applied_any = pstate.apply(*resp, config_updates) || applied_any;
       } catch (const remote_config::reportable_error& e) {
         logger_->log_error(std::string{"Failed to apply configuration for "} +
                            std::string{product.name()} + ": " + e.what());
@@ -327,7 +326,7 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     update_next_state(nullopt, build_error_message(errors));
   }
 
-  return config_update;
+  return config_updates;
 }
 
 void RemoteConfigurationManager::add_listener(

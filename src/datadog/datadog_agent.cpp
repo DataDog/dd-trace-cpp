@@ -160,14 +160,16 @@ DatadogAgent::DatadogAgent(
       remote_configuration_endpoint_(remote_configuration_endpoint(config.url)),
       http_client_(config.http_client),
       event_scheduler_(config.event_scheduler),
-      cancel_scheduled_flush_(event_scheduler_->schedule_recurring_event(
-          config.flush_interval, [this]() { flush(); })),
       flush_interval_(config.flush_interval),
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
       remote_config_(tracer_signature, config_manager, logger) {
   assert(logger_);
   assert(tracer_telemetry_);
+
+  tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
+      config.flush_interval, [this]() { flush(); }));
+
   if (tracer_telemetry_->enabled()) {
     // Callback for successful telemetry HTTP requests, to examine HTTP
     // status.
@@ -194,44 +196,48 @@ DatadogAgent::DatadogAgent(
     // Every 10 seconds, have the tracer telemetry capture the metrics
     // values. Every 60 seconds, also report those values to the datadog
     // agent.
-    cancel_telemetry_timer_ = event_scheduler_->schedule_recurring_event(
+    tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
         std::chrono::seconds(10), [this, n = 0]() mutable {
           n++;
           tracer_telemetry_->capture_metrics();
           if (n % 6 == 0) {
             send_heartbeat_and_telemetry();
           }
-        });
+        }));
   }
 
-  for (auto&& l : config.rem_cfg_listeners) {
-    remote_config_.add_listener(std::move(l));
-  }
-  config.rem_cfg_listeners.clear();
-  for (auto&& l : config.rem_cfg_end_listeners) {
-    remote_config_.add_config_end_listener(std::move(l));
-  }
-  config.rem_cfg_end_listeners.clear();
+  if (config.remote_configuration_enabled) {
+    for (auto&& l : config.rem_cfg_listeners) {
+      remote_config_.add_listener(std::move(l));
+    }
+    config.rem_cfg_listeners.clear();
+    for (auto&& l : config.rem_cfg_end_listeners) {
+      remote_config_.add_config_end_listener(std::move(l));
+    }
+    config.rem_cfg_end_listeners.clear();
 
-  cancel_remote_configuration_task_ =
-      event_scheduler_->schedule_recurring_event(
-          config.remote_configuration_poll_interval,
-          [this] { get_and_apply_remote_configuration_updates(); });
+    tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
+        config.remote_configuration_poll_interval,
+        [this] { get_and_apply_remote_configuration_updates(); }));
+  }
 }
 
 DatadogAgent::~DatadogAgent() {
   const auto deadline = clock_().tick + shutdown_timeout_;
-  cancel_scheduled_flush_();
+
+  for (auto&& cancel_task : tasks_) {
+    cancel_task();
+  }
+
   flush();
-  cancel_remote_configuration_task_();
+
   if (tracer_telemetry_->enabled()) {
-    // This action only needs to occur if tracer telemetry is enabled.
-    cancel_telemetry_timer_();
     tracer_telemetry_->capture_metrics();
     // The app-closing message is bundled with a message containing the
     // final metric values.
     send_app_closing();
   }
+
   http_client_->drain(deadline);
 }
 

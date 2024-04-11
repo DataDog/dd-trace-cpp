@@ -346,11 +346,14 @@ class ProductListener {
   ProductListener(ProductListener &&) = delete;
   ProductListener &operator=(ProductListener &&) = delete;
 
-  virtual void on_config_update(const ParsedConfigKey &key,
-                                const std::string &content,
-                                std::vector<ConfigMetadata> &config_update) = 0;
-  virtual void on_config_remove(const ParsedConfigKey &key,
-                                std::vector<ConfigMetadata> &config_update) = 0;
+  virtual void on_config_update(
+      const ParsedConfigKey &key, const std::string &content,
+      std::vector<ConfigMetadata> &config_updates) = 0;
+
+  virtual void on_config_remove(
+      const ParsedConfigKey &key,
+      std::vector<ConfigMetadata> &config_updates) = 0;
+
   [[nodiscard]] virtual CapabilitiesSet capabilities() const = 0;
 
   Product product() const { return product_; }

@@ -383,6 +383,19 @@ REMOTE_CONFIG_TEST("response processing") {
     CHECK(new_span_defaults != old_span_defaults);
     CHECK(new_report_traces != old_report_traces);
 
+    SECTION("config status is correctly applied") {
+      const auto payload = rc.make_request_payload();
+      const auto s = payload.dump(2);
+      REQUIRE(payload.contains("/client/state/config_states"_json_pointer) ==
+              true);
+
+      const auto& config_states =
+          payload.at("/client/state/config_states"_json_pointer);
+      REQUIRE(config_states.size() == 1);
+      CHECK(config_states[0]["product"] == "APM_TRACING");
+      CHECK(config_states[0]["apply_state"] == 2);
+    }
+
     SECTION("reset configuration") {
       SECTION(
           "missing from client_configs -> all configurations should be reset") {
@@ -492,6 +505,8 @@ REMOTE_CONFIG_TEST("response processing") {
     auto subseq_payload = rc.make_request_payload();
     CHECK(subseq_payload["client"]["state"]["error"] == "");
     CHECK(subseq_payload["client"]["state"]["config_states"].size() == 1);
+    CHECK(subseq_payload["client"]["state"]["config_states"][0]["product"] ==
+          "APM_TRACING");
     CHECK(
         subseq_payload["client"]["state"]["config_states"][0]["apply_state"] ==
         datadog::tracing::remote_config::ConfigState::ApplyState::Acknowledged);

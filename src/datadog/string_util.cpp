@@ -1,11 +1,14 @@
 #include "string_util.h"
 
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
 namespace datadog {
 namespace tracing {
 namespace {
+
+constexpr StringView k_spaces_characters = " \f\n\r\t\v";
 
 template <typename Sequence, typename Func>
 std::string join(const Sequence& elements, StringView separator,
@@ -25,6 +28,11 @@ std::string join(const Sequence& elements, StringView separator,
 }
 
 }  // namespace
+
+void to_lower(std::string& text) {
+  std::transform(text.begin(), text.end(), text.begin(),
+                 [](unsigned char ch) { return std::tolower(ch); });
+}
 
 std::string to_string(bool b) { return b ? "true" : "false"; }
 
@@ -77,9 +85,19 @@ std::string join_tags(
   });
 }
 
+bool starts_with(StringView subject, StringView prefix) {
+  if (prefix.size() > subject.size()) {
+    return false;
+  }
+
+  return std::mismatch(subject.begin(), subject.end(), prefix.begin()).second ==
+         prefix.end();
+}
+
 StringView trim(StringView str) {
-  str.remove_prefix(std::min(str.find_first_not_of(' '), str.size()));
-  const auto pos = str.find_last_not_of(' ');
+  str.remove_prefix(
+      std::min(str.find_first_not_of(k_spaces_characters), str.size()));
+  const auto pos = str.find_last_not_of(k_spaces_characters);
   if (pos != str.npos) str.remove_suffix(str.size() - pos - 1);
   return str;
 }

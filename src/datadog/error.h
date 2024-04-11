@@ -77,7 +77,7 @@ struct Error {
     SAMPLING_DELEGATION_RESPONSE_INVALID_JSON = 52,
   };
 
-  Code code;
+  Code code{};
   std::string message;
 
   Error with_prefix(StringView) const;
