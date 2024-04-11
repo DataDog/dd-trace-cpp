@@ -46,6 +46,9 @@ TEST_CASE("set_tag") {
       span.set_tag("foo", "lemon");
       span.set_tag("foo.bar", "mint");
       span.set_tag("foo.baz", "blueberry");
+      span.set_tag("_dd.secret.sauce", "thousand islands");
+      span.set_tag("_dd_not_internal", "");
+      span.set_tag("_dd.chipmunk", "");
     }
 
     REQUIRE(collector->chunks.size() == 1);
@@ -57,18 +60,21 @@ TEST_CASE("set_tag") {
     REQUIRE(span.tags.at("foo") == "lemon");
     REQUIRE(span.tags.at("foo.bar") == "mint");
     REQUIRE(span.tags.at("foo.baz") == "blueberry");
+    REQUIRE(span.tags.at("_dd.secret.sauce") == "thousand islands");
+    REQUIRE(span.tags.at("_dd_not_internal") == "");
+    REQUIRE(span.tags.at("_dd.chipmunk") == "");
   }
 
   SECTION("tags can be overwritten") {
     {
       SpanConfig config;
-      config.tags = {
-          {"color", "purple"},
-          {"turtle.depth", "all the way down"},
-      };
+      config.tags = {{"color", "purple"},
+                     {"turtle.depth", "all the way down"},
+                     {"_dd.tag", "written"}};
       auto span = tracer.create_span(config);
       span.set_tag("color", "green");
       span.set_tag("bonus", "applied");
+      span.set_tag("_dd.tag", "overwritten");
     }
 
     REQUIRE(collector->chunks.size() == 1);
@@ -80,29 +86,7 @@ TEST_CASE("set_tag") {
     REQUIRE(span.tags.at("color") == "green");
     REQUIRE(span.tags.at("turtle.depth") == "all the way down");
     REQUIRE(span.tags.at("bonus") == "applied");
-  }
-
-  SECTION("set internal tags") {
-    {
-      auto span = tracer.create_span();
-      span.set_tag("foo", "lemon");
-      span.set_tag("_dd.secret.sauce", "thousand islands");
-      span.set_tag("_dd_not_internal", "");
-      // _dd.p.dm will end up in the tags due to how sampling works
-      // span.set_tag("_dd.p.dm", "-4");
-      span.set_tag("_dd.chipmunk", "");
-    }
-
-    REQUIRE(collector->chunks.size() == 1);
-    const auto& chunk = collector->chunks.front();
-    REQUIRE(chunk.size() == 1);
-    const auto& span_ptr = chunk.front();
-    REQUIRE(span_ptr);
-    const auto& span = *span_ptr;
-    REQUIRE(span.tags.at("foo") == "lemon");
-    REQUIRE(span.tags.at("_dd.secret.sauce") == "thousand islands");
-    REQUIRE(span.tags.at("_dd_not_internal") == "");
-    REQUIRE(span.tags.at("_dd.chipmunk") == "");
+    REQUIRE(span.tags.at("_dd.tag") == "overwritten");
   }
 }
 
@@ -120,15 +104,18 @@ TEST_CASE("lookup_tag") {
     auto span = tracer.create_span();
     REQUIRE(!span.lookup_tag("nope"));
     REQUIRE(!span.lookup_tag("also nope"));
+    REQUIRE(!span.lookup_tag("_dd.nope"));
   }
 
   SECTION("lookup after set") {
     auto span = tracer.create_span();
     span.set_tag("color", "purple");
     span.set_tag("turtle.depth", "all the way down");
+    span.set_tag("_dd.tag", "found");
 
     REQUIRE(span.lookup_tag("color") == "purple");
     REQUIRE(span.lookup_tag("turtle.depth") == "all the way down");
+    REQUIRE(span.lookup_tag("_dd.tag") == "found");
   }
 
   SECTION("lookup after config") {
@@ -136,19 +123,13 @@ TEST_CASE("lookup_tag") {
     config.tags = {
         {"color", "purple"},
         {"turtle.depth", "all the way down"},
+        {"_dd.tag", "found"},
     };
     auto span = tracer.create_span(config);
 
     REQUIRE(span.lookup_tag("color") == "purple");
     REQUIRE(span.lookup_tag("turtle.depth") == "all the way down");
-  }
-
-  SECTION("lookup internal tags") {
-    auto span = tracer.create_span();
-    span.set_tag("_dd.this", "purple");
-    REQUIRE(span.lookup_tag("_dd.this") == "purple");
-    REQUIRE(!span.lookup_tag("_dd.that"));
-    REQUIRE(!span.lookup_tag("_dd.the.other.thing"));
+    REQUIRE(span.lookup_tag("_dd.tag") == "found");
   }
 }
 
@@ -165,18 +146,21 @@ TEST_CASE("remove_tag") {
   SECTION("doesn't have to be there already") {
     auto span = tracer.create_span();
     span.remove_tag("not even there");
+    span.remove_tag("_dd.tag");
   }
 
   SECTION("after removal, lookup yields null") {
     SpanConfig config;
-    config.tags = {{"mayfly", "carpe diem"}};
+    config.tags = {{"mayfly", "carpe diem"}, {"_dd.mayfly", "carpe diem"}};
     auto span = tracer.create_span(config);
     span.set_tag("foo", "bar");
 
     span.remove_tag("mayfly");
+    span.remove_tag("_dd.mayfly");
     span.remove_tag("foo");
 
     REQUIRE(!span.lookup_tag("mayfly"));
+    REQUIRE(!span.lookup_tag("_dd.mayfly"));
     REQUIRE(!span.lookup_tag("foo"));
   }
 }
@@ -198,6 +182,9 @@ TEST_CASE("set_metric") {
       span.set_metric("foo", 5.0);
       span.set_metric("foo.bar", 3.0);
       span.set_metric("foo.baz", 1.0);
+      span.set_metric("_dd.secret.sauce", 2.0);
+      span.set_metric("_dd_not_internal", 3.0);
+      span.set_metric("_dd.chipmunk", 4.0);
     }
 
     REQUIRE(collector->chunks.size() == 1);
@@ -209,6 +196,9 @@ TEST_CASE("set_metric") {
     REQUIRE(span.numeric_tags.at("foo") == 5.0);
     REQUIRE(span.numeric_tags.at("foo.bar") == 3.0);
     REQUIRE(span.numeric_tags.at("foo.baz") == 1.0);
+    REQUIRE(span.numeric_tags.at("_dd.secret.sauce") == 2.0);
+    REQUIRE(span.numeric_tags.at("_dd_not_internal") == 3.0);
+    REQUIRE(span.numeric_tags.at("_dd.chipmunk") == 4.0);
   }
 
   SECTION("metrics can be overwritten") {
@@ -229,27 +219,6 @@ TEST_CASE("set_metric") {
     REQUIRE(span.numeric_tags.at("color") == 1.0);
     REQUIRE(span.numeric_tags.at("bonus") == 5.0);
   }
-
-  SECTION("set internal metrics") {
-    {
-      auto span = tracer.create_span();
-      span.set_metric("foo", 1.0);
-      span.set_metric("_dd.secret.sauce", 2.0);
-      span.set_metric("_dd_not_internal", 3.0);
-      span.set_metric("_dd.chipmunk", 4.0);
-    }
-
-    REQUIRE(collector->chunks.size() == 1);
-    const auto& chunk = collector->chunks.front();
-    REQUIRE(chunk.size() == 1);
-    const auto& span_ptr = chunk.front();
-    REQUIRE(span_ptr);
-    const auto& span = *span_ptr;
-    REQUIRE(span.numeric_tags.at("foo") == 1.0);
-    REQUIRE(span.numeric_tags.at("_dd.secret.sauce") == 2.0);
-    REQUIRE(span.numeric_tags.at("_dd_not_internal") == 3.0);
-    REQUIRE(span.numeric_tags.at("_dd.chipmunk") == 4.0);
-  }
 }
 
 TEST_CASE("lookup_metric") {
@@ -266,23 +235,18 @@ TEST_CASE("lookup_metric") {
     auto span = tracer.create_span();
     REQUIRE(!span.lookup_metric("nope"));
     REQUIRE(!span.lookup_metric("also nope"));
+    REQUIRE(!span.lookup_metric("_dd.nope"));
   }
 
   SECTION("lookup after set") {
     auto span = tracer.create_span();
     span.set_metric("color", 11.0);
     span.set_metric("turtle.depth", 6.0);
+    span.set_metric("_dd.this", 33.0);
 
     REQUIRE(span.lookup_metric("color") == 11.0);
     REQUIRE(span.lookup_metric("turtle.depth") == 6.0);
-  }
-
-  SECTION("lookup internal metrics") {
-    auto span = tracer.create_span();
-    span.set_metric("_dd.this", 33.0);
     REQUIRE(span.lookup_metric("_dd.this") == 33.0);
-    REQUIRE(!span.lookup_metric("_dd.that"));
-    REQUIRE(!span.lookup_metric("_dd.the.other.thing"));
   }
 }
 
@@ -305,12 +269,15 @@ TEST_CASE("remove_metric") {
     auto span = tracer.create_span();
     span.set_metric("mayfly", 10.0);
     span.set_metric("foo", 11.0);
+    span.set_metric("_dd.metric", 1.0);
 
     span.remove_metric("mayfly");
     span.remove_metric("foo");
+    span.remove_metric("_dd.metric");
 
     REQUIRE(!span.lookup_metric("mayfly"));
     REQUIRE(!span.lookup_metric("foo"));
+    REQUIRE(!span.lookup_metric("_dd.metric"));
   }
 }
 
