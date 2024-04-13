@@ -58,8 +58,9 @@ SpanSampler::SpanSampler(const FinalizedSpanSamplerConfig& config,
 }
 
 SpanSampler::Rule* SpanSampler::match(const SpanData& span) {
-  const auto found = std::find_if(rules_.begin(), rules_.end(),
-                                  [&](Rule& rule) { return rule.match(span); });
+  const auto found =
+      std::find_if(rules_.begin(), rules_.end(),
+                   [&](Rule& rule) { return match_span(rule, span); });
   if (found != rules_.end()) {
     return &*found;
   }

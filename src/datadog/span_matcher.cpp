@@ -28,14 +28,17 @@ nlohmann::json SpanMatcher::to_json() const {
   });
 }
 
-bool SpanMatcher::match(const SpanData& span) const {
-  return is_match(service, span.service) && is_match(name, span.name) &&
-         is_match(resource, span.resource) &&
-         std::all_of(tags.begin(), tags.end(), [&](const auto& entry) {
-           const auto& [name, pattern] = entry;
-           auto found = span.tags.find(name);
-           return found != span.tags.end() && is_match(pattern, found->second);
-         });
+bool match_span(const SpanMatcher& matcher, const SpanData& span) {
+  return is_match(matcher.service, span.service) &&
+         is_match(matcher.name, span.name) &&
+         is_match(matcher.resource, span.resource) &&
+         std::all_of(matcher.tags.begin(), matcher.tags.end(),
+                     [&](const auto& entry) {
+                       const auto& [name, pattern] = entry;
+                       auto found = span.tags.find(name);
+                       return found != span.tags.end() &&
+                              is_match(pattern, found->second);
+                     });
 }
 
 Expected<SpanMatcher> SpanMatcher::from_json(const nlohmann::json& json) {

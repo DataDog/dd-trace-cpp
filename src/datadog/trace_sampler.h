@@ -106,13 +106,20 @@ class TraceSampler {
 
   Optional<Rate> collector_default_sample_rate_;
   std::unordered_map<std::string, Rate> collector_sample_rates_;
+  std::unordered_map<SpanMatcher, Rate, SpanMatcher::Hash> rules_;
 
-  std::vector<FinalizedTraceSamplerConfig::Rule> rules_;
   Limiter limiter_;
   double limiter_max_per_second_;
 
  public:
   TraceSampler(const FinalizedTraceSamplerConfig& config, const Clock& clock);
+
+  // Removes the specified rule from the collection of rules.
+  // Return true if the rule was successfully removed, otherwise false.
+  bool remove_rule(const SpanMatcher& rule);
+
+  // Inserts or updates a rule with the specified rate.
+  void insert_or_assign_rule(SpanMatcher rule, Rate rate);
 
   // Return a sampling decision for the specified root span.
   SamplingDecision decide(const SpanData&);

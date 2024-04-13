@@ -28,11 +28,28 @@ struct SpanMatcher {
   // (no globbing), while the tag's value must match the glob pattern.
   std::unordered_map<std::string, std::string> tags;
 
-  bool match(const SpanData&) const;
   nlohmann::json to_json() const;
 
   static Expected<SpanMatcher> from_json(const nlohmann::json&);
+
+  bool operator==(const SpanMatcher& other) const {
+    return (service == other.service && name == other.name &&
+            resource == other.resource && tags == other.tags);
+  }
+
+  // TODO: add tags
+  struct Hash {
+    size_t operator()(const SpanMatcher& rule) const {
+      return std::hash<std::string>()(rule.service) ^
+             (std::hash<std::string>()(rule.name) << 1) ^
+             (std::hash<std::string>()(rule.resource) << 2);
+    }
+  };
 };
+
+static const SpanMatcher catch_all;
+
+bool match_span(const SpanMatcher&, const SpanData&);
 
 }  // namespace tracing
 }  // namespace datadog

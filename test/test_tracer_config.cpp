@@ -618,7 +618,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.size() == 1);
       // and the default sample_rate is 100%
-      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 1.0);
+      REQUIRE(finalized->trace_sampler.rules[catch_all] == 1.0);
     }
 
     SECTION("has to have a valid sample_rate") {
@@ -632,25 +632,13 @@ TEST_CASE("TracerConfig::trace_sampler") {
     }
   }
 
-  SECTION("two sampling rules") {
-    auto& rules = config.trace_sampler.rules;
-    rules.resize(rules.size() + 2);
-    rules[0].sample_rate = 0.5;
-    rules[1].sample_rate = 0.6;
-    auto finalized = finalize_config(config);
-    REQUIRE(finalized);
-    REQUIRE(finalized->trace_sampler.rules.size() == 2);
-    REQUIRE(finalized->trace_sampler.rules[0].sample_rate == 0.5);
-    REQUIRE(finalized->trace_sampler.rules[1].sample_rate == 0.6);
-  }
-
   SECTION("global sample_rate creates a catch-all rule") {
     config.trace_sampler.sample_rate = 0.25;
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_sampler.rules.size() == 1);
-    const auto& rule = finalized->trace_sampler.rules.front();
-    REQUIRE(rule.sample_rate == 0.25);
+    REQUIRE(finalized->trace_sampler.rules.count(catch_all));
+    const auto& [rule, rate] = *finalized->trace_sampler.rules.find(catch_all);
+    REQUIRE(rate == 0.25);
     REQUIRE(rule.service == "*");
     REQUIRE(rule.name == "*");
     REQUIRE(rule.resource == "*");
@@ -662,8 +650,8 @@ TEST_CASE("TracerConfig::trace_sampler") {
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", "0.5"};
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->trace_sampler.rules.size() == 1);
-      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 0.5);
+      REQUIRE(finalized->trace_sampler.rules.count(catch_all));
+      REQUIRE(finalized->trace_sampler.rules[catch_all] == 0.5);
     }
 
     SECTION("overrides TraceSamplerConfig::sample_rate") {
@@ -671,8 +659,8 @@ TEST_CASE("TracerConfig::trace_sampler") {
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", "0.5"};
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->trace_sampler.rules.size() == 1);
-      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 0.5);
+      REQUIRE(finalized->trace_sampler.rules.count(catch_all));
+      REQUIRE(finalized->trace_sampler.rules[catch_all] == 0.5);
     }
 
     SECTION("has to have a valid value") {
@@ -802,20 +790,24 @@ TEST_CASE("TracerConfig::trace_sampler") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
 
-      const auto& rules = finalized->trace_sampler.rules;
+      auto& rules = finalized->trace_sampler.rules;
       CAPTURE(rules_json);
       CAPTURE(rules);
       REQUIRE(rules.size() == 2);
-      REQUIRE(rules[0].service == "poohbear");
-      REQUIRE(rules[0].name == "get.honey");
-      REQUIRE(rules[0].sample_rate == 0);
-      REQUIRE(rules[0].tags.size() == 0);
-      REQUIRE(rules[1].service == "*");
-      REQUIRE(rules[1].name == "*");
-      REQUIRE(rules[1].sample_rate == 1);
-      REQUIRE(rules[1].tags.size() == 1);
-      REQUIRE(rules[1].tags.at("error") == "*");
-      REQUIRE(rules[1].resource == "/admin/*");
+
+      SpanMatcher rule0;
+      rule0.service = "poohbear";
+      rule0.name = "get.honey";
+      REQUIRE(rules.count(rule0));
+      CHECK(rules[rule0] == 0);
+
+      SpanMatcher rule1;
+      rule1.service = "*";
+      rule1.name = "*";
+      rule1.tags.emplace("error", "*");
+      rule1.resource = "/admin/*";
+      REQUIRE(rules.count(rule1));
+      CHECK(rules[rule1] == 1);
     }
 
     SECTION("must be valid") {

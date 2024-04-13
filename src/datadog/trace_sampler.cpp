@@ -21,25 +21,33 @@ TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config,
       limiter_(clock, config.max_per_second),
       limiter_max_per_second_(config.max_per_second) {}
 
+bool TraceSampler::remove_rule(const SpanMatcher& rule) {
+  return rules_.erase(rule) != 0;
+}
+
+void TraceSampler::insert_or_assign_rule(SpanMatcher rule, Rate rate) {
+  rules_.insert_or_assign(rule, rate);
+}
+
 SamplingDecision TraceSampler::decide(const SpanData& span) {
   SamplingDecision decision;
   decision.origin = SamplingDecision::Origin::LOCAL;
 
   // First check sampling rules.
-  auto found_rule =
-      std::find_if(rules_.begin(), rules_.end(),
-                   [&](const auto& rule) { return rule.match(span); });
+  const auto found_rule =
+      std::find_if(rules_.cbegin(), rules_.cend(),
+                   [&](const auto& it) { return match_span(it.first, span); });
 
   // `mutex_` protects `limiter_`, `collector_sample_rates_`, and
   // `collector_default_sample_rate_`, so let's lock it here.
   std::lock_guard lock(mutex_);
 
-  if (found_rule != rules_.end()) {
-    const auto& rule = *found_rule;
+  if (found_rule != rules_.cend()) {
+    const auto& [rule, sample_rate] = *found_rule;
     decision.mechanism = int(SamplingMechanism::RULE);
     decision.limiter_max_per_second = limiter_max_per_second_;
-    decision.configured_rate = rule.sample_rate;
-    const std::uint64_t threshold = max_id_from_rate(rule.sample_rate);
+    decision.configured_rate = sample_rate;
+    const std::uint64_t threshold = max_id_from_rate(sample_rate);
     if (knuth_hash(span.trace_id.low) < threshold) {
       const auto result = limiter_.allow();
       if (result.allowed) {
@@ -57,7 +65,7 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
 
   // No sampling rule matched.  Find the appropriate collector-controlled
   // sample rate.
-  auto found_rate = collector_sample_rates_.find(
+  const auto found_rate = collector_sample_rates_.find(
       CollectorResponse::key(span.service, span.environment().value_or("")));
   if (found_rate != collector_sample_rates_.end()) {
     decision.configured_rate = found_rate->second;
@@ -99,8 +107,10 @@ void TraceSampler::handle_collector_response(
 
 nlohmann::json TraceSampler::config_json() const {
   std::vector<nlohmann::json> rules;
-  for (const auto& rule : rules_) {
-    rules.push_back(to_json(rule));
+  for (const auto& [rule, rate] : rules_) {
+    auto j = rule.to_json();
+    j["sampling_rate"] = rate.value();
+    rules.push_back(j);
   }
 
   return nlohmann::json::object({

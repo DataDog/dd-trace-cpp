@@ -41,20 +41,13 @@ class FinalizedTraceSamplerConfig {
   FinalizedTraceSamplerConfig() = default;
 
  public:
-  struct Rule : public SpanMatcher {
-    Rate sample_rate;
-  };
-
-  std::vector<Rule> rules;
   double max_per_second;
-
+  std::unordered_map<SpanMatcher, Rate, SpanMatcher::Hash> rules;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
     const TraceSamplerConfig& config);
-
-nlohmann::json to_json(const FinalizedTraceSamplerConfig::Rule&);
 
 }  // namespace tracing
 }  // namespace datadog

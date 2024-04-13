@@ -179,10 +179,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       return error->with_prefix(prefix);
     }
 
-    FinalizedTraceSamplerConfig::Rule finalized;
-    static_cast<SpanMatcher &>(finalized) = rule;
-    finalized.sample_rate = *maybe_rate;
-    result.rules.push_back(std::move(finalized));
+    result.rules[rule] = *maybe_rate;
   }
 
   Optional<double> sample_rate;
@@ -208,9 +205,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
           "Unable to parse overall sample_rate for trace sampling: ");
     }
 
-    FinalizedTraceSamplerConfig::Rule catch_all;
-    catch_all.sample_rate = *maybe_rate;
-    result.rules.push_back(std::move(catch_all));
+    result.rules[catch_all] = *maybe_rate;
   }
 
   const auto [origin, max_per_second] =
@@ -231,13 +226,6 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   }
   result.max_per_second = max_per_second;
 
-  return result;
-}
-
-nlohmann::json to_json(const FinalizedTraceSamplerConfig::Rule &rule) {
-  // Get the base class's fields, then add our own.
-  auto result = static_cast<const SpanMatcher &>(rule).to_json();
-  result["sample_rate"] = double(rule.sample_rate);
   return result;
 }
 
