@@ -34,7 +34,11 @@ bool SpanMatcher::match(const SpanData& span) const {
          std::all_of(tags.begin(), tags.end(), [&](const auto& entry) {
            const auto& [name, pattern] = entry;
            auto found = span.tags.find(name);
-           return found != span.tags.end() && is_match(pattern, found->second);
+           auto found_numeric = span.numeric_tags.find(name);
+           return (found != span.tags.end() &&
+                   is_match(pattern, found->second)) ||
+                  (found_numeric != span.numeric_tags.end() &&
+                   is_match(pattern, std::to_string(found_numeric->second)));
          });
 }
 
