@@ -101,10 +101,6 @@ const std::string& Span::name() const { return data_->name; }
 const std::string& Span::resource_name() const { return data_->resource; }
 
 Optional<StringView> Span::lookup_tag(StringView name) const {
-  if (tags::is_internal(name)) {
-    return nullopt;
-  }
-
   const auto found = data_->tags.find(std::string(name));
   if (found == data_->tags.end()) {
     return nullopt;
@@ -112,16 +108,26 @@ Optional<StringView> Span::lookup_tag(StringView name) const {
   return found->second;
 }
 
-void Span::set_tag(StringView name, StringView value) {
-  if (!tags::is_internal(name)) {
-    data_->tags.insert_or_assign(std::string(name), std::string(value));
+Optional<double> Span::lookup_metric(StringView name) const {
+  const auto found = data_->numeric_tags.find(std::string(name));
+  if (found == data_->numeric_tags.end()) {
+    return nullopt;
   }
+  return found->second;
 }
 
-void Span::remove_tag(StringView name) {
-  if (!tags::is_internal(name)) {
-    data_->tags.erase(std::string(name));
-  }
+void Span::set_tag(StringView name, StringView value) {
+  data_->tags.insert_or_assign(std::string(name), std::string(value));
+}
+
+void Span::set_metric(StringView name, double value) {
+  data_->numeric_tags.insert_or_assign(std::string(name), value);
+}
+
+void Span::remove_tag(StringView name) { data_->tags.erase(std::string(name)); }
+
+void Span::remove_metric(StringView name) {
+  data_->numeric_tags.erase(std::string(name));
 }
 
 void Span::set_service_name(StringView service) {

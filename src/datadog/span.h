@@ -125,12 +125,19 @@ class Span {
   // Return the value of the tag having the specified `name`, or return null if
   // there is no such tag.
   Optional<StringView> lookup_tag(StringView name) const;
+  // Return the value of the metric having the specified `name`, or return null
+  // if there is no such metric.
+  Optional<double> lookup_metric(StringView name) const;
   // Overwrite the tag having the specified `name` so that it has the specified
   // `value`, or create a new tag.
   void set_tag(StringView name, StringView value);
+  // Overwrite the metric having the specified `name` so that it has the
+  // specified `value`, or create a new metric.
+  void set_metric(StringView name, double value);
   // Delete the tag having the specified `name` if it exists.
   void remove_tag(StringView name);
-
+  // Delete the metric having the specified `name` if it exists.
+  void remove_metric(StringView name);
   // Set the name of the service associated with this span, e.g.
   // "ingress-nginx-useast1".
   void set_service_name(StringView);
