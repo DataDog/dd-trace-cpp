@@ -165,8 +165,24 @@ void RequestHandler::on_set_meta(const httplib::Request& req,
 
 void RequestHandler::on_set_metric(const httplib::Request& /* req */,
                                    httplib::Response& res) {
-  // No method available for directly setting a span metric.
-  // Returning OK instead of UNIMPLEMENTED to satisfy the test framework.
+  const auto request_json = nlohmann::json::parse(res.body);
+
+  auto span_id = utils::get_if_exists<uint64_t>(request_json, "span_id");
+  if (!span_id) {
+    VALIDATION_ERROR(res, "on_set_meta: missing `span_id` field.");
+  }
+
+  auto span_it = active_spans_.find(*span_id);
+  if (span_it == active_spans_.cend()) {
+    const auto msg =
+        "on_set_meta: span not found for id " + std::to_string(*span_id);
+    VALIDATION_ERROR(res, msg);
+  }
+
+  auto& span = span_it->second;
+  span.set_metric(request_json.at("key").get<std::string_view>(),
+                  request_json.at("value").get<double>());
+
   res.status = 200;
 }
 
