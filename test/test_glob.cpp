@@ -8,7 +8,7 @@
 
 using namespace datadog::tracing;
 
-TEST_CASE("glob") {
+TEST_CASE("glob", "[glob]") {
   struct TestCase {
     StringView pattern;
     StringView subject;
@@ -42,7 +42,13 @@ TEST_CASE("glob") {
     {"", "", true},
     {"", "a", false},
     {"*", "", true},
-    {"?", "", false}
+    {"?", "", false},
+
+    // case sensitivity
+    {"true", "TRUE", true},
+    {"true", "True", true},
+    {"true", "tRue", true},
+    {"false", "FALSE", true}
   }));
   // clang-format on
 
