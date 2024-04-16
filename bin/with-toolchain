@@ -15,7 +15,7 @@ usage:
         Print this message.
 
 example:
-    $ ../bin/with-toolchain llvm cmake .. -DBUILD_TESTING=1
+    $ ../bin/with-toolchain llvm cmake .. -DDD_TRACE_BUILD_TESTING=1
 END_USAGE
 }
 

@@ -38,9 +38,11 @@ add_executable(tests
     test_trace_sampler.cpp
 )
 
-target_link_libraries(tests dd_trace_cpp-static ${COVERAGE_LIBRARIES})
-if(BUILD_COVERAGE)
-    target_link_options(tests PRIVATE -fprofile-arcs -ftest-coverage)
-endif()
+target_link_libraries(tests 
+  PRIVATE
+    libcurl
+    dd_trace_cpp-static
+    dd_trace::specs
+)
 
 add_subdirectory(system-tests)

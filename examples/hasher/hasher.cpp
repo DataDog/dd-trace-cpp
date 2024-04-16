@@ -150,9 +150,9 @@ int main() {
     const fs::path path(input_path);
 
     // Create a root span for the current request.
-    dd::SpanConfig config;
-    config.name = "sha256.request";
-    auto root = tracer.create_span(config);
+    dd::SpanConfig span_config;
+    span_config.name = "sha256.request";
+    auto root = tracer.create_span(span_config);
     root.set_tag("path", path.u8string());
 
     if (!fs::exists(path)) {

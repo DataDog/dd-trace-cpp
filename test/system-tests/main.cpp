@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
     res.status = 500;
   });
 
-  std::signal(SIGTERM, hard_stop);
+  // std::signal(SIGTERM, hard_stop);
   svr.listen("0.0.0.0", *port);
   return 0;
 }

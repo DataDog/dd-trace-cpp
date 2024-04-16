@@ -35,7 +35,7 @@ This directory contains scripts that are useful during development.
 - [with-toolchain](with-toolchain) is a command wrapper that sets the `CC` and
   `CXX` environment variables based on its first argument, which is either "gnu"
   (to use the gcc/g++ toolchain) or "llvm" (to use the clang/clang++ toolchain).
-  For example: `with-toolchain llvm cmake -DBUILD_TESTING=1 ..`.
+  For example: `with-toolchain llvm cmake -DDD_TRACE_BUILD_TESTING=1 ..`.
 
 [1]: https://bazel.build/
 [2]: https://github.com/bazelbuild/bazelisk

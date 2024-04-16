@@ -211,19 +211,19 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     const auto global_styles =
         styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE);
 
-    if (auto propagation_value =
+    if (auto trace_extraction_styles =
             styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT)) {
-      env_cfg.extraction_styles = std::move(*propagation_value);
-    } else if (auto propagation_value =
+      env_cfg.extraction_styles = std::move(*trace_extraction_styles);
+    } else if (auto extraction_styles =
                    styles_from_env(environment::DD_PROPAGATION_STYLE_EXTRACT)) {
-      env_cfg.extraction_styles = std::move(*propagation_value);
+      env_cfg.extraction_styles = std::move(*extraction_styles);
     } else {
       env_cfg.extraction_styles = global_styles;
     }
 
-    if (auto injection_styles =
+    if (auto trace_injection_styles =
             styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE_INJECT)) {
-      env_cfg.injection_styles = std::move(*injection_styles);
+      env_cfg.injection_styles = std::move(*trace_injection_styles);
     } else if (auto injection_styles =
                    styles_from_env(environment::DD_PROPAGATION_STYLE_INJECT)) {
       env_cfg.injection_styles = std::move(*injection_styles);

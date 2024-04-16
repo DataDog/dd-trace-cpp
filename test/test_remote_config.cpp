@@ -19,7 +19,7 @@ REMOTE_CONFIG_TEST("first payload") {
   TracerConfig tracer_cfg;
 
   const std::time_t mock_time = 1672484400;
-  const Clock clock = []() {
+  const Clock clock = [mock_time]() {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(mock_time);
     return result;
@@ -53,7 +53,7 @@ REMOTE_CONFIG_TEST("response processing") {
   TracerConfig tracer_cfg;
 
   const std::time_t mock_time = 1672484400;
-  const Clock clock = []() {
+  const Clock clock = [mock_time]() {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(mock_time);
     return result;

@@ -52,15 +52,15 @@ class Expected {
  public:
   Expected() = default;
   Expected(const Expected&) = default;
-  Expected(Expected&) = default;
   Expected(Expected&&) = default;
+
+  Expected(const Value&);
+  Expected(Value&&);
+  Expected(const Error&);
+  Expected(Error&&);
+
   Expected& operator=(const Expected&) = default;
   Expected& operator=(Expected&&) = default;
-
-  template <typename Other>
-  Expected(Other&&);
-  template <typename Other>
-  Expected& operator=(Other&&);
 
   // Return whether this object holds a `Value` (as opposed to an `Error`).
   bool has_value() const noexcept;
@@ -99,15 +99,21 @@ class Expected {
 };
 
 template <typename Value>
-template <typename Other>
-Expected<Value>::Expected(Other&& other) : data_(std::forward<Other>(other)) {}
+Expected<Value>::Expected(const Value& value) : data_(value) {}
 
 template <typename Value>
-template <typename Other>
-Expected<Value>& Expected<Value>::operator=(Other&& other) {
-  data_ = std::forward<Other>(other);
-  return *this;
-}
+Expected<Value>::Expected(Value&& value) : data_(std::move(value)) {}
+
+template <typename Value>
+Expected<Value>::Expected(const Error& error) : data_(error) {}
+
+template <typename Value>
+Expected<Value>::Expected(Error&& error) : data_(std::move(error)) {}
+
+// Expected<Value>& Expected<Value>::operator=(Other&& other) {
+//   data_ = std::forward<Other>(other);
+//   return *this;
+// }
 
 template <typename Value>
 bool Expected<Value>::has_value() const noexcept {
@@ -194,15 +200,15 @@ class Expected<void> {
  public:
   Expected() = default;
   Expected(const Expected&) = default;
-  Expected(Expected&) = default;
   Expected(Expected&&) = default;
   Expected& operator=(const Expected&) = default;
   Expected& operator=(Expected&&) = default;
 
-  template <typename Other>
-  Expected(Other&&);
-  template <typename Other>
-  Expected& operator=(Other&&);
+  Expected(const Error&);
+  Expected(Error&&);
+  Expected(decltype(nullopt));
+  explicit Expected(const Optional<Error>&);
+  explicit Expected(Optional<Error>&&);
 
   void swap(Expected& other);
 
@@ -221,14 +227,12 @@ class Expected<void> {
   const Error* if_error() const&& = delete;
 };
 
-template <typename Other>
-Expected<void>::Expected(Other&& other) : data_(std::forward<Other>(other)) {}
-
-template <typename Other>
-Expected<void>& Expected<void>::operator=(Other&& other) {
-  data_ = std::forward<Other>(other);
-  return *this;
-}
+inline Expected<void>::Expected(const Error& error) : data_(error) {}
+inline Expected<void>::Expected(Error&& error) : data_(std::move(error)) {}
+inline Expected<void>::Expected(decltype(nullopt)) : data_(nullopt) {}
+inline Expected<void>::Expected(const Optional<Error>& data) : data_(data) {}
+inline Expected<void>::Expected(Optional<Error>&& data)
+    : data_(std::move(data)) {}
 
 inline void Expected<void>::swap(Expected& other) { data_.swap(other.data_); }
 

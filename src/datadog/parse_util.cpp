@@ -18,14 +18,15 @@ namespace {
 template <typename Integer>
 Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
   Integer value;
-  const auto status = std::from_chars(input.begin(), input.end(), value, base);
+  const char *const end = input.data() + input.size();
+  const auto status = std::from_chars(input.data(), end, value, base);
   if (status.ec == std::errc::invalid_argument) {
     std::string message;
     message += "Is not a valid integer: \"";
     append(message, input);
     message += '\"';
     return Error{Error::INVALID_INTEGER, std::move(message)};
-  } else if (status.ptr != input.end()) {
+  } else if (status.ptr != end) {
     std::string message;
     message += "Integer has trailing characters in: \"";
     append(message, input);
@@ -101,9 +102,9 @@ std::vector<StringView> parse_list(StringView input) {
     return items;
   }
 
-  const char *const end = input.end();
+  const char *const end = input.data() + input.size();
+  const char *current = input.data();
 
-  const char *current = input.begin();
   const char *begin_delim;
   do {
     const char *begin_item =
@@ -135,16 +136,16 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
   std::string value;
 
   for (const StringView &token : list) {
-    const auto separator = std::find(token.begin(), token.end(), ':');
+    const auto separator = token.find(':');
 
-    if (separator == token.end()) {
+    if (separator == std::string::npos) {
       key = std::string{trim(token)};
     } else {
-      key = std::string{trim(range(token.begin(), separator))};
+      key = std::string{trim(token.substr(0, separator))};
       if (key.empty()) {
         continue;
       }
-      value = std::string{trim(range(separator + 1, token.end()))};
+      value = std::string{trim(token.substr(separator + 1))};
     }
 
     // If there are duplicate values, then the last one wins.

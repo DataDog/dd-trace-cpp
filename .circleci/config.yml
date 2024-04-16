@@ -33,18 +33,65 @@ jobs:
         type: string
       arch:
         type: string
+      bazelrc:
+        type: string
     executor: docker-<< parameters.arch >>
     environment:
       MAKE_JOB_COUNT: 8
     steps:
     - checkout
-    - run: bin/with-toolchain << parameters.toolchain >> bazelisk build --jobs $MAKE_JOB_COUNT dd_trace_cpp
+    - run: bin/with-toolchain << parameters.toolchain >> bazelisk --bazelrc=<< parameters.bazelrc >> build --jobs $MAKE_JOB_COUNT dd_trace_cpp
 
-  test-cmake:
+  build-and-test-windows-bazel:
+    parameters:
+      # `bazelrc` is the path to the .bazelrc file to use in the build/test.
+      # The repository has two flavors: one that uses Abseil types (for use with
+      # Envoy), and one that uses std types.
+      bazelrc:
+        type: string
+    machine:
+      image: "windows-server-2022-gui:current"
+      resource_class: windows.medium
+      shell: powershell.exe -ExecutionPolicy Bypass
+    environment:
+      MAKE_JOB_COUNT: 4
+    steps:
+    - checkout
+    - run: choco install -y bazelisk
+    - run: bazelisk.exe --bazelrc=<< parameters.bazelrc >> build --jobs $env:MAKE_JOB_COUNT dd_trace_cpp
+
+  build-and-test-windows-cmake:
+    parameters:
+      arch:
+        type: string
+    machine:
+      image: "windows-server-2022-gui:current"
+      shell: powershell.exe -ExecutionPolicy Bypass 
+      resource_class: "windows.large"
+    environment:
+      MAKE_JOB_COUNT: 8
+    steps:
+    - checkout
+    - run:
+        name: Install dependencies
+        command: |
+          choco install -y cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+          choco install -y ninja
+    - run: 
+        name: Building
+        command: |
+          & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch << parameters.arch >> 
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_TESTING=1 -G Ninja .
+          cmake --build build -j $env:MAKE_JOB_COUNT -v
+    - run:
+        name: Testing
+        command: |
+          & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch << parameters.arch >> 
+          .\build\test\tests.exe 
+
+  build-and-test-cmake:
     parameters:
       toolchain:
-        type: string
-      sanitize:
         type: string
       arch:
         type: string
@@ -55,7 +102,7 @@ jobs:
       ASAN_OPTIONS: alloc_dealloc_mismatch=0
     steps:
     - checkout
-    - run: bin/with-toolchain << parameters.toolchain >> cmake . -B .build -DBUILD_TESTING=1 -DSANITIZE=<< parameters.sanitize >>
+    - run: bin/with-toolchain << parameters.toolchain >> cmake . -B .build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_TESTING=1 
     - run: cmake --build .build -j ${MAKE_JOB_COUNT} -v
     - run: cd .build && test/tests
 
@@ -127,19 +174,34 @@ workflows:
     jobs:
     - format
     - shellcheck
-    - test-cmake:
+    - build-and-test-cmake:
         matrix:
           parameters:
             toolchain: ["gnu", "llvm"]
-            sanitize: ["on", "off"]
             arch: ["amd64", "arm64"]
     - build-bazel:
         matrix:
           parameters:
-            arch: ["amd64", "arm64"]
             toolchain: ["gnu", "llvm"]
-    - coverage
+            arch: ["amd64", "arm64"]
+            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
+    - build-and-test-windows-cmake:
+        matrix:
+          parameters:
+            arch: ["amd64"]
+    - build-and-test-windows-bazel:
+        matrix:
+          parameters:
+            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
+    - coverage:
+        requires:
+          - build-and-test-cmake
     - system-tests:
+        requires:
+          - build-bazel
+          - build-and-test-cmake
+          - build-and-test-windows-bazel
+          - build-and-test-windows-cmake
         filters:
           branches:
             only:

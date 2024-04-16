@@ -1,4 +1,3 @@
-
 include(FetchContent)
 
 # No need to build curl executable
@@ -17,6 +16,8 @@ SET(USE_LIBIDN2 OFF)
 SET(CURL_USE_LIBSSH2 OFF)
 SET(CURL_USE_LIBPSL OFF)
 SET(CURL_DISABLE_HSTS ON)
+set(CURL_CA_PATH "none")
+set(CURL_CA_PATH_SET FALSE)
 
 FetchContent_Declare(
   curl

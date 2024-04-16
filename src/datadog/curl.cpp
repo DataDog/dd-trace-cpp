@@ -223,8 +223,6 @@ class CurlImpl {
                                     void *user_data);
   static std::size_t on_read_body(char *data, std::size_t, std::size_t length,
                                   void *user_data);
-  static bool is_non_whitespace(unsigned char);
-  static char to_lower(unsigned char);
 
  public:
   explicit CurlImpl(const std::shared_ptr<Logger> &, const Clock &,
@@ -367,8 +365,8 @@ Expected<void> CurlImpl::post(
   throw_on_error(
       curl_.easy_setopt_errorbuffer(handle.get(), request->error_buffer));
   throw_on_error(curl_.easy_setopt_post(handle.get(), 1));
-  throw_on_error(curl_.easy_setopt_postfieldsize(handle.get(),
-                                                 request->request_body.size()));
+  throw_on_error(curl_.easy_setopt_postfieldsize(
+      handle.get(), static_cast<long>(request->request_body.size())));
   throw_on_error(
       curl_.easy_setopt_postfields(handle.get(), request->request_body.data()));
   throw_on_error(
@@ -431,28 +429,18 @@ std::size_t CurlImpl::on_read_header(char *data, std::size_t,
   // https://curl.se/libcurl/c/CURLOPT_HEADERFUNCTION.html
   //
 
-  const char *const begin = data;
-  const char *const end = begin + length;
-  const char *const colon = std::find(begin, end, ':');
-  if (colon == end) {
+  StringView sv(data, length);
+  auto colon_idx = sv.find(":");
+  if (colon_idx == StringView::npos) {
     return length;
   }
 
-  const auto key = trim(range(begin, colon));
-  const auto value = trim(range(colon + 1, end));
+  const auto key = trim(sv.substr(0, colon_idx));
+  const auto value = trim(sv.substr(colon_idx + 1));
 
-  std::string key_lower;
-  key_lower.reserve(key.size());
-  std::transform(key.begin(), key.end(), std::back_inserter(key_lower),
-                 &to_lower);
-
-  request->response_headers_lower.emplace(std::move(key_lower), value);
+  request->response_headers_lower.emplace(to_lower(key), value);
   return length;
 }
-
-bool CurlImpl::is_non_whitespace(unsigned char ch) { return !std::isspace(ch); }
-
-char CurlImpl::to_lower(unsigned char ch) { return std::tolower(ch); }
 
 std::size_t CurlImpl::on_read_body(char *data, std::size_t, std::size_t length,
                                    void *user_data) {
@@ -480,7 +468,7 @@ CURLMcode CurlImpl::log_on_error(CURLMcode result) {
 void CurlImpl::run() {
   int num_messages_remaining;
   CURLMsg *message;
-  const int max_wait_milliseconds = 10000;
+  constexpr int max_wait_milliseconds = 10000;
   std::unique_lock<std::mutex> lock(mutex_);
 
   for (;;) {
@@ -513,18 +501,18 @@ void CurlImpl::run() {
       auto *request = reinterpret_cast<Request *>(user_data);
       const auto timeout = request->deadline - clock_().tick;
       if (timeout <= std::chrono::steady_clock::time_point::duration::zero()) {
-        std::string message;
-        message +=
+        std::string error_message;
+        error_message +=
             "Request deadline exceeded before request was even added to "
             "libcurl "
             "event loop. Deadline was ";
-        message += std::to_string(
+        error_message += std::to_string(
             -std::chrono::duration_cast<std::chrono::nanoseconds>(timeout)
                  .count());
-        message += " nanoseconds ago.";
+        error_message += " nanoseconds ago.";
         request->on_error(
             Error{Error::CURL_DEADLINE_EXCEEDED_BEFORE_REQUEST_START,
-                  std::move(message)});
+                  std::move(error_message)});
 
         curl_.easy_cleanup(handle);
         delete request;
@@ -533,8 +521,10 @@ void CurlImpl::run() {
       }
 
       log_on_error(curl_.easy_setopt_timeout_ms(
-          handle, std::chrono::duration_cast<std::chrono::milliseconds>(timeout)
-                      .count()));
+          handle,
+          static_cast<long>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(timeout)
+                  .count())));
       log_on_error(curl_.multi_add_handle(multi_handle_, handle));
       request_handles_.insert(handle);
     }
@@ -631,9 +621,7 @@ CurlImpl::HeaderReader::HeaderReader(
     : response_headers_lower_(response_headers_lower) {}
 
 Optional<StringView> CurlImpl::HeaderReader::lookup(StringView key) const {
-  buffer_.clear();
-  std::transform(key.begin(), key.end(), std::back_inserter(buffer_),
-                 &to_lower);
+  buffer_ = to_lower(key);
 
   const auto found = response_headers_lower_->find(buffer_);
   if (found == response_headers_lower_->end()) {

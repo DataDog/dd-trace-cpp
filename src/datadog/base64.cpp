@@ -47,9 +47,9 @@ std::string base64_decode(StringView input) {
       return "";
     }
 
-    output.push_back(c0 << 2 | (c1 & 0xF0) >> 4);
-    output.push_back((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2));
-    output.push_back(((c2 & 0x03) << 6) | (c3 & 0x3F));
+    output.push_back(static_cast<char>(c0 << 2 | (c1 & 0xF0) >> 4));
+    output.push_back(static_cast<char>((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2)));
+    output.push_back(static_cast<char>(((c2 & 0x03) << 6) | (c3 & 0x3F)));
   }
 
   // If padding is missing, return the empty string in lieu of an Error.
@@ -68,17 +68,17 @@ std::string base64_decode(StringView input) {
   if (c2 == k_eol) {
     // The last quadruplet is of the form "xx==", where only one character needs
     // to be decoded.
-    output.push_back(c0 << 2 | (c1 & 0xF0) >> 4);
+    output.push_back(static_cast<char>(c0 << 2 | (c1 & 0xF0) >> 4));
   } else if (c3 == k_eol) {
     // The last quadruplet is of the form "xxx=", where only two character needs
     // to be decoded.
-    output.push_back(c0 << 2 | (c1 & 0xF0) >> 4);
-    output.push_back((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2));
+    output.push_back(static_cast<char>(c0 << 2 | (c1 & 0xF0) >> 4));
+    output.push_back(static_cast<char>((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2)));
   } else {
     // The last quadruplet is not padded -> common use case
-    output.push_back(c0 << 2 | (c1 & 0xF0) >> 4);
-    output.push_back((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2));
-    output.push_back(((c2 & 0x03) << 6) | (c3 & 0x3F));
+    output.push_back(static_cast<char>(c0 << 2 | (c1 & 0xF0) >> 4));
+    output.push_back(static_cast<char>((c1 & 0x0F) << 4 | ((c2 & 0x3C) >> 2)));
+    output.push_back(static_cast<char>(((c2 & 0x03) << 6) | (c3 & 0x3F)));
   }
 
   return output;

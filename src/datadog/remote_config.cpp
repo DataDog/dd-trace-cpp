@@ -6,9 +6,9 @@
 #include <unordered_set>
 
 #include "base64.h"
-#include "datadog/string_view.h"
 #include "json.hpp"
 #include "random.h"
+#include "string_view.h"
 #include "version.h"
 
 using namespace nlohmann::literals;
@@ -38,7 +38,7 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
   std::size_t j = sizeof(in) - 1;
   std::array<uint8_t, sizeof(uint64_t)> res{};
   for (std::size_t i = 0; i < sizeof(in); ++i) {
-    res[j--] = in >> (i * 8);
+    res[j--] = static_cast<uint8_t>(in >> (i * 8));
   }
 
   return res;
@@ -56,12 +56,12 @@ ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
 
   if (auto sampling_rate_it = j.find("tracing_sampling_rate");
       sampling_rate_it != j.cend() && sampling_rate_it->is_number()) {
-    config_update.trace_sampling_rate = *sampling_rate_it;
+    config_update.trace_sampling_rate = sampling_rate_it->get<double>();
   }
 
   if (auto tags_it = j.find("tracing_tags");
       tags_it != j.cend() && tags_it->is_array()) {
-    config_update.tags = *tags_it;
+    config_update.tags = tags_it->get<std::vector<StringView>>();
   }
 
   if (auto tracing_enabled_it = j.find("tracing_enabled");

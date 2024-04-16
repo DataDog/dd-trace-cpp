@@ -25,7 +25,7 @@ struct NullLogger : public Logger {
 
 struct MockLogger : public Logger {
   struct Entry {
-    enum Kind { ERROR, STARTUP } kind;
+    enum Kind { DD_ERROR, STARTUP } kind;
     std::variant<std::string, Error> payload;
   };
 
@@ -49,7 +49,7 @@ struct MockLogger : public Logger {
     if (echo) {
       *echo << stream.str() << '\n';
     }
-    entries.push_back(Entry{Entry::ERROR, stream.str()});
+    entries.push_back(Entry{Entry::DD_ERROR, stream.str()});
   }
 
   void log_startup(const LogFunc& write) override {
@@ -67,7 +67,7 @@ struct MockLogger : public Logger {
     if (echo) {
       *echo << error << '\n';
     }
-    entries.push_back(Entry{Entry::ERROR, error});
+    entries.push_back(Entry{Entry::DD_ERROR, error});
   }
 
   void log_error(StringView message) override {
@@ -75,10 +75,10 @@ struct MockLogger : public Logger {
     if (echo) {
       *echo << message << '\n';
     }
-    entries.push_back(Entry{Entry::ERROR, std::string(message)});
+    entries.push_back(Entry{Entry::DD_ERROR, std::string(message)});
   }
 
-  int error_count() const { return count(Entry::ERROR); }
+  int error_count() const { return count(Entry::DD_ERROR); }
 
   int startup_count() const { return count(Entry::STARTUP); }
 
@@ -94,7 +94,7 @@ struct MockLogger : public Logger {
     std::lock_guard<std::mutex> lock{mutex};
     auto found = std::find_if(
         entries.begin(), entries.end(),
-        [](const Entry& entry) { return entry.kind == Entry::ERROR; });
+        [](const Entry& entry) { return entry.kind == Entry::DD_ERROR; });
     return std::get<Error>(found->payload);
   }
 
