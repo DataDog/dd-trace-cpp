@@ -6,6 +6,68 @@
 
 namespace datadog {
 namespace tracing {
+namespace {
+
+using Rules =
+    std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash>;
+
+Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
+  Rules parsed_rules;
+
+  std::string type = json_rules.type_name();
+  if (type != "array") {
+    std::string message;
+    return Error{Error::TRACE_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
+  }
+
+  for (const auto& json_rule : json_rules) {
+    auto matcher = SpanMatcher::from_json(json_rule);
+    if (auto* error = matcher.if_error()) {
+      std::string prefix;
+      return error->with_prefix(prefix);
+    }
+
+    TraceSamplerRate rate;
+    if (auto sample_rate = json_rule.find("sample_rate");
+        sample_rate != json_rule.end()) {
+      type = sample_rate->type_name();
+      if (type != "number") {
+        std::string message;
+        return Error{Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE,
+                     std::move(message)};
+      }
+
+      auto maybe_rate = Rate::from(*sample_rate);
+      if (auto error = maybe_rate.if_error()) {
+        return *error;
+      }
+
+      rate.value = *maybe_rate;
+    }
+
+    if (auto provenance_it = json_rule.find("provenance");
+        provenance_it != json_rule.cend()) {
+      if (!provenance_it->is_string()) {
+        std::string message;
+        return Error{Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE,
+                     std::move(message)};
+      }
+
+      auto provenance = provenance_it->get<std::string_view>();
+      if (provenance == "customer") {
+        rate.mechanism = SamplingMechanism::REMOTE_RULE;
+      } else if (provenance == "dynamic") {
+        rate.mechanism = SamplingMechanism::REMOTE_ADAPTIVE_RULE;
+      }
+    }
+
+    parsed_rules.emplace(std::move(*matcher), std::move(rate));
+  }
+
+  return parsed_rules;
+}
+
+}  // namespace
 
 ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
     : clock_(config.clock),
@@ -53,6 +115,26 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
     rules[catch_all] = TraceSamplerRate{*rate, SamplingMechanism::REMOTE_RULE};
 
     metadata.emplace_back(std::move(trace_sampling_metadata));
+  }
+
+  if (!conf.trace_sampling_rules) {
+    auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RULES);
+    if (found != default_metadata_.cend()) {
+      metadata.emplace_back(found->second);
+    }
+  } else {
+    ConfigMetadata trace_sampling_rules_metadata(
+        ConfigName::TRACE_SAMPLING_RULES,
+        conf.trace_sampling_rules->get<std::string>(),
+        ConfigMetadata::Origin::REMOTE_CONFIG);
+
+    auto maybe_rules = parse_trace_sampling_rules(*conf.trace_sampling_rules);
+    if (auto error = maybe_rules.if_error()) {
+      trace_sampling_rules_metadata.error = std::move(*error);
+    } else {
+      rules.merge(*maybe_rules);
+      metadata.emplace_back(std::move(trace_sampling_rules_metadata));
+    }
   }
 
   trace_sampler_->set_rules(rules);

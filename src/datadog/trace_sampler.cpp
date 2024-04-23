@@ -24,6 +24,7 @@ TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config,
 void TraceSampler::set_rules(
     std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash>
         rules) {
+  std::lock_guard lock(mutex_);
   rules_ = std::move(rules);
 }
 

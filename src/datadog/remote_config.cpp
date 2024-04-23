@@ -30,7 +30,8 @@ namespace {
 enum CapabilitiesFlag : uint64_t {
   APM_TRACING_SAMPLE_RATE = 1 << 12,
   APM_TRACING_TAGS = 1 << 15,
-  APM_TRACING_ENABLED = 1 << 19
+  APM_TRACING_ENABLED = 1 << 19,
+  APM_TRACING_SAMPLE_RULES = 1 << 29,
 };
 
 constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
@@ -46,7 +47,7 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
 
 constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
     capabilities_byte_array(APM_TRACING_SAMPLE_RATE | APM_TRACING_TAGS |
-                            APM_TRACING_ENABLED);
+                            APM_TRACING_ENABLED | APM_TRACING_SAMPLE_RULES);
 
 constexpr StringView k_apm_product = "APM_TRACING";
 constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
@@ -67,6 +68,12 @@ ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
   if (auto tracing_enabled_it = j.find("tracing_enabled");
       tracing_enabled_it != j.cend() && tracing_enabled_it->is_boolean()) {
     config_update.report_traces = tracing_enabled_it->get<bool>();
+  }
+
+  if (auto tracing_sampling_rules_it = j.find("tracing_sampling_rules");
+      tracing_sampling_rules_it != j.cend() &&
+      tracing_sampling_rules_it->is_array()) {
+    config_update.trace_sampling_rules = &(*tracing_sampling_rules_it);
   }
 
   return config_update;
