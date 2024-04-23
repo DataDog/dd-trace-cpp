@@ -124,8 +124,7 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
     }
   } else {
     ConfigMetadata trace_sampling_rules_metadata(
-        ConfigName::TRACE_SAMPLING_RULES,
-        conf.trace_sampling_rules->get<std::string>(),
+        ConfigName::TRACE_SAMPLING_RULES, conf.trace_sampling_rules->dump(),
         ConfigMetadata::Origin::REMOTE_CONFIG);
 
     auto maybe_rules = parse_trace_sampling_rules(*conf.trace_sampling_rules);
