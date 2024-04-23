@@ -114,6 +114,10 @@ class TraceSampler {
  public:
   TraceSampler(const FinalizedTraceSamplerConfig& config, const Clock& clock);
 
+  void set_rules(
+      std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash>
+          rules);
+
   // Return a sampling decision for the specified root span.
   SamplingDecision decide(const SpanData&);
 

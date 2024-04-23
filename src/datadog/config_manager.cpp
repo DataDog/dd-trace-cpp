@@ -12,12 +12,13 @@ ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
       default_metadata_(config.metadata),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock_)),
+      rules_(config.trace_sampler.rules),
       span_defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       report_traces_(config.report_traces) {}
 
 std::shared_ptr<TraceSampler> ConfigManager::trace_sampler() {
   std::lock_guard<std::mutex> lock(mutex_);
-  return trace_sampler_.value();
+  return trace_sampler_;
 }
 
 std::shared_ptr<const SpanDefaults> ConfigManager::span_defaults() {
@@ -35,31 +36,26 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
 
   std::lock_guard<std::mutex> lock(mutex_);
 
+  auto rules = rules_;
+
   if (!conf.trace_sampling_rate) {
-    reset_config(ConfigName::TRACE_SAMPLING_RATE, trace_sampler_, metadata);
+    auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RATE);
+    if (found != default_metadata_.cend()) {
+      metadata.push_back(found->second);
+    }
   } else {
     ConfigMetadata trace_sampling_metadata(
         ConfigName::TRACE_SAMPLING_RATE,
         to_string(*conf.trace_sampling_rate, 1),
         ConfigMetadata::Origin::REMOTE_CONFIG);
 
-    TraceSamplerConfig trace_sampler_cfg;
-    trace_sampler_cfg.sample_rate = *conf.trace_sampling_rate;
+    auto rate = Rate::from(*conf.trace_sampling_rate);
+    rules[catch_all] = TraceSamplerRate{*rate, SamplingMechanism::REMOTE_RULE};
 
-    auto finalized_trace_sampler_cfg = finalize_config(trace_sampler_cfg);
-    if (auto error = finalized_trace_sampler_cfg.if_error()) {
-      trace_sampling_metadata.error = *error;
-    }
-
-    auto trace_sampler =
-        std::make_shared<TraceSampler>(*finalized_trace_sampler_cfg, clock_);
-
-    // This reset rate limiting and `TraceSampler` has no `operator==`.
-    // TODO: Instead of creating another `TraceSampler`, we should
-    // update the default sampling rate.
-    trace_sampler_ = std::move(trace_sampler);
     metadata.emplace_back(std::move(trace_sampling_metadata));
   }
+
+  trace_sampler_->set_rules(rules);
 
   if (!conf.tags) {
     reset_config(ConfigName::TAGS, span_defaults_, metadata);
@@ -109,10 +105,9 @@ std::vector<ConfigMetadata> ConfigManager::reset() { return update({}); }
 
 nlohmann::json ConfigManager::config_json() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return nlohmann::json{
-      {"defaults", to_json(*span_defaults_.value())},
-      {"trace_sampler", trace_sampler_.value()->config_json()},
-      {"report_traces", report_traces_.value()}};
+  return nlohmann::json{{"defaults", to_json(*span_defaults_.value())},
+                        {"trace_sampler", trace_sampler_->config_json()},
+                        {"report_traces", report_traces_.value()}};
 }
 
 }  // namespace tracing

@@ -21,6 +21,12 @@ TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config,
       limiter_(clock, config.max_per_second),
       limiter_max_per_second_(config.max_per_second) {}
 
+void TraceSampler::set_rules(
+    std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash>
+        rules) {
+  rules_ = std::move(rules);
+}
+
 SamplingDecision TraceSampler::decide(const SpanData& span) {
   SamplingDecision decision;
   decision.origin = SamplingDecision::Origin::LOCAL;
