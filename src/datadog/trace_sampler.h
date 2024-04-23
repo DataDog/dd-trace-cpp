@@ -102,11 +102,12 @@ struct SamplingDecision;
 struct SpanData;
 
 class TraceSampler {
+ private:
   std::mutex mutex_;
 
   Optional<Rate> collector_default_sample_rate_;
   std::unordered_map<std::string, Rate> collector_sample_rates_;
-  std::unordered_map<SpanMatcher, Rate, SpanMatcher::Hash> rules_;
+  std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash> rules_;
   Limiter limiter_;
   double limiter_max_per_second_;
 

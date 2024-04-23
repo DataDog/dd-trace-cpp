@@ -180,7 +180,8 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     }
 
     SpanMatcher matcher = rule;
-    result.rules.emplace(matcher, *maybe_rate);
+    result.rules.emplace(
+        matcher, TraceSamplerRate{*maybe_rate, SamplingMechanism::RULE});
   }
 
   Optional<double> sample_rate;
@@ -206,7 +207,8 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
           "Unable to parse overall sample_rate for trace sampling: ");
     }
 
-    result.rules.emplace(catch_all, *maybe_rate);
+    result.rules.emplace(
+        catch_all, TraceSamplerRate{*maybe_rate, SamplingMechanism::RULE});
   }
 
   const auto [origin, max_per_second] =

@@ -606,9 +606,11 @@ TEST_CASE("TracerConfig::trace_sampler") {
     SECTION("yields one sampling rule") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->trace_sampler.rules.size() == 1);
+      REQUIRE(finalized->trace_sampler.rules.count(catch_all));
       // and the default sample_rate is 100%
-      REQUIRE(finalized->trace_sampler.rules[catch_all] == 1.0);
+      const auto& rate = finalized->trace_sampler.rules[catch_all];
+      CHECK(rate.value == 1.0);
+      CHECK(rate.mechanism == SamplingMechanism::RULE);
     }
 
     SECTION("has to have a valid sample_rate") {
@@ -629,8 +631,11 @@ TEST_CASE("TracerConfig::trace_sampler") {
     rules[1].sample_rate = 0.6;
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_sampler.rules.size() == 1);
-    REQUIRE(finalized->trace_sampler.rules[catch_all] == 0.5);
+    REQUIRE(finalized->trace_sampler.rules.count(catch_all));
+
+    const auto& rate = finalized->trace_sampler.rules[catch_all];
+    CHECK(rate.value == 0.5);
+    CHECK(rate.mechanism == SamplingMechanism::RULE);
   }
 
   SECTION("global sample_rate creates a catch-all rule") {
@@ -639,7 +644,8 @@ TEST_CASE("TracerConfig::trace_sampler") {
     REQUIRE(finalized);
     REQUIRE(finalized->trace_sampler.rules.count(catch_all));
     const auto& rate = finalized->trace_sampler.rules[catch_all];
-    REQUIRE(rate == 0.25);
+    CHECK(rate.value == 0.25);
+    CHECK(rate.mechanism == SamplingMechanism::RULE);
   }
 
   SECTION("DD_TRACE_SAMPLE_RATE") {
@@ -648,7 +654,9 @@ TEST_CASE("TracerConfig::trace_sampler") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.count(catch_all));
-      REQUIRE(finalized->trace_sampler.rules[catch_all] == 0.5);
+      const auto& rate = finalized->trace_sampler.rules[catch_all];
+      CHECK(rate.value == 0.5);
+      CHECK(rate.mechanism == SamplingMechanism::RULE);
     }
 
     SECTION("overrides TraceSamplerConfig::sample_rate") {
@@ -657,7 +665,9 @@ TEST_CASE("TracerConfig::trace_sampler") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.count(catch_all));
-      REQUIRE(finalized->trace_sampler.rules[catch_all] == 0.5);
+      const auto& rate = finalized->trace_sampler.rules[catch_all];
+      CHECK(rate.value == 0.5);
+      CHECK(rate.mechanism == SamplingMechanism::RULE);
     }
 
     SECTION("has to have a valid value") {
@@ -796,7 +806,9 @@ TEST_CASE("TracerConfig::trace_sampler") {
 
       auto found = rules.find(matcher);
       REQUIRE(found != rules.cend());
-      CHECK(found->second == 0);
+
+      CHECK(found->second.value == 0);
+      CHECK(found->second.mechanism == SamplingMechanism::RULE);
 
       SpanMatcher matcher2;
       matcher2.service = "*";
@@ -806,7 +818,8 @@ TEST_CASE("TracerConfig::trace_sampler") {
 
       found = rules.find(matcher2);
       REQUIRE(found != rules.cend());
-      CHECK(found->second == 1);
+      CHECK(found->second.value == 1);
+      CHECK(found->second.mechanism == SamplingMechanism::RULE);
     }
 
     SECTION("must be valid") {
