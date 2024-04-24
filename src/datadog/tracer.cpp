@@ -175,7 +175,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   auto [trace_id, parent_id, origin, trace_tags, delegate_sampling_decision,
-        sampling_priority, additional_w3c_tracestate,
+        sampling_priority, datadog_w3c_parent_id, additional_w3c_tracestate,
         additional_datadog_w3c_tracestate, style, headers_examined] =
       merge(extracted_contexts);
 
@@ -275,6 +275,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         extant->second = hex_high;
       }
     }
+  }
+
+  if (datadog_w3c_parent_id) {
+    span_data->tags["_dd.parent_id"] = *datadog_w3c_parent_id;
   }
 
   Optional<SamplingDecision> sampling_decision;

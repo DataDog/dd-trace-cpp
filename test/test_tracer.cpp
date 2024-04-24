@@ -736,6 +736,7 @@ TEST_CASE("span extraction") {
       std::vector<std::pair<std::string, std::string>> expected_trace_tags = {};
       Optional<std::string> expected_additional_w3c_tracestate = {};
       Optional<std::string> expected_additional_datadog_w3c_tracestate = {};
+      Optional<std::string> expected_datadog_w3c_parent_id = {};
     };
 
     static const std::string traceparent_prefix =
@@ -826,14 +827,28 @@ TEST_CASE("span extraction") {
          nullopt, // expected_additional_w3c_tracestate
          "foo:bar;baz:bam"}, // expected_additional_datadog_w3c_tracestate
 
-         {__LINE__, "origin, trace tags, and extra fields",
+         {__LINE__, "origin, trace tags, parent, and extra fields",
           traceparent_drop, // traceparent
-          "dd=o:France;t.foo:thing1;t.bar:thing2;x:wow;y:wow", // tracestate
+          "dd=o:France;p:00000000000d69ac;t.foo:thing1;t.bar:thing2;x:wow;y:wow", // tracestate
           0, // expected_sampling_priority
           "France", // expected_origin
           {{"_dd.p.foo", "thing1"}, {"_dd.p.bar", "thing2"}}, // expected_trace_tags
           nullopt, // expected_additional_w3c_tracestate
-          "x:wow;y:wow"}, // expected_additional_datadog_w3c_tracestate
+          "x:wow;y:wow", // expected_additional_datadog_w3c_tracestate
+          "00000000000d69ac", // expected_datadog_w3c_parent_id 
+         },
+
+        {__LINE__, "dd parent id is malformed (1/2)",
+          traceparent_drop, // traceparent
+          "dd=p:XxDDOGxX", // tracestate
+          0, // expected_sampling_priority
+        },
+
+        {__LINE__, "dd parent id is malformed (1/2)",
+          traceparent_drop, // traceparent
+          "dd=p:a4c928f8ad6d444b", // tracestate
+          0, // expected_sampling_priority
+        },
 
         {__LINE__, "origin with escaped equal sign",
          traceparent_drop, // traceparent
@@ -921,9 +936,28 @@ TEST_CASE("span extraction") {
             test_case.expected_additional_w3c_tracestate);
     REQUIRE(extracted->additional_datadog_w3c_tracestate ==
             test_case.expected_additional_datadog_w3c_tracestate);
+    REQUIRE(extracted->datadog_w3c_parent_id ==
+            test_case.expected_datadog_w3c_parent_id);
 
     REQUIRE(logger.entries.empty());
     REQUIRE(span_tags.empty());
+  }
+
+  SECTION("_dd.parent_id") {
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+
+    std::unordered_map<std::string, std::string> headers;
+    headers["traceparent"] =
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    headers["tracestate"] = "dd=s:1;p:000000000000002a;foo:bar,lol=wut";
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+
+    auto parent_id_tag = span->lookup_tag("_dd.parent_id");
+    REQUIRE(parent_id_tag);
+    CHECK(*parent_id_tag == "000000000000002a");
   }
 
   SECTION("x-datadog-tags") {
@@ -1119,7 +1153,7 @@ TEST_CASE("128-bit trace IDs") {
     // trace ID in the traceparent.
     // It will be ignored, and the resulting _dd.p.tid value will be consistent
     // with the higher part of the trace ID in traceparent: "deadbeefdeadbeef".
-    headers["tracestate"] = "dd=t.tid:" + tid;
+    headers["tracestate"] = "dd=t.tid:" + tid + ";p:0000000000000001";
     MockDictReader reader{headers};
     const auto span = tracer.extract_span(reader);
     CAPTURE(logger->entries);
@@ -1629,7 +1663,7 @@ TEST_CASE("heterogeneous extraction") {
      {{"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
       {"tracestate", "dd=foo:bar,lol=wut"}},
      {{"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-000000000000002a-01"},
-      {"tracestate", "dd=s:1;foo:bar,lol=wut"}}},
+      {"tracestate", "dd=s:1;p:000000000000002a;foo:bar,lol=wut"}}},
 
     {__LINE__, "tracestate from subsequent style",
      {PropagationStyle::DATADOG, PropagationStyle::W3C},
@@ -1639,7 +1673,7 @@ TEST_CASE("heterogeneous extraction") {
       {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}}, // origin is different
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;o:Kansas;ah:choo,competitor=stuff"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,competitor=stuff"}}},
 
     {__LINE__, "ignore interlopers",
      {PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C},
@@ -1652,7 +1686,7 @@ TEST_CASE("heterogeneous extraction") {
       {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;o:Kansas;ah:choo,competitor=stuff"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,competitor=stuff"}}},
 
     {__LINE__, "don't take tracestate if trace ID doesn't match",
      {PropagationStyle::DATADOG, PropagationStyle::W3C},
@@ -1662,7 +1696,7 @@ TEST_CASE("heterogeneous extraction") {
       {"traceparent", "00-00000000000000000000000000000031-0000000000000040-01"},
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;o:Kansas"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas"}}},
 
     {__LINE__, "don't take tracestate if W3C extraction isn't configured",
      {PropagationStyle::DATADOG, PropagationStyle::B3},
@@ -1672,7 +1706,7 @@ TEST_CASE("heterogeneous extraction") {
       {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;o:Kansas"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas"}}},
   }));
   // clang-format on
 

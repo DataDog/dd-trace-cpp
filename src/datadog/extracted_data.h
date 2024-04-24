@@ -23,6 +23,10 @@ struct ExtractedData {
   bool delegate_sampling_decision = false;
   Optional<int> sampling_priority;
   // If this `ExtractedData` was created on account of `PropagationStyle::W3C`,
+  // then `datadog_w3c_parent_id` contains the parts of the "tracestate"
+  // refering to the latest datadog parent ID.
+  Optional<std::string> datadog_w3c_parent_id;
+  // If this `ExtractedData` was created on account of `PropagationStyle::W3C`,
   // then `additional_w3c_tracestate` contains the parts of the "tracestate"
   // header that are not the "dd" (Datadog) entry. If there are no other parts,
   // then `additional_w3c_tracestate` is null.
