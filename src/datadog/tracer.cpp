@@ -278,7 +278,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   if (datadog_w3c_parent_id) {
-    span_data->tags["_dd.parent_id"] = *datadog_w3c_parent_id;
+    span_data->tags[tags::internal::w3c_parent_id] = *datadog_w3c_parent_id;
   }
 
   Optional<SamplingDecision> sampling_decision;

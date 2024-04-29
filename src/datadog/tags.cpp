@@ -1,7 +1,5 @@
 #include "tags.h"
 
-#include "string_util.h"
-
 namespace datadog {
 namespace tracing {
 namespace tags {
@@ -32,10 +30,9 @@ const std::string process_id = "process_id";
 const std::string language = "language";
 const std::string runtime_id = "runtime-id";
 const std::string sampling_decider = "_dd.is_sampling_decider";
+const std::string w3c_parent_id = "_dd.parent_id";
 
 }  // namespace internal
-
-bool is_internal(StringView tag_name) { return starts_with(tag_name, "_dd."); }
 
 }  // namespace tags
 }  // namespace tracing

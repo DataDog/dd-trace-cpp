@@ -16,7 +16,12 @@ class HeaderWriter final : public datadog::tracing::DictWriter {
   explicit HeaderWriter(httplib::Headers& headers) : headers_(headers) {}
 
   void set(std::string_view key, std::string_view value) override {
-    headers_.emplace(key, value);
+    auto found = headers_.find(std::string(key));
+    if (found == headers_.cend()) {
+      headers_.emplace(key, value);
+    } else {
+      found->second = value;
+    }
   }
 };
 

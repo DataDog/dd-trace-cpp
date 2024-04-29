@@ -228,7 +228,7 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
         continue;
       }
 
-      const auto maybe_id = parse_int(value, 16);
+      const auto maybe_id = parse_uint64(value, 16);
       if (!maybe_id || *maybe_id == 0) {
         // chaff!
         pair_begin = pair_end == end ? end : pair_end + 1;
