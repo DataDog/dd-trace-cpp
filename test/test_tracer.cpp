@@ -838,15 +838,9 @@ TEST_CASE("span extraction") {
           "00000000000d69ac", // expected_datadog_w3c_parent_id 
          },
 
-        {__LINE__, "dd parent id is malformed (1/2)",
+        {__LINE__, "dd parent id is malformed",
           traceparent_drop, // traceparent
           "dd=p:XxDDOGxX", // tracestate
-          0, // expected_sampling_priority
-        },
-
-        {__LINE__, "dd parent id is malformed (1/2)",
-          traceparent_drop, // traceparent
-          "dd=p:a4c928f8ad6d444b", // tracestate
           0, // expected_sampling_priority
         },
 
