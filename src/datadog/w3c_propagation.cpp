@@ -228,13 +228,6 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
         continue;
       }
 
-      const auto maybe_id = parse_uint64(value, 16);
-      if (!maybe_id || *maybe_id == 0) {
-        // chaff!
-        pair_begin = pair_end == end ? end : pair_end + 1;
-        continue;
-      }
-
       result.datadog_w3c_parent_id = std::string(value);
     } else if (starts_with(key, "t.")) {
       // The part of the key that follows "t." is the name of a trace tag,
@@ -315,6 +308,7 @@ Expected<ExtractedData> extract_w3c(
     return result;
   }
 
+  result.datadog_w3c_parent_id = "0000000000000000";
   extract_tracestate(result, headers);
 
   return result;
