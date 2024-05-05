@@ -60,7 +60,7 @@ Expected<HTTPClient::URL> HTTPClient::URL::parse(StringView input) {
       return Error{Error::URL_UNIX_DOMAIN_SOCKET_PATH_NOT_ABSOLUTE,
                    std::move(message)};
     }
-    return HTTPClient::URL{std::string(scheme), std::string(authority_and_path),
+    return HTTPClient::URL{true, std::string(input), scheme, authority_and_path,
                            ""};
   }
 
@@ -71,10 +71,9 @@ Expected<HTTPClient::URL> HTTPClient::URL::parse(StringView input) {
   // location.  Still, let's parse it properly.
   const auto after_authority =
       std::find(authority_and_path.begin(), authority_and_path.end(), '/');
-  return HTTPClient::URL{
-      std::string(scheme),
-      std::string(range(authority_and_path.begin(), after_authority)),
-      std::string(range(after_authority, authority_and_path.end()))};
+  return HTTPClient::URL{false, std::string(input), scheme,
+                         range(authority_and_path.begin(), after_authority),
+                         range(after_authority, authority_and_path.end())};
 }
 
 }  // namespace tracing

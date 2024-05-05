@@ -33,22 +33,22 @@ void set_content_type_json(DictWriter& headers) {
 }
 
 HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
-  auto traces_url = agent_url;
-  append(traces_url.path, traces_api_path);
-  return traces_url;
+  std::string new_url = agent_url.url;
+  new_url += traces_api_path;
+  return *HTTPClient::URL::parse(new_url);
 }
 
 HTTPClient::URL telemetry_endpoint(const HTTPClient::URL& agent_url) {
-  auto telemetry_v2_url = agent_url;
-  append(telemetry_v2_url.path, telemetry_v2_path);
-  return telemetry_v2_url;
+  std::string new_url = agent_url.url;
+  new_url += telemetry_v2_path;
+  return *HTTPClient::URL::parse(new_url);
 }
 
 HTTPClient::URL remote_configuration_endpoint(
     const HTTPClient::URL& agent_url) {
-  auto remote_configuration = agent_url;
-  append(remote_configuration.path, remote_configuration_path);
-  return remote_configuration;
+  std::string new_url = agent_url.url;
+  new_url += remote_configuration_path;
+  return *HTTPClient::URL::parse(new_url);
 }
 
 Expected<void> msgpack_encode(
@@ -241,21 +241,29 @@ Expected<void> DatadogAgent::send(
 }
 
 nlohmann::json DatadogAgent::config_json() const {
-  // clang-format off
   return nlohmann::json::object({
-    {"type", "datadog::tracing::DatadogAgent"},
-    {"config", nlohmann::json::object({
-      {"traces_url", (traces_endpoint_.scheme + "://" + traces_endpoint_.authority + traces_endpoint_.path)},
-      {"telemetry_url", (telemetry_endpoint_.scheme + "://" + telemetry_endpoint_.authority + telemetry_endpoint_.path)},
-      {"remote_configuration_url", (remote_configuration_endpoint_.scheme + "://" + remote_configuration_endpoint_.authority + remote_configuration_endpoint_.path)},
-      {"flush_interval_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_).count() },
-      {"request_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(request_timeout_).count() },
-      {"shutdown_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(shutdown_timeout_).count() },
-      {"http_client", http_client_->config_json()},
-      {"event_scheduler", event_scheduler_->config_json()},
-    })},
+      {"type", "datadog::tracing::DatadogAgent"},
+      {"config",
+       nlohmann::json::object({
+           {"traces_url", traces_endpoint_.url},
+           {"telemetry_url", telemetry_endpoint_.url},
+           {"remote_configuration_url", remote_configuration_endpoint_.url},
+           {"flush_interval_milliseconds",
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                flush_interval_)
+                .count()},
+           {"request_timeout_milliseconds",
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                request_timeout_)
+                .count()},
+           {"shutdown_timeout_milliseconds",
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                shutdown_timeout_)
+                .count()},
+           {"http_client", http_client_->config_json()},
+           {"event_scheduler", event_scheduler_->config_json()},
+       })},
   });
-  // clang-format on
 }
 
 void DatadogAgent::flush() {

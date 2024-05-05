@@ -166,7 +166,8 @@ TEST_CASE("parse response headers and body", "[curl]") {
     // verify that the received response headers are as expected.
     Optional<Error> post_error;
     std::exception_ptr exception;
-    const HTTPClient::URL url = {"http", "whatever", ""};
+    const HTTPClient::URL url = {false, "http://whatever", "http", "whatever",
+                                 ""};
     const auto result = client->post(
         url, [](const auto &) {}, "whatever",
         [&](int status, const DictReader &headers, std::string body) {
@@ -216,7 +217,8 @@ TEST_CASE("bad multi-handle means error mode", "[curl]") {
   REQUIRE(logger->first_error().code == Error::CURL_HTTP_CLIENT_SETUP_FAILED);
 
   const auto ignore = [](auto &&...) {};
-  const HTTPClient::URL url = {"http", "whatever", ""};
+  const HTTPClient::URL url = {false, "http://whatever", "http", "whatever",
+                               ""};
   const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
   const auto result =
       client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
@@ -239,7 +241,8 @@ TEST_CASE("bad std::thread means error mode", "[curl]") {
 
   const auto ignore = [](auto &&...) {};
   const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
-  const HTTPClient::URL url = {"http", "whatever", ""};
+  const HTTPClient::URL url = {false, "http://whatever", "http", "whatever",
+                               ""};
   const auto result =
       client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
   REQUIRE_FALSE(result);
@@ -260,7 +263,8 @@ TEST_CASE("fail to allocate request handle", "[curl]") {
   const auto client = std::make_shared<Curl>(logger, clock, library);
 
   const auto ignore = [](auto &&...) {};
-  const HTTPClient::URL url = {"http", "whatever", ""};
+  const HTTPClient::URL url = {false, "http://whatever", "http", "whatever",
+                               ""};
   const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
   const auto result =
       client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
@@ -404,7 +408,8 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
   SECTION("when the response is delivered") {
     Optional<Error> post_error;
     std::exception_ptr exception;
-    const HTTPClient::URL url = {"http", "whatever", ""};
+    const HTTPClient::URL url = {false, "http://whatever", "http", "whatever",
+                                 ""};
     const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
     const auto result = client->post(
         url, [](const auto &) {}, "whatever",
@@ -429,7 +434,8 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
 
   SECTION("when an error occurs") {
     Optional<Error> post_error;
-    const HTTPClient::URL url = {"http", "whatever", ""};
+    const HTTPClient::URL url = {false, "http://whatever", "http", "whatever",
+                                 ""};
     const auto ignore = [](auto &&...) {};
     const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
     library.message_result_ = CURLE_COULDNT_CONNECT;  // any error would do
@@ -443,7 +449,8 @@ TEST_CASE("handles are always cleaned up", "[curl]") {
   }
 
   SECTION("when we shut down while a request is in flight") {
-    const HTTPClient::URL url = {"http", "whatever", ""};
+    const HTTPClient::URL url = {false, "http://whatever", "http", "whatever",
+                                 ""};
     const auto ignore = [](auto &&...) {};
     const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
     library.delay_message_ = true;
@@ -465,7 +472,8 @@ TEST_CASE("post() deadline exceeded before request start", "[curl]") {
   Curl client{std::make_shared<NullLogger>(), clock};
 
   const auto ignore = [](auto &&...) {};
-  const HTTPClient::URL url = {"http", "whatever", ""};
+  const HTTPClient::URL url = {false, "http://whatever", "http", "whatever",
+                               ""};
   const std::string body;
   const auto deadline = clock().tick - std::chrono::milliseconds(1);
   Optional<Error> error_delivered;

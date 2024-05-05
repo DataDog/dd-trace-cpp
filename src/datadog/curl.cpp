@@ -376,17 +376,14 @@ Expected<void> CurlImpl::post(
   throw_on_error(curl_.easy_setopt_headerdata(handle.get(), request.get()));
   throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
   throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
-  if (url.scheme == "unix" || url.scheme == "http+unix" ||
-      url.scheme == "https+unix") {
-    throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
-                                                      url.authority.c_str()));
+  if (url.is_uds) {
+    throw_on_error(
+        curl_.easy_setopt_unix_socket_path(handle.get(), url.authority.data()));
     // The authority section of the URL is ignored when a unix domain socket is
     // to be used.
-    throw_on_error(curl_.easy_setopt_url(
-        handle.get(), ("http://localhost" + url.path).c_str()));
+    throw_on_error(curl_.easy_setopt_url(handle.get(), "http://localhost"));
   } else {
-    throw_on_error(curl_.easy_setopt_url(
-        handle.get(), (url.scheme + "://" + url.authority + url.path).c_str()));
+    throw_on_error(curl_.easy_setopt_url(handle.get(), url.url.c_str()));
   }
 
   std::list<CURL *> node;

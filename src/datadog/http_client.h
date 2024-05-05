@@ -25,9 +25,11 @@ class DictWriter;
 class HTTPClient {
  public:
   struct URL {
-    std::string scheme;     // http, https, or unix
-    std::string authority;  // domain:port or /path/to/socket
-    std::string path;       // resource, e.g. /v0.4/traces
+    bool is_uds;
+    std::string url;
+    StringView scheme;     // http, https, or unix
+    StringView authority;  // domain:port or /path/to/socket
+    StringView path;       // resource, e.g. /v0.4/traces
 
     static Expected<HTTPClient::URL> parse(StringView input);
   };
