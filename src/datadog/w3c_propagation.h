@@ -37,7 +37,8 @@ std::string encode_traceparent(TraceID trace_id, std::uint64_t span_id,
 
 // Return a value for the "tracestate" header containing the specified fields.
 std::string encode_tracestate(
-    int sampling_priority, const Optional<std::string>& origin,
+    uint64_t span_id, int sampling_priority,
+    const Optional<std::string>& origin,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate,
     const Optional<std::string>& additional_w3c_tracestate);

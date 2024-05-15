@@ -49,37 +49,38 @@ int main() {
   auto forward_handler = [&tracer, &upstream_client](
                              const httplib::Request& req,
                              httplib::Response& res) {
-    auto span = tracer.create_span();
-    span.set_name("forward.request");
-    span.set_resource_name(req.method + " " + req.path);
-    span.set_tag("network.origin.ip", req.remote_addr);
-    span.set_tag("network.origin.port", std::to_string(req.remote_port));
-    span.set_tag("http.url_details.path", req.target);
-    span.set_tag("http.route", req.path);
-    span.set_tag("http.method", req.method);
+    tracingutil::HeaderReader reader(req.headers);
+    auto span = tracer.extract_or_create_span(reader);
+    span->set_name("forward.request");
+    span->set_resource_name(req.method + " " + req.path);
+    span->set_tag("network.origin.ip", req.remote_addr);
+    span->set_tag("network.origin.port", std::to_string(req.remote_port));
+    span->set_tag("http.url_details.path", req.target);
+    span->set_tag("http.route", req.path);
+    span->set_tag("http.method", req.method);
 
     httplib::Error er;
     httplib::Request forward_request(req);
     forward_request.path = req.target;
 
     tracingutil::HeaderWriter writer(forward_request.headers);
-    span.inject(writer);
+    span->inject(writer);
 
     upstream_client.send(forward_request, res, er);
     if (er != httplib::Error::Success) {
       res.status = 500;
-      span.set_error_message(httplib::to_string(er));
+      span->set_error_message(httplib::to_string(er));
       std::cerr << "Error occurred while proxying request: " << req.target
                 << "\n";
     } else {
       tracingutil::HeaderReader reader(res.headers);
-      auto status = span.read_sampling_delegation_response(reader);
+      auto status = span->read_sampling_delegation_response(reader);
       if (auto error = status.if_error()) {
         std::cerr << error << "\n";
       }
     }
 
-    span.set_tag("http.status_code", std::to_string(res.status));
+    span->set_tag("http.status_code", std::to_string(res.status));
   };
 
   httplib::Server server;

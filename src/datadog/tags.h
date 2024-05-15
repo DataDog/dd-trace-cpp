@@ -5,6 +5,7 @@
 
 #include <string>
 
+#include "string_util.h"
 #include "string_view.h"
 
 namespace datadog {
@@ -36,11 +37,14 @@ extern const std::string process_id;
 extern const std::string language;
 extern const std::string runtime_id;
 extern const std::string sampling_decider;
+extern const std::string w3c_parent_id;
 }  // namespace internal
 
 // Return whether the specified `tag_name` is reserved for use internal to this
 // library.
-bool is_internal(StringView tag_name);
+inline bool is_internal(StringView tag_name) {
+  return starts_with(tag_name, "_dd.");
+}
 
 }  // namespace tags
 }  // namespace tracing

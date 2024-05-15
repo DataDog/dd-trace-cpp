@@ -221,6 +221,14 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
           (*result.sampling_priority > 0) == (priority > 0)) {
         result.sampling_priority = priority;
       }
+    } else if (key == "p") {
+      if (value.size() != 16) {
+        // chaff!
+        pair_begin = pair_end == end ? end : pair_end + 1;
+        continue;
+      }
+
+      result.datadog_w3c_parent_id = std::string(value);
     } else if (starts_with(key, "t.")) {
       // The part of the key that follows "t." is the name of a trace tag,
       // except without the "_dd.p." prefix.
@@ -300,6 +308,7 @@ Expected<ExtractedData> extract_w3c(
     return result;
   }
 
+  result.datadog_w3c_parent_id = "0000000000000000";
   extract_tracestate(result, headers);
 
   return result;
@@ -326,11 +335,14 @@ std::string encode_traceparent(TraceID trace_id, std::uint64_t span_id,
 }
 
 std::string encode_datadog_tracestate(
-    int sampling_priority, const Optional<std::string>& origin,
+    uint64_t span_id, int sampling_priority,
+    const Optional<std::string>& origin,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate) {
   std::string result = "dd=s:";
   result += std::to_string(sampling_priority);
+  result += ";p:";
+  result += hex_padded(span_id);
 
   if (origin) {
     result += ";o:";
@@ -382,12 +394,14 @@ std::string encode_datadog_tracestate(
 }
 
 std::string encode_tracestate(
-    int sampling_priority, const Optional<std::string>& origin,
+    uint64_t span_id, int sampling_priority,
+    const Optional<std::string>& origin,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate,
     const Optional<std::string>& additional_w3c_tracestate) {
-  std::string result = encode_datadog_tracestate(
-      sampling_priority, origin, trace_tags, additional_datadog_w3c_tracestate);
+  std::string result =
+      encode_datadog_tracestate(span_id, sampling_priority, origin, trace_tags,
+                                additional_datadog_w3c_tracestate);
 
   if (additional_w3c_tracestate) {
     result += ',';

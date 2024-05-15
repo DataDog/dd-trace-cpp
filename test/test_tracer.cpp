@@ -736,162 +736,328 @@ TEST_CASE("span extraction") {
       std::vector<std::pair<std::string, std::string>> expected_trace_tags = {};
       Optional<std::string> expected_additional_w3c_tracestate = {};
       Optional<std::string> expected_additional_datadog_w3c_tracestate = {};
+      Optional<std::string> expected_datadog_w3c_parent_id = {};
     };
 
     static const std::string traceparent_prefix =
         "00-00000000000000000000000000000001-0000000000000001-0";
     static const std::string traceparent_drop = traceparent_prefix + "0";
     static const std::string traceparent_keep = traceparent_prefix + "1";
-    // clang-format off
+
     auto test_case = GENERATE(values<TestCase>({
-        {__LINE__, "no tracestate",
-         traceparent_drop, // traceparent
-         nullopt, // tracestate
-         0}, // expected_sampling_priority
+        {
+            __LINE__,
+            "no tracestate",
+            traceparent_drop,    // traceparent
+            nullopt,             // tracestate
+            0,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags,
+            nullopt,             // expected_additional_w3c_tracestate,
+            nullopt,             // expected_additional_datadog_w3c_tracestate,
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "empty tracestate",
-         traceparent_drop, // traceparent
-         "", // tracestate
-         0}, // expected_sampling_priority
+        {
+            __LINE__,
+            "empty tracestate",
+            traceparent_drop,    // traceparent
+            "",                  // tracestate
+            0,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags,
+            nullopt,             // expected_additional_w3c_tracestate,
+            nullopt,             // expected_additional_datadog_w3c_tracestate,
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "no dd entry",
-         traceparent_drop, // traceparent
-         "foo=hello,@thingy/thing=wah;wah;wah", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {}, // expected_trace_tags
-         "foo=hello,@thingy/thing=wah;wah;wah", // expected_additional_w3c_tracestate
-         nullopt}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "no dd entry",
+            traceparent_drop,                       // traceparent
+            "foo=hello,@thingy/thing=wah;wah;wah",  // tracestate
+            0,        // expected_sampling_priority
+            nullopt,  // expected_origin
+            {},       // expected_trace_tags
+            "foo=hello,@thingy/thing=wah;wah;wah",  // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "empty entry",
-         traceparent_drop, // traceparent
-         "foo=hello,,bar=thing", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {}, // expected_trace_tags
-         "foo=hello,,bar=thing", // expected_additional_w3c_tracestate
-         nullopt}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "empty entry",
+            traceparent_drop,        // traceparent
+            "foo=hello,,bar=thing",  // tracestate
+            0,                       // expected_sampling_priority
+            nullopt,                 // expected_origin
+            {},                      // expected_trace_tags
+            "foo=hello,,bar=thing",  // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "malformed entry",
-         traceparent_drop, // traceparent
-         "foo=hello,chicken,bar=thing", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {}, // expected_trace_tags
-         "foo=hello,chicken,bar=thing", // expected_additional_w3c_tracestate
-         nullopt}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "malformed entry",
+            traceparent_drop,               // traceparent
+            "foo=hello,chicken,bar=thing",  // tracestate
+            0,                              // expected_sampling_priority
+            nullopt,                        // expected_origin
+            {},                             // expected_trace_tags
+            "foo=hello,chicken,bar=thing",  // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "stuff before dd entry",
-         traceparent_drop, // traceparent
-         "foo=hello,bar=baz,dd=", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {}, // expected_trace_tags
-         "foo=hello,bar=baz", // expected_additional_w3c_tracestate
-         nullopt}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "stuff before dd entry",
+            traceparent_drop,         // traceparent
+            "foo=hello,bar=baz,dd=",  // tracestate
+            0,                        // expected_sampling_priority
+            nullopt,                  // expected_origin
+            {},                       // expected_trace_tags
+            "foo=hello,bar=baz",      // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "stuff after dd entry",
-         traceparent_drop, // traceparent
-         "dd=,foo=hello,bar=baz", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {}, // expected_trace_tags
-         "foo=hello,bar=baz", // expected_additional_w3c_tracestate
-         nullopt}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "stuff after dd entry",
+            traceparent_drop,         // traceparent
+            "dd=,foo=hello,bar=baz",  // tracestate
+            0,                        // expected_sampling_priority
+            nullopt,                  // expected_origin
+            {},                       // expected_trace_tags
+            "foo=hello,bar=baz",      // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "stuff before and after dd entry",
-         traceparent_drop, // traceparent
-         "chicken=yes,nuggets=yes,dd=,foo=hello,bar=baz", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {}, // expected_trace_tags
-         "chicken=yes,nuggets=yes,foo=hello,bar=baz", // expected_additional_w3c_tracestate
-         nullopt}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "stuff before and after dd entry",
+            traceparent_drop,                                 // traceparent
+            "chicken=yes,nuggets=yes,dd=,foo=hello,bar=baz",  // tracestate
+            0,        // expected_sampling_priority
+            nullopt,  // expected_origin
+            {},       // expected_trace_tags
+            "chicken=yes,nuggets=yes,foo=hello,bar=baz",  // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "dd entry with empty subentries",
-         traceparent_drop, // traceparent
-         "dd=foo:bar;;;;;baz:bam;;;", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {}, // expected_trace_tags
-         nullopt, // expected_additional_w3c_tracestate
-         "foo:bar;baz:bam"}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "dd entry with empty subentries",
+            traceparent_drop,             // traceparent
+            "dd=foo:bar;;;;;baz:bam;;;",  // tracestate
+            0,                            // expected_sampling_priority
+            nullopt,                      // expected_origin
+            {},                           // expected_trace_tags
+            nullopt,                      // expected_additional_w3c_tracestate
+            "foo:bar;baz:bam",   // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-        {__LINE__, "dd entry with malformed subentries",
-         traceparent_drop, // traceparent
-         "dd=foo:bar;chicken;chicken;baz:bam;chicken", // tracestate
-         0, // expected_sampling_priority
-         nullopt, // expected_origin
-         {}, // expected_trace_tags
-         nullopt, // expected_additional_w3c_tracestate
-         "foo:bar;baz:bam"}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "dd entry with malformed subentries",
+            traceparent_drop,                              // traceparent
+            "dd=foo:bar;chicken;chicken;baz:bam;chicken",  // tracestate
+            0,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            "foo:bar;baz:bam",   // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "origin, trace tags, and extra fields",
-          traceparent_drop, // traceparent
-          "dd=o:France;t.foo:thing1;t.bar:thing2;x:wow;y:wow", // tracestate
-          0, // expected_sampling_priority
-          "France", // expected_origin
-          {{"_dd.p.foo", "thing1"}, {"_dd.p.bar", "thing2"}}, // expected_trace_tags
-          nullopt, // expected_additional_w3c_tracestate
-          "x:wow;y:wow"}, // expected_additional_datadog_w3c_tracestate
+        {
+            __LINE__,
+            "origin, trace tags, parent, and extra fields",
+            traceparent_drop,  // traceparent
+            "dd=o:France;p:00000000000d69ac;t.foo:thing1;t.bar:thing2;x:wow;y:"
+            "wow",     // tracestate
+            0,         // expected_sampling_priority
+            "France",  // expected_origin
+            {{"_dd.p.foo", "thing1"},
+             {"_dd.p.bar", "thing2"}},  // expected_trace_tags
+            nullopt,                    // expected_additional_w3c_tracestate
+            "x:wow;y:wow",       // expected_additional_datadog_w3c_tracestate
+            "00000000000d69ac",  // expected_datadog_w3c_parent_id
+        },
 
-        {__LINE__, "origin with escaped equal sign",
-         traceparent_drop, // traceparent
-         "dd=o:France~country", // tracestate
-         0, // expected_sampling_priority
-         "France=country"}, // expected_origin
+        {
+            __LINE__,
+            "dd parent id is malformed",
+            traceparent_drop,    // traceparent
+            "dd=p:XxDDOGxX",     // tracestate
+            0,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+        {
+            __LINE__,
+            "dd parent id is propagated even if not valid",
+            traceparent_drop,         // traceparent
+            "dd=p:yu7C0o3AOmbOcfXw",  // tracestate
+            0,                        // expected_sampling_priority
+            nullopt,                  // expected_origin
+            {},                       // expected_trace_tags
+            nullopt,                  // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "yu7C0o3AOmbOcfXw",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "traceparent and tracestate sampling agree (1/4)",
-          traceparent_drop, // traceparent
-          "dd=s:0", // tracestate
-          0}, // expected_sampling_priority
+        {
+            __LINE__,
+            "origin with escaped equal sign",
+            traceparent_drop,       // traceparent
+            "dd=o:France~country",  // tracestate
+            0,                      // expected_sampling_priority
+            "France=country",       // expected_origin
+            {},                     // expected_trace_tags
+            nullopt,                // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "traceparent and tracestate sampling agree (2/4)",
-          traceparent_drop, // traceparent
-          "dd=s:-1", // tracestate
-          -1}, // expected_sampling_priority
+        {
+            __LINE__,
+            "traceparent and tracestate sampling agree (1/4)",
+            traceparent_drop,    // traceparent
+            "dd=s:0",            // tracestate
+            0,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "traceparent and tracestate sampling agree (3/4)",
-          traceparent_keep, // traceparent
-          "dd=s:1", // tracestate
-          1}, // expected_sampling_priority
+        {
+            __LINE__,
+            "traceparent and tracestate sampling agree (2/4)",
+            traceparent_drop,    // traceparent
+            "dd=s:-1",           // tracestate
+            -1,                  // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "traceparent and tracestate sampling agree (4/4)",
-          traceparent_keep, // traceparent
-          "dd=s:2", // tracestate
-          2}, // expected_sampling_priority
+        {
+            __LINE__,
+            "traceparent and tracestate sampling agree (3/4)",
+            traceparent_keep,    // traceparent
+            "dd=s:1",            // tracestate
+            1,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "traceparent and tracestate sampling disagree (1/4)",
-          traceparent_drop, // traceparent
-          "dd=s:1", // tracestate
-          0}, // expected_sampling_priority
+        {
+            __LINE__,
+            "traceparent and tracestate sampling agree (4/4)",
+            traceparent_keep,    // traceparent
+            "dd=s:2",            // tracestate
+            2,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "traceparent and tracestate sampling disagree (2/4)",
-          traceparent_drop, // traceparent
-          "dd=s:2", // tracestate
-          0}, // expected_sampling_priority
+        {
+            __LINE__,
+            "traceparent and tracestate sampling disagree (1/4)",
+            traceparent_drop,    // traceparent
+            "dd=s:1",            // tracestate
+            0,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "traceparent and tracestate sampling disagree (3/4)",
-          traceparent_keep, // traceparent
-          "dd=s:0", // tracestate
-          1}, // expected_sampling_priority
+        {
+            __LINE__,
+            "traceparent and tracestate sampling disagree (2/4)",
+            traceparent_drop,    // traceparent
+            "dd=s:2",            // tracestate
+            0,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "traceparent and tracestate sampling disagree (4/4)",
-          traceparent_keep, // traceparent
-          "dd=s:-1", // tracestate
-          1}, // expected_sampling_priority
+        {
+            __LINE__,
+            "traceparent and tracestate sampling disagree (3/4)",
+            traceparent_keep,    // traceparent
+            "dd=s:0",            // tracestate
+            1,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "invalid sampling priority (1/2)",
-          traceparent_drop, // traceparent
-          "dd=s:oops", // tracestate
-          0}, // expected_sampling_priority
+        {
+            __LINE__,
+            "traceparent and tracestate sampling disagree (4/4)",
+            traceparent_keep,    // traceparent
+            "dd=s:-1",           // tracestate
+            1,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
 
-         {__LINE__, "invalid sampling priority (2/2)",
-          traceparent_keep, // traceparent
-          "dd=s:oops", // tracestate
-          1}, // expected_sampling_priority
+        {
+            __LINE__,
+            "invalid sampling priority (1/2)",
+            traceparent_drop,    // traceparent
+            "dd=s:oops",         // tracestate
+            0,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "invalid sampling priority (2/2)",
+            traceparent_keep,    // traceparent
+            "dd=s:oops",         // tracestate
+            1,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
     }));
-    // clang-format on
 
     CAPTURE(test_case.name);
     CAPTURE(test_case.line);
@@ -921,9 +1087,28 @@ TEST_CASE("span extraction") {
             test_case.expected_additional_w3c_tracestate);
     REQUIRE(extracted->additional_datadog_w3c_tracestate ==
             test_case.expected_additional_datadog_w3c_tracestate);
+    REQUIRE(extracted->datadog_w3c_parent_id ==
+            test_case.expected_datadog_w3c_parent_id);
 
     REQUIRE(logger.entries.empty());
     REQUIRE(span_tags.empty());
+  }
+
+  SECTION("_dd.parent_id") {
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+
+    std::unordered_map<std::string, std::string> headers;
+    headers["traceparent"] =
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    headers["tracestate"] = "dd=s:1;p:000000000000002a;foo:bar,lol=wut";
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+
+    auto parent_id_tag = span->lookup_tag("_dd.parent_id");
+    REQUIRE(parent_id_tag);
+    CHECK(*parent_id_tag == "000000000000002a");
   }
 
   SECTION("x-datadog-tags") {
@@ -1119,7 +1304,7 @@ TEST_CASE("128-bit trace IDs") {
     // trace ID in the traceparent.
     // It will be ignored, and the resulting _dd.p.tid value will be consistent
     // with the higher part of the trace ID in traceparent: "deadbeefdeadbeef".
-    headers["tracestate"] = "dd=t.tid:" + tid;
+    headers["tracestate"] = "dd=t.tid:" + tid + ";p:0000000000000001";
     MockDictReader reader{headers};
     const auto span = tracer.extract_span(reader);
     CAPTURE(logger->entries);
@@ -1629,7 +1814,7 @@ TEST_CASE("heterogeneous extraction") {
      {{"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
       {"tracestate", "dd=foo:bar,lol=wut"}},
      {{"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-000000000000002a-01"},
-      {"tracestate", "dd=s:1;foo:bar,lol=wut"}}},
+      {"tracestate", "dd=s:1;p:000000000000002a;foo:bar,lol=wut"}}},
 
     {__LINE__, "tracestate from subsequent style",
      {PropagationStyle::DATADOG, PropagationStyle::W3C},
@@ -1639,7 +1824,7 @@ TEST_CASE("heterogeneous extraction") {
       {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}}, // origin is different
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;o:Kansas;ah:choo,competitor=stuff"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,competitor=stuff"}}},
 
     {__LINE__, "ignore interlopers",
      {PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C},
@@ -1652,7 +1837,7 @@ TEST_CASE("heterogeneous extraction") {
       {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;o:Kansas;ah:choo,competitor=stuff"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,competitor=stuff"}}},
 
     {__LINE__, "don't take tracestate if trace ID doesn't match",
      {PropagationStyle::DATADOG, PropagationStyle::W3C},
@@ -1662,7 +1847,7 @@ TEST_CASE("heterogeneous extraction") {
       {"traceparent", "00-00000000000000000000000000000031-0000000000000040-01"},
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;o:Kansas"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas"}}},
 
     {__LINE__, "don't take tracestate if W3C extraction isn't configured",
      {PropagationStyle::DATADOG, PropagationStyle::B3},
@@ -1672,7 +1857,7 @@ TEST_CASE("heterogeneous extraction") {
       {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;o:Kansas"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas"}}},
   }));
   // clang-format on
 
