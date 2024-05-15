@@ -43,7 +43,7 @@ int main() {
 
   dd::Tracer tracer{*finalized_config};
 
-  httplib::Client upstream_client("server", 8080);
+  httplib::Client upstream_client("server", 80);
 
   // Configure the HTTP server.
   auto forward_handler = [&tracer, &upstream_client](

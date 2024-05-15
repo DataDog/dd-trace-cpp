@@ -795,7 +795,6 @@ TEST_CASE("injecting W3C tracestate header") {
   span->inject(writer);
 
   CAPTURE(writer.items);
-  // TODO: substitue parent ID in tracestate
   const auto found = writer.items.find("tracestate");
   REQUIRE(found != writer.items.end());
 
