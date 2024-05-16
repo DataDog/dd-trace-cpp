@@ -418,10 +418,11 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         writer.set(
             "traceparent",
             encode_traceparent(span.trace_id, span.span_id, sampling_priority));
-        writer.set("tracestate",
-                   encode_tracestate(sampling_priority, origin_, trace_tags,
-                                     additional_datadog_w3c_tracestate_,
-                                     additional_w3c_tracestate_));
+        writer.set(
+            "tracestate",
+            encode_tracestate(span.span_id, sampling_priority, origin_,
+                              trace_tags, additional_datadog_w3c_tracestate_,
+                              additional_w3c_tracestate_));
         break;
       default:
         assert(style == PropagationStyle::NONE);

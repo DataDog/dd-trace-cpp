@@ -1,5 +1,6 @@
 #include "glob.h"
 
+#include <cctype>
 #include <cstdint>
 
 namespace datadog {
@@ -18,8 +19,11 @@ bool glob_match(StringView pattern, StringView subject) {
   Index next_p = 0;  // next [p]attern index
   Index next_s = 0;  // next [s]ubject index
 
-  while (p < pattern.size() || s < subject.size()) {
-    if (p < pattern.size()) {
+  const size_t p_size = pattern.size();
+  const size_t s_size = subject.size();
+
+  while (p < p_size || s < s_size) {
+    if (p < p_size) {
       const char pattern_char = pattern[p];
       switch (pattern_char) {
         case '*':
@@ -30,14 +34,14 @@ bool glob_match(StringView pattern, StringView subject) {
           ++p;
           continue;
         case '?':
-          if (s < subject.size()) {
+          if (s < s_size) {
             ++p;
             ++s;
             continue;
           }
           break;
         default:
-          if (s < subject.size() && subject[s] == pattern_char) {
+          if (s < s_size && tolower(subject[s]) == tolower(pattern_char)) {
             ++p;
             ++s;
             continue;
@@ -45,7 +49,7 @@ bool glob_match(StringView pattern, StringView subject) {
       }
     }
     // Mismatch.  Maybe restart.
-    if (0 < next_s && next_s <= subject.size()) {
+    if (0 < next_s && next_s <= s_size) {
       p = next_p;
       s = next_s;
       continue;

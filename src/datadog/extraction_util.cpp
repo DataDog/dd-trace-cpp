@@ -295,6 +295,7 @@ ExtractedData merge(const std::vector<ExtractedData>& contexts) {
       });
 
   if (other != contexts.end()) {
+    result.datadog_w3c_parent_id = other->datadog_w3c_parent_id;
     result.additional_w3c_tracestate = other->additional_w3c_tracestate;
     result.additional_datadog_w3c_tracestate =
         other->additional_datadog_w3c_tracestate;

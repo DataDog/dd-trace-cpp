@@ -2,6 +2,7 @@
 
 // This component provides parsing-related miscellanea.
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
