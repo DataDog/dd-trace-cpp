@@ -60,8 +60,8 @@ TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
     : enabled_(enabled),
       clock_(clock),
       logger_(logger),
+      host_info_(get_host_info()),
       tracer_signature_(tracer_signature),
-      hostname_(get_hostname().value_or("hostname-unavailable")),
       integration_name_(integration_name),
       integration_version_(integration_version) {
   if (enabled_) {
@@ -120,10 +120,16 @@ nlohmann::json TracerTelemetry::generate_telemetry_body(
            {"language_name", tracer_signature_.library_language},
            {"language_version", tracer_signature_.library_language_version},
        })},
-      // TODO: host information (os, os_version, kernel, etc)
-      {"host", nlohmann::json::object({
-                   {"hostname", hostname_},
-               })},
+      {"host",
+       {
+           {"hostname", host_info_.hostname},
+           {"os", host_info_.os},
+           {"os_version", host_info_.os_version},
+           {"architecture", host_info_.cpu_architecture},
+           {"kernel_name", host_info_.kernel_name},
+           {"kernel_version", host_info_.kernel_version},
+           {"kernel_release", host_info_.kernel_release},
+       }},
   });
 }
 

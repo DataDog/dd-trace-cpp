@@ -4,12 +4,25 @@
 
 #include <string>
 
-#include "optional.h"
-
 namespace datadog {
 namespace tracing {
 
-Optional<std::string> get_hostname();
+// Hold host information mainly used for telemetry purposes
+// and for identifying a tracer.
+struct HostInfo final {
+  std::string os;
+  std::string os_version;
+  std::string hostname;
+  std::string cpu_architecture;
+  std::string kernel_name;
+  std::string kernel_version;
+  std::string kernel_release;
+};
+
+// Returns host information. Lazy.
+HostInfo get_host_info();
+
+std::string get_hostname();
 
 int get_process_id();
 

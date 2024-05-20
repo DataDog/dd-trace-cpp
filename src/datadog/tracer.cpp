@@ -51,9 +51,11 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       clock_(config.clock),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
-      hostname_(config.report_hostname ? get_hostname() : nullopt),
       tags_header_max_size_(config.tags_header_size),
       sampling_delegation_enabled_(config.delegate_trace_sampling) {
+  if (config.report_hostname) {
+    hostname_ = get_hostname();
+  }
   if (auto* collector =
           std::get_if<std::shared_ptr<Collector>>(&config.collector)) {
     collector_ = *collector;
