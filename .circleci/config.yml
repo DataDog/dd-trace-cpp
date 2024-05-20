@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  codecov: codecov/codecov@4.0.1
+
 executors:
   docker-amd64:
     docker:
@@ -115,10 +118,9 @@ jobs:
     steps:
     - checkout
     - run: bin/test --coverage --verbose
-    - add_ssh_keys:
-        fingerprints:
-        - "d3:8f:a8:6e:b6:ef:37:65:1a:dc:2b:88:3b:ff:50:f4"
-    - run: bin/publish-coverage
+    - codecov/upload:
+        file: .coverage/filtered.info
+        upload_args: --disable-search
 
   # Copy-pasta from dd-trace-java. Thank you <3
   system-tests:

@@ -69,7 +69,7 @@ if (DD_TRACE_ENABLE_COVERAGE)
 
   target_link_libraries(dd_trace_cpp-specs
     INTERFACE
-      gcov
+      -fprofile-arcs
   )
 endif()
 
