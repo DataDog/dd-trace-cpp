@@ -370,7 +370,7 @@ void DatadogAgent::flush() {
 
 void DatadogAgent::send_telemetry(StringView request_type,
                                   std::string payload) {
-  auto set_telemetry_headers = [request_type, &payload,
+  auto set_telemetry_headers = [request_type, payload_size = payload.size(),
                                 debug_enabled = tracer_telemetry_->debug(),
                                 tracer_signature =
                                     &tracer_signature_](DictWriter& headers) {
@@ -379,12 +379,15 @@ void DatadogAgent::send_telemetry(StringView request_type,
         Datadog-Container-ID
     */
     headers.set("Content-Type", "application/json");
-    headers.set("Content-Length", std::to_string(payload.size()));
+    headers.set("Content-Length", std::to_string(payload_size));
     headers.set("DD-Telemetry-API-Version", "v2");
     headers.set("DD-Client-Library-Language", "cpp");
     headers.set("DD-Client-Library-Version", tracer_signature->library_version);
     headers.set("DD-Telemetry-Request-Type", request_type);
-    headers.set("DD-Telemetry-Debug-Enabled", debug_enabled ? "true" : "false");
+
+    if (debug_enabled) {
+      headers.set("DD-Telemetry-Debug-Enabled", "true");
+    }
   };
 
   auto post_result =

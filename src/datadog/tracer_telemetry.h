@@ -51,7 +51,6 @@ class TracerTelemetry {
   std::shared_ptr<Logger> logger_;
   HostInfo host_info_;
   TracerSignature tracer_signature_;
-  std::string hostname_;
   std::string integration_name_;
   std::string integration_version_;
   // Track sequence id per payload generated
