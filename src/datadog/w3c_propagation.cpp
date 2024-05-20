@@ -215,8 +215,6 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
       }
     } else if (key == "p") {
       if (value.size() != 16) {
-        // chaff!
-        pair_begin = pair_end == end ? end : pair_end + 1;
         continue;
       }
 

@@ -91,14 +91,14 @@ bool starts_with(StringView subject, StringView prefix) {
   auto s = subject.data();
   auto p = prefix.data();
   const auto prefix_end = p + prefix.size();
-  while (*s == *p) {
-    ++s;
-    ++p;
+  while (p < prefix_end) {
+    if (*s++ != *p++) {
+      return false;
+    }
   }
 
-  return p == prefix_end;
+  return true;
 }
-
 StringView trim(StringView str) {
   str.remove_prefix(
       std::min(str.find_first_not_of(k_spaces_characters), str.size()));
