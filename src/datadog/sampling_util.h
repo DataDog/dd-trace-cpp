@@ -35,7 +35,8 @@ inline std::uint64_t max_id_from_rate(Rate rate) {
     return std::numeric_limits<uint64_t>::max();
   }
 
-  return rate * static_cast<double>(std::numeric_limits<std::uint64_t>::max());
+  return static_cast<std::uint64_t>(
+      rate * static_cast<double>(std::numeric_limits<std::uint64_t>::max()));
 }
 
 }  // namespace tracing

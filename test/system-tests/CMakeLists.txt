@@ -12,7 +12,7 @@ target_include_directories(parametric-http-server
   ../../examples/http-server/common
 )
 
-target_link_libraries(parametric-http-server dd_trace_cpp-static)
+target_link_libraries(parametric-http-server dd_trace_cpp-static dd_trace::specs)
 
 install(
   TARGETS parametric-http-server

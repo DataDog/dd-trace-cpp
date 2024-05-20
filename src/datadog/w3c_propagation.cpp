@@ -59,40 +59,41 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
                   // group 5)
   static const std::regex regex{pattern};
 
-  std::match_results<StringView::iterator> match;
-  if (!std::regex_match(traceparent.begin(), traceparent.end(), match, regex)) {
+  std::cmatch match;
+  if (!std::regex_match(traceparent.data(), match, regex)) {
     return "malformed_traceparent";
   }
 
   assert(match.ready());
   assert(match.size() == 5 + 1);
 
-  const auto to_string_view = [](const auto& submatch) {
-    assert(submatch.first <= submatch.second);
-    return StringView{submatch.first,
-                      std::size_t(submatch.second - submatch.first)};
+  const auto to_string_view = [traceparent](const std::cmatch& match,
+                                            const std::size_t index) {
+    assert(index < match.size());
+    return StringView(traceparent.data() + match.position(index),
+                      std::size_t(match.length(index)));
   };
 
-  const auto version = to_string_view(match[1]);
+  const auto version = to_string_view(match, 1);
   if (version == "ff") {
     return "invalid_version";
   }
 
-  if (version == "00" && !to_string_view(match[5]).empty()) {
+  if (version == "00" && !to_string_view(match, 5).empty()) {
     return "malformed_traceparent";
   }
 
-  result.trace_id = *TraceID::parse_hex(to_string_view(match[2]));
+  result.trace_id = *TraceID::parse_hex(to_string_view(match, 2));
   if (result.trace_id == 0) {
     return "trace_id_zero";
   }
 
-  result.parent_id = *parse_uint64(to_string_view(match[3]), 16);
+  result.parent_id = *parse_uint64(to_string_view(match, 3), 16);
   if (*result.parent_id == 0) {
     return "parent_id_zero";
   }
 
-  const auto flags = *parse_uint64(to_string_view(match[4]), 16);
+  const auto flags = *parse_uint64(to_string_view(match, 4), 16);
   result.sampling_priority = int(flags & 1);
 
   return nullopt;
@@ -109,61 +110,58 @@ struct PartiallyParsedTracestate {
 // specified `tracestate`. If `tracestate` does not have a Datadog-specific
 // portion, return `nullopt`.
 Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
-  Optional<PartiallyParsedTracestate> result;
-
-  const char* const begin = tracestate.begin();
-  const char* const end = tracestate.end();
-  const char* pair_begin = begin;
-  while (pair_begin != end) {
-    const char* const pair_end = std::find(pair_begin, end, ',');
+  const std::size_t begin = 0;
+  const std::size_t end = tracestate.size();
+  std::size_t pair_begin = begin;
+  while (pair_begin < end) {
+    const std::size_t pair_end = tracestate.find(',', pair_begin);
     // Note that since this `pair` is `strip`ped, `pair_begin` is not
     // necessarily equal to `pair.begin()` (similarly for the ends).
-    const auto pair = trim(range(pair_begin, pair_end));
+    const auto pair =
+        trim(tracestate.substr(pair_begin, pair_end - pair_begin));
     if (pair.empty()) {
-      pair_begin = pair_end == end ? end : pair_end + 1;
+      pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
       continue;
     }
 
-    const auto kv_separator = std::find(pair.begin(), pair.end(), '=');
-    if (kv_separator == pair.end()) {
+    const auto kv_separator = pair.find('=');
+    if (kv_separator == StringView::npos) {
       // This is an invalid entry because it contains a non-whitespace character
       // but not a "=".
       // Let's move on to the next entry.
-      pair_begin = pair_end == end ? end : pair_end + 1;
+      pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
       continue;
     }
 
-    const auto key = range(pair.begin(), kv_separator);
+    const auto key = pair.substr(0, kv_separator);
     if (key != "dd") {
       // On to the next.
-      pair_begin = pair_end == end ? end : pair_end + 1;
+      pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
       continue;
     }
 
-    // We found the "dd" entry.
-    result.emplace();
-    result->datadog_value = range(kv_separator + 1, pair.end());
+    PartiallyParsedTracestate result;
+    result.datadog_value = pair.substr(kv_separator + 1);
     // `result->other_entries` is whatever was before the "dd" entry and
     // whatever is after the "dd" entry, but without an extra comma in the
     // middle.
-    if (pair_begin != begin) {
+    if (pair_begin != 0) {
       // There's a prefix
-      append(result->other_entries, range(begin, pair_begin - 1));
-      if (pair_end != end) {
+      append(result.other_entries, tracestate.substr(0, pair_begin - 1));
+      if (pair_end != StringView::npos && pair_end + 1 < end) {
         // and a suffix
-        append(result->other_entries, range(pair_end, end));
+        append(result.other_entries, tracestate.substr(pair_end));
       }
-    } else if (pair_end != end) {
+    } else if (pair_end != StringView::npos && pair_end + 1 < end) {
       // There's just a suffix
-      append(result->other_entries, range(pair_end + 1, end));
+      append(result.other_entries, tracestate.substr(pair_end + 1));
     }
 
-    break;
+    return result;
   }
 
-  return result;
+  return nullopt;
 }
-
 // Fill the specified `result` with information parsed from the specified
 // `datadog_value`. `datadog_value` is the value of the "dd" entry in the
 // "tracestate" header.
@@ -175,27 +173,23 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
 // - `sampling_priority`
 // - `additional_datadog_w3c_tracestate`
 void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
-  const char* const begin = datadog_value.begin();
-  const char* const end = datadog_value.end();
-  const char* pair_begin = begin;
-  while (pair_begin != end) {
-    const char* const pair_end = std::find(pair_begin, end, ';');
-    const auto pair = range(pair_begin, pair_end);
+  const std::size_t end = datadog_value.size();
+  std::size_t pair_begin = 0;
+  while (pair_begin < end) {
+    const std::size_t pair_end = datadog_value.find(';', pair_begin);
+    const auto pair = datadog_value.substr(pair_begin, pair_end - pair_begin);
+    pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
     if (pair.empty()) {
-      // chaff!
-      pair_begin = pair_end == end ? end : pair_end + 1;
       continue;
     }
 
-    const auto kv_separator = std::find(pair_begin, pair_end, ':');
-    if (kv_separator == pair_end) {
-      // chaff!
-      pair_begin = pair_end == end ? end : pair_end + 1;
+    const auto kv_separator = pair.find(':');
+    if (kv_separator == StringView::npos) {
       continue;
     }
 
-    const auto key = range(pair_begin, kv_separator);
-    const auto value = range(kv_separator + 1, pair_end);
+    const auto key = pair.substr(0, kv_separator);
+    const auto value = pair.substr(kv_separator + 1);
     if (key == "o") {
       result.origin = std::string{value};
       // Equal signs are allowed in the value of "origin," but equal signs are
@@ -206,8 +200,6 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
     } else if (key == "s") {
       const auto maybe_priority = parse_int(value, 10);
       if (!maybe_priority) {
-        // chaff!
-        pair_begin = pair_end == end ? end : pair_end + 1;
         continue;
       }
       const int priority = *maybe_priority;
@@ -223,8 +215,6 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
       }
     } else if (key == "p") {
       if (value.size() != 16) {
-        // chaff!
-        pair_begin = pair_end == end ? end : pair_end + 1;
         continue;
       }
 
@@ -253,8 +243,6 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
       }
       append(*entries, pair);
     }
-
-    pair_begin = pair_end == end ? end : pair_end + 1;
   }
 }
 
@@ -266,7 +254,7 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
 // `parse_datadog_tracestate`.
 void extract_tracestate(ExtractedData& result, const DictReader& headers) {
   const auto maybe_tracestate = headers.lookup("tracestate");
-  if (!maybe_tracestate) {
+  if (!maybe_tracestate || maybe_tracestate->empty()) {
     return;
   }
 

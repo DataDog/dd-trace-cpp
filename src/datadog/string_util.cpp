@@ -34,6 +34,15 @@ void to_lower(std::string& text) {
                  [](unsigned char ch) { return std::tolower(ch); });
 }
 
+std::string to_lower(StringView sv) {
+  std::string s;
+  s.reserve(sv.size());
+  std::transform(sv.begin(), sv.end(), std::back_inserter(s),
+                 [](char c) { return std::tolower(c); });
+
+  return s;
+}
+
 std::string to_string(bool b) { return b ? "true" : "false"; }
 
 std::string to_string(double d, size_t precision) {
@@ -79,14 +88,17 @@ std::string join_tags(
 }
 
 bool starts_with(StringView subject, StringView prefix) {
-  if (prefix.size() > subject.size()) {
-    return false;
+  auto s = subject.data();
+  auto p = prefix.data();
+  const auto prefix_end = p + prefix.size();
+  while (p < prefix_end) {
+    if (*s++ != *p++) {
+      return false;
+    }
   }
 
-  return std::mismatch(subject.begin(), subject.end(), prefix.begin()).second ==
-         prefix.end();
+  return true;
 }
-
 StringView trim(StringView str) {
   str.remove_prefix(
       std::min(str.find_first_not_of(k_spaces_characters), str.size()));

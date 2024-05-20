@@ -4,6 +4,7 @@
 #include <datadog/tracer_config.h>
 
 #include <chrono>
+#include <csignal>
 #include <datadog/json.hpp>
 #include <iostream>
 #include <optional>

@@ -9,7 +9,7 @@ executables to the build: `BUILD_FUZZERS`.
 When building the fuzzers, the toolchain must be clang-based.  For example:
 ```console
 $ rm -rf .build # if toolchain needs clearing
-$ bin/with-toolchain llvm bin/cmake-build -DBUILD_FUZZERS=1
+$ bin/with-toolchain llvm bin/cmake-build -DDD_TRACE_BUILD_FUZZERS=1
 $ .build/fuzz/w3c-propagation/w3c-propagation-fuzz
 
 [... fuzzer output ...]

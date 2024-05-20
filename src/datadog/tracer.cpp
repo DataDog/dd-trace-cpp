@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cassert>
 
-#include "datadog/runtime_id.h"
-#include "datadog/trace_sampler_config.h"
 #include "datadog_agent.h"
 #include "dict_reader.h"
 #include "environment.h"
@@ -15,6 +13,7 @@
 #include "logger.h"
 #include "parse_util.h"
 #include "platform_util.h"
+#include "runtime_id.h"
 #include "span.h"
 #include "span_config.h"
 #include "span_data.h"
@@ -22,6 +21,7 @@
 #include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
+#include "trace_sampler_config.h"
 #include "trace_segment.h"
 #include "tracer_signature.h"
 #include "version.h"

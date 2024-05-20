@@ -70,12 +70,13 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
                                                     StringView header_kind,
                                                     StringView style_name,
                                                     int base) {
+  Optional<std::uint64_t> result;
   auto found = headers.lookup(header);
   if (!found) {
-    return nullopt;
+    return result;
   }
-  auto result = parse_uint64(*found, base);
-  if (auto* error = result.if_error()) {
+  auto parsed_id = parse_uint64(*found, base);
+  if (auto* error = parsed_id.if_error()) {
     std::string prefix;
     prefix += "Could not extract ";
     append(prefix, style_name);
@@ -88,7 +89,8 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
     prefix += ' ';
     return error->with_prefix(prefix);
   }
-  return *result;
+  result = std::move(*parsed_id);
+  return result;
 }
 
 }  // namespace

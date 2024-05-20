@@ -42,8 +42,10 @@ Expected<void> decode_tag(
     return Error{Error::MALFORMED_TRACE_TAGS, std::move(message)};
   }
 
-  const StringView key = range(entry.begin(), separator);
-  const StringView value = range(separator + 1, entry.end());
+  const StringView key = entry.substr(0, separator - entry.cbegin());
+  const StringView value =
+      entry.substr(separator - entry.cbegin() + 1,
+                   separator - entry.cbegin() + entry.size());
   destination.emplace_back(std::string(key), std::string(value));
 
   return nullopt;
@@ -61,18 +63,29 @@ void append_tag(std::string& serialized_tags, StringView tag_key,
 Expected<std::vector<std::pair<std::string, std::string>>> decode_tags(
     StringView header_value) {
   std::vector<std::pair<std::string, std::string>> tags;
+  tags.reserve(header_value.size());
 
-  auto iter = header_value.begin();
-  const auto end = header_value.end();
-  if (iter == end) {
-    // An empty string means no tags.
-    return tags;
+  if (header_value.empty()) return tags;
+
+  std::size_t beg = 0;
+  for (std::size_t i = 0; i < header_value.size(); ++i) {
+    if (header_value[i] == ',') {
+      auto result = decode_tag(tags, header_value.substr(beg, i - beg));
+      if (auto* error = result.if_error()) {
+        std::string prefix;
+        prefix += "Error decoding trace tags \"";
+        append(prefix, header_value);
+        prefix += "\": ";
+        return error->with_prefix(prefix);
+      }
+
+      beg = i + 1;
+    }
   }
 
-  decltype(iter) next;
-  do {
-    next = std::find(iter, end, ',');
-    auto result = decode_tag(tags, range(iter, next));
+  if (beg != header_value.size()) {
+    auto result =
+        decode_tag(tags, header_value.substr(beg, header_value.size() - beg));
     if (auto* error = result.if_error()) {
       std::string prefix;
       prefix += "Error decoding trace tags \"";
@@ -80,8 +93,7 @@ Expected<std::vector<std::pair<std::string, std::string>>> decode_tags(
       prefix += "\": ";
       return error->with_prefix(prefix);
     }
-    iter = next + 1;
-  } while (next != end);
+  }
 
   return tags;
 }

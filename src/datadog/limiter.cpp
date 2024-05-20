@@ -70,11 +70,10 @@ Limiter::Result Limiter::allow(int tokens_requested) {
   num_requested_++;
   // refill "tokens"
   if (now >= next_refresh_) {
-    auto intervals =
-        (now - next_refresh_).count() / refresh_interval_.count() + 1;
+    intervals = (now - next_refresh_).count() / refresh_interval_.count() + 1;
     if (intervals > 0) {
       next_refresh_ += refresh_interval_ * intervals;
-      num_tokens_ += intervals * tokens_per_refresh_;
+      num_tokens_ += static_cast<int>(intervals * tokens_per_refresh_);
       if (num_tokens_ > max_tokens_) {
         num_tokens_ = max_tokens_;
       }
