@@ -1,6 +1,3 @@
-# add_library(httplib INTERFACE)
-# target_include_directories(httplib SYSTEM INTERFACE .)
-
 add_executable(parametric-http-server)
 
 target_sources(parametric-http-server

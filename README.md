@@ -39,13 +39,12 @@ int main() {
 See the [examples](examples) directory for more extensive usage examples.
 
 ## Platform Support
-The library is currently compatible with and has been tested on the following CPU architecture, OS and compiler combinations:
+The library has been tested and is compatible on the following CPU architecture, OS and compiler combinations:
 - x86_64 and arm64 Linux with GCC 11.4.
 - x86_64 and arm64 Linux with Clang 14.
 - x86_64 Windows with MSVC 2022.
 - arm64 macOS with Apple Clang 15.
 
-All possible configurations cannot be tested. However, any conforming C++17 compiler should be supported.
 
 ## Building and Installation
 
@@ -67,7 +66,7 @@ cmake --build build -j
 ```
 
 By default CMake will generate both static and shared libraries. To build either on of them use
-as configuration parameter `BUILD_SHARED_LIBS` or `BUILD_STATIC_LIBS`. Example:
+either `BUILD_SHARED_LIBS` or `BUILD_STATIC_LIBS`. Example:
 
 ```shell
 cmake -B build -DBUILD_SHARED_LIBS=1 .

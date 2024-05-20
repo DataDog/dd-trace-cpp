@@ -109,7 +109,6 @@ std::tuple<std::string, std::string> get_windows_info() {
     os_info.dwOSVersionInfoSize = sizeof(os_info);
 
     if (func(&os_info) == 0) {
-      // major, minor, build -> name, version
       switch (os_info.dwMajorVersion) {
         case 5: {
           switch (os_info.dwMinorVersion) {

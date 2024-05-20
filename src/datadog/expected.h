@@ -110,11 +110,6 @@ Expected<Value>::Expected(const Error& error) : data_(error) {}
 template <typename Value>
 Expected<Value>::Expected(Error&& error) : data_(std::move(error)) {}
 
-// Expected<Value>& Expected<Value>::operator=(Other&& other) {
-//   data_ = std::forward<Other>(other);
-//   return *this;
-// }
-
 template <typename Value>
 bool Expected<Value>::has_value() const noexcept {
   return std::holds_alternative<Value>(data_);
