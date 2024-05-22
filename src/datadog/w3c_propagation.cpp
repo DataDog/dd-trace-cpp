@@ -17,6 +17,18 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+// Note that match group 0 is the entire match.
+constexpr StringView k_traceparent_pattern =
+    "([0-9a-f]{2})"  // hex version number (match group 1)
+    "-"
+    "([0-9a-f]{32})"  // hex trace ID (match group 2)
+    "-"
+    "([0-9a-f]{16})"  // hex parent span ID (match group 3)
+    "-"
+    "([0-9a-f]{2})"  // hex "trace-flags" (match group 4)
+    "($|-.*)";  // either the end, or a hyphen preceding further fields (match
+                // group 5)
+
 // Return a predicate that returns whether its `char` argument is any of the
 // following:
 //
@@ -45,32 +57,23 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
 
   const auto traceparent = trim(*maybe_traceparent);
 
-  // Note that leading and trailing whitespace was already removed above.
-  // Note that match group 0 is the entire match.
-  static const auto& pattern =
-      "([0-9a-f]{2})"  // hex version number (match group 1)
-      "-"
-      "([0-9a-f]{32})"  // hex trace ID (match group 2)
-      "-"
-      "([0-9a-f]{16})"  // hex parent span ID (match group 3)
-      "-"
-      "([0-9a-f]{2})"  // hex "trace-flags" (match group 4)
-      "($|-.*)";  // either the end, or a hyphen preceding further fields (match
-                  // group 5)
-  static const std::regex regex{pattern};
+  static const std::regex regex{k_traceparent_pattern.data()};
 
   std::cmatch match;
-  if (!std::regex_match(traceparent.data(), match, regex)) {
+  if (!std::regex_match(traceparent.data(),
+                        traceparent.data() + traceparent.size(), match,
+                        regex)) {
     return "malformed_traceparent";
   }
 
   assert(match.ready());
-  assert(match.size() == 5 + 1);
+  assert(match.size() == 6);
 
-  const auto to_string_view = [traceparent](const std::cmatch& match,
-                                            const std::size_t index) {
+  const auto to_string_view = [traceparent_beg = traceparent.data()](
+                                  const std::cmatch& match,
+                                  const std::size_t index) {
     assert(index < match.size());
-    return StringView(traceparent.data() + match.position(index),
+    return StringView(traceparent_beg + match.position(index),
                       std::size_t(match.length(index)));
   };
 
