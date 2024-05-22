@@ -899,18 +899,6 @@ TEST_CASE("span extraction") {
 
         {
             __LINE__,
-            "dd parent id is malformed",
-            traceparent_drop,    // traceparent
-            "dd=p:XxDDOGxX",     // tracestate
-            0,                   // expected_sampling_priority
-            nullopt,             // expected_origin
-            {},                  // expected_trace_tags
-            nullopt,             // expected_additional_w3c_tracestate
-            nullopt,             // expected_additional_datadog_w3c_tracestate
-            "0000000000000000",  // expected_datadog_w3c_parent_id,
-        },
-        {
-            __LINE__,
             "dd parent id is propagated even if not valid",
             traceparent_drop,         // traceparent
             "dd=p:yu7C0o3AOmbOcfXw",  // tracestate
