@@ -16,7 +16,12 @@ namespace {
 std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
   nlohmann::json res;
   for (const auto &r : rules) {
-    res.emplace_back(r.to_json());
+    auto j = r.to_json();
+    j["sample_rate"] = r.sample_rate;
+    if (r.max_per_second) {
+      j["max_per_second"] = *r.max_per_second;
+    }
+    res.emplace_back(std::move(j));
   }
 
   return res.dump();
