@@ -134,7 +134,9 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
 std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
   nlohmann::json res;
   for (const auto &r : rules) {
-    res.emplace_back(r.to_json());
+    auto j = r.to_json();
+    j["sample_rate"] = r.sample_rate;
+    res.emplace_back(std::move(j));
   }
 
   return res.dump();

@@ -98,7 +98,7 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
 
   std::lock_guard<std::mutex> lock(mutex_);
 
-  auto rules = rules_;
+  decltype(rules_) rules;
 
   if (!conf.trace_sampling_rate) {
     auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RATE);
@@ -132,10 +132,12 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
       trace_sampling_rules_metadata.error = std::move(*error);
     } else {
       rules.merge(*maybe_rules);
-      metadata.emplace_back(std::move(trace_sampling_rules_metadata));
     }
+
+    metadata.emplace_back(std::move(trace_sampling_rules_metadata));
   }
 
+  rules.merge(rules_);
   trace_sampler_->set_rules(rules);
 
   if (!conf.tags) {
