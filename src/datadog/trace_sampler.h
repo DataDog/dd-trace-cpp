@@ -102,17 +102,21 @@ struct SamplingDecision;
 struct SpanData;
 
 class TraceSampler {
+ private:
   std::mutex mutex_;
 
   Optional<Rate> collector_default_sample_rate_;
   std::unordered_map<std::string, Rate> collector_sample_rates_;
-
-  std::vector<FinalizedTraceSamplerConfig::Rule> rules_;
+  std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash> rules_;
   Limiter limiter_;
   double limiter_max_per_second_;
 
  public:
   TraceSampler(const FinalizedTraceSamplerConfig& config, const Clock& clock);
+
+  void set_rules(
+      std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash>
+          rules);
 
   // Return a sampling decision for the specified root span.
   SamplingDecision decide(const SpanData&);

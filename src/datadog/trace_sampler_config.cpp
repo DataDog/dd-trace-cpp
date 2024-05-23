@@ -134,7 +134,9 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
 std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
   nlohmann::json res;
   for (const auto &r : rules) {
-    res.emplace_back(r.to_json());
+    auto j = r.to_json();
+    j["sample_rate"] = r.sample_rate;
+    res.emplace_back(std::move(j));
   }
 
   return res.dump();
@@ -179,10 +181,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       return error->with_prefix(prefix);
     }
 
-    FinalizedTraceSamplerConfig::Rule finalized;
-    static_cast<SpanMatcher &>(finalized) = rule;
-    finalized.sample_rate = *maybe_rate;
-    result.rules.push_back(std::move(finalized));
+    SpanMatcher matcher = rule;
+    result.rules.emplace(
+        matcher, TraceSamplerRate{*maybe_rate, SamplingMechanism::RULE});
   }
 
   Optional<double> sample_rate;
@@ -196,6 +197,10 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
         ConfigName::TRACE_SAMPLING_RATE, to_string(*sample_rate, 1),
         ConfigMetadata::Origin::CODE);
+  } else {
+    result.metadata[ConfigName::TRACE_SAMPLING_RATE] =
+        ConfigMetadata(ConfigName::TRACE_SAMPLING_RATE, "1.0",
+                       ConfigMetadata::Origin::DEFAULT);
   }
 
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
@@ -208,9 +213,8 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
           "Unable to parse overall sample_rate for trace sampling: ");
     }
 
-    FinalizedTraceSamplerConfig::Rule catch_all;
-    catch_all.sample_rate = *maybe_rate;
-    result.rules.push_back(std::move(catch_all));
+    result.rules.emplace(
+        catch_all, TraceSamplerRate{*maybe_rate, SamplingMechanism::RULE});
   }
 
   const auto [origin, max_per_second] =
@@ -231,13 +235,6 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   }
   result.max_per_second = max_per_second;
 
-  return result;
-}
-
-nlohmann::json to_json(const FinalizedTraceSamplerConfig::Rule &rule) {
-  // Get the base class's fields, then add our own.
-  auto result = static_cast<const SpanMatcher &>(rule).to_json();
-  result["sample_rate"] = double(rule.sample_rate);
   return result;
 }
 

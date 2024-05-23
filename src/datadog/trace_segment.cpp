@@ -230,7 +230,10 @@ void TraceSegment::span_finished() {
         decision.mechanism == int(SamplingMechanism::DEFAULT)) {
       local_root.numeric_tags[tags::internal::agent_sample_rate] =
           *decision.configured_rate;
-    } else if (decision.mechanism == int(SamplingMechanism::RULE)) {
+    } else if (decision.mechanism == int(SamplingMechanism::RULE) ||
+               decision.mechanism == int(SamplingMechanism::REMOTE_RULE) ||
+               decision.mechanism ==
+                   int(SamplingMechanism::REMOTE_ADAPTIVE_RULE)) {
       local_root.numeric_tags[tags::internal::rule_sample_rate] =
           *decision.configured_rate;
       if (decision.limiter_effective_rate) {
