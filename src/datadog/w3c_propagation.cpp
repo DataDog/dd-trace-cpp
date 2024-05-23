@@ -174,6 +174,7 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
 // - `origin`
 // - `trace_tags`
 // - `sampling_priority`
+// - `datadog_w3c_parent_id`
 // - `additional_datadog_w3c_tracestate`
 void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
   const std::size_t end = datadog_value.size();
@@ -217,10 +218,6 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
         result.sampling_priority = priority;
       }
     } else if (key == "p") {
-      if (value.size() != 16) {
-        continue;
-      }
-
       result.datadog_w3c_parent_id = std::string(value);
     } else if (starts_with(key, "t.")) {
       // The part of the key that follows "t." is the name of a trace tag,
