@@ -199,7 +199,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
         ConfigMetadata::Origin::CODE);
   } else {
     result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
-        ConfigName::TRACE_SAMPLING_RATE, "1.0", ConfigMetadata::Origin::CODE);
+        ConfigName::TRACE_SAMPLING_RATE, "1.0", ConfigMetadata::Origin::DEFAULT);
   }
 
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
