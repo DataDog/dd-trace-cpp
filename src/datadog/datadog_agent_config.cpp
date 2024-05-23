@@ -21,7 +21,7 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
 
   if (auto raw_rc_poll_interval_value =
           lookup(environment::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS)) {
-    auto res = parse_int(*raw_rc_poll_interval_value, 10);
+    auto res = parse_double(*raw_rc_poll_interval_value);
     if (auto error = res.if_error()) {
       return error->with_prefix(
           "DatadogAgent: Remote Configuration poll interval error ");
@@ -114,12 +114,13 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "milliseconds."};
   }
 
-  if (int rc_poll_interval_seconds =
+  if (double rc_poll_interval_seconds =
           value_or(env_config->remote_configuration_poll_interval_seconds,
-                   user_config.remote_configuration_poll_interval_seconds, 5);
-      rc_poll_interval_seconds > 0) {
+                   user_config.remote_configuration_poll_interval_seconds, 5.0);
+      rc_poll_interval_seconds >= 0.0) {
     result.remote_configuration_poll_interval =
-        std::chrono::seconds(rc_poll_interval_seconds);
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::duration<double>(rc_poll_interval_seconds));
   } else {
     return Error{Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL,
                  "DatadogAgent: Remote Configuration poll interval must be a "

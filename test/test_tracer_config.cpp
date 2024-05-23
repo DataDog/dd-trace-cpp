@@ -446,14 +446,6 @@ TEST_CASE("TracerConfig::agent") {
   }
 
   SECTION("remote configuration poll interval") {
-    SECTION("cannot be zero") {
-      config.agent.remote_configuration_poll_interval_seconds = 0;
-      auto finalized = finalize_config(config);
-      REQUIRE(!finalized);
-      REQUIRE(finalized.error().code ==
-              Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
-    }
-
     SECTION("cannot be negative") {
       config.agent.remote_configuration_poll_interval_seconds = -1337;
       auto finalized = finalize_config(config);
@@ -491,7 +483,7 @@ TEST_CASE("TracerConfig::agent") {
                                  "ddog"};
         auto finalized = finalize_config(config);
         REQUIRE(!finalized);
-        REQUIRE(finalized.error().code == Error::INVALID_INTEGER);
+        REQUIRE(finalized.error().code == Error::INVALID_DOUBLE);
       }
     }
   }
