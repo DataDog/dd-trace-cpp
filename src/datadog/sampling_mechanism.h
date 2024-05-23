@@ -61,10 +61,10 @@ enum class SamplingMechanism {
   // Reserved for future use.
   OTLP_RULE = 9,
   // Sampling rule configured by user via remote configuration.
-  REMOTE_RULE = 10,
+  REMOTE_RULE = 11,
   // Adaptive sampling rule automatically computed by Datadog backend and sent
   // via remote configuration.
-  REMOTE_ADAPTIVE_RULE = 11,
+  REMOTE_ADAPTIVE_RULE = 12,
 };
 
 }  // namespace tracing

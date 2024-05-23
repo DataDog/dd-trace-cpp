@@ -112,7 +112,7 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
         ConfigMetadata::Origin::REMOTE_CONFIG);
 
     auto rate = Rate::from(*conf.trace_sampling_rate);
-    rules[catch_all] = TraceSamplerRate{*rate, SamplingMechanism::REMOTE_RULE};
+    rules[catch_all] = TraceSamplerRate{*rate, SamplingMechanism::RULE};
 
     metadata.emplace_back(std::move(trace_sampling_metadata));
   }
@@ -137,7 +137,7 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
     metadata.emplace_back(std::move(trace_sampling_rules_metadata));
   }
 
-  rules.merge(rules_);
+  rules.insert(rules_.cbegin(), rules_.cend());
   trace_sampler_->set_rules(rules);
 
   if (!conf.tags) {
