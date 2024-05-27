@@ -144,6 +144,12 @@ std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
 
 }  // namespace
 
+nlohmann::json TraceSamplerRule::to_json() const {
+  auto j = matcher.to_json();
+  j["sample_rate"] = rate.value();
+  return j;
+}
+
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
@@ -181,9 +187,11 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       return error->with_prefix(prefix);
     }
 
-    SpanMatcher matcher = rule;
-    result.rules.emplace(
-        matcher, TraceSamplerRate{*maybe_rate, SamplingMechanism::RULE});
+    TraceSamplerRule finalized_rule;
+    finalized_rule.matcher = rule;
+    finalized_rule.rate = *maybe_rate;
+    finalized_rule.mechanism = SamplingMechanism::RULE;
+    result.rules.emplace_back(std::move(finalized_rule));
   }
 
   Optional<double> sample_rate;
@@ -213,8 +221,11 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
           "Unable to parse overall sample_rate for trace sampling: ");
     }
 
-    result.rules.emplace(
-        catch_all, TraceSamplerRate{*maybe_rate, SamplingMechanism::RULE});
+    TraceSamplerRule finalized_rule;
+    finalized_rule.rate = *maybe_rate;
+    finalized_rule.matcher = catch_all;
+    finalized_rule.mechanism = SamplingMechanism::RULE;
+    result.rules.emplace_back(std::move(finalized_rule));
   }
 
   const auto [origin, max_per_second] =

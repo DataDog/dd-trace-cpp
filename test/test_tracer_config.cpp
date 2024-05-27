@@ -606,11 +606,11 @@ TEST_CASE("TracerConfig::trace_sampler") {
     SECTION("yields one sampling rule") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->trace_sampler.rules.count(catch_all));
+      REQUIRE(finalized->trace_sampler.rules.size() == 1);
       // and the default sample_rate is 100%
-      const auto& rate = finalized->trace_sampler.rules[catch_all];
-      CHECK(rate.value == 1.0);
-      CHECK(rate.mechanism == SamplingMechanism::RULE);
+      const auto& rule = finalized->trace_sampler.rules.front();
+      CHECK(rule.rate == 1.0);
+      CHECK(rule.mechanism == SamplingMechanism::RULE);
     }
 
     SECTION("has to have a valid sample_rate") {
@@ -631,21 +631,24 @@ TEST_CASE("TracerConfig::trace_sampler") {
     rules[1].sample_rate = 0.6;
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_sampler.rules.count(catch_all));
+    REQUIRE(finalized->trace_sampler.rules.size() == 2);
 
-    const auto& rate = finalized->trace_sampler.rules[catch_all];
-    CHECK(rate.value == 0.5);
-    CHECK(rate.mechanism == SamplingMechanism::RULE);
+    const auto& rule = finalized->trace_sampler.rules.front();
+    CHECK(rule.rate == 0.5);
+    CHECK(rule.mechanism == SamplingMechanism::RULE);
   }
 
   SECTION("global sample_rate creates a catch-all rule") {
     config.trace_sampler.sample_rate = 0.25;
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->trace_sampler.rules.count(catch_all));
-    const auto& rate = finalized->trace_sampler.rules[catch_all];
-    CHECK(rate.value == 0.25);
-    CHECK(rate.mechanism == SamplingMechanism::RULE);
+    REQUIRE(finalized->trace_sampler.rules.size() == 1);
+    const auto& rule = finalized->trace_sampler.rules.front();
+    REQUIRE(rule.rate == 0.25);
+    REQUIRE(rule.matcher.service == "*");
+    REQUIRE(rule.matcher.name == "*");
+    REQUIRE(rule.matcher.resource == "*");
+    REQUIRE(rule.matcher.tags.empty());
   }
 
   SECTION("DD_TRACE_SAMPLE_RATE") {
@@ -653,10 +656,10 @@ TEST_CASE("TracerConfig::trace_sampler") {
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", "0.5"};
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->trace_sampler.rules.count(catch_all));
-      const auto& rate = finalized->trace_sampler.rules[catch_all];
-      CHECK(rate.value == 0.5);
-      CHECK(rate.mechanism == SamplingMechanism::RULE);
+      REQUIRE(finalized->trace_sampler.rules.size() == 1);
+      REQUIRE(finalized->trace_sampler.rules.front().rate == 0.5);
+      REQUIRE(finalized->trace_sampler.rules.front().mechanism ==
+              SamplingMechanism::RULE);
     }
 
     SECTION("overrides TraceSamplerConfig::sample_rate") {
@@ -664,10 +667,8 @@ TEST_CASE("TracerConfig::trace_sampler") {
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", "0.5"};
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->trace_sampler.rules.count(catch_all));
-      const auto& rate = finalized->trace_sampler.rules[catch_all];
-      CHECK(rate.value == 0.5);
-      CHECK(rate.mechanism == SamplingMechanism::RULE);
+      REQUIRE(finalized->trace_sampler.rules.size() == 1);
+      REQUIRE(finalized->trace_sampler.rules.front().rate == 0.5);
     }
 
     SECTION("has to have a valid value") {
@@ -799,27 +800,16 @@ TEST_CASE("TracerConfig::trace_sampler") {
       CAPTURE(rules_json);
       CAPTURE(rules);
       REQUIRE(rules.size() == 2);
-
-      SpanMatcher matcher;
-      matcher.service = "poohbear";
-      matcher.name = "get.honey";
-
-      auto found = rules.find(matcher);
-      REQUIRE(found != rules.cend());
-
-      CHECK(found->second.value == 0);
-      CHECK(found->second.mechanism == SamplingMechanism::RULE);
-
-      SpanMatcher matcher2;
-      matcher2.service = "*";
-      matcher2.name = "*";
-      matcher2.tags.emplace("error", "*");
-      matcher2.resource = "/admin/*";
-
-      found = rules.find(matcher2);
-      REQUIRE(found != rules.cend());
-      CHECK(found->second.value == 1);
-      CHECK(found->second.mechanism == SamplingMechanism::RULE);
+      REQUIRE(rules[0].matcher.service == "poohbear");
+      REQUIRE(rules[0].matcher.name == "get.honey");
+      REQUIRE(rules[0].rate == 0);
+      REQUIRE(rules[0].matcher.tags.size() == 0);
+      REQUIRE(rules[1].matcher.service == "*");
+      REQUIRE(rules[1].matcher.name == "*");
+      REQUIRE(rules[1].rate == 1);
+      REQUIRE(rules[1].matcher.tags.size() == 1);
+      REQUIRE(rules[1].matcher.tags.at("error") == "*");
+      REQUIRE(rules[1].matcher.resource == "/admin/*");
     }
 
     SECTION("must be valid") {

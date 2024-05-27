@@ -37,15 +37,6 @@ struct SpanMatcher {
     return (service == other.service && name == other.name &&
             resource == other.resource && tags == other.tags);
   }
-
-  // TODO: add tags
-  struct Hash {
-    size_t operator()(const SpanMatcher& rule) const {
-      return std::hash<std::string>()(rule.service) ^
-             (std::hash<std::string>()(rule.name) << 1) ^
-             (std::hash<std::string>()(rule.resource) << 2);
-    }
-  };
 };
 
 static const SpanMatcher catch_all;

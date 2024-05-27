@@ -55,7 +55,7 @@ class ConfigManager {
   std::unordered_map<ConfigName, ConfigMetadata> default_metadata_;
 
   std::shared_ptr<TraceSampler> trace_sampler_;
-  std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash> rules_;
+  std::vector<TraceSamplerRule> rules_;
 
   DynamicConfig<std::shared_ptr<const SpanDefaults>> span_defaults_;
   DynamicConfig<bool> report_traces_;
