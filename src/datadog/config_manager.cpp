@@ -57,7 +57,7 @@ Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
                      std::move(message)};
       }
 
-      auto provenance = to_lower(provenance_it->get<std::string_view>());
+      auto provenance = to_lower(provenance_it->get<StringView>());
       if (provenance == "customer") {
         rule.mechanism = SamplingMechanism::REMOTE_RULE;
       } else if (provenance == "dynamic") {
