@@ -21,9 +21,12 @@
 namespace datadog {
 namespace tracing {
 
-struct TraceSamplerRate final {
-  Rate value;
+struct TraceSamplerRule final {
+  Rate rate;
+  SpanMatcher matcher;
   SamplingMechanism mechanism;
+
+  nlohmann::json to_json() const;
 };
 
 struct TraceSamplerConfig {
@@ -48,8 +51,8 @@ class FinalizedTraceSamplerConfig {
 
  public:
   double max_per_second;
+  std::vector<TraceSamplerRule> rules;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
-  std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash> rules;
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(

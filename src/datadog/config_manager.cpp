@@ -8,8 +8,7 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-using Rules =
-    std::unordered_map<SpanMatcher, TraceSamplerRate, SpanMatcher::Hash>;
+using Rules = std::vector<TraceSamplerRule>;
 
 Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
   Rules parsed_rules;
@@ -27,7 +26,9 @@ Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
       return error->with_prefix(prefix);
     }
 
-    TraceSamplerRate rate;
+    TraceSamplerRule rule;
+    rule.matcher = std::move(*matcher);
+
     if (auto sample_rate = json_rule.find("sample_rate");
         sample_rate != json_rule.end()) {
       type = sample_rate->type_name();
@@ -42,7 +43,10 @@ Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
         return *error;
       }
 
-      rate.value = *maybe_rate;
+      rule.rate = *maybe_rate;
+    } else {
+      return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
+                   "Missing \"sample_rate\" field"};
     }
 
     if (auto provenance_it = json_rule.find("provenance");
@@ -53,15 +57,21 @@ Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
                      std::move(message)};
       }
 
-      auto provenance = provenance_it->get<std::string_view>();
+      auto provenance = to_lower(provenance_it->get<StringView>());
       if (provenance == "customer") {
-        rate.mechanism = SamplingMechanism::REMOTE_RULE;
+        rule.mechanism = SamplingMechanism::REMOTE_RULE;
       } else if (provenance == "dynamic") {
-        rate.mechanism = SamplingMechanism::REMOTE_ADAPTIVE_RULE;
+        rule.mechanism = SamplingMechanism::REMOTE_ADAPTIVE_RULE;
+      } else {
+        return Error{Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY,
+                     "Unknown \"provenance\" value"};
       }
+    } else {
+      return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
+                   "Missing \"provenance\" field"};
     }
 
-    parsed_rules.emplace(std::move(*matcher), std::move(rate));
+    parsed_rules.emplace_back(std::move(rule));
   }
 
   return parsed_rules;
@@ -98,7 +108,19 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
 
   std::lock_guard<std::mutex> lock(mutex_);
 
-  decltype(rules_) rules;
+  // NOTE(@dmehala): Sampling rules are generally not well specified.
+  //
+  // Rules are evaluated in the order they are inserted, which means the most
+  // specific matching rule might not be evaluated, even though it should be.
+  // For now, we must follow this legacy behavior.
+  //
+  // Additionally, I exploit this behavior to avoid a merge operation.
+  // The resulting array can contain duplicate `SpanMatcher`, but only the first
+  // encountered one will be evaluated, acting as an override.
+  //
+  // Remote Configuration rules will/should always be placed at the begining of
+  // the array, ensuring they are evaluated first.
+  auto rules = rules_;
 
   if (!conf.trace_sampling_rate) {
     auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RATE);
@@ -112,7 +134,12 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
         ConfigMetadata::Origin::REMOTE_CONFIG);
 
     auto rate = Rate::from(*conf.trace_sampling_rate);
-    rules[catch_all] = TraceSamplerRate{*rate, SamplingMechanism::RULE};
+
+    TraceSamplerRule rule;
+    rule.rate = *rate;
+    rule.matcher = catch_all;
+    rule.mechanism = SamplingMechanism::RULE;
+    rules.emplace(rules.cbegin(), std::move(rule));
 
     metadata.emplace_back(std::move(trace_sampling_metadata));
   }
@@ -131,14 +158,13 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
     if (auto error = maybe_rules.if_error()) {
       trace_sampling_rules_metadata.error = std::move(*error);
     } else {
-      rules.merge(*maybe_rules);
+      rules.insert(rules.cbegin(), maybe_rules->begin(), maybe_rules->end());
     }
 
     metadata.emplace_back(std::move(trace_sampling_rules_metadata));
   }
 
-  rules.insert(rules_.cbegin(), rules_.cend());
-  trace_sampler_->set_rules(rules);
+  trace_sampler_->set_rules(std::move(rules));
 
   if (!conf.tags) {
     reset_config(ConfigName::TAGS, span_defaults_, metadata);
