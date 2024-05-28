@@ -3,7 +3,7 @@ from ubuntu:22.04
 WORKDIR /dd-trace-cpp
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG BRANCH=v0.2.0
+ARG BRANCH=v0.2.1
 
 run apt update -y \
  && apt install -y g++ make git wget sed \
