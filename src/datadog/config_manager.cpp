@@ -110,8 +110,8 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
 
   // NOTE(@dmehala): Sampling rules are generally not well specified.
   //
-  // Rules are eveluated in the order they are inserted, which means the most
-  // specific matching rule moght not be evaluated, even though it should be.
+  // Rules are evaluated in the order they are inserted, which means the most
+  // specific matching rule might not be evaluated, even though it should be.
   // For now, we must follow this legacy behavior.
   //
   // Additionally, I exploit this behavior to avoid a merge operation.
