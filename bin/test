@@ -61,13 +61,14 @@ if [ "$coverage_flags" != '' ]; then
     lcov --quiet --capture --directory .build --output-file .coverage/raw.info --rc geninfo_json_module=JSON::XS
     # Filter out system headers and test drivers.
     lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
-    # Generate an HTML coverage report at ".coverage/report/index.html".
-    genhtml --quiet --dark-mode .coverage/filtered.info --output-directory .coverage/report
 
     echo 'Done.'
 fi
 
 if [ "$show_coverage" -eq 1 ]; then
+    # Generate an HTML coverage report at ".coverage/report/index.html".
+    genhtml --quiet --dark-mode .coverage/filtered.info --output-directory .coverage/report
+
     index='.coverage/report/index.html'
     case "$(uname -s)" in
       Darwin) open "$index" ;;

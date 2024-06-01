@@ -1,5 +1,7 @@
 Datadog C++ Tracing Library
 ===========================
+[![codecov](https://codecov.io/gh/DataDog/dd-trace-cpp/graph/badge.svg?token=78VYILWPMC)](https://codecov.io/gh/DataDog/dd-trace-cpp)
+
 ```c++
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
