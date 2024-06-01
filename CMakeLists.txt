@@ -6,6 +6,7 @@ project(dd-trace-cpp)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(BUILD_STATIC_LIBS "Build static libraries" OFF)
+option(BUILD_C_BINDING "Build C binding" OFF)
 
 # Consumer of the library using FetchContent do not need
 # to build unit tests, fuzzers and examples.
@@ -69,6 +70,7 @@ endif ()
 if (DD_TRACE_BUILD_BENCHMARK)
   add_subdirectory(benchmark)
 endif ()
+
 
 add_library(dd_trace_cpp-objects OBJECT)
 add_library(dd_trace::obj ALIAS dd_trace_cpp-objects)
@@ -262,3 +264,7 @@ if (BUILD_STATIC_LIBS)
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 endif ()
+
+if (BUILD_C_BINDING)
+  add_subdirectory(binding/c)
+endif()
