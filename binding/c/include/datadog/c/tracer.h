@@ -1,22 +1,31 @@
 #ifndef DD_TRACE_SDK_C_TRACER_H
 #define DD_TRACE_SDK_C_TRACER_H
 
+#include <stddef.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
+
+struct str_view {
+  const char* buf;
+  size_t len;
+};
 
 // TBD
 //
 // @param       key         Context key to read
 // @param[out]  result      TBD
-typedef const char* (*datadog_sdk_context_read_callback)(const char* key);
+typedef str_view (*datadog_sdk_context_read_callback)(void* reader_ctx,
+                                                      str_view key);
 
 // TBD
 //
 // @param[out] key        Key to write
 // @param[out] value      Value
-typedef void (*datadog_sdk_context_write_callback)(const char* key,
-                                                   const char* value);
+typedef void (*datadog_sdk_context_write_callback)(void* writer_ctx,
+                                                   str_view key,
+                                                   str_view value);
 
 enum datadog_sdk_tracer_option {
   DATADOG_TRACER_OPT_SERVICE_NAME = 0,
@@ -70,7 +79,7 @@ void datadog_sdk_tracer_free(datadog_sdk_tracer_t* tracer_handle);
 //
 // @return  span_handle   Span handle, or a null pointer on error
 datadog_sdk_span_t* datadog_sdk_tracer_create_span(
-    datadog_sdk_tracer_t* tracer_handle, const char* name);
+    datadog_sdk_tracer_t* tracer_handle, str_view name);
 
 // Extract or create a span using a Tracer.
 //
@@ -82,9 +91,9 @@ datadog_sdk_span_t* datadog_sdk_tracer_create_span(
 //
 // @return span_handle    Span handle, or a null pointer on error
 datadog_sdk_span_t* datadog_sdk_tracer_extract_or_create_span(
-    datadog_sdk_tracer_t* tracer_handle,
-    datadog_sdk_context_read_callback on_context_read, const char* name,
-    const char* resource);
+    datadog_sdk_tracer_t* tracer_handle, void* reader_ctx,
+    datadog_sdk_context_read_callback on_context_read, str_view name,
+    str_view resource);
 
 // Release a span instance
 //
@@ -98,8 +107,8 @@ void datadog_sdk_span_free(datadog_sdk_span_t* span_handle);
 // @param span_handle Handle on span instance
 // @param key         Key to associate
 // @param value       Value
-void datadog_sdk_span_set_tag(datadog_sdk_span_t* span_handle, const char* key,
-                              const char* value);
+void datadog_sdk_span_set_tag(datadog_sdk_span_t* span_handle, str_view key,
+                              str_view value);
 
 // Set a span as errorneous
 //
@@ -113,7 +122,7 @@ void datadog_sdk_span_set_error(datadog_sdk_span_t* span_handle,
 // @param span_handle   Handle on a span instance
 // @param error_message Error message
 void datadog_sdk_span_set_error_message(datadog_sdk_span_t* span_handle,
-                                        const char* error_message);
+                                        str_view error_message);
 
 // Context propagation injection
 //
@@ -121,7 +130,7 @@ void datadog_sdk_span_set_error_message(datadog_sdk_span_t* span_handle,
 // @param on_context_write  Callback that will be called per field for context
 // propagation
 void datadog_sdk_span_inject(
-    datadog_sdk_span_t* span_handle,
+    datadog_sdk_span_t* span_handle, void* writer_ctx,
     datadog_sdk_context_write_callback on_context_write);
 
 // Create a child span.
@@ -131,7 +140,7 @@ void datadog_sdk_span_inject(
 //
 // @return span_handle  Handle or a null pointer
 void* datadog_sdk_span_create_child(datadog_sdk_span_t* span_handle,
-                                    const char* name);
+                                    str_view name);
 
 // Stop the span time
 //
