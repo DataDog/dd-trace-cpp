@@ -4,16 +4,29 @@ cmake_minimum_required(VERSION 3.24)
 
 project(dd-trace-cpp)
 
-option(BUILD_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
-option(BUILD_EXAMPLES "Build example programs" OFF)
-option(BUILD_TESTING "Build the unit tests (test/)" OFF)
-option(BUILD_FUZZERS "Build fuzzers" OFF)
-option(BUILD_BENCHMARK "Build benchmark binaries" OFF)
-option(SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(BUILD_STATIC_LIBS "Build static libraries" OFF)
+
+# Consumer of the library using FetchContent do not need
+# to build unit tests, fuzzers and examples.
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  option(DD_TRACE_BUILD_EXAMPLES "Build example programs" OFF)
+  option(DD_TRACE_BUILD_TESTING "Build the unit tests (test/)" OFF)
+  option(DD_TRACE_BUILD_FUZZERS "Build fuzzers" OFF)
+  option(DD_TRACE_BUILD_BENCHMARK "Build benchmark binaries" OFF)
+  option(DD_TRACE_ENABLE_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
+  option(DD_TRACE_ENABLE_SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
+endif()
 
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(DD_TRACE_ENABLE_SANITIZE ON)
 endif ()
+
+# Linking this library requires libcurl and threads.
+find_package(Threads REQUIRED)
+include(cmake/deps/curl.cmake)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -21,72 +34,49 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# This warning has a false positive. See
-# <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108088>.
-add_compile_options(-Wno-error=free-nonheap-object)
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/datadog/version.cpp DD_TRACE_VERSION_CPP_CONTENTS REGEX "#define DD_TRACE_VERSION( |_NUM )")
+string(REGEX MATCH "#define DD_TRACE_VERSION \"[^\"]*" DD_TRACE_VERSION ${DD_TRACE_VERSION_CPP_CONTENTS})
+string(REGEX REPLACE "[^\"]+\"" "" DD_TRACE_VERSION ${DD_TRACE_VERSION})
+message(STATUS "dd-trace-cpp version=[${DD_TRACE_VERSION}]")
+unset(DD_TRACE_VERSION_CPP_CONTENTS)
 
-# This warning has a false positive with clang. See
-# <https://stackoverflow.com/questions/52416362>.
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    add_compile_options(-Wno-error=unused-lambda-capture)
-
-    # If we're building with clang, then use the libc++ version of the standard
-    # library instead of libstdc++. Better coverage of build configurations.
-    #
-    # But there's one exception: libfuzzer is built with libstdc++ on Ubuntu,
-    # and so won't link to libc++. So, if any of the FUZZ_* variables are set,
-    # keep to libstdc++ (the default on most systems).
-    if (NOT ${BUILD_FUZZERS})
-      add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-stdlib=libc++>)
-      add_link_options(-stdlib=libc++)
-    endif ()
-endif()
-
-function(add_sanitizers)
-  add_compile_options(-fsanitize=address)
-  add_link_options(-fsanitize=address)
-  add_compile_options(-fsanitize=undefined)
-  add_link_options(-fsanitize=undefined)
-endfunction()
-
-if(BUILD_FUZZERS)
-  set(BUILD_TESTING OFF)
-  add_compile_options(-fsanitize=fuzzer)
-  add_link_options(-fsanitize=fuzzer)
-  add_sanitizers()
-  add_subdirectory(fuzz)
-endif()
-
-if (SANITIZE)
-  add_sanitizers()
-endif()
-
-if (BUILD_TESTING)
-  set(CMAKE_BUILD_TYPE "Debug")
-endif()
-
-include(cmake/curl.cmake)
-
-if (APPLE)
-  find_library(COREFOUNDATION_LIBRARY CoreFoundation)
-  find_library(SYSTEMCONFIGURATION_LIBRARY SystemConfiguration)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  message(STATUS "Compiler: MSVC ${CMAKE_CXX_COMPILER_VERSION}")
+  include(cmake/compiler/msvc.cmake)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  message(STATUS "Compiler: clang ${CMAKE_CXX_COMPILER_VERSION}")
+  include(cmake/compiler/clang.cmake)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+  message(STATUS "Compiler: clang-apple ${CMAKE_CXX_COMPILER_VERSION}")
+  include(cmake/compiler/clang_apple.cmake)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  message(STATUS "Compiler: GCC ${CMAKE_CXX_COMPILER_VERSION}")
+  include(cmake/compiler/gcc.cmake)
 endif ()
 
-if (MSVC)
-    add_compile_options(/W4 /WX)
-else()
-    add_compile_options(-Wall -Wextra -pedantic -Werror)
-    if (BUILD_COVERAGE)
-      add_compile_options(-g -O0 -fprofile-arcs -ftest-coverage)
-    endif()
+if (DD_TRACE_BUILD_FUZZERS)
+  add_subdirectory(fuzz)
+endif ()
+
+if (DD_TRACE_BUILD_TESTING)
+  add_subdirectory(test)
 endif()
 
-if(BUILD_COVERAGE)
-  set(COVERAGE_LIBRARIES gcov)
-endif()
+if (DD_TRACE_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif ()
+
+if (DD_TRACE_BUILD_BENCHMARK)
+  add_subdirectory(benchmark)
+endif ()
 
 add_library(dd_trace_cpp-objects OBJECT)
-target_sources(dd_trace_cpp-objects PRIVATE
+add_library(dd_trace::obj ALIAS dd_trace_cpp-objects)
+
+add_dependencies(dd_trace_cpp-objects libcurl)
+
+target_sources(dd_trace_cpp-objects
+  PRIVATE
     src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
@@ -210,43 +200,65 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/w3c_propagation.h
 )
 
-add_dependencies(dd_trace_cpp-objects libcurl)
+# TODO: define public/private
+# Headers location are different depending of whether we are building 
+# or installing the library.
+# target_include_directories(dd_trace_cpp-objects
+#   PUBLIC
+#     $<INSTALL_INTERFACE:src>
+#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+# )
 
-# Linking this library requires libcurl and threads.
-find_package(Threads REQUIRED)
 target_link_libraries(dd_trace_cpp-objects
-  PUBLIC
+  PRIVATE
     libcurl
     Threads::Threads
-    ${COVERAGE_LIBRARIES}
-    ${COREFOUNDATION_LIBRARY}
-    ${SYSTEMCONFIGURATION_LIBRARY}
+    dd_trace::specs
 )
 
 # Produce both shared and static versions of the library.
-add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
-set_target_properties(dd_trace_cpp-shared PROPERTIES OUTPUT_NAME "dd_trace_cpp")
-add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)
-target_link_libraries(dd_trace_cpp-shared dd_trace_cpp-objects)
+if (BUILD_SHARED_LIBS)
+  add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
+  add_library(dd_trace::shared ALIAS dd_trace_cpp-shared)
 
-add_library(dd_trace_cpp-static STATIC $<TARGET_OBJECTS:dd_trace_cpp-objects>)
-set_target_properties(dd_trace_cpp-static PROPERTIES OUTPUT_NAME "dd_trace_cpp")
-add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
-target_link_libraries(dd_trace_cpp-static dd_trace_cpp-objects)
+  add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)
 
-# When installing, install the static library, the shared library, and the
-# public headers.
-install(TARGETS dd_trace_cpp-static dd_trace_cpp-shared dd_trace_cpp-objects
-  FILE_SET public_headers)
+  target_link_libraries(dd_trace_cpp-shared
+    PUBLIC
+      dd_trace::obj
+    PRIVATE
+      dd_trace::specs
+  )
 
-if(BUILD_TESTING)
-  add_subdirectory(test)
-endif()
+  install(TARGETS dd_trace_cpp-objects dd_trace_cpp-shared
+    EXPORT dd_trace_cpp-export
+    FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    # For Windows
+    RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+endif ()
 
-if(BUILD_EXAMPLES)
-  add_subdirectory(examples)
-endif()
+if (BUILD_STATIC_LIBS)
+  add_library(dd_trace_cpp-static STATIC $<TARGET_OBJECTS:dd_trace_cpp-objects>)
+  add_library(dd_trace::static ALIAS dd_trace_cpp-static)
 
-if(BUILD_BENCHMARK)
-  add_subdirectory(benchmark)
-endif()
+  add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
+
+  target_link_libraries(dd_trace_cpp-static 
+    PUBLIC
+      dd_trace::obj
+    PRIVATE
+      dd_trace::specs
+  )
+
+  install(TARGETS dd_trace_cpp-objects dd_trace_cpp-static
+    EXPORT dd_trace_cpp-export
+    FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    # For Windows
+    RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+endif ()

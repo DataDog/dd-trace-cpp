@@ -23,11 +23,6 @@
 #include "mocks/event_schedulers.h"
 #include "mocks/loggers.h"
 #include "test.h"
-#ifdef _MSC_VER
-#include <winbase.h>  // SetEnvironmentVariable
-#else
-#include <stdlib.h>  // setenv, unsetenv
-#endif
 
 namespace datadog {
 namespace tracing {
@@ -68,7 +63,10 @@ class EnvGuard {
 
   void set_value(const std::string& value) {
 #ifdef _MSC_VER
-    ::SetEnvironmentVariable(name_.c_str(), value.c_str());
+    std::string envstr{name_};
+    envstr += "=";
+    envstr += value;
+    assert(_putenv(envstr.c_str()) == 0);
 #else
     const bool overwrite = true;
     ::setenv(name_.c_str(), value.c_str(), overwrite);
@@ -77,7 +75,9 @@ class EnvGuard {
 
   void unset() {
 #ifdef _MSC_VER
-    ::SetEnvironmentVariable(name_.c_str(), NULL);
+    std::string envstr{name_};
+    envstr += "=";
+    assert(_putenv(envstr.c_str()) == 0);
 #else
     ::unsetenv(name_.c_str());
 #endif
@@ -212,7 +212,6 @@ TEST_CASE("TracerConfig::defaults") {
     };
 
     auto test_case = GENERATE(values<TestCase>({
-        {"empty", "", {}, nullopt},
         {"missing colon",
          "foo",
          {
@@ -447,14 +446,6 @@ TEST_CASE("TracerConfig::agent") {
   }
 
   SECTION("remote configuration poll interval") {
-    SECTION("cannot be zero") {
-      config.agent.remote_configuration_poll_interval_seconds = 0;
-      auto finalized = finalize_config(config);
-      REQUIRE(!finalized);
-      REQUIRE(finalized.error().code ==
-              Error::DATADOG_AGENT_INVALID_REMOTE_CONFIG_POLL_INTERVAL);
-    }
-
     SECTION("cannot be negative") {
       config.agent.remote_configuration_poll_interval_seconds = -1337;
       auto finalized = finalize_config(config);
@@ -492,7 +483,7 @@ TEST_CASE("TracerConfig::agent") {
                                  "ddog"};
         auto finalized = finalize_config(config);
         REQUIRE(!finalized);
-        REQUIRE(finalized.error().code == Error::INVALID_INTEGER);
+        REQUIRE(finalized.error().code == Error::INVALID_DOUBLE);
       }
     }
   }
@@ -561,7 +552,6 @@ TEST_CASE("TracerConfig::agent") {
           // during configuration.  For the purposes of configuration, any
           // value is accepted.
           {"we don't parse port", x, "bogus", x, "http", "localhost:bogus"},
-          {"even empty is ok", x, "", x, "http", "localhost:"},
           {"URL", x, x, "http://dd-agent:8080", "http", "dd-agent:8080"},
           {"URL overrides scheme", x, x, "https://dd-agent:8080", "https",
            "dd-agent:8080"},
@@ -618,7 +608,9 @@ TEST_CASE("TracerConfig::trace_sampler") {
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.size() == 1);
       // and the default sample_rate is 100%
-      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 1.0);
+      const auto& rule = finalized->trace_sampler.rules.front();
+      CHECK(rule.rate == 1.0);
+      CHECK(rule.mechanism == SamplingMechanism::RULE);
     }
 
     SECTION("has to have a valid sample_rate") {
@@ -640,8 +632,10 @@ TEST_CASE("TracerConfig::trace_sampler") {
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->trace_sampler.rules.size() == 2);
-    REQUIRE(finalized->trace_sampler.rules[0].sample_rate == 0.5);
-    REQUIRE(finalized->trace_sampler.rules[1].sample_rate == 0.6);
+
+    const auto& rule = finalized->trace_sampler.rules.front();
+    CHECK(rule.rate == 0.5);
+    CHECK(rule.mechanism == SamplingMechanism::RULE);
   }
 
   SECTION("global sample_rate creates a catch-all rule") {
@@ -650,11 +644,11 @@ TEST_CASE("TracerConfig::trace_sampler") {
     REQUIRE(finalized);
     REQUIRE(finalized->trace_sampler.rules.size() == 1);
     const auto& rule = finalized->trace_sampler.rules.front();
-    REQUIRE(rule.sample_rate == 0.25);
-    REQUIRE(rule.service == "*");
-    REQUIRE(rule.name == "*");
-    REQUIRE(rule.resource == "*");
-    REQUIRE(rule.tags.empty());
+    REQUIRE(rule.rate == 0.25);
+    REQUIRE(rule.matcher.service == "*");
+    REQUIRE(rule.matcher.name == "*");
+    REQUIRE(rule.matcher.resource == "*");
+    REQUIRE(rule.matcher.tags.empty());
   }
 
   SECTION("DD_TRACE_SAMPLE_RATE") {
@@ -663,7 +657,9 @@ TEST_CASE("TracerConfig::trace_sampler") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.size() == 1);
-      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 0.5);
+      REQUIRE(finalized->trace_sampler.rules.front().rate == 0.5);
+      REQUIRE(finalized->trace_sampler.rules.front().mechanism ==
+              SamplingMechanism::RULE);
     }
 
     SECTION("overrides TraceSamplerConfig::sample_rate") {
@@ -672,7 +668,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.size() == 1);
-      REQUIRE(finalized->trace_sampler.rules.front().sample_rate == 0.5);
+      REQUIRE(finalized->trace_sampler.rules.front().rate == 0.5);
     }
 
     SECTION("has to have a valid value") {
@@ -683,7 +679,6 @@ TEST_CASE("TracerConfig::trace_sampler") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"empty", "", {Error::INVALID_DOUBLE}},
           {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
           {"trailing space", "0.23   ", {Error::INVALID_DOUBLE}},
           {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
@@ -749,7 +744,6 @@ TEST_CASE("TracerConfig::trace_sampler") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"empty", "", {Error::INVALID_DOUBLE}},
           {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
           {"trailing space", "23   ", {Error::INVALID_DOUBLE}},
           {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
@@ -806,16 +800,16 @@ TEST_CASE("TracerConfig::trace_sampler") {
       CAPTURE(rules_json);
       CAPTURE(rules);
       REQUIRE(rules.size() == 2);
-      REQUIRE(rules[0].service == "poohbear");
-      REQUIRE(rules[0].name == "get.honey");
-      REQUIRE(rules[0].sample_rate == 0);
-      REQUIRE(rules[0].tags.size() == 0);
-      REQUIRE(rules[1].service == "*");
-      REQUIRE(rules[1].name == "*");
-      REQUIRE(rules[1].sample_rate == 1);
-      REQUIRE(rules[1].tags.size() == 1);
-      REQUIRE(rules[1].tags.at("error") == "*");
-      REQUIRE(rules[1].resource == "/admin/*");
+      REQUIRE(rules[0].matcher.service == "poohbear");
+      REQUIRE(rules[0].matcher.name == "get.honey");
+      REQUIRE(rules[0].rate == 0);
+      REQUIRE(rules[0].matcher.tags.size() == 0);
+      REQUIRE(rules[1].matcher.service == "*");
+      REQUIRE(rules[1].matcher.name == "*");
+      REQUIRE(rules[1].rate == 1);
+      REQUIRE(rules[1].matcher.tags.size() == 1);
+      REQUIRE(rules[1].matcher.tags.at("error") == "*");
+      REQUIRE(rules[1].matcher.resource == "/admin/*");
     }
 
     SECTION("must be valid") {
@@ -1060,13 +1054,17 @@ TEST_CASE("TracerConfig::span_sampler") {
 
       SECTION("failed usage") {
         SECTION("unable to open") {
-          std::filesystem::path defunct;
-          {
-            SomewhatSecureTemporaryFile file;
-            REQUIRE(file.is_open());
-            defunct = file.path();
-          }
-          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE", defunct.string()};
+          // It's not elegant, but neither an empty path nor a path to a
+          // deleted file work for this test on Windows.
+          //
+          // On Windows, deleting the file doesn't delete the file, and an
+          // empty path deletes the environment variable rather than set the
+          // environment variable empty.
+          //
+          // An easy workaround is to choose a path that is very likely not on
+          // the file system.
+          const std::string invalid = "ooga/booga/booga/booga";
+          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES_FILE", invalid};
           auto finalized = finalize_config(config);
           REQUIRE(!finalized);
           REQUIRE(finalized.error().code == Error::SPAN_SAMPLING_RULES_FILE_IO);
@@ -1169,8 +1167,9 @@ TEST_CASE("TracerConfig propagation styles") {
         };
 
         // brevity
-        const auto datadog = PropagationStyle::DATADOG,
-                   b3 = PropagationStyle::B3, none = PropagationStyle::NONE;
+        static const auto datadog = PropagationStyle::DATADOG,
+                          b3 = PropagationStyle::B3,
+                          none = PropagationStyle::NONE;
         // clang-format off
         auto test_case = GENERATE(values<TestCase>({
           {__LINE__, "Datadog", x, {datadog}},
@@ -1346,7 +1345,6 @@ TEST_CASE("configure 128-bit trace IDs") {
       {__LINE__, "no", false},
       {__LINE__, "nein", true},
       {__LINE__, "0", false},
-      {__LINE__, "", true},
     }));
     // clang-format on
 

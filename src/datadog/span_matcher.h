@@ -32,7 +32,14 @@ struct SpanMatcher {
   nlohmann::json to_json() const;
 
   static Expected<SpanMatcher> from_json(const nlohmann::json&);
+
+  bool operator==(const SpanMatcher& other) const {
+    return (service == other.service && name == other.name &&
+            resource == other.resource && tags == other.tags);
+  }
 };
+
+static const SpanMatcher catch_all;
 
 }  // namespace tracing
 }  // namespace datadog

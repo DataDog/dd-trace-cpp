@@ -54,7 +54,9 @@ class ConfigManager {
   Clock clock_;
   std::unordered_map<ConfigName, ConfigMetadata> default_metadata_;
 
-  DynamicConfig<std::shared_ptr<TraceSampler>> trace_sampler_;
+  std::shared_ptr<TraceSampler> trace_sampler_;
+  std::vector<TraceSamplerRule> rules_;
+
   DynamicConfig<std::shared_ptr<const SpanDefaults>> span_defaults_;
   DynamicConfig<bool> report_traces_;
 

@@ -6,18 +6,91 @@
 
 namespace datadog {
 namespace tracing {
+namespace {
+
+using Rules = std::vector<TraceSamplerRule>;
+
+Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
+  Rules parsed_rules;
+
+  std::string type = json_rules.type_name();
+  if (type != "array") {
+    std::string message;
+    return Error{Error::TRACE_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
+  }
+
+  for (const auto& json_rule : json_rules) {
+    auto matcher = SpanMatcher::from_json(json_rule);
+    if (auto* error = matcher.if_error()) {
+      std::string prefix;
+      return error->with_prefix(prefix);
+    }
+
+    TraceSamplerRule rule;
+    rule.matcher = std::move(*matcher);
+
+    if (auto sample_rate = json_rule.find("sample_rate");
+        sample_rate != json_rule.end()) {
+      type = sample_rate->type_name();
+      if (type != "number") {
+        std::string message;
+        return Error{Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE,
+                     std::move(message)};
+      }
+
+      auto maybe_rate = Rate::from(*sample_rate);
+      if (auto error = maybe_rate.if_error()) {
+        return *error;
+      }
+
+      rule.rate = *maybe_rate;
+    } else {
+      return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
+                   "Missing \"sample_rate\" field"};
+    }
+
+    if (auto provenance_it = json_rule.find("provenance");
+        provenance_it != json_rule.cend()) {
+      if (!provenance_it->is_string()) {
+        std::string message;
+        return Error{Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE,
+                     std::move(message)};
+      }
+
+      auto provenance = to_lower(provenance_it->get<StringView>());
+      if (provenance == "customer") {
+        rule.mechanism = SamplingMechanism::REMOTE_RULE;
+      } else if (provenance == "dynamic") {
+        rule.mechanism = SamplingMechanism::REMOTE_ADAPTIVE_RULE;
+      } else {
+        return Error{Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY,
+                     "Unknown \"provenance\" value"};
+      }
+    } else {
+      return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
+                   "Missing \"provenance\" field"};
+    }
+
+    parsed_rules.emplace_back(std::move(rule));
+  }
+
+  return parsed_rules;
+}
+
+}  // namespace
 
 ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
     : clock_(config.clock),
       default_metadata_(config.metadata),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock_)),
+      rules_(config.trace_sampler.rules),
       span_defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       report_traces_(config.report_traces) {}
 
 std::shared_ptr<TraceSampler> ConfigManager::trace_sampler() {
   std::lock_guard<std::mutex> lock(mutex_);
-  return trace_sampler_.value();
+  return trace_sampler_;
 }
 
 std::shared_ptr<const SpanDefaults> ConfigManager::span_defaults() {
@@ -35,31 +108,63 @@ std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
 
   std::lock_guard<std::mutex> lock(mutex_);
 
+  // NOTE(@dmehala): Sampling rules are generally not well specified.
+  //
+  // Rules are evaluated in the order they are inserted, which means the most
+  // specific matching rule might not be evaluated, even though it should be.
+  // For now, we must follow this legacy behavior.
+  //
+  // Additionally, I exploit this behavior to avoid a merge operation.
+  // The resulting array can contain duplicate `SpanMatcher`, but only the first
+  // encountered one will be evaluated, acting as an override.
+  //
+  // Remote Configuration rules will/should always be placed at the begining of
+  // the array, ensuring they are evaluated first.
+  auto rules = rules_;
+
   if (!conf.trace_sampling_rate) {
-    reset_config(ConfigName::TRACE_SAMPLING_RATE, trace_sampler_, metadata);
+    auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RATE);
+    if (found != default_metadata_.cend()) {
+      metadata.push_back(found->second);
+    }
   } else {
     ConfigMetadata trace_sampling_metadata(
         ConfigName::TRACE_SAMPLING_RATE,
         to_string(*conf.trace_sampling_rate, 1),
         ConfigMetadata::Origin::REMOTE_CONFIG);
 
-    TraceSamplerConfig trace_sampler_cfg;
-    trace_sampler_cfg.sample_rate = *conf.trace_sampling_rate;
+    auto rate = Rate::from(*conf.trace_sampling_rate);
 
-    auto finalized_trace_sampler_cfg = finalize_config(trace_sampler_cfg);
-    if (auto error = finalized_trace_sampler_cfg.if_error()) {
-      trace_sampling_metadata.error = *error;
-    }
+    TraceSamplerRule rule;
+    rule.rate = *rate;
+    rule.matcher = catch_all;
+    rule.mechanism = SamplingMechanism::RULE;
+    rules.emplace(rules.cbegin(), std::move(rule));
 
-    auto trace_sampler =
-        std::make_shared<TraceSampler>(*finalized_trace_sampler_cfg, clock_);
-
-    // This reset rate limiting and `TraceSampler` has no `operator==`.
-    // TODO: Instead of creating another `TraceSampler`, we should
-    // update the default sampling rate.
-    trace_sampler_ = std::move(trace_sampler);
     metadata.emplace_back(std::move(trace_sampling_metadata));
   }
+
+  if (!conf.trace_sampling_rules) {
+    auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RULES);
+    if (found != default_metadata_.cend()) {
+      metadata.emplace_back(found->second);
+    }
+  } else {
+    ConfigMetadata trace_sampling_rules_metadata(
+        ConfigName::TRACE_SAMPLING_RULES, conf.trace_sampling_rules->dump(),
+        ConfigMetadata::Origin::REMOTE_CONFIG);
+
+    auto maybe_rules = parse_trace_sampling_rules(*conf.trace_sampling_rules);
+    if (auto error = maybe_rules.if_error()) {
+      trace_sampling_rules_metadata.error = std::move(*error);
+    } else {
+      rules.insert(rules.cbegin(), maybe_rules->begin(), maybe_rules->end());
+    }
+
+    metadata.emplace_back(std::move(trace_sampling_rules_metadata));
+  }
+
+  trace_sampler_->set_rules(std::move(rules));
 
   if (!conf.tags) {
     reset_config(ConfigName::TAGS, span_defaults_, metadata);
@@ -109,10 +214,9 @@ std::vector<ConfigMetadata> ConfigManager::reset() { return update({}); }
 
 nlohmann::json ConfigManager::config_json() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return nlohmann::json{
-      {"defaults", to_json(*span_defaults_.value())},
-      {"trace_sampler", trace_sampler_.value()->config_json()},
-      {"report_traces", report_traces_.value()}};
+  return nlohmann::json{{"defaults", to_json(*span_defaults_.value())},
+                        {"trace_sampler", trace_sampler_->config_json()},
+                        {"report_traces", report_traces_.value()}};
 }
 
 }  // namespace tracing

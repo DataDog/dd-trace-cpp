@@ -8,7 +8,7 @@ cd "$(dirname "$0")"/..
 mkdir -p .build
 
 cd .build
-cmake .. -DBUILD_BENCHMARK=1 -DCMAKE_BUILD_TYPE=Release
+cmake .. -DDD_TRACE_BUILD_BENCHMARK=1 -DCMAKE_BUILD_TYPE=Release
 make -j
 cd ../
 

@@ -62,7 +62,7 @@ struct DatadogAgentConfig {
   Optional<bool> remote_configuration_enabled;
   // How often, in seconds, to query the Datadog Agent for remote configuration
   // updates.
-  Optional<int> remote_configuration_poll_interval_seconds;
+  Optional<double> remote_configuration_poll_interval_seconds;
 
   // Remote configuration listeners to add
   std::vector<std::unique_ptr<remote_config::ProductListener>>

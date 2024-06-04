@@ -37,13 +37,22 @@ nlohmann::json::array_t subscribed_products_to_json(
   return res;
 }
 
-// Big-endian serialization of the capabilities set
+// The ".client.capabilities" field of the remote config request payload
+// describes which parts of the library's configuration are supported for remote
+// configuration.
+//
+// It's a bitset, 64 bits wide, where each bit indicates whether the library
+// supports a particular feature for remote configuration.
+//
+// The bitset is encoded in the request as a JSON array of 8 integers, where
+// each integer is one byte from the 64 bits. The bytes are in big-endian order
+// within the array.
 constexpr std::array<uint8_t, sizeof(remote_config::CapabilitiesSet)>
 capabilities_byte_array(uint64_t in) {
   std::size_t j = sizeof(in) - 1;
   std::array<uint8_t, sizeof(remote_config::CapabilitiesSet)> res{};
   for (std::size_t i = 0; i < sizeof(in); ++i) {
-    res[j--] = in >> (i * 8);
+    res[j--] = static_cast<uint8_t>(in >> (i * 8));
   }
 
   return res;
@@ -103,6 +112,7 @@ class TracingProductListener : public remote_config::ProductListener {
         remote_config::Capability::APM_TRACING_SAMPLE_RATE,
         remote_config::Capability::APM_TRACING_CUSTOM_TAGS,
         remote_config::Capability::APM_TRACING_TRACING_ENABLED,
+        remote_config::Capability::APM_TRACING_SAMPLE_RULES,
     };
   }
 
@@ -124,7 +134,7 @@ class TracingProductListener : public remote_config::ProductListener {
 
     if (auto sampling_rate_it = j.find("tracing_sampling_rate"_sv);
         sampling_rate_it != j.cend() && sampling_rate_it->is_number()) {
-      config_update.trace_sampling_rate = *sampling_rate_it;
+      config_update.trace_sampling_rate = sampling_rate_it->get<double>();
     }
 
     if (auto tags_it = j.find("tracing_tags"_sv);
@@ -135,6 +145,12 @@ class TracingProductListener : public remote_config::ProductListener {
     if (auto tracing_enabled_it = j.find("tracing_enabled"_sv);
         tracing_enabled_it != j.cend() && tracing_enabled_it->is_boolean()) {
       config_update.report_traces = tracing_enabled_it->get<bool>();
+    }
+
+    if (auto tracing_sampling_rules_it = j.find("tracing_sampling_rules");
+        tracing_sampling_rules_it != j.cend() &&
+        tracing_sampling_rules_it->is_array()) {
+      config_update.trace_sampling_rules = &(*tracing_sampling_rules_it);
     }
 
     return config_update;

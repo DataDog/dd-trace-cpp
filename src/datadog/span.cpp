@@ -3,7 +3,6 @@
 #include <cassert>
 #include <string>
 
-#include "datadog/sampling_mechanism.h"
 #include "dict_writer.h"
 #include "optional.h"
 #include "span_config.h"

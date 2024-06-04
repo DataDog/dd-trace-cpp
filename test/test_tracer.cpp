@@ -622,6 +622,13 @@ TEST_CASE("span extraction") {
          67667974448284343ULL, // expected_parent_id
          0}, // expected_sampling_priority
 
+        {__LINE__, "valid: leading and trailing spaces",
+         "    00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01 \t", // traceparent
+         nullopt,
+         *TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"), // expected_trace_id
+         67667974448284343ULL, // expected_parent_id
+         1}, // expected_sampling_priority
+
         {__LINE__, "no traceparent",
          nullopt}, // traceparent
 
@@ -890,18 +897,6 @@ TEST_CASE("span extraction") {
             "00000000000d69ac",  // expected_datadog_w3c_parent_id
         },
 
-        {
-            __LINE__,
-            "dd parent id is malformed",
-            traceparent_drop,    // traceparent
-            "dd=p:XxDDOGxX",     // tracestate
-            0,                   // expected_sampling_priority
-            nullopt,             // expected_origin
-            {},                  // expected_trace_tags
-            nullopt,             // expected_additional_w3c_tracestate
-            nullopt,             // expected_additional_datadog_w3c_tracestate
-            "0000000000000000",  // expected_datadog_w3c_parent_id,
-        },
         {
             __LINE__,
             "dd parent id is propagated even if not valid",

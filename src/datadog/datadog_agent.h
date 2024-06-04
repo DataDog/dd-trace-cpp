@@ -17,6 +17,7 @@
 #include "http_client.h"
 #include "metrics.h"
 #include "remote_config.h"
+#include "tracer_signature.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {
@@ -55,9 +56,10 @@ class DatadogAgent : public Collector {
   std::chrono::steady_clock::duration shutdown_timeout_;
 
   RemoteConfigurationManager remote_config_;
+  TracerSignature tracer_signature_;
 
   void flush();
-  void send_telemetry(std::string);
+  void send_telemetry(StringView, std::string);
   void send_heartbeat_and_telemetry();
   void send_app_closing();
 

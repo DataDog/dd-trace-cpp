@@ -5,6 +5,7 @@
 #include "datadog/json_fwd.hpp"
 #include "datadog/logger.h"
 #include "datadog/remote_config.h"
+#include "datadog/trace_sampler.h"
 #include "datadog/tracer_config.h"
 #include "mocks/loggers.h"
 #include "test.h"
@@ -22,7 +23,7 @@ REMOTE_CONFIG_TEST("first payload") {
   TracerConfig tracer_cfg;
 
   const std::time_t mock_time = 1672484400;
-  const Clock clock = []() {
+  const Clock clock = [mock_time]() {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(mock_time);
     return result;
@@ -44,7 +45,7 @@ REMOTE_CONFIG_TEST("first payload") {
   CHECK(payload.contains("error") == false);
   CHECK(payload["client"]["is_tracer"] == true);
   CHECK(payload["client"]["capabilities"] ==
-        std::vector{0, 0, 0, 0, 0, 8, 144, 0});
+        std::vector{0, 0, 0, 0, 32, 8, 144, 0});
   CHECK(payload["client"]["products"] ==
         std::vector<std::string>{"APM_TRACING"});
   CHECK(payload["client"]["client_tracer"]["language"] == "cpp");
@@ -66,7 +67,7 @@ REMOTE_CONFIG_TEST("response processing") {
   TracerConfig tracer_cfg;
 
   const std::time_t mock_time = 1672484400;
-  const Clock clock = []() {
+  const Clock clock = [mock_time]() {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(mock_time);
     return result;
@@ -370,16 +371,18 @@ REMOTE_CONFIG_TEST("response processing") {
 
     REQUIRE(!response_json.is_discarded());
 
-    const auto old_trace_sampler = config_manager->trace_sampler();
+    const auto old_trace_sampler_config =
+        config_manager->trace_sampler()->config_json();
     const auto old_span_defaults = config_manager->span_defaults();
     const auto old_report_traces = config_manager->report_traces();
     const auto config_updated = rc.process_response(std::move(response_json));
     REQUIRE(config_updated.size() == 3);
-    const auto new_trace_sampler = config_manager->trace_sampler();
+    const auto new_trace_sampler_config =
+        config_manager->trace_sampler()->config_json();
     const auto new_span_defaults = config_manager->span_defaults();
     const auto new_report_traces = config_manager->report_traces();
 
-    CHECK(new_trace_sampler != old_trace_sampler);
+    CHECK(new_trace_sampler_config != old_trace_sampler_config);
     CHECK(new_span_defaults != old_span_defaults);
     CHECK(new_report_traces != old_report_traces);
 
@@ -418,11 +421,12 @@ REMOTE_CONFIG_TEST("response processing") {
             rc.process_response(std::move(response_json));
         REQUIRE(config_updated.size() == 3);
 
-        const auto current_trace_sampler = config_manager->trace_sampler();
+        const auto current_trace_sampler_config =
+            config_manager->trace_sampler()->config_json();
         const auto current_span_defaults = config_manager->span_defaults();
         const auto current_report_traces = config_manager->report_traces();
 
-        CHECK(old_trace_sampler == current_trace_sampler);
+        CHECK(old_trace_sampler_config == current_trace_sampler_config);
         CHECK(old_span_defaults == current_span_defaults);
         CHECK(old_report_traces == current_report_traces);
       }
@@ -453,8 +457,9 @@ REMOTE_CONFIG_TEST("response processing") {
         const auto config_updated =
             rc.process_response(std::move(response_json));
         REQUIRE(config_updated.size() == 1);
-        const auto current_trace_sampler = config_manager->trace_sampler();
-        CHECK(old_trace_sampler == current_trace_sampler);
+        const auto current_trace_sampler_config =
+            config_manager->trace_sampler()->config_json();
+        CHECK(old_trace_sampler_config == current_trace_sampler_config);
       }
     }
   }

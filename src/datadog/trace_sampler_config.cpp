@@ -134,13 +134,21 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
 std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
   nlohmann::json res;
   for (const auto &r : rules) {
-    res.emplace_back(r.to_json());
+    auto j = r.to_json();
+    j["sample_rate"] = r.sample_rate;
+    res.emplace_back(std::move(j));
   }
 
   return res.dump();
 }
 
 }  // namespace
+
+nlohmann::json TraceSamplerRule::to_json() const {
+  auto j = matcher.to_json();
+  j["sample_rate"] = rate.value();
+  return j;
+}
 
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
@@ -179,10 +187,11 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       return error->with_prefix(prefix);
     }
 
-    FinalizedTraceSamplerConfig::Rule finalized;
-    static_cast<SpanMatcher &>(finalized) = rule;
-    finalized.sample_rate = *maybe_rate;
-    result.rules.push_back(std::move(finalized));
+    TraceSamplerRule finalized_rule;
+    finalized_rule.matcher = rule;
+    finalized_rule.rate = *maybe_rate;
+    finalized_rule.mechanism = SamplingMechanism::RULE;
+    result.rules.emplace_back(std::move(finalized_rule));
   }
 
   Optional<double> sample_rate;
@@ -196,6 +205,10 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
         ConfigName::TRACE_SAMPLING_RATE, to_string(*sample_rate, 1),
         ConfigMetadata::Origin::CODE);
+  } else {
+    result.metadata[ConfigName::TRACE_SAMPLING_RATE] =
+        ConfigMetadata(ConfigName::TRACE_SAMPLING_RATE, "1.0",
+                       ConfigMetadata::Origin::DEFAULT);
   }
 
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
@@ -208,9 +221,11 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
           "Unable to parse overall sample_rate for trace sampling: ");
     }
 
-    FinalizedTraceSamplerConfig::Rule catch_all;
-    catch_all.sample_rate = *maybe_rate;
-    result.rules.push_back(std::move(catch_all));
+    TraceSamplerRule finalized_rule;
+    finalized_rule.rate = *maybe_rate;
+    finalized_rule.matcher = catch_all;
+    finalized_rule.mechanism = SamplingMechanism::RULE;
+    result.rules.emplace_back(std::move(finalized_rule));
   }
 
   const auto [origin, max_per_second] =
@@ -226,18 +241,11 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     message +=
         "Trace sampling max_per_second must be greater than zero, but the "
         "following value was given: ";
-    message += std::to_string(*config.max_per_second);
+    message += std::to_string(max_per_second);
     return Error{Error::MAX_PER_SECOND_OUT_OF_RANGE, std::move(message)};
   }
   result.max_per_second = max_per_second;
 
-  return result;
-}
-
-nlohmann::json to_json(const FinalizedTraceSamplerConfig::Rule &rule) {
-  // Get the base class's fields, then add our own.
-  auto result = static_cast<const SpanMatcher &>(rule).to_json();
-  result["sample_rate"] = double(rule.sample_rate);
   return result;
 }
 

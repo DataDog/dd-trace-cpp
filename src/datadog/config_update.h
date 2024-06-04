@@ -17,6 +17,7 @@ struct ConfigUpdate {
   Optional<bool> report_traces;
   Optional<double> trace_sampling_rate;
   Optional<std::vector<std::string>> tags;
+  const nlohmann::json* trace_sampling_rules = nullptr;
 };
 
 }  // namespace tracing

@@ -34,6 +34,7 @@
 #include "config.h"
 #include "json.hpp"
 #include "metrics.h"
+#include "platform_util.h"
 #include "runtime_id.h"
 #include "tracer_signature.h"
 
@@ -48,8 +49,8 @@ class TracerTelemetry {
   bool debug_ = false;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
+  HostInfo host_info_;
   TracerSignature tracer_signature_;
-  std::string hostname_;
   std::string integration_name_;
   std::string integration_version_;
   // Track sequence id per payload generated
@@ -115,10 +116,11 @@ class TracerTelemetry {
                   const TracerSignature& tracer_signature,
                   const std::string& integration_name,
                   const std::string& integration_version);
-  bool enabled() { return enabled_; };
+  inline bool enabled() { return enabled_; }
+  inline bool debug() { return debug_; }
   // Provides access to the telemetry metrics for updating the values.
   // This value should not be stored.
-  auto& metrics() { return metrics_; };
+  auto& metrics() { return metrics_; }
   // Constructs an `app-started` message using information provided when
   // constructed and the tracer_config value passed in.
   std::string app_started(

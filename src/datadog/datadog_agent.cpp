@@ -18,7 +18,6 @@
 #include "string_view.h"
 #include "trace_sampler.h"
 #include "tracer.h"
-#include "version.h"
 
 namespace datadog {
 namespace tracing {
@@ -163,7 +162,8 @@ DatadogAgent::DatadogAgent(
       flush_interval_(config.flush_interval),
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
-      remote_config_(tracer_signature, config_manager, logger) {
+      remote_config_(tracer_signature, config_manager, logger),
+      tracer_signature_(tracer_signature) {
   assert(logger_);
   assert(tracer_telemetry_);
 
@@ -299,8 +299,10 @@ void DatadogAgent::flush() {
   auto set_request_headers = [&](DictWriter& headers) {
     headers.set("Content-Type", "application/msgpack");
     headers.set("Datadog-Meta-Lang", "cpp");
-    headers.set("Datadog-Meta-Lang-Version", std::to_string(__cplusplus));
-    headers.set("Datadog-Meta-Tracer-Version", tracer_version);
+    headers.set("Datadog-Meta-Lang-Version",
+                tracer_signature_.library_language_version);
+    headers.set("Datadog-Meta-Tracer-Version",
+                tracer_signature_.library_version);
     headers.set("X-Datadog-Trace-Count", std::to_string(trace_chunks.size()));
   };
 
@@ -375,9 +377,30 @@ void DatadogAgent::flush() {
   }
 }
 
-void DatadogAgent::send_telemetry(std::string payload) {
+void DatadogAgent::send_telemetry(StringView request_type,
+                                  std::string payload) {
+  auto set_telemetry_headers = [request_type, payload_size = payload.size(),
+                                debug_enabled = tracer_telemetry_->debug(),
+                                tracer_signature =
+                                    &tracer_signature_](DictWriter& headers) {
+    /*
+      TODO:
+        Datadog-Container-ID
+    */
+    headers.set("Content-Type", "application/json");
+    headers.set("Content-Length", std::to_string(payload_size));
+    headers.set("DD-Telemetry-API-Version", "v2");
+    headers.set("DD-Client-Library-Language", "cpp");
+    headers.set("DD-Client-Library-Version", tracer_signature->library_version);
+    headers.set("DD-Telemetry-Request-Type", request_type);
+
+    if (debug_enabled) {
+      headers.set("DD-Telemetry-Debug-Enabled", "true");
+    }
+  };
+
   auto post_result =
-      http_client_->post(telemetry_endpoint_, set_content_type_json,
+      http_client_->post(telemetry_endpoint_, set_telemetry_headers,
                          std::move(payload), telemetry_on_response_,
                          telemetry_on_error_, clock_().tick + request_timeout_);
   if (auto* error = post_result.if_error()) {
@@ -388,20 +411,22 @@ void DatadogAgent::send_telemetry(std::string payload) {
 
 void DatadogAgent::send_app_started(
     const std::unordered_map<ConfigName, ConfigMetadata>& config_metadata) {
-  send_telemetry(tracer_telemetry_->app_started(config_metadata));
+  send_telemetry("app-started",
+                 tracer_telemetry_->app_started(config_metadata));
 }
 
 void DatadogAgent::send_heartbeat_and_telemetry() {
-  send_telemetry(tracer_telemetry_->heartbeat_and_telemetry());
+  send_telemetry("app-heartbeat", tracer_telemetry_->heartbeat_and_telemetry());
 }
 
 void DatadogAgent::send_app_closing() {
-  send_telemetry(tracer_telemetry_->app_closing());
+  send_telemetry("app-closing", tracer_telemetry_->app_closing());
 }
 
 void DatadogAgent::send_configuration_change(
     const std::vector<ConfigMetadata>& config) {
-  send_telemetry(tracer_telemetry_->configuration_change(config));
+  send_telemetry("app-client-configuration-change",
+                 tracer_telemetry_->configuration_change(config));
 }
 
 void DatadogAgent::get_and_apply_remote_configuration_updates() {

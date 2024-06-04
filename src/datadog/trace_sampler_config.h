@@ -15,10 +15,19 @@
 #include "json_fwd.hpp"
 #include "optional.h"
 #include "rate.h"
+#include "sampling_mechanism.h"
 #include "span_matcher.h"
 
 namespace datadog {
 namespace tracing {
+
+struct TraceSamplerRule final {
+  Rate rate;
+  SpanMatcher matcher;
+  SamplingMechanism mechanism;
+
+  nlohmann::json to_json() const;
+};
 
 struct TraceSamplerConfig {
   struct Rule : public SpanMatcher {
@@ -41,20 +50,13 @@ class FinalizedTraceSamplerConfig {
   FinalizedTraceSamplerConfig() = default;
 
  public:
-  struct Rule : public SpanMatcher {
-    Rate sample_rate;
-  };
-
-  std::vector<Rule> rules;
   double max_per_second;
-
+  std::vector<TraceSamplerRule> rules;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
     const TraceSamplerConfig& config);
-
-nlohmann::json to_json(const FinalizedTraceSamplerConfig::Rule&);
 
 }  // namespace tracing
 }  // namespace datadog
