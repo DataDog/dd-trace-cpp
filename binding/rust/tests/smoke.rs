@@ -1,5 +1,3 @@
-use std::collections::btree_map::Keys;
-
 use dd_trace_rust::{Config, ConfigProperty, Span, Tracer};
 
 fn foo(current_span: &mut Span) {
@@ -44,4 +42,16 @@ fn test_smoke() {
         eprintln!("{:?}", op2_span);
         foo(&mut op2_span);
     }
+}
+
+#[test]
+fn test_thread_safe() {
+    fn is_send<T: Send>() {}
+    fn is_sync<T: Sync>() {}
+
+    is_send::<Span>();
+    is_sync::<Span>();
+
+    is_send::<Tracer>();
+    is_sync::<Tracer>();
 }

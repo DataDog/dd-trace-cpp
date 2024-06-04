@@ -1,7 +1,21 @@
-mod dd_trace_cpp;
-use std::{ffi, ptr, slice};
+mod datadog_sdk;
+pub mod tracing_dd;
 
-use dd_trace_cpp::bindings;
+use std::{
+    ffi,
+    ptr::{self, NonNull},
+    slice,
+};
+
+use datadog_sdk::bindings;
+
+macro_rules! debug_println {
+    ($($arg:tt)*) => {
+        if cfg!(debug_assertions) {
+            eprintln!($($arg)*)
+        }
+    };
+}
 
 #[repr(u32)]
 pub enum ConfigProperty {
@@ -12,21 +26,24 @@ pub enum ConfigProperty {
 }
 
 pub struct Config {
-    inner: *mut bindings::datadog_sdk_conf_t,
+    inner: NonNull<bindings::datadog_sdk_conf_t>,
 }
 
 impl Config {
     pub fn new() -> Self {
         Self {
-            inner: unsafe { bindings::datadog_sdk_tracer_conf_new() },
+            inner: unsafe {
+                NonNull::new(bindings::datadog_sdk_tracer_conf_new())
+                    .expect("Datadog configuration should not be null")
+            },
         }
     }
 
     pub fn set(&mut self, property: ConfigProperty, value: &str) {
         let mut value = str_to_ffi_view(value);
         unsafe {
-            dd_trace_cpp::bindings::datadog_sdk_tracer_conf_set(
-                self.inner,
+            datadog_sdk::bindings::datadog_sdk_tracer_conf_set(
+                self.inner.as_ptr(),
                 property as bindings::datadog_sdk_tracer_option,
                 &mut value as *mut bindings::str_view as *mut ffi::c_void,
             )
@@ -36,26 +53,42 @@ impl Config {
 
 impl Drop for Config {
     fn drop(&mut self) {
-        unsafe { bindings::datadog_sdk_tracer_conf_free(self.inner) }
+        unsafe { bindings::datadog_sdk_tracer_conf_free(self.inner.as_ptr()) }
     }
 }
 
 pub struct Tracer {
-    inner: *mut ffi::c_void,
+    inner: Option<NonNull<bindings::datadog_sdk_tracer_t>>,
 }
 
 impl Tracer {
+    pub fn new_noop() -> Self {
+        Self { inner: None }
+    }
+
     pub fn new(cfg: &Config) -> Self {
-        Tracer {
-            inner: unsafe { dd_trace_cpp::bindings::datadog_sdk_tracer_new(cfg.inner) },
+        // TODO(paullgdc): should we log something or return an error when the tracer is null?
+        let inner = NonNull::new(unsafe {
+            datadog_sdk::bindings::datadog_sdk_tracer_new(cfg.inner.as_ptr())
+        });
+        if inner.is_none() {
+            debug_println!("ddtrace-rust: datadog_sdk_tracer_new returned null");
         }
+        Tracer { inner }
     }
 
     pub fn create_span(&self, name: &str) -> Span {
+        eprintln!("creating span {}", name);
+        let Some(inner) = self.inner else {
+            return Span::new_noop();
+        };
         let name = str_to_ffi_view(name);
         Span {
             inner: unsafe {
-                dd_trace_cpp::bindings::datadog_sdk_tracer_create_span(self.inner, name)
+                NonNull::new(datadog_sdk::bindings::datadog_sdk_tracer_create_span(
+                    inner.as_ptr(),
+                    name,
+                ))
             },
         }
     }
@@ -66,6 +99,10 @@ impl Tracer {
         name: &str,
         ressource: &str,
     ) -> Span {
+        let Some(inner) = self.inner.map(NonNull::as_ptr) else {
+            return Span::new_noop();
+        };
+
         let name = str_to_ffi_view(name);
         let resource = str_to_ffi_view(ressource);
         unsafe extern "C" fn reader_fn_trampoline<'a, F: FnMut(&[u8]) -> Option<&'a [u8]> + 'a>(
@@ -79,7 +116,7 @@ impl Tracer {
                 };
             };
             let key = ffi_view_to_slice(&key);
-            match dbg!(f(key)) {
+            match f(key) {
                 Some(value) => str_to_ffi_view(value),
                 None => bindings::str_view {
                     buf: ptr::null_mut(),
@@ -89,68 +126,104 @@ impl Tracer {
         }
 
         let ctx: *mut ffi::c_void = &mut reader as *mut F as *mut ffi::c_void;
-        Span {
-            inner: unsafe {
-                dd_trace_cpp::bindings::datadog_sdk_tracer_extract_or_create_span(
-                    self.inner,
-                    ctx,
-                    Some(reader_fn_trampoline::<F>),
-                    name,
-                    resource,
-                )
-            },
+
+        let inner = NonNull::new(unsafe {
+            datadog_sdk::bindings::datadog_sdk_tracer_extract_or_create_span(
+                inner,
+                ctx,
+                Some(reader_fn_trampoline::<F>),
+                name,
+                resource,
+            )
+        });
+        if inner.is_none() {
+            debug_println!(
+                "ddtrace-rust: datadog_sdk_tracer_extract_or_create_span returned a null span"
+            );
         }
+        Span { inner }
     }
 }
 
 impl Drop for Tracer {
     fn drop(&mut self) {
-        unsafe { dd_trace_cpp::bindings::datadog_sdk_tracer_free(self.inner) };
+        let Some(inner) = self.inner.map(NonNull::as_ptr) else {
+            return ;
+        };
+        unsafe { datadog_sdk::bindings::datadog_sdk_tracer_free(inner) };
     }
 }
 
+// The Tracer is thread safe
+unsafe impl Send for Tracer {}
+unsafe impl Sync for Tracer {}
+
 #[derive(Debug)]
 pub struct Span {
-    inner: *mut bindings::datadog_sdk_span_t,
+    inner: Option<NonNull<bindings::datadog_sdk_span_t>>,
 }
 
 impl Drop for Span {
     fn drop(&mut self) {
+        let Some(inner) = self.inner.map(NonNull::as_ptr) else {
+            return ;
+        };
         unsafe {
-            dd_trace_cpp::bindings::datadog_sdk_span_finish(self.inner);
-            dd_trace_cpp::bindings::datadog_sdk_span_free(self.inner);
+            datadog_sdk::bindings::datadog_sdk_span_finish(inner);
+            datadog_sdk::bindings::datadog_sdk_span_free(inner);
         };
     }
 }
 
+// Span objects are thread safe
+unsafe impl Send for Span {}
+unsafe impl Sync for Span {}
+
 impl Span {
-    pub fn set_tag(&mut self, tag: &str, value: &str) {
+    pub fn new_noop() -> Self {
+        Self { inner: None }
+    }
+    pub fn set_tag(&self, tag: &str, value: &str) {
+        let Some(inner) = self.inner.map(NonNull::as_ptr) else {
+            return ;
+        };
         let tag = str_to_ffi_view(tag);
         let value = str_to_ffi_view(value);
-        unsafe { dd_trace_cpp::bindings::datadog_sdk_span_set_tag(self.inner, tag, value) }
+        unsafe { datadog_sdk::bindings::datadog_sdk_span_set_tag(inner, tag, value) }
     }
 
-    pub fn set_error(&mut self, is_err: bool) {
-        unsafe {
-            dd_trace_cpp::bindings::datadog_sdk_span_set_error(self.inner, is_err as ffi::c_int)
-        }
+    pub fn set_error(&self, is_err: bool) {
+        let Some(inner) = self.inner.map(NonNull::as_ptr) else {
+            return ;
+        };
+        unsafe { datadog_sdk::bindings::datadog_sdk_span_set_error(inner, is_err as ffi::c_int) }
     }
 
-    pub fn set_error_message(&mut self, message: &str) {
+    pub fn set_error_message(&self, message: &str) {
+        let Some(inner) = self.inner.map(NonNull::as_ptr) else {
+            return ;
+        };
         let message = str_to_ffi_view(message);
-        unsafe { dd_trace_cpp::bindings::datadog_sdk_span_set_error_message(self.inner, message) }
+        unsafe { datadog_sdk::bindings::datadog_sdk_span_set_error_message(inner, message) }
     }
 
-    pub fn create_child(&mut self, name: &str) -> Self {
+    pub fn create_child(&self, name: &str) -> Self {
+        let Some(inner) = self.inner.map(NonNull::as_ptr) else {
+            return Span::new_noop();
+        };
         let name = str_to_ffi_view(name);
         Self {
-            inner: unsafe {
-                dd_trace_cpp::bindings::datadog_sdk_span_create_child(self.inner, name)
-            },
+            inner: NonNull::new(unsafe {
+                datadog_sdk::bindings::datadog_sdk_span_create_child(inner, name)
+            }),
         }
     }
 
     pub fn inject<F: FnMut(&[u8], &[u8])>(&self, mut writer: F) {
+        let Some(inner) = self.inner.map(NonNull::as_ptr) else {
+            return ;
+        };
+
         unsafe extern "C" fn writer_trampoline<F: FnMut(&[u8], &[u8])>(
             ctx: *mut ffi::c_void,
             key: bindings::str_view,
@@ -163,11 +236,7 @@ impl Span {
         }
         let ctx = &mut writer as *mut F as *mut ffi::c_void;
         unsafe {
-            dd_trace_cpp::bindings::datadog_sdk_span_inject(
-                self.inner,
-                ctx,
-                Some(writer_trampoline::<F>),
-            )
+            datadog_sdk::bindings::datadog_sdk_span_inject(inner, ctx, Some(writer_trampoline::<F>))
         }
     }
 }
