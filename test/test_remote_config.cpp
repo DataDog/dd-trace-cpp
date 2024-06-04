@@ -276,7 +276,8 @@ REMOTE_CONFIG_TEST("response processing") {
     // Next payload should contain an error.
     const auto payload = rc.make_request_payload();
     CHECK(payload["client"]["state"]["has_error"] == true);
-    CHECK(payload["client"]["state"]["error"] == test_case.second);
+    CHECK(payload["client"]["state"]["error"].get<std::string>() ==
+          test_case.second);
   }
 
   SECTION("error applying configuration") {
@@ -322,8 +323,8 @@ REMOTE_CONFIG_TEST("response processing") {
           "APM_TRACING");
     CHECK(payload["client"]["state"]["config_states"][0]["apply_state"] ==
           datadog::tracing::remote_config::ConfigState::ApplyState::Error);
-    CHECK(payload["client"]["state"]["config_states"][0]["apply_error"] ==
-          test_case.second);
+    CHECK(payload["client"]["state"]["config_states"][0]["apply_error"]
+              .get<std::string>() == test_case.second);
 
     CHECK(payload["client"]["state"]["targets_version"] == 2);
     CHECK(payload["cached_target_files"].size() == 1);
