@@ -8,16 +8,31 @@
 #include <mutex>
 
 #include "clock.h"
-#include "config_update.h"
 #include "json.hpp"
 #include "optional.h"
+#include "remote_config/listener.h"
 #include "span_defaults.h"
 #include "tracer_config.h"
+#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
 
-class ConfigManager {
+class ConfigManager : public remote_config::Listener {
+ public:
+  // The `ConfigUpdate` struct serves as a container for configuration that can
+  // exclusively be changed remotely.
+  //
+  // Configurations can be `nullopt` to signal the absence of a value from the
+  // remote configuration value.
+  struct Update {
+    Optional<bool> report_traces;
+    Optional<double> trace_sampling_rate;
+    Optional<std::vector<StringView>> tags;
+    const nlohmann::json* trace_sampling_rules = nullptr;
+  };
+
+ private:
   // A class template for managing dynamic configuration values.
   //
   // This class allows storing and managing dynamic configuration values. It
@@ -60,13 +75,25 @@ class ConfigManager {
   DynamicConfig<std::shared_ptr<const SpanDefaults>> span_defaults_;
   DynamicConfig<bool> report_traces_;
 
+  std::shared_ptr<TracerTelemetry> telemetry_;
+
  private:
   template <typename T>
   void reset_config(ConfigName name, T& conf,
                     std::vector<ConfigMetadata>& metadata);
 
  public:
-  ConfigManager(const FinalizedTracerConfig& config);
+  ConfigManager(const FinalizedTracerConfig& config,
+                const std::shared_ptr<TracerTelemetry>& telemetry);
+  ~ConfigManager() override{};
+
+  remote_config::Products get_products() override;
+  remote_config::Capabilities get_capabilities() override;
+
+  Optional<std::string> on_update(
+      const Listener::Configuration& config) override;
+  void on_revert(const Listener::Configuration& config) override;
+  void on_post_process() override{};
 
   // Return the `TraceSampler` consistent with the most recent configuration.
   std::shared_ptr<TraceSampler> trace_sampler();
@@ -77,16 +104,11 @@ class ConfigManager {
   // Return whether traces should be sent to the collector.
   bool report_traces();
 
-  // Apply the specified `conf` update.
-  std::vector<ConfigMetadata> update(const ConfigUpdate& conf);
-
-  // Restore the configuration that was passed to this object's constructor,
-  // overriding any previous calls to `update`.
-  std::vector<ConfigMetadata> reset();
-
   // Return a JSON representation of the current configuration managed by this
   // object.
   nlohmann::json config_json() const;
+
+  std::vector<ConfigMetadata> apply_update(const ConfigManager::Update& conf);
 };
 
 }  // namespace tracing

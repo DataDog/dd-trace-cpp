@@ -16,7 +16,7 @@
 #include "event_scheduler.h"
 #include "http_client.h"
 #include "metrics.h"
-#include "remote_config.h"
+#include "remote_config/remote_config.h"
 #include "tracer_signature.h"
 #include "tracer_telemetry.h"
 
@@ -55,7 +55,7 @@ class DatadogAgent : public Collector {
   std::chrono::steady_clock::duration request_timeout_;
   std::chrono::steady_clock::duration shutdown_timeout_;
 
-  RemoteConfigurationManager remote_config_;
+  remote_config::Manager remote_config_;
   TracerSignature tracer_signature_;
 
   void flush();
@@ -67,7 +67,8 @@ class DatadogAgent : public Collector {
   DatadogAgent(const FinalizedDatadogAgentConfig&,
                const std::shared_ptr<TracerTelemetry>&,
                const std::shared_ptr<Logger>&, const TracerSignature& id,
-               const std::shared_ptr<ConfigManager>& config_manager);
+               const std::vector<std::shared_ptr<remote_config::Listener>>&
+                   rc_listeners);
   ~DatadogAgent();
 
   Expected<void> send(
@@ -77,7 +78,7 @@ class DatadogAgent : public Collector {
   void send_app_started(
       const std::unordered_map<ConfigName, ConfigMetadata>& config_metadata);
 
-  void send_configuration_change(const std::vector<ConfigMetadata>& config);
+  void send_configuration_change();
 
   void get_and_apply_remote_configuration_updates();
 

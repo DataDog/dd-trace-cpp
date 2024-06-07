@@ -195,16 +195,16 @@ TEST_CASE("Remote Configuration", "[datadog_agent]") {
   REQUIRE(finalized);
 
   const TracerSignature signature(RuntimeID::generate(), "testsvc", "test");
-  auto config_manager = std::make_shared<ConfigManager>(*finalized);
 
   auto telemetry = std::make_shared<TracerTelemetry>(
       finalized->report_telemetry, finalized->clock, finalized->logger,
       signature, "", "");
 
+  auto config_manager = std::make_shared<ConfigManager>(*finalized, telemetry);
+
   const auto& agent_config =
       std::get<FinalizedDatadogAgentConfig>(finalized->collector);
-  DatadogAgent agent(agent_config, telemetry, config.logger, signature,
-                     config_manager);
+  DatadogAgent agent(agent_config, telemetry, config.logger, signature, {});
 
   SECTION("404 do not log an error") {
     http_client->response_status = 404;

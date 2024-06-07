@@ -145,12 +145,14 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 
 }  // namespace
 
+namespace rc = datadog::remote_config;
+
 DatadogAgent::DatadogAgent(
     const FinalizedDatadogAgentConfig& config,
     const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
     const std::shared_ptr<Logger>& logger,
     const TracerSignature& tracer_signature,
-    const std::shared_ptr<ConfigManager>& config_manager)
+    const std::vector<std::shared_ptr<rc::Listener>>& rc_listeners)
     : tracer_telemetry_(tracer_telemetry),
       clock_(config.clock),
       logger_(logger),
@@ -162,7 +164,7 @@ DatadogAgent::DatadogAgent(
       flush_interval_(config.flush_interval),
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
-      remote_config_(tracer_signature, config_manager),
+      remote_config_(tracer_signature, rc_listeners),
       tracer_signature_(tracer_signature) {
   assert(logger_);
   assert(tracer_telemetry_);
@@ -410,14 +412,13 @@ void DatadogAgent::send_heartbeat_and_telemetry() {
   send_telemetry("app-heartbeat", tracer_telemetry_->heartbeat_and_telemetry());
 }
 
-void DatadogAgent::send_app_closing() {
-  send_telemetry("app-closing", tracer_telemetry_->app_closing());
+void DatadogAgent::send_configuration_change() {
+  send_telemetry("app-client-configuration-change",
+                 tracer_telemetry_->configuration_change());
 }
 
-void DatadogAgent::send_configuration_change(
-    const std::vector<ConfigMetadata>& config) {
-  send_telemetry("app-client-configuration-change",
-                 tracer_telemetry_->configuration_change(config));
+void DatadogAgent::send_app_closing() {
+  send_telemetry("app-closing", tracer_telemetry_->app_closing());
 }
 
 void DatadogAgent::get_and_apply_remote_configuration_updates() {
@@ -457,11 +458,13 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
         }
 
         if (!response_json.empty()) {
-          auto updated_configuration =
-              remote_config_.process_response(response_json);
-          if (!updated_configuration.empty()) {
-            send_configuration_change(updated_configuration);
-          }
+          remote_config_.process_response(response_json);
+          // NOTE(@dmehala): Not ideal but it mimics the old behavior.
+          // In the future, I would prefer telemetry pushing to the agent
+          // and not the agent pulling from telemetry. That way telemetry will
+          // be more flexible and could support env var to customize how often
+          // it captures metrics.
+          send_configuration_change();
         }
       };
 

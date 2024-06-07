@@ -12,57 +12,58 @@
 // It interacts with the `ConfigManager` to seamlessly apply or revert
 // configurations based on responses received from the remote source.
 
+#include <array>
+#include <cstdint>
 #include <memory>
+#include <set>
 #include <string>
 
-#include "config_manager.h"
 #include "logger.h"
 #include "optional.h"
+#include "remote_config/listener.h"
 #include "runtime_id.h"
 #include "string_view.h"
 #include "trace_sampler_config.h"
 #include "tracer_signature.h"
 
 namespace datadog {
-namespace tracing {
+namespace remote_config {
 
-class RemoteConfigurationManager {
-  // Represents the *current* state of the RemoteConfigurationManager.
+class Manager {
+  // Represents the *current* state of the Manager.
   // It is also used to report errors to the remote source.
   struct State {
     uint64_t targets_version = 0;
     std::string opaque_backend_state;
-    Optional<std::string> error_message;
+    tracing::Optional<std::string> error_message;
   };
 
   // Holds information about a specific configuration update,
   // including its identifier, hash value, version number and the content.
-  struct Configuration {
-    std::string id;
-    std::string hash;
-    std::size_t version;
-    ConfigUpdate content;
-
+  struct Configuration final : public Listener::Configuration {
     enum State : char {
       unacknowledged = 1,
       acknowledged = 2,
       error = 3
     } state = State::unacknowledged;
 
-    Optional<std::string> error_message;
+    tracing::Optional<std::string> error_message;
   };
 
-  TracerSignature tracer_signature_;
-  std::shared_ptr<ConfigManager> config_manager_;
+  tracing::TracerSignature tracer_signature_;
+  std::vector<std::shared_ptr<Listener>> listeners_;
+  std::set<tracing::StringView> products_;
+  std::unordered_map<product::Flag, std::vector<Listener*>>
+      listeners_per_product_;
+  std::array<uint8_t, sizeof(uint64_t)> capabilities_;
   std::string client_id_;
 
   State state_;
   std::unordered_map<std::string, Configuration> applied_config_;
 
  public:
-  RemoteConfigurationManager(
-      const TracerSignature& tracer_signature,
-      const std::shared_ptr<ConfigManager>& config_manager);
+  Manager(const tracing::TracerSignature& tracer_signature,
+          const std::vector<std::shared_ptr<Listener>>& listeners);
 
   // Construct a JSON object representing the payload to be sent in a remote
   // configuration request.
@@ -70,18 +71,13 @@ class RemoteConfigurationManager {
 
   // Handles the response received from a remote source and udates the internal
   // state accordingly.
-  std::vector<ConfigMetadata> process_response(const nlohmann::json& json);
+  void process_response(const nlohmann::json& json);
 
  private:
   // Tell if a `config_path` is a new configuration update.
-  bool is_new_config(StringView config_path, const nlohmann::json& config_meta);
-
-  // Apply a remote configuration.
-  std::vector<ConfigMetadata> apply_config(Configuration config);
-
-  // Revert a remote configuration.
-  std::vector<ConfigMetadata> revert_config(Configuration config);
+  bool is_new_config(tracing::StringView config_path,
+                     const nlohmann::json& config_meta);
 };
 
-}  // namespace tracing
+}  // namespace remote_config
 }  // namespace datadog

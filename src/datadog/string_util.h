@@ -13,6 +13,8 @@ namespace tracing {
 void to_lower(std::string& text);
 std::string to_lower(StringView sv);
 
+std::string to_upper(StringView sv);
+
 // Return a string representation of the specified boolean `value`.
 // The result is "true" for `true` and "false" for `false`.
 std::string to_string(bool b);

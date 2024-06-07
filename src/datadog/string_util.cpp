@@ -43,6 +43,15 @@ std::string to_lower(StringView sv) {
   return s;
 }
 
+std::string to_upper(StringView sv) {
+  std::string s;
+  s.reserve(sv.size());
+  std::transform(sv.begin(), sv.end(), std::back_inserter(s),
+                 [](char c) { return std::toupper(c); });
+
+  return s;
+}
+
 std::string to_string(bool b) { return b ? "true" : "false"; }
 
 std::string to_string(double d, size_t precision) {

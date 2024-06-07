@@ -35,11 +35,11 @@ class SpanSampler;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
-  std::shared_ptr<ConfigManager> config_manager_;
-  std::shared_ptr<Collector> collector_;
   RuntimeID runtime_id_;
   TracerSignature signature_;
   std::shared_ptr<TracerTelemetry> tracer_telemetry_;
+  std::shared_ptr<ConfigManager> config_manager_;
+  std::shared_ptr<Collector> collector_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const IDGenerator> generator_;
   Clock clock_;

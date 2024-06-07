@@ -36,8 +36,6 @@ Tracer::Tracer(const FinalizedTracerConfig& config)
 Tracer::Tracer(const FinalizedTracerConfig& config,
                const std::shared_ptr<const IDGenerator>& generator)
     : logger_(config.logger),
-      config_manager_(std::make_shared<ConfigManager>(config)),
-      collector_(/* see constructor body */),
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
       signature_{runtime_id_, config.defaults.service,
@@ -45,6 +43,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
           config.report_telemetry, config.clock, logger_, signature_,
           config.integration_name, config.integration_version)),
+      config_manager_(
+          std::make_shared<ConfigManager>(config, tracer_telemetry_)),
+      collector_(/* see constructor body */),
       span_sampler_(
           std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
       generator_(generator),
@@ -63,9 +64,11 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     auto& agent_config =
         std::get<FinalizedDatadogAgentConfig>(config.collector);
 
-    auto agent = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
-                                                config.logger, signature_,
-                                                config_manager_);
+    auto rc_listeners = agent_config.remote_configuration_listeners;
+    rc_listeners.emplace_back(config_manager_);
+    auto agent =
+        std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
+                                       config.logger, signature_, rc_listeners);
     collector_ = agent;
 
     if (tracer_telemetry_->enabled()) {

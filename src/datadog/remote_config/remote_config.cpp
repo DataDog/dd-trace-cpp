@@ -1,38 +1,22 @@
 #include "remote_config.h"
 
 #include <cassert>
-#include <cstdint>
-#include <type_traits>
+#include <regex>
 #include <unordered_set>
 
 #include "base64.h"
 #include "json.hpp"
 #include "random.h"
+#include "remote_config/capability.h"
+#include "remote_config/listener.h"
 #include "string_view.h"
-#include "version.h"
 
+using namespace datadog::tracing;
 using namespace nlohmann::literals;
 
 namespace datadog {
-namespace tracing {
+namespace remote_config {
 namespace {
-
-// The ".client.capabilities" field of the remote config request payload
-// describes which parts of the library's configuration are supported for remote
-// configuration.
-//
-// It's a bitset, 64 bits wide, where each bit indicates whether the library
-// supports a particular feature for remote configuration.
-//
-// The bitset is encoded in the request as a JSON array of 8 integers, where
-// each integer is one byte from the 64 bits. The bytes are in big-endian order
-// within the array.
-enum CapabilitiesFlag : uint64_t {
-  APM_TRACING_SAMPLE_RATE = 1 << 12,
-  APM_TRACING_TAGS = 1 << 15,
-  APM_TRACING_ENABLED = 1 << 19,
-  APM_TRACING_SAMPLE_RULES = 1 << 29,
-};
 
 constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
     uint64_t in) {
@@ -45,53 +29,59 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
   return res;
 }
 
-constexpr std::array<uint8_t, sizeof(uint64_t)> k_apm_capabilities =
-    capabilities_byte_array(APM_TRACING_SAMPLE_RATE | APM_TRACING_TAGS |
-                            APM_TRACING_ENABLED | APM_TRACING_SAMPLE_RULES);
+Optional<product::Flag> parse_config_path(StringView config_path) {
+  static const std::regex path_reg(
+      "^(datadog/\\d+|employee)/([^/]+)/[^/]+/[^/]+$");
 
-constexpr StringView k_apm_product = "APM_TRACING";
-constexpr StringView k_apm_product_path_substring = "/APM_TRACING/";
-
-ConfigUpdate parse_dynamic_config(const nlohmann::json& j) {
-  ConfigUpdate config_update;
-
-  if (auto sampling_rate_it = j.find("tracing_sampling_rate");
-      sampling_rate_it != j.cend() && sampling_rate_it->is_number()) {
-    config_update.trace_sampling_rate = sampling_rate_it->get<double>();
+  std::cmatch match;
+  if (!std::regex_match(config_path.data(),
+                        config_path.data() + config_path.size(), match,
+                        path_reg)) {
+    return nullopt;
   }
 
-  if (auto tags_it = j.find("tracing_tags");
-      tags_it != j.cend() && tags_it->is_array()) {
-    config_update.tags = tags_it->get<std::vector<StringView>>();
-  }
+  assert(match.ready());
+  assert(match.size() == 3);
 
-  if (auto tracing_enabled_it = j.find("tracing_enabled");
-      tracing_enabled_it != j.cend() && tracing_enabled_it->is_boolean()) {
-    config_update.report_traces = tracing_enabled_it->get<bool>();
-  }
+  StringView product_sv(config_path.data() + match.position(2),
+                        std::size_t(match.length(2)));
 
-  if (auto tracing_sampling_rules_it = j.find("tracing_sampling_rules");
-      tracing_sampling_rules_it != j.cend() &&
-      tracing_sampling_rules_it->is_array()) {
-    config_update.trace_sampling_rules = &(*tracing_sampling_rules_it);
-  }
-
-  return config_update;
+  return parse_product(product_sv);
 }
 
 }  // namespace
 
-RemoteConfigurationManager::RemoteConfigurationManager(
-    const TracerSignature& tracer_signature,
-    const std::shared_ptr<ConfigManager>& config_manager)
+Manager::Manager(const TracerSignature& tracer_signature,
+                 const std::vector<std::shared_ptr<Listener>>& listeners)
     : tracer_signature_(tracer_signature),
-      config_manager_(config_manager),
+      listeners_(listeners),
       client_id_(uuid()) {
-  assert(config_manager_);
+  Capabilities capabilities = 0;
+
+  for (const auto& listener : listeners_) {
+    visit_products(
+        listener->get_products(), [this, &listener](product::Flag product) {
+          products_.emplace(to_string_view(product));
+          listeners_per_product_[product].emplace_back(listener.get());
+        });
+    capabilities |= listener->get_capabilities();
+  }
+
+  // The ".client.capabilities" field of the remote config request payload
+  // describes which parts of the library's configuration are supported for
+  // remote configuration.
+  //
+  // It's a bitset, 64 bits wide, where each bit indicates whether the library
+  // supports a particular feature for remote configuration.
+  //
+  // The bitset is encoded in the request as a JSON array of 8 integers, where
+  // each integer is one byte from the 64 bits. The bytes are in big-endian
+  // order within the array.
+  capabilities_ = capabilities_byte_array(capabilities);
 }
 
-bool RemoteConfigurationManager::is_new_config(
-    StringView config_path, const nlohmann::json& config_meta) {
+bool Manager::is_new_config(StringView config_path,
+                            const nlohmann::json& config_meta) {
   auto it = applied_config_.find(std::string{config_path});
   if (it == applied_config_.cend()) return true;
 
@@ -99,14 +89,14 @@ bool RemoteConfigurationManager::is_new_config(
          config_meta.at("/hashes/sha256"_json_pointer).get<StringView>();
 }
 
-nlohmann::json RemoteConfigurationManager::make_request_payload() {
+nlohmann::json Manager::make_request_payload() {
   // clang-format off
   auto j = nlohmann::json{
     {"client", {
       {"id", client_id_},
-      {"products", nlohmann::json::array({k_apm_product})},
+      {"products", products_},
       {"is_tracer", true},
-      {"capabilities", k_apm_capabilities},
+      {"capabilities", capabilities_},
       {"client_tracer", {
         {"runtime_id", tracer_signature_.runtime_id.string()},
         {"language", tracer_signature_.library_language},
@@ -129,7 +119,7 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
       nlohmann::json config_state = {
           {"id", config.id},
           {"version", config.version},
-          {"product", k_apm_product},
+          {"product", to_string_view(config.product)},
           {"apply_state", config.state},
       };
 
@@ -151,11 +141,7 @@ nlohmann::json RemoteConfigurationManager::make_request_payload() {
   return j;
 }
 
-std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
-    const nlohmann::json& json) {
-  std::vector<ConfigMetadata> config_updates;
-  config_updates.reserve(8);
-
+void Manager::process_response(const nlohmann::json& json) {
   state_.error_message = nullopt;
 
   try {
@@ -173,28 +159,41 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
     if (client_configs_it == json.cend()) {
       if (!applied_config_.empty()) {
         std::for_each(applied_config_.cbegin(), applied_config_.cend(),
-                      [this, &config_updates](const auto it) {
-                        auto updated = revert_config(it.second);
-                        config_updates.insert(config_updates.end(),
-                                              updated.begin(), updated.end());
+                      [this](const auto& it) {
+                        for (const auto& listener :
+                             listeners_per_product_[it.second.product]) {
+                          listener->on_revert(it.second);
+                        }
                       });
         applied_config_.clear();
       }
-      return config_updates;
+
+      for (const auto& listener : listeners_) {
+        listener->on_post_process();
+      }
+      return;
     }
 
     // Keep track of config path received to know which ones to revert.
     std::unordered_set<std::string> visited_config;
-    visited_config.reserve(client_configs_it->size());
 
     for (const auto& client_config : *client_configs_it) {
       auto config_path = client_config.get<StringView>();
       visited_config.emplace(config_path);
 
+      const auto product = parse_config_path(config_path);
+      if (!product) {
+        std::string error_message{config_path};
+        error_message += " is an invalid configuration path";
+
+        state_.error_message = std::move(error_message);
+        return;
+      }
+
       const auto& config_metadata =
           targets.at("/signed/targets"_json_pointer).at(config_path);
-      if (!contains(config_path, k_apm_product_path_substring) ||
-          !is_new_config(config_path, config_metadata)) {
+
+      if (!is_new_config(config_path, config_metadata)) {
         continue;
       }
 
@@ -206,21 +205,27 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
           });
 
       if (target_it == target_files.cend()) {
-        state_.error_message =
-            "Missing configuration from Remote Configuration response: No "
-            "target file having path \"";
-        append(*state_.error_message, config_path);
-        *state_.error_message += '\"';
-        return config_updates;
+        std::string error_message{"Missing configuration \""};
+        append(error_message, config_path);
+        error_message += "\" from Remote Configuration response";
+
+        state_.error_message = std::move(error_message);
+        return;
       }
 
-      const auto config_json = nlohmann::json::parse(
-          base64_decode(target_it.value().at("raw").get<StringView>()));
+      auto decoded_config =
+          base64_decode(target_it.value().at("raw").get<StringView>());
+
+      // TODO: try to remove the following line
+      const auto config_json = nlohmann::json::parse(decoded_config);
 
       Configuration new_config;
       new_config.id = config_json.at("id");
+      new_config.path = std::string{config_path};
       new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
+      new_config.content = std::move(decoded_config);
       new_config.version = config_json.at("revision");
+      new_config.product = *product;
 
       const auto& targeted_service = config_json.at("service_target");
       if (targeted_service.at("service").get<StringView>() !=
@@ -230,48 +235,46 @@ std::vector<ConfigMetadata> RemoteConfigurationManager::process_response(
         new_config.state = Configuration::State::error;
         new_config.error_message = "Wrong service targeted";
       } else {
-        new_config.state = Configuration::State::acknowledged;
-        new_config.content = parse_dynamic_config(config_json.at("lib_config"));
-
-        auto updated = apply_config(new_config);
-        config_updates.insert(config_updates.end(), updated.begin(),
-                              updated.end());
+        for (const auto& listener : listeners_per_product_[*product]) {
+          // Q: Two listeners on the same product. What should be the behaviour
+          // if one of the listeners report an error?
+          // R(@dmehala): Unspecified. For now, the config is marked with an
+          // error.
+          if (auto error_msg = listener->on_update(new_config)) {
+            new_config.state = Configuration::State::error;
+            new_config.error_message = std::move(*error_msg);
+          } else {
+            new_config.state = Configuration::State::acknowledged;
+          }
+        }
       }
 
       applied_config_[std::string{config_path}] = new_config;
     }
 
-    // Applied configuration not present must be reverted.
+    // Revert applied configurations not present
     for (auto it = applied_config_.cbegin(); it != applied_config_.cend();) {
       if (!visited_config.count(it->first)) {
-        auto updated = revert_config(it->second);
-        config_updates.insert(config_updates.end(), updated.begin(),
-                              updated.end());
+        for (const auto& listener :
+             listeners_per_product_[it->second.product]) {
+          listener->on_revert(it->second);
+        }
         it = applied_config_.erase(it);
       } else {
         it++;
       }
     }
+
+    for (const auto& listener : listeners_) {
+      listener->on_post_process();
+    }
   } catch (const nlohmann::json::exception& e) {
-    std::string error_message = "Ill-formatted Remote Configuration response: ";
+    std::string error_message = "Invalid Remote Configuration response: ";
     error_message += e.what();
 
     state_.error_message = std::move(error_message);
-    return config_updates;
   }
-
-  return config_updates;
 }
 
-std::vector<ConfigMetadata> RemoteConfigurationManager::apply_config(
-    Configuration config) {
-  return config_manager_->update(config.content);
-}
-
-std::vector<ConfigMetadata> RemoteConfigurationManager::revert_config(
-    Configuration) {
-  return config_manager_->reset();
-}
-
-}  // namespace tracing
+}  // namespace remote_config
 }  // namespace datadog
