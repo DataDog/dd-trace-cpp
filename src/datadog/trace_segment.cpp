@@ -281,6 +281,10 @@ void TraceSegment::span_finished() {
   tracer_telemetry_->metrics().tracer.trace_segments_closed.inc();
 }
 
+void TraceSegment::override_sampling_priority(SamplingPriority priority) {
+  override_sampling_priority(static_cast<int>(priority));
+}
+
 void TraceSegment::override_sampling_priority(int priority) {
   SamplingDecision decision;
   decision.priority = priority;
