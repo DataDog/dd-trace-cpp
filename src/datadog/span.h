@@ -114,7 +114,7 @@ class Span {
   // "ingress-nginx-useast1".
   const std::string& service_name() const;
   // Return the type of the service associated with this span, e.g. "web".
-  const std::string& service_type() const;
+  std::string& service_type() const;
   // Return the name of the operation associated with the operation that this
   // span represents, e.g. "handle.request", "execute.query", or "healthcheck".
   const std::string& name() const;

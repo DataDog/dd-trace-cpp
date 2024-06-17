@@ -257,6 +257,12 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.clock = clock;
   final_config.logger = logger;
 
+  final_config.library_version = user_config.library_version ? *user_config.library_version : tracer_version;
+  final_config.library_language =  user_config.library_language ? *user_config.library_language : "cpp";
+  final_config.library_language_version = user_config.library_language_version
+    ? *user_config.library_language_version 
+    : cpp_language_version;
+
   ConfigMetadata::Origin origin;
 
   std::tie(origin, final_config.defaults.service) =
@@ -292,6 +298,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
            std::unordered_map<std::string, std::string>{});
   final_config.metadata[ConfigName::TAGS] = ConfigMetadata(
       ConfigName::TAGS, join_tags(final_config.defaults.tags), origin);
+
+  final_config.defaults.library_language = final_config.library_language;
 
   // Extraction Styles
   const std::vector<PropagationStyle> default_propagation_styles{

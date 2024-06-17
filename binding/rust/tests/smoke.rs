@@ -1,4 +1,4 @@
-use dd_trace_rust::{Config, ConfigProperty, Span, Tracer};
+use dd_trace_rust::datadog_sdk::{Config, ConfigProperty, Span, Tracer};
 
 fn foo(current_span: &mut Span) {
     let span = current_span.create_child("foo");
@@ -20,7 +20,7 @@ fn test_smoke() {
     cfg.set(ConfigProperty::AgentUrl, "http://localhost:8126");
     cfg.set(ConfigProperty::Version, "0.0.1");
 
-    let tracer: Tracer = Tracer::new(&cfg);
+    let tracer: Tracer = Tracer::new(cfg);
 
     {
         let mut op1_span: Span = tracer.create_span("op1");
@@ -30,8 +30,8 @@ fn test_smoke() {
     {
         let mut op2_span = tracer.create_or_extract_span(
             |key| {
-                eprintln!("read key {}", String::from_utf8_lossy(key));
-                if key == b"x-datadog-trace-id" {
+                eprintln!("read key {}", key);
+                if key == "x-datadog-trace-id" {
                     return Some(b"12345679");
                 }
                 None

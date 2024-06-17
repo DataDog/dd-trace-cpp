@@ -266,7 +266,7 @@ void TraceSegment::span_finished() {
       span.tags[tags::internal::origin] = *origin_;
     }
     span.numeric_tags[tags::internal::process_id] = Cache::process_id;
-    span.tags[tags::internal::language] = "cpp";
+    span.tags[tags::internal::language] = defaults().library_language;
     span.tags[tags::internal::runtime_id] = runtime_id_.string();
   }
 

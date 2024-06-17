@@ -31,7 +31,10 @@ enum datadog_sdk_tracer_option {
   DATADOG_TRACER_OPT_SERVICE_NAME = 0,
   DATADOG_TRACER_OPT_ENV = 1,
   DATADOG_TRACER_OPT_VERSION = 2,
-  DATADOG_TRACER_OPT_AGENT_URL = 3
+  DATADOG_TRACER_OPT_AGENT_URL = 3,
+  DATADOG_TRACER_OPT_LIBRARY_VERSION = 4,
+  DATADOG_TRACER_OPT_LIBRARY_LANGUAGE = 5,
+  DATADOG_TRACER_OPT_LIBRARY_LANGUAGE_VERSION = 6,
 };
 
 typedef void datadog_sdk_conf_t;
@@ -109,6 +112,16 @@ void datadog_sdk_span_free(datadog_sdk_span_t* span_handle);
 // @param value       Value
 void datadog_sdk_span_set_tag(datadog_sdk_span_t* span_handle, str_view key,
                               str_view value);
+
+// Set type
+//
+// @param span_handle   Handle on a span instance.
+// @param name          Name of the span.
+//
+// @return span_handle  Handle or a null pointer
+void datadog_sdk_span_set_type(datadog_sdk_span_t* span_handle,
+                                    str_view type);
+
 
 // Set a span as errorneous
 //

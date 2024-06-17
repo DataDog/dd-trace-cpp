@@ -18,6 +18,7 @@ struct SpanDefaults {
   std::string environment = "";
   std::string version = "";
   std::string name = "";
+  std::string library_language = "";
   std::unordered_map<std::string, std::string> tags;
 };
 

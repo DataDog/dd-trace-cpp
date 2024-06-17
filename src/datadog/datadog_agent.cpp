@@ -6,6 +6,7 @@
 #include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
+#include <iostream>
 
 #include "collector_response.h"
 #include "datadog_agent_config.h"
@@ -285,11 +286,13 @@ void DatadogAgent::flush() {
     response_handlers.insert(std::move(chunk.response_handler));
   }
 
+  std::cerr << "flushing " << tracer_signature_.library_language << " " << tracer_signature_.library_language_version << " " << tracer_signature_.library_version << "\n";
+
   // This is the callback for setting request headers.
   // It's invoked synchronously (before `post` returns).
   auto set_request_headers = [&](DictWriter& headers) {
     headers.set("Content-Type", "application/msgpack");
-    headers.set("Datadog-Meta-Lang", "cpp");
+    headers.set("Datadog-Meta-Lang", tracer_signature_.library_language);
     headers.set("Datadog-Meta-Lang-Version",
                 tracer_signature_.library_language_version);
     headers.set("Datadog-Meta-Tracer-Version",

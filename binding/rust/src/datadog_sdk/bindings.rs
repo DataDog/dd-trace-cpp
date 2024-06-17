@@ -57,6 +57,12 @@ pub const datadog_sdk_tracer_option_DATADOG_TRACER_OPT_SERVICE_NAME: datadog_sdk
 pub const datadog_sdk_tracer_option_DATADOG_TRACER_OPT_ENV: datadog_sdk_tracer_option = 1;
 pub const datadog_sdk_tracer_option_DATADOG_TRACER_OPT_VERSION: datadog_sdk_tracer_option = 2;
 pub const datadog_sdk_tracer_option_DATADOG_TRACER_OPT_AGENT_URL: datadog_sdk_tracer_option = 3;
+pub const datadog_sdk_tracer_option_DATADOG_TRACER_OPT_LIBRARY_VERSION: datadog_sdk_tracer_option =
+    4;
+pub const datadog_sdk_tracer_option_DATADOG_TRACER_OPT_LIBRARY_LANGUAGE: datadog_sdk_tracer_option =
+    5;
+pub const datadog_sdk_tracer_option_DATADOG_TRACER_OPT_LIBRARY_LANGUAGE_VERSION:
+    datadog_sdk_tracer_option = 6;
 pub type datadog_sdk_tracer_option = ::std::os::raw::c_uint;
 pub type datadog_sdk_conf_t = ::std::os::raw::c_void;
 extern "C" {
@@ -106,6 +112,9 @@ extern "C" {
         key: str_view,
         value: str_view,
     );
+}
+extern "C" {
+    pub fn datadog_sdk_span_set_type(span_handle: *mut datadog_sdk_span_t, type_: str_view);
 }
 extern "C" {
     pub fn datadog_sdk_span_set_error(

@@ -80,6 +80,15 @@ void datadog_sdk_tracer_conf_set(datadog_sdk_conf_t* handle,
   } else if (option == DATADOG_TRACER_OPT_AGENT_URL) {
     str_view agent_url = *(str_view*)value;
     cfg->agent.url = str_view_to_string(agent_url);
+  } else if (option == DATADOG_TRACER_OPT_LIBRARY_LANGUAGE) {
+    str_view library_language = *(str_view*)value;
+    cfg->library_language = str_view_to_string(library_language);
+  } else if (option == DATADOG_TRACER_OPT_LIBRARY_VERSION) {
+    str_view s = *(str_view*)value;
+    cfg->library_version = str_view_to_string(s);
+  } else if (option == DATADOG_TRACER_OPT_LIBRARY_LANGUAGE_VERSION) {
+    str_view s = *(str_view*)value;
+    cfg->library_language_version = str_view_to_string(s);
   }
 }
 
@@ -138,6 +147,11 @@ void datadog_sdk_span_set_tag(datadog_sdk_span_t* span_handle, str_view key,
                               str_view value) {
   auto* span = static_cast<dd::Span*>(span_handle);
   span->set_tag(str_view_to_dd_view(key), str_view_to_dd_view(value));
+}
+
+void datadog_sdk_span_set_type(datadog_sdk_span_t* span_handle, str_view type) {
+  auto* span = static_cast<dd::Span*>(span_handle);
+  span->service_type() = str_view_to_dd_view(type);
 }
 
 void datadog_sdk_span_set_error(datadog_sdk_span_t* span_handle,
