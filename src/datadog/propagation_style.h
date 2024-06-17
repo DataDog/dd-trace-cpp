@@ -27,6 +27,7 @@ enum class PropagationStyle {
   NONE,
 };
 
+StringView to_string_view(PropagationStyle style);
 nlohmann::json to_json(PropagationStyle style);
 nlohmann::json to_json(const std::vector<PropagationStyle>& styles);
 

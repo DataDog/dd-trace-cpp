@@ -8,7 +8,7 @@
 namespace datadog {
 namespace tracing {
 
-nlohmann::json to_json(PropagationStyle style) {
+StringView to_string_view(PropagationStyle style) {
   // Note: Make sure that these strings are consistent (modulo case) with
   // `parse_propagation_styles` in `tracer_config.cpp`.
   switch (style) {
@@ -23,6 +23,8 @@ nlohmann::json to_json(PropagationStyle style) {
       return "none";
   }
 }
+
+nlohmann::json to_json(PropagationStyle style) { return to_string_view(style); }
 
 nlohmann::json to_json(const std::vector<PropagationStyle>& styles) {
   std::vector<nlohmann::json> styles_json;
