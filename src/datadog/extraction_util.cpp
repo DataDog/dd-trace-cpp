@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 #include "extracted_data.h"
-#include "json.hpp"
 #include "logger.h"
 #include "parse_util.h"
 #include "string_util.h"
@@ -223,15 +222,15 @@ std::string extraction_error_prefix(
   std::ostringstream stream;
   stream << "While extracting trace context";
   if (style) {
-    stream << " in the " << to_json(*style) << " propagation style";
+    stream << " in the " << to_string_view(*style) << " propagation style";
   }
-  auto it = headers_examined.begin();
-  if (it != headers_examined.end()) {
-    stream << " from the following headers: [";
-    stream << nlohmann::json(it->first + ": " + it->second);
+
+  if (!headers_examined.empty()) {
+    auto it = headers_examined.begin();
+    stream << " from the following headers: [" << it->first << ": "
+           << it->second;
     for (++it; it != headers_examined.end(); ++it) {
-      stream << ", ";
-      stream << nlohmann::json(it->first + ": " + it->second);
+      stream << ", " << it->first << ": " << it->second;
     }
     stream << "]";
   }
