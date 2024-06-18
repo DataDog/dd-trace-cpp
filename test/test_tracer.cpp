@@ -383,6 +383,13 @@ TEST_CASE("span extraction") {
          {PropagationStyle::B3},
          {{"x-b3-traceid", "0"}, {"x-b3-spanid", "123"}, {"x-b3-sampled", "0"}},
          Error::ZERO_TRACE_ID},
+        {__LINE__,
+         "character encoding",
+         {PropagationStyle::DATADOG},
+         {{"x-datadog-trace-id", "\xFD\xD0\x6C\x6C\x6F\x2C\x20\xC3\xB1\x21"},
+          {"x-datadog-parent-id", "1234"},
+          {"x-datadog-sampling-priority", "0"}},
+         Error::INVALID_INTEGER},
     }));
 
     CAPTURE(test_case.line);
