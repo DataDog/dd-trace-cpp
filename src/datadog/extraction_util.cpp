@@ -17,9 +17,6 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-constexpr StringView sampling_delegation_request_header =
-    "x-datadog-delegate-trace-sampling";
-
 // Decode the specified `trace_tags` and integrate them into the specified
 // `result`. If an error occurs, add a `tags::internal::propagation_error` tag
 // to the specified `span_tags` and log a diagnostic using the specified
@@ -129,29 +126,24 @@ Expected<ExtractedData> extract_datadog(
   }
   result.parent_id = *parent_id;
 
-  if (auto sampling_delegation_header =
-          headers.lookup(sampling_delegation_request_header)) {
-    result.delegate_sampling_decision = true;
-    // If the trace sampling decision is being delegated to us, then we don't
-    // interpret the sampling priority (if any) included in the request.
-  } else {
-    result.delegate_sampling_decision = false;
-
-    const StringView sampling_priority_header = "x-datadog-sampling-priority";
-    if (auto found = headers.lookup(sampling_priority_header)) {
-      auto sampling_priority = parse_int(*found, 10);
-      if (auto* error = sampling_priority.if_error()) {
-        std::string prefix;
-        prefix += "Could not extract Datadog-style sampling priority from ";
-        append(prefix, sampling_priority_header);
-        prefix += ": ";
-        append(prefix, *found);
-        prefix += ' ';
-        return error->with_prefix(prefix);
-      }
-
-      result.sampling_priority = *sampling_priority;
+  if (auto found = headers.lookup("x-datadog-sampling-priority")) {
+    auto sampling_priority = parse_int(*found, 10);
+    if (auto* error = sampling_priority.if_error()) {
+      std::string prefix;
+      prefix +=
+          "Could not extract Datadog-style sampling priority from "
+          "x-datadog-sampling-priority: ";
+      append(prefix, *found);
+      prefix += ' ';
+      return error->with_prefix(prefix);
     }
+
+    result.sampling_priority = *sampling_priority;
+  }
+
+  if (auto sampling_delegation_header =
+          headers.lookup("x-datadog-delegate-trace-sampling")) {
+    result.delegate_sampling_decision = true;
   }
 
   auto origin = headers.lookup("x-datadog-origin");
