@@ -16,8 +16,6 @@ using Capabilities = uint64_t;
 namespace capability {
 
 enum Flag : Capabilities {
-  // DEFAULT is a special value. It is the default of the product capability.
-  DEFAULT = 0,
   ASM_ACTIVATION = 1 << 1,
   ASM_IP_BLOCKING = 1 << 2,
   ASM_DD_RULES = 1 << 3,
