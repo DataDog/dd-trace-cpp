@@ -4,6 +4,7 @@
 
 #include "capability.h"
 #include "optional.h"
+#include "product.h"
 
 namespace datadog {
 namespace remote_config {

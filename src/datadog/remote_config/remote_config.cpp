@@ -175,7 +175,7 @@ void Manager::process_response(const nlohmann::json& json) {
     }
 
     // Keep track of config path received to know which ones to revert.
-    std::unordered_set<std::string> visited_config;
+    std::unordered_set<StringView> visited_config;
 
     for (const auto& client_config : *client_configs_it) {
       auto config_path = client_config.get<StringView>();

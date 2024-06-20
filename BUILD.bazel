@@ -89,6 +89,7 @@ cc_library(
     "src/datadog/rate.h",
     "src/datadog/remote_config/capability.h",
     "src/datadog/remote_config/listener.h",
+    "src/datadog/remote_config/product.h",
     "src/datadog/remote_config/remote_config.h",
     "src/datadog/runtime_id.h",
     "src/datadog/sampling_decision.h",
