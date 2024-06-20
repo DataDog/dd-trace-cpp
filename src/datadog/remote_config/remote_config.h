@@ -47,11 +47,13 @@ class Manager {
       error = 3
     } state = State::unacknowledged;
 
+    std::string hash;
     tracing::Optional<std::string> error_message;
   };
 
   tracing::TracerSignature tracer_signature_;
   std::vector<std::shared_ptr<Listener>> listeners_;
+  std::shared_ptr<tracing::Logger> logger_;
   std::set<tracing::StringView> products_;
   std::unordered_map<product::Flag, std::vector<Listener*>>
       listeners_per_product_;
@@ -63,7 +65,8 @@ class Manager {
 
  public:
   Manager(const tracing::TracerSignature& tracer_signature,
-          const std::vector<std::shared_ptr<Listener>>& listeners);
+          const std::vector<std::shared_ptr<Listener>>& listeners,
+          const std::shared_ptr<tracing::Logger>& logger);
 
   // Construct a JSON object representing the payload to be sent in a remote
   // configuration request.
@@ -77,6 +80,8 @@ class Manager {
   // Tell if a `config_path` is a new configuration update.
   bool is_new_config(tracing::StringView config_path,
                      const nlohmann::json& config_meta);
+
+  void error(std::string message);
 };
 
 }  // namespace remote_config

@@ -125,7 +125,7 @@ rc::Capabilities ConfigManager::get_capabilities() {
   using namespace rc::capability;
   return APM_TRACING_SAMPLE_RATE | APM_TRACING_TAGS | APM_TRACING_ENABLED |
          APM_TRACING_SAMPLE_RULES;
-};
+}
 
 Optional<std::string> ConfigManager::on_update(const Configuration& config) {
   const auto config_json = nlohmann::json::parse(config.content);

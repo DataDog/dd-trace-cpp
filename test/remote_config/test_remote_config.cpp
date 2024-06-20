@@ -1,6 +1,7 @@
 #include "catch.hpp"
 #include "datadog/json.hpp"
 #include "datadog/remote_config/remote_config.h"
+#include "mocks/loggers.h"
 
 namespace rc = datadog::remote_config;
 using namespace datadog::tracing;
@@ -37,6 +38,9 @@ struct FakeListener : public rc::Listener {
 
   void on_post_process() override { ++count_on_post_process; }
 };
+
+auto logger = std::make_shared<NullLogger>();
+
 }  // namespace
 
 REMOTE_CONFIG_TEST("initial state payload") {
@@ -61,7 +65,7 @@ REMOTE_CONFIG_TEST("initial state payload") {
       "APM_TRACING", "ASM", "ASM_DATA", "ASM_DD", "ASM_FEATURES"};
   const std::vector<uint8_t> expected_capabilities{0, 0, 0, 0, 0, 0, 145, 2};
 
-  rc::Manager rc(tracer_signature, {tracing_listener, asm_listener});
+  rc::Manager rc(tracer_signature, {tracing_listener, asm_listener}, logger);
 
   const auto payload = rc.make_request_payload();
 
@@ -176,7 +180,7 @@ REMOTE_CONFIG_TEST("response processing") {
                               /* allow_exceptions = */ false);
     REQUIRE(!response_json.is_discarded());
 
-    rc::Manager rc(tracer_signature, {});
+    rc::Manager rc(tracer_signature, {}, logger);
 
     rc.process_response(response_json);
 
@@ -231,7 +235,7 @@ REMOTE_CONFIG_TEST("response processing") {
     auto tracing_listener = std::make_shared<FakeListener>();
     tracing_listener->products = rc::product::APM_TRACING;
 
-    rc::Manager rc(tracer_signature, {tracing_listener});
+    rc::Manager rc(tracer_signature, {tracing_listener}, logger);
     rc.process_response(response_json);
 
     CHECK(tracing_listener->count_on_update == 0);
@@ -296,7 +300,8 @@ REMOTE_CONFIG_TEST("response processing") {
           return "test error message";
         });
 
-    rc::Manager rc(tracer_signature, {tracing_listener, agent_listener});
+    rc::Manager rc(tracer_signature, {tracing_listener, agent_listener},
+                   logger);
     rc.process_response(response_json);
 
     CHECK(tracing_listener->count_on_update == 1);

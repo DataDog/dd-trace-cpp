@@ -164,7 +164,7 @@ DatadogAgent::DatadogAgent(
       flush_interval_(config.flush_interval),
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
-      remote_config_(tracer_signature, rc_listeners),
+      remote_config_(tracer_signature, rc_listeners, logger),
       tracer_signature_(tracer_signature) {
   assert(logger_);
   assert(tracer_telemetry_);

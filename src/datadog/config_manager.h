@@ -20,7 +20,7 @@ namespace tracing {
 
 class ConfigManager : public remote_config::Listener {
  public:
-  // The `ConfigUpdate` struct serves as a container for configuration that can
+  // The `Update` struct serves as a container for configuration that can
   // exclusively be changed remotely.
   //
   // Configurations can be `nullopt` to signal the absence of a value from the

@@ -33,7 +33,6 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
 
   rc::Listener::Configuration config_update{/* id = */ "id",
                                             /* path = */ "",
-                                            /* hash = */ "",
                                             /* content = */ "",
                                             /* version = */ 1,
                                             rc::product::Flag::APM_TRACING};

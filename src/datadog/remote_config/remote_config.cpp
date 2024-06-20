@@ -52,9 +52,11 @@ Optional<product::Flag> parse_config_path(StringView config_path) {
 }  // namespace
 
 Manager::Manager(const TracerSignature& tracer_signature,
-                 const std::vector<std::shared_ptr<Listener>>& listeners)
+                 const std::vector<std::shared_ptr<Listener>>& listeners,
+                 const std::shared_ptr<tracing::Logger>& logger)
     : tracer_signature_(tracer_signature),
       listeners_(listeners),
+      logger_(logger),
       client_id_(uuid()) {
   Capabilities capabilities = 0;
 
@@ -89,6 +91,11 @@ bool Manager::is_new_config(StringView config_path,
          config_meta.at("/hashes/sha256"_json_pointer).get<StringView>();
 }
 
+void Manager::error(std::string message) {
+  logger_->log_error(Error{Error::REMOTE_CONFIGURATION_INVALID_INPUT, message});
+  state_.error_message = std::move(message);
+}
+
 nlohmann::json Manager::make_request_payload() {
   // clang-format off
   auto j = nlohmann::json{
@@ -113,8 +120,15 @@ nlohmann::json Manager::make_request_payload() {
   };
   // clang-format on
 
+  if (state_.error_message) {
+    j["client"]["state"]["has_error"] = true;
+    j["client"]["state"]["error"] = *state_.error_message;
+  }
+
   if (!applied_config_.empty()) {
     auto config_states = nlohmann::json::array();
+    auto cached_target_files = nlohmann::json::array();
+
     for (const auto& [_, config] : applied_config_) {
       nlohmann::json config_state = {
           {"id", config.id},
@@ -128,14 +142,17 @@ nlohmann::json Manager::make_request_payload() {
       }
 
       config_states.emplace_back(std::move(config_state));
+
+      nlohmann::json cached_file = {
+          {"path", config.path},
+          {"length", config.content.size()},
+          {"hashes", {{"algorithm", "sha256"}, {"hash", config.hash}}}};
+
+      cached_target_files.emplace_back(std::move(cached_file));
     }
 
+    j["cached_target"] = cached_target_files;
     j["client"]["state"]["config_states"] = config_states;
-  }
-
-  if (state_.error_message) {
-    j["client"]["state"]["has_error"] = true;
-    j["client"]["state"]["error"] = *state_.error_message;
   }
 
   return j;
@@ -183,10 +200,10 @@ void Manager::process_response(const nlohmann::json& json) {
 
       const auto product = parse_config_path(config_path);
       if (!product) {
-        std::string error_message{config_path};
-        error_message += " is an invalid configuration path";
+        std::string reason{config_path};
+        reason += " is an invalid configuration path";
 
-        state_.error_message = std::move(error_message);
+        error(reason);
         return;
       }
 
@@ -205,18 +222,17 @@ void Manager::process_response(const nlohmann::json& json) {
           });
 
       if (target_it == target_files.cend()) {
-        std::string error_message{"Missing configuration \""};
-        append(error_message, config_path);
-        error_message += "\" from Remote Configuration response";
+        std::string reason{"Target \""};
+        append(reason, config_path);
+        reason += "\" missing from the list of targets";
 
-        state_.error_message = std::move(error_message);
+        error(reason);
         return;
       }
 
       auto decoded_config =
           base64_decode(target_it.value().at("raw").get<StringView>());
 
-      // TODO: try to remove the following line
       const auto config_json = nlohmann::json::parse(decoded_config);
 
       Configuration new_config;
@@ -269,10 +285,10 @@ void Manager::process_response(const nlohmann::json& json) {
       listener->on_post_process();
     }
   } catch (const nlohmann::json::exception& e) {
-    std::string error_message = "Invalid Remote Configuration response: ";
-    error_message += e.what();
+    std::string reason = "Failed to parse the response: ";
+    reason += e.what();
 
-    state_.error_message = std::move(error_message);
+    error(reason);
   }
 }
 

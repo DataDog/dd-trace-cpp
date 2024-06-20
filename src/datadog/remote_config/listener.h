@@ -19,7 +19,6 @@ class Listener {
   struct Configuration {
     std::string id;
     std::string path;
-    std::string hash;
     std::string content;
     std::size_t version;
     product::Flag product;
