@@ -192,7 +192,7 @@ void Manager::process_response(const nlohmann::json& json) {
     }
 
     // Keep track of config path received to know which ones to revert.
-    std::unordered_set<StringView> visited_config;
+    std::unordered_set<std::string> visited_config;
 
     for (const auto& client_config : *client_configs_it) {
       auto config_path = client_config.get<StringView>();
@@ -284,11 +284,13 @@ void Manager::process_response(const nlohmann::json& json) {
     for (const auto& listener : listeners_) {
       listener->on_post_process();
     }
-  } catch (const nlohmann::json::exception& e) {
+  } catch (const nlohmann::json::exception& json_exception) {
     std::string reason = "Failed to parse the response: ";
-    reason += e.what();
+    reason += json_exception.what();
 
     error(reason);
+  } catch (const std::exception& e) {
+    error(e.what());
   }
 }
 
