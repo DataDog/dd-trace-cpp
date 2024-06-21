@@ -207,13 +207,9 @@ void on_request_headers_consumed(const httplib::Request& request, dd::Tracer& tr
   config.start = context->request_start;
 
   tracingutil::HeaderReader reader{request.headers};
-  auto maybe_span = tracer.extract_or_create_span(reader, config);
-  if (dd::Error* error = maybe_span.if_error()) {
-    std::cerr << "While extracting trace context from request: " << *error << '\n';
-    // Create a trace from scratch.
-    context->spans.push(tracer.create_span(config));
-  } else {
-    context->spans.push(std::move(*maybe_span));
+  {
+    auto span = tracer.extract_or_create_span(reader, config);
+    context->spans.push(std::move(span));
   }
 
   dd::Span& span = context->spans.top();
@@ -237,7 +233,7 @@ void on_healthcheck(const httplib::Request& request, httplib::Response& response
   // We'd prefer not to send healthcheck traces to Datadog. They're
   // noisy. So, override the sampling decision to "definitely
   // drop," and don't even bother creating a span here.
-  context->spans.top().trace_segment().override_sampling_priority(int(dd::SamplingPriority::USER_DROP));
+  context->spans.top().trace_segment().override_sampling_priority(dd::SamplingPriority::USER_DROP);
 
   response.set_content("I'm still here!\n", "text/plain");
 }

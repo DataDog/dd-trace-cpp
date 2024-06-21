@@ -102,16 +102,11 @@ void RequestHandler::on_span_start(const httplib::Request& req,
   if (auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
           request_json, "http_headers")) {
     if (!http_headers->empty()) {
-      auto maybe_span = tracer_.extract_or_create_span(
+      auto span = tracer_.extract_or_create_span(
           utils::HeaderReader(*http_headers), span_cfg);
-      if (auto error = maybe_span.if_error()) {
-        logger_->log_error(
-            error->with_prefix("could not extract span from http_headers: "));
-      } else {
-        success(*maybe_span, res);
-        active_spans_.emplace(maybe_span->id(), std::move(*maybe_span));
-        return;
-      }
+      success(span, res);
+      active_spans_.emplace(span.id(), std::move(span));
+      return;
     }
   }
 
