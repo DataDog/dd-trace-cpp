@@ -97,7 +97,7 @@ else ()
   # and so won't link to libc++. So, if any of the FUZZ_* variables are set,
   # keep to libstdc++ (the default on most systems).
   message(STATUS "C++ standard library: libc++")
-  add_compile_options(-stdlib=libc++)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-stdlib=libc++>)
   add_link_options(-stdlib=libc++)
 endif()
 

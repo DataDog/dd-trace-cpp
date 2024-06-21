@@ -239,11 +239,11 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
 
 }  // namespace
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
+Expected<FinalizedTracerConfig> finalize_config(TracerConfig &config) {
   return finalize_config(config, default_clock);
 }
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
+Expected<FinalizedTracerConfig> finalize_config(TracerConfig &user_config,
                                                 const Clock &clock) {
   auto logger =
       user_config.logger ? user_config.logger : std::make_shared<CerrLogger>();
@@ -379,7 +379,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     if (auto *error = finalized.if_error()) {
       return std::move(*error);
     }
-    final_config.collector = *finalized;
+    final_config.collector = std::move(*finalized);
     final_config.metadata.merge(finalized->metadata);
   } else {
     final_config.collector = user_config.collector;

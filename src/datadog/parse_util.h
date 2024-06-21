@@ -13,6 +13,12 @@
 namespace datadog {
 namespace tracing {
 
+// Return a `string_view` over the specified range of characters `[begin, end)`.
+template <typename Iterator>
+StringView range(Iterator begin, Iterator end) {
+  return StringView{&*begin, std::size_t(end - begin)};
+}
+
 bool falsy(StringView input);
 
 // Return a non-negative integer parsed from the specified `input` with respect
@@ -37,7 +43,9 @@ Expected<double> parse_double(StringView input);
 std::vector<StringView> parse_list(StringView input);
 
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
-    std::vector<StringView> list);
+    const std::vector<StringView>& list);
+Expected<std::unordered_map<std::string, std::string>> parse_tags(
+    const std::vector<std::string>& list);
 
 Expected<std::unordered_map<std::string, std::string>> parse_tags(
     StringView input);

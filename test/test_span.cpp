@@ -555,7 +555,7 @@ TEST_CASE("injection can be disabled using the \"none\" style") {
   config.logger = std::make_shared<MockLogger>();
   config.injection_styles = {PropagationStyle::NONE};
 
-  const auto finalized_config = finalize_config(config);
+  auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);
   Tracer tracer{*finalized_config};
 
@@ -575,7 +575,7 @@ TEST_CASE("injecting W3C traceparent header") {
 
   SECTION("extracted from W3C traceparent") {
     config.extraction_styles = {PropagationStyle::W3C};
-    const auto finalized_config = finalize_config(config);
+    auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
 
     // Override the tracer's ID generator to always return `expected_parent_id`.
@@ -612,7 +612,7 @@ TEST_CASE("injecting W3C traceparent header") {
   }
 
   SECTION("not extracted from W3C traceparent") {
-    const auto finalized_config = finalize_config(config);
+    auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
 
     // Override the tracer's ID generator to always return a fixed value.
@@ -686,7 +686,7 @@ TEST_CASE("injecting W3C tracestate header") {
   config.logger = logger;
   config.collector = std::make_shared<NullCollector>();
 
-  const auto finalized_config = finalize_config(config);
+  auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);
   Tracer tracer{*finalized_config};
 
@@ -816,7 +816,7 @@ TEST_CASE("128-bit trace ID injection") {
       PropagationStyle::W3C, PropagationStyle::DATADOG, PropagationStyle::B3};
   config.injection_styles = injection_styles;
 
-  const auto finalized = finalize_config(config);
+  auto finalized = finalize_config(config);
   REQUIRE(finalized);
 
   class MockIDGenerator : public IDGenerator {
@@ -867,7 +867,7 @@ TEST_CASE("sampling delegation injection") {
 
   SECTION("configuration") {
     config.delegate_trace_sampling = true;
-    const auto finalized = finalize_config(config);
+    auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
     Tracer tracer{*finalized};
@@ -893,7 +893,7 @@ TEST_CASE("sampling delegation injection") {
   }
 
   SECTION("injection options") {
-    const auto finalized = finalize_config(config);
+    auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
     Tracer tracer{*finalized};
@@ -911,7 +911,7 @@ TEST_CASE("sampling delegation injection") {
 
   SECTION("end-to-end") {
     config.delegate_trace_sampling = true;
-    const auto finalized = finalize_config(config);
+    auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
     Tracer tracer{*finalized};

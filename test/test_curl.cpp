@@ -153,7 +153,7 @@ TEST_CASE("parse response headers and body", "[curl]") {
     // force only tracing to be sent and exclude telemetry.
     config.report_telemetry = false;
 
-    const auto finalized = finalize_config(config);
+    auto finalized = finalize_config(config);
     REQUIRE(finalized);
     Tracer tracer{*finalized};
 

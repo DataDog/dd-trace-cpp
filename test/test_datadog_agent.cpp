@@ -201,7 +201,7 @@ TEST_CASE("Remote Configuration", "[datadog_agent]") {
       finalized->report_telemetry, finalized->clock, finalized->logger,
       signature, "", "");
 
-  const auto& agent_config =
+  auto& agent_config =
       std::get<FinalizedDatadogAgentConfig>(finalized->collector);
   DatadogAgent agent(agent_config, telemetry, config.logger, signature,
                      config_manager);

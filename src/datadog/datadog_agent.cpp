@@ -146,7 +146,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
 }  // namespace
 
 DatadogAgent::DatadogAgent(
-    const FinalizedDatadogAgentConfig& config,
+    FinalizedDatadogAgentConfig& config,
     const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
     const std::shared_ptr<Logger>& logger,
     const TracerSignature& tracer_signature,
@@ -162,7 +162,7 @@ DatadogAgent::DatadogAgent(
       flush_interval_(config.flush_interval),
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
-      remote_config_(tracer_signature, config_manager),
+      remote_config_(tracer_signature, config_manager, logger),
       tracer_signature_(tracer_signature) {
   assert(logger_);
   assert(tracer_telemetry_);
@@ -207,6 +207,15 @@ DatadogAgent::DatadogAgent(
   }
 
   if (config.remote_configuration_enabled) {
+    for (auto&& l : config.rem_cfg_listeners) {
+      remote_config_.add_listener(std::move(l));
+    }
+    config.rem_cfg_listeners.clear();
+    for (auto&& l : config.rem_cfg_end_listeners) {
+      remote_config_.add_config_end_listener(std::move(l));
+    }
+    config.rem_cfg_end_listeners.clear();
+
     tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
         config.remote_configuration_poll_interval,
         [this] { get_and_apply_remote_configuration_updates(); }));
@@ -445,7 +454,7 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
           return;
         }
 
-        const auto response_json =
+        auto response_json =
             nlohmann::json::parse(/* input = */ response_body,
                                   /* parser_callback = */ nullptr,
                                   /* allow_exceptions = */ false);
@@ -458,9 +467,9 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
 
         if (!response_json.empty()) {
           auto updated_configuration =
-              remote_config_.process_response(response_json);
+              remote_config_.process_response(std::move(response_json));
           if (!updated_configuration.empty()) {
-            send_configuration_change(updated_configuration);
+            send_configuration_change(std::move(updated_configuration));
           }
         }
       };

@@ -551,7 +551,7 @@ TEST_CASE("span extraction") {
   SECTION("extraction can be disabled using the \"none\" style") {
     config.extraction_styles = {PropagationStyle::NONE};
 
-    const auto finalized_config = finalize_config(config);
+    auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
     Tracer tracer{*finalized_config};
     const std::unordered_map<std::string, std::string> headers{
@@ -1262,7 +1262,7 @@ TEST_CASE("128-bit trace IDs") {
   std::vector<PropagationStyle> extraction_styles{
       PropagationStyle::W3C, PropagationStyle::DATADOG, PropagationStyle::B3};
   config.extraction_styles = extraction_styles;
-  const auto finalized = finalize_config(config, clock);
+  auto finalized = finalize_config(config, clock);
   REQUIRE(finalized);
   Tracer tracer{*finalized};
   TraceID trace_id;  // used below the following SECTIONs
@@ -1380,7 +1380,7 @@ TEST_CASE(
   config.logger = logger;
   std::vector<PropagationStyle> extraction_styles{PropagationStyle::W3C};
   config.extraction_styles = extraction_styles;
-  const auto finalized = finalize_config(config);
+  auto finalized = finalize_config(config);
   REQUIRE(finalized);
   Tracer tracer{*finalized};
 

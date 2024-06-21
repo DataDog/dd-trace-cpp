@@ -21,6 +21,7 @@
 #include "config.h"
 #include "expected.h"
 #include "http_client.h"
+#include "remote_config.h"
 #include "string_view.h"
 
 namespace datadog {
@@ -63,12 +64,20 @@ struct DatadogAgentConfig {
   // updates.
   Optional<double> remote_configuration_poll_interval_seconds;
 
+  // Remote configuration listeners to add
+  std::vector<std::unique_ptr<remote_config::ProductListener>>
+      rem_cfg_listeners;
+
+  // Callbacks invoked after all the configuration listeners for all products
+  // have been called, as long as at least one has.
+  std::vector<std::function<void()>> rem_cfg_end_listeners;
+
   static Expected<HTTPClient::URL> parse(StringView);
 };
 
 class FinalizedDatadogAgentConfig {
   friend Expected<FinalizedDatadogAgentConfig> finalize_config(
-      const DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&);
+      DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&);
 
   FinalizedDatadogAgentConfig() = default;
 
@@ -83,10 +92,13 @@ class FinalizedDatadogAgentConfig {
   std::chrono::steady_clock::duration shutdown_timeout;
   std::chrono::steady_clock::duration remote_configuration_poll_interval;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::vector<std::unique_ptr<remote_config::ProductListener>>
+      rem_cfg_listeners;
+  std::vector<std::function<void()>> rem_cfg_end_listeners;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
+    DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
     const Clock& clock);
 
 }  // namespace tracing

@@ -48,8 +48,8 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
 }
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& user_config,
-    const std::shared_ptr<Logger>& logger, const Clock& clock) {
+    DatadogAgentConfig& user_config, const std::shared_ptr<Logger>& logger,
+    const Clock& clock) {
   Expected<DatadogAgentConfig> env_config = load_datadog_agent_env_config();
   if (auto error = env_config.if_error()) {
     return *error;
@@ -140,6 +140,9 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.url = *parsed_url;
   result.metadata[ConfigName::AGENT_URL] =
       ConfigMetadata(ConfigName::AGENT_URL, url, origin);
+
+  result.rem_cfg_listeners = std::move(user_config.rem_cfg_listeners);
+  result.rem_cfg_end_listeners = std::move(user_config.rem_cfg_end_listeners);
 
   return result;
 }
