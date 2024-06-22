@@ -97,7 +97,6 @@ target_sources(dd_trace_cpp-objects
     src/datadog/logger.cpp
     src/datadog/metrics.cpp
     src/datadog/msgpack.cpp
-    src/datadog/null_collector.cpp
     src/datadog/parse_util.cpp
     src/datadog/platform_util.cpp
     src/datadog/propagation_style.cpp

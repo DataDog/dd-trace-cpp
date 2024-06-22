@@ -11,9 +11,7 @@
 
 #include <chrono>
 #include <functional>
-
-#include "error.h"
-#include "json_fwd.hpp"
+#include <string>
 
 namespace datadog {
 namespace tracing {
@@ -37,7 +35,7 @@ class EventScheduler {
   //   "datadog::tracing::ThreadedEventScheduler".
   // - "config" is an object containing this object's configuration. "config"
   //   may be omitted if the derived class has no configuration.
-  virtual nlohmann::json config_json() const = 0;
+  virtual std::string config() const = 0;
 
   virtual ~EventScheduler() = default;
 };

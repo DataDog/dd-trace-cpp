@@ -77,18 +77,18 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 
   if (config.log_on_startup) {
-    logger_->log_startup([this](std::ostream& log) {
-      log << "DATADOG TRACER CONFIGURATION - " << config_json();
+    logger_->log_startup([configuration = this->config()](std::ostream& log) {
+      log << "DATADOG TRACER CONFIGURATION - " << configuration;
     });
   }
 }
 
-nlohmann::json Tracer::config_json() const {
+std::string Tracer::config() const {
   // clang-format off
   auto config = nlohmann::json::object({
     {"version", tracer_version_string},
     {"runtime_id", runtime_id_.string()},
-    {"collector", collector_->config_json()},
+    {"collector", collector_->config()},
     {"span_sampler", span_sampler_->config_json()},
     {"injection_styles", to_json(injection_styles_)},
     {"extraction_styles", to_json(extraction_styles_)},
@@ -103,7 +103,7 @@ nlohmann::json Tracer::config_json() const {
     config["hostname"] = *hostname_;
   }
 
-  return config;
+  return config.dump();
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }

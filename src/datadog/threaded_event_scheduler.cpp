@@ -58,9 +58,10 @@ EventScheduler::Cancel ThreadedEventScheduler::schedule_recurring_event(
   };
 }
 
-nlohmann::json ThreadedEventScheduler::config_json() const {
+std::string ThreadedEventScheduler::config() const {
   return nlohmann::json::object(
-      {{"type", "datadog::tracing::ThreadedEventScheduler"}});
+             {{"type", "datadog::tracing::ThreadedEventScheduler"}})
+      .dump();
 }
 
 void ThreadedEventScheduler::run() {
