@@ -446,6 +446,15 @@ TEST_CASE("span extraction") {
          456,
          2},
         {__LINE__,
+         "datadog style with leading and trailing spaces",
+         {PropagationStyle::DATADOG},
+         {{"x-datadog-trace-id", "   123  "},
+          {"x-datadog-parent-id", " 456  "},
+          {"x-datadog-sampling-priority", "    2 "}},
+         TraceID(123),
+         456,
+         2},
+        {__LINE__,
          "datadog style without sampling priority",
          {PropagationStyle::DATADOG},
          {{"x-datadog-trace-id", "123"}, {"x-datadog-parent-id", "456"}},
@@ -465,6 +474,15 @@ TEST_CASE("span extraction") {
          {{"x-b3-traceid", "abc"},
           {"x-b3-spanid", "def"},
           {"x-b3-sampled", "0"}},
+         TraceID(0xabc),
+         0xdef,
+         0},
+        {__LINE__,
+         "B3 style with leading and trailing spaces",
+         {PropagationStyle::B3},
+         {{"x-b3-traceid", "   abc   "},
+          {"x-b3-spanid", " def  "},
+          {"x-b3-sampled", "     0  "}},
          TraceID(0xabc),
          0xdef,
          0},
@@ -593,6 +611,13 @@ TEST_CASE("span extraction") {
         // https://www.w3.org/TR/trace-context/#examples-of-http-traceparent-headers
         {__LINE__, "valid: w3.org example 1",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", // traceparent
+         nullopt,
+         *TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"), // expected_trace_id
+         67667974448284343ULL, // expected_parent_id
+         1}, // expected_sampling_priority
+
+        {__LINE__, "valid: w3.org example 1 with leading and trailing spaces",
+         "   00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01   ", // traceparent
          nullopt,
          *TraceID::parse_hex("4bf92f3577b34da6a3ce929d0e0e4736"), // expected_trace_id
          67667974448284343ULL, // expected_parent_id
