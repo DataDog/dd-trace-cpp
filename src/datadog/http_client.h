@@ -13,8 +13,6 @@
 
 #include "error.h"
 #include "expected.h"
-#include "json_fwd.hpp"
-#include "optional.h"
 
 namespace datadog {
 namespace tracing {
@@ -63,7 +61,7 @@ class HTTPClient {
   //   "datadog::tracing::Curl".
   // - "config" is an object containing this object's configuration. "config"
   //   may be omitted if the derived class has no configuration.
-  virtual nlohmann::json config_json() const = 0;
+  virtual std::string config() const = 0;
 
   virtual ~HTTPClient() = default;
 };

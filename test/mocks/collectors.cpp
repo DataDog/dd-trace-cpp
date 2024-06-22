@@ -2,9 +2,9 @@
 
 #include <datadog/json.hpp>
 
-#define DEFINE_CONFIG_JSON_METHOD(TYPE)               \
-  nlohmann::json TYPE::config_json() const {          \
-    return nlohmann::json::object({{"type", #TYPE}}); \
+#define DEFINE_CONFIG_JSON_METHOD(TYPE)                      \
+  std::string TYPE::config() const {                         \
+    return nlohmann::json::object({{"type", #TYPE}}).dump(); \
   }
 
 DEFINE_CONFIG_JSON_METHOD(MockCollector)
