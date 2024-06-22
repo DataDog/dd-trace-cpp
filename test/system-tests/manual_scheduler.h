@@ -29,7 +29,7 @@ struct ManualScheduler : public datadog::tracing::EventScheduler {
     return scheduler_.schedule_recurring_event(interval, callback);
   }
 
-  nlohmann::json config_json() const override {
-    return nlohmann::json::object({{"type", "ManualScheduler"}});
+  std::string config() const override {
+    return nlohmann::json::object({{"type", "ManualScheduler"}}).dump();
   }
 };

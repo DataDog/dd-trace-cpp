@@ -69,12 +69,13 @@ SpanSampler::Rule* SpanSampler::match(const SpanData& span) {
 nlohmann::json SpanSampler::config_json() const {
   std::vector<nlohmann::json> rules;
   for (const auto& rule : rules_) {
-    rules.push_back(to_json(rule));
+    rules.push_back(to_string(rule));
   }
 
   return nlohmann::json::object({
-      {"rules", rules},
-  });
+                                    {"rules", rules},
+                                })
+      .dump();
 }
 
 }  // namespace tracing
