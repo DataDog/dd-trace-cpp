@@ -3,11 +3,11 @@
 #include <cassert>
 #include <cstddef>
 
-#include "error.h"
+#include "datadog/error.h"
+#include "datadog/span_config.h"
+#include "datadog/string_view.h"
 #include "msgpack.h"
-#include "span_config.h"
 #include "span_defaults.h"
-#include "string_view.h"
 #include "tags.h"
 
 namespace datadog {

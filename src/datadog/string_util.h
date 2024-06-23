@@ -3,8 +3,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "propagation_style.h"
-#include "string_view.h"
+#include "datadog/propagation_style.h"
+#include "datadog/string_view.h"
 
 namespace datadog {
 namespace tracing {

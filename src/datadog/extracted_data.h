@@ -8,9 +8,9 @@
 #include <utility>
 #include <vector>
 
-#include "optional.h"
-#include "propagation_style.h"
-#include "trace_id.h"
+#include "datadog/optional.h"
+#include "datadog/propagation_style.h"
+#include "datadog/trace_id.h"
 
 namespace datadog {
 namespace tracing {

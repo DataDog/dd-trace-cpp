@@ -2,8 +2,9 @@
 
 #include <unordered_map>
 
+#include "datadog/trace_sampler_config.h"
+#include "json.hpp"
 #include "optional"
-#include "trace_sampler_config.h"
 
 namespace datadog {
 namespace tracing {

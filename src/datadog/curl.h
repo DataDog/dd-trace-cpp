@@ -17,8 +17,8 @@
 #include <string>
 #include <thread>
 
-#include "clock.h"
-#include "http_client.h"
+#include "datadog/clock.h"
+#include "datadog/http_client.h"
 #include "json_fwd.hpp"
 
 namespace datadog {

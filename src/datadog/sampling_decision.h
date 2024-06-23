@@ -4,7 +4,7 @@
 // keep/drop sampling decision (for either trace sampling or span sampling) and
 // contains supporting information about the reason for the decision.
 
-#include "optional.h"
+#include "datadog/optional.h"
 #include "rate.h"
 #include "sampling_mechanism.h"
 

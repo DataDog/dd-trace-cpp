@@ -12,8 +12,8 @@
 #include <cstdint>
 #include <memory>
 
-#include "clock.h"
-#include "trace_id.h"
+#include "datadog/clock.h"
+#include "datadog/trace_id.h"
 
 namespace datadog {
 namespace tracing {

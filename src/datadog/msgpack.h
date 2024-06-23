@@ -17,8 +17,8 @@
 #include <string>
 #include <utility>
 
-#include "expected.h"
-#include "string_view.h"
+#include "datadog/expected.h"
+#include "datadog/string_view.h"
 
 namespace datadog {
 namespace tracing {

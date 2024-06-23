@@ -1,9 +1,9 @@
 #include "tracer_telemetry.h"
 
-#include "logger.h"
+#include "datadog/logger.h"
+#include "datadog/version.h"
 #include "platform_util.h"
 #include "span_defaults.h"
-#include "version.h"
 
 namespace datadog {
 namespace tracing {

@@ -30,12 +30,12 @@
 // configuration has been updated by a Remote Configuration event.
 #include <vector>
 
-#include "clock.h"
 #include "config.h"
+#include "datadog/clock.h"
+#include "datadog/runtime_id.h"
 #include "json.hpp"
 #include "metrics.h"
 #include "platform_util.h"
-#include "runtime_id.h"
 #include "tracer_signature.h"
 
 namespace datadog {

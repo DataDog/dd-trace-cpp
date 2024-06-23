@@ -1,7 +1,6 @@
 // This test covers operations defined for metrics defined in `metrics.h`.
 
-#include <datadog/metrics.h>
-
+#include "datadog/metrics.h"
 #include "test.h"
 
 using namespace datadog::tracing;

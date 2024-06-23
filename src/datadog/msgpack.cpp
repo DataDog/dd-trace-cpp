@@ -5,7 +5,7 @@
 #include <limits>
 #include <type_traits>
 
-#include "error.h"
+#include "datadog/error.h"
 
 namespace datadog {
 namespace tracing {

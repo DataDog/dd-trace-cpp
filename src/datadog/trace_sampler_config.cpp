@@ -1,12 +1,15 @@
-#include "trace_sampler_config.h"
+#include "datadog/trace_sampler_config.h"
 
 #include <cmath>
 #include <unordered_set>
 
+#include "config.h"
 #include "environment.h"
 #include "json.hpp"
 #include "parse_util.h"
 #include "string_util.h"
+#include "trace_sampler_config_final.h"
+#include "trace_sampler_rule.h"
 
 namespace datadog {
 namespace tracing {

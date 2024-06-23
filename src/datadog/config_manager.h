@@ -7,12 +7,14 @@
 
 #include <mutex>
 
-#include "clock.h"
+#include "config.h"
 #include "config_update.h"
+#include "datadog/clock.h"
+#include "datadog/optional.h"
+#include "datadog/tracer_config.h"
 #include "json.hpp"
-#include "optional.h"
 #include "span_defaults.h"
-#include "tracer_config.h"
+#include "trace_sampler_rule.h"
 
 namespace datadog {
 namespace tracing {

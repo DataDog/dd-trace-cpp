@@ -6,10 +6,10 @@
 #include <regex>
 #include <utility>
 
-#include "dict_reader.h"
+#include "datadog/dict_reader.h"
+#include "datadog/propagation_style.h"
 #include "hex.h"
 #include "parse_util.h"
-#include "propagation_style.h"
 #include "string_util.h"
 #include "tags.h"
 

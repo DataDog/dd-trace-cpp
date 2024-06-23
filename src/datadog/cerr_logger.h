@@ -10,7 +10,7 @@
 #include <mutex>
 #include <sstream>
 
-#include "logger.h"
+#include "datadog/logger.h"
 
 namespace datadog {
 namespace tracing {

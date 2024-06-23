@@ -125,88 +125,16 @@ target_sources(dd_trace_cpp-objects
     src/datadog/w3c_propagation.cpp
 )
 
-# This library's public headers are just its source headers.
-target_sources(dd_trace_cpp-objects PUBLIC
-  FILE_SET public_headers
-  TYPE HEADERS
-  BASE_DIRS src/
-  FILES
-  src/datadog/base64.h
-  src/datadog/config.h
-  src/datadog/cerr_logger.h
-  src/datadog/clock.h
-  src/datadog/config_manager.h
-  src/datadog/config_update.h
-  src/datadog/collector.h
-  src/datadog/collector_response.h
-  # src/datadog/curl.h except for curl.h
-  src/datadog/datadog_agent_config.h
-  src/datadog/datadog_agent.h
-  src/datadog/default_http_client.h
-  src/datadog/dict_reader.h
-  src/datadog/dict_writer.h
-  src/datadog/environment.h
-  src/datadog/error.h
-  src/datadog/event_scheduler.h
-  src/datadog/expected.h
-  src/datadog/extracted_data.h
-  src/datadog/extraction_util.h
-  src/datadog/glob.h
-  src/datadog/hex.h
-  src/datadog/http_client.h
-  src/datadog/id_generator.h
-  src/datadog/injection_options.h
-  src/datadog/json_fwd.hpp
-  src/datadog/json.hpp
-  src/datadog/limiter.h
-  src/datadog/logger.h
-  src/datadog/metrics.h
-  src/datadog/msgpack.h
-  src/datadog/null_collector.h
-  src/datadog/optional.h
-  src/datadog/parse_util.h
-  src/datadog/platform_util.h
-  src/datadog/propagation_style.h
-  src/datadog/random.h
-  src/datadog/rate.h
-  src/datadog/remote_config.h
-  src/datadog/runtime_id.h
-  src/datadog/sampling_decision.h
-  src/datadog/sampling_mechanism.h
-  src/datadog/sampling_priority.h
-  src/datadog/sampling_util.h
-  src/datadog/span_config.h
-  src/datadog/span_data.h
-  src/datadog/span_defaults.h
-  src/datadog/span.h
-  src/datadog/span_matcher.h
-  src/datadog/span_sampler_config.h
-  src/datadog/span_sampler.h
-  src/datadog/string_util.h
-  src/datadog/string_view.h
-  src/datadog/tag_propagation.h
-  src/datadog/tags.h
-  src/datadog/threaded_event_scheduler.h
-  src/datadog/tracer_config.h
-  src/datadog/tracer_signature.h
-  src/datadog/tracer_telemetry.h
-  src/datadog/tracer.h
-  src/datadog/trace_id.h
-  src/datadog/trace_sampler_config.h
-  src/datadog/trace_sampler.h
-  src/datadog/trace_segment.h
-  src/datadog/version.h
-  src/datadog/w3c_propagation.h
-)
-
 # TODO: define public/private
 # Headers location are different depending of whether we are building 
 # or installing the library.
-# target_include_directories(dd_trace_cpp-objects
-#   PUBLIC
-#     $<INSTALL_INTERFACE:src>
-#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-# )
+target_include_directories(dd_trace_cpp-objects
+  PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/datadog>
+)
 
 target_link_libraries(dd_trace_cpp-objects
   PRIVATE

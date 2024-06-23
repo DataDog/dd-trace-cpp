@@ -3,6 +3,7 @@
 #include "parse_util.h"
 #include "string_util.h"
 #include "trace_sampler.h"
+#include "tracer_config_final.h"
 
 namespace datadog {
 namespace tracing {

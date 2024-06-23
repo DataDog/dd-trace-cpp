@@ -1,6 +1,10 @@
 // This is an HTTP server that listens on port 80 and forwards all requests to
 // the the "server" host on port 80.
 
+#include <datadog/dict_reader.h>
+#include <datadog/dict_writer.h>
+#include <datadog/span.h>
+#include <datadog/span_config.h>
 #include <datadog/tracer.h>
 
 #include <csignal>
@@ -8,11 +12,6 @@
 #include <optional>
 #include <string_view>
 
-#include "datadog/dict_reader.h"
-#include "datadog/dict_writer.h"
-#include "datadog/span.h"
-#include "datadog/span_config.h"
-#include "datadog/trace_segment.h"
 #include "httplib.h"
 #include "tracingutil.h"
 

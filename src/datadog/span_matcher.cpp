@@ -1,11 +1,11 @@
-#include "span_matcher.h"
+#include "datadog/span_matcher.h"
 
 #include <algorithm>
 
-#include "error.h"
+#include "datadog/error.h"
+#include "datadog/optional.h"
 #include "glob.h"
 #include "json.hpp"
-#include "optional.h"
 #include "span_data.h"
 
 namespace datadog {

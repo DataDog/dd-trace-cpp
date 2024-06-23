@@ -10,11 +10,11 @@
 #include <mutex>
 #include <vector>
 
-#include "clock.h"
-#include "collector.h"
 #include "config_manager.h"
-#include "event_scheduler.h"
-#include "http_client.h"
+#include "datadog/clock.h"
+#include "datadog/collector.h"
+#include "datadog/event_scheduler.h"
+#include "datadog/http_client.h"
 #include "metrics.h"
 #include "remote_config.h"
 #include "tracer_signature.h"

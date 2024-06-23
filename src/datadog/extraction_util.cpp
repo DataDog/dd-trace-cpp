@@ -6,9 +6,9 @@
 #include <string>
 #include <unordered_map>
 
+#include "datadog/logger.h"
 #include "extracted_data.h"
 #include "json.hpp"
-#include "logger.h"
 #include "parse_util.h"
 #include "string_util.h"
 #include "tag_propagation.h"

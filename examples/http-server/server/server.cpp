@@ -24,10 +24,8 @@
 #include <datadog/clock.h>
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
-#include <datadog/sampling_decision.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
-#include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -160,7 +158,7 @@ int main() {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
 
     tracingutil::HeaderWriter writer(response.headers);
-    context->spans.top().trace_segment().write_sampling_delegation_response(writer);
+    /*context->spans.top().trace_segment().write_sampling_delegation_response(writer);*/
 
     context->spans.pop();
     return httplib::Server::HandlerResponse::Unhandled;
@@ -233,7 +231,7 @@ void on_healthcheck(const httplib::Request& request, httplib::Response& response
   // We'd prefer not to send healthcheck traces to Datadog. They're
   // noisy. So, override the sampling decision to "definitely
   // drop," and don't even bother creating a span here.
-  context->spans.top().trace_segment().override_sampling_priority(dd::SamplingPriority::USER_DROP);
+  /*context->spans.top().trace_segment().override_sampling_priority(dd::SamplingPriority::USER_DROP);*/
 
   response.set_content("I'm still here!\n", "text/plain");
 }

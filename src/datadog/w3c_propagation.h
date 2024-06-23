@@ -8,10 +8,10 @@
 #include <string>
 #include <unordered_map>
 
-#include "expected.h"
+#include "datadog/expected.h"
+#include "datadog/optional.h"
+#include "datadog/trace_id.h"
 #include "extracted_data.h"
-#include "optional.h"
-#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {

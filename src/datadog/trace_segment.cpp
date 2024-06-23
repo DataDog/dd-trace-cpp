@@ -6,16 +6,16 @@
 #include <utility>
 #include <vector>
 
-#include "collector.h"
 #include "collector_response.h"
-#include "dict_reader.h"
-#include "dict_writer.h"
-#include "error.h"
+#include "datadog/collector.h"
+#include "datadog/dict_reader.h"
+#include "datadog/dict_writer.h"
+#include "datadog/error.h"
+#include "datadog/injection_options.h"
+#include "datadog/logger.h"
+#include "datadog/optional.h"
 #include "hex.h"
-#include "injection_options.h"
 #include "json.hpp"
-#include "logger.h"
-#include "optional.h"
 #include "platform_util.h"
 #include "random.h"
 #include "span_data.h"

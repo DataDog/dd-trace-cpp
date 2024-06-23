@@ -10,7 +10,7 @@
 
 #include <variant>
 
-#include "expected.h"
+#include "datadog/expected.h"
 
 namespace datadog {
 namespace tracing {

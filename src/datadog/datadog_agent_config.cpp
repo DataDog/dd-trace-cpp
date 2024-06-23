@@ -1,9 +1,11 @@
-#include "datadog_agent_config.h"
+#include "datadog/datadog_agent_config.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
 
+#include "config.h"
+#include "datadog_config_final.h"
 #include "default_http_client.h"
 #include "environment.h"
 #include "parse_util.h"

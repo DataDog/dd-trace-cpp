@@ -1,8 +1,8 @@
 #include "span_sampler.h"
 
+#include "datadog/sampling_priority.h"
 #include "json.hpp"
 #include "sampling_mechanism.h"
-#include "sampling_priority.h"
 #include "sampling_util.h"
 #include "span_data.h"
 
@@ -68,9 +68,9 @@ SpanSampler::Rule* SpanSampler::match(const SpanData& span) {
 
 nlohmann::json SpanSampler::config_json() const {
   std::vector<nlohmann::json> rules;
-  for (const auto& rule : rules_) {
-    rules.push_back(to_json(rule));
-  }
+  /*for (const auto& rule : rules_) {*/
+  /*  rules.push_back(to_json(rule));*/
+  /*}*/
 
   return nlohmann::json::object({
       {"rules", rules},

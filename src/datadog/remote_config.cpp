@@ -6,10 +6,10 @@
 #include <unordered_set>
 
 #include "base64.h"
+#include "datadog/string_view.h"
+#include "datadog/version.h"
 #include "json.hpp"
 #include "random.h"
-#include "string_view.h"
-#include "version.h"
 
 using namespace nlohmann::literals;
 

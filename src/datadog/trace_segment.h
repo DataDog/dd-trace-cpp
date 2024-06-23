@@ -33,12 +33,12 @@
 #include <vector>
 
 #include "config_manager.h"
-#include "expected.h"
+#include "datadog/expected.h"
+#include "datadog/optional.h"
+#include "datadog/propagation_style.h"
+#include "datadog/sampling_priority.h"
 #include "metrics.h"
-#include "optional.h"
-#include "propagation_style.h"
 #include "sampling_decision.h"
-#include "sampling_priority.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {

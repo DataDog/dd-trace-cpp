@@ -87,12 +87,13 @@
 #include <string>
 #include <unordered_map>
 
-#include "clock.h"
+#include "datadog/clock.h"
+#include "datadog/optional.h"
+#include "datadog/trace_sampler_config.h"
 #include "json_fwd.hpp"
 #include "limiter.h"
-#include "optional.h"
 #include "rate.h"
-#include "trace_sampler_config.h"
+#include "trace_sampler_rule.h"
 
 namespace datadog {
 namespace tracing {

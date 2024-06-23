@@ -1,4 +1,4 @@
-#include "tracer_config.h"
+#include "datadog/tracer_config.h"
 
 #include <algorithm>
 #include <cassert>
@@ -10,12 +10,13 @@
 #include <vector>
 
 #include "cerr_logger.h"
+#include "datadog/string_view.h"
 #include "datadog_agent.h"
 #include "environment.h"
 #include "json.hpp"
 #include "parse_util.h"
 #include "string_util.h"
-#include "string_view.h"
+#include "tracer_config_final.h"
 
 namespace datadog {
 namespace tracing {

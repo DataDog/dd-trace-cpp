@@ -21,11 +21,12 @@
 #include <memory>
 #include <mutex>
 
-#include "clock.h"
+#include "datadog/clock.h"
+#include "datadog/span_sampler_config.h"
 #include "json_fwd.hpp"
 #include "limiter.h"
 #include "sampling_decision.h"
-#include "span_sampler_config.h"
+#include "span_sampler_config_final.h"
 
 namespace datadog {
 namespace tracing {

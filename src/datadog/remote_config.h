@@ -16,11 +16,11 @@
 #include <string>
 
 #include "config_manager.h"
-#include "logger.h"
-#include "optional.h"
-#include "runtime_id.h"
-#include "string_view.h"
-#include "trace_sampler_config.h"
+#include "datadog/logger.h"
+#include "datadog/optional.h"
+#include "datadog/runtime_id.h"
+#include "datadog/string_view.h"
+#include "datadog/trace_sampler_config.h"
 #include "tracer_signature.h"
 
 namespace datadog {

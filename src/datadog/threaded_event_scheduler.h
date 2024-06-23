@@ -14,7 +14,7 @@
 #include <thread>
 #include <vector>
 
-#include "event_scheduler.h"
+#include "datadog/event_scheduler.h"
 
 namespace datadog {
 namespace tracing {

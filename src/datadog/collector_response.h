@@ -16,8 +16,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "datadog/string_view.h"
 #include "rate.h"
-#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

@@ -21,9 +21,9 @@
 
 #include <string>
 
-#include "runtime_id.h"
-#include "string_view.h"
-#include "version.h"
+#include "datadog/runtime_id.h"
+#include "datadog/string_view.h"
+#include "datadog/version.h"
 
 #define DD_TRACE_STRINGIFY(ARG) DD_TRACE_STRINGIFY_HELPER(ARG)
 #define DD_TRACE_STRINGIFY_HELPER(ARG) #ARG
@@ -39,7 +39,7 @@ struct TracerSignature {
   StringView library_language;
   StringView library_language_version;
 
-  TracerSignature() = delete;
+  /*TracerSignature() = delete;*/
   TracerSignature(RuntimeID id, std::string service, std::string environment)
       : runtime_id(id),
         default_service(std::move(service)),

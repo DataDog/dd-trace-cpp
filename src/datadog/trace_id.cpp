@@ -1,4 +1,4 @@
-#include "trace_id.h"
+#include "datadog/trace_id.h"
 
 #include "hex.h"
 #include "parse_util.h"

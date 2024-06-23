@@ -9,10 +9,10 @@
 #include <utility>
 #include <vector>
 
-#include "dict_reader.h"
-#include "expected.h"
-#include "optional.h"
-#include "propagation_style.h"
+#include "datadog/dict_reader.h"
+#include "datadog/expected.h"
+#include "datadog/optional.h"
+#include "datadog/propagation_style.h"
 
 namespace datadog {
 namespace tracing {

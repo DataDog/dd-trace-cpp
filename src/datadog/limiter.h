@@ -10,7 +10,7 @@
 
 #include <vector>
 
-#include "clock.h"
+#include "datadog/clock.h"
 #include "rate.h"
 
 namespace datadog {

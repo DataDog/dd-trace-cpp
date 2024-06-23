@@ -1,30 +1,34 @@
-#include "tracer.h"
+#include "datadog/tracer.h"
 
 #include <algorithm>
 #include <cassert>
 
+#include "config_manager.h"
+#include "datadog/dict_reader.h"
+#include "datadog/logger.h"
+#include "datadog/runtime_id.h"
+#include "datadog/span.h"
+#include "datadog/span_config.h"
+#include "datadog/trace_sampler_config.h"
+#include "datadog/version.h"
 #include "datadog_agent.h"
-#include "dict_reader.h"
 #include "environment.h"
 #include "extracted_data.h"
 #include "extraction_util.h"
 #include "hex.h"
+#include "id_generator.h"
 #include "json.hpp"
-#include "logger.h"
 #include "parse_util.h"
 #include "platform_util.h"
-#include "runtime_id.h"
-#include "span.h"
-#include "span_config.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
-#include "trace_sampler_config.h"
 #include "trace_segment.h"
+#include "tracer_config_final.h"
 #include "tracer_signature.h"
-#include "version.h"
+#include "tracer_telemetry.h"
 #include "w3c_propagation.h"
 
 namespace datadog {
@@ -40,10 +44,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       collector_(/* see constructor body */),
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
-      signature_{runtime_id_, config.defaults.service,
-                 config.defaults.environment},
+      signature_(std::make_shared<TracerSignature>(
+          runtime_id_, config.defaults.service, config.defaults.environment)),
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
-          config.report_telemetry, config.clock, logger_, signature_,
+          config.report_telemetry, config.clock, logger_, *signature_,
           config.integration_name, config.integration_version)),
       span_sampler_(
           std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
@@ -64,7 +68,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
         std::get<FinalizedDatadogAgentConfig>(config.collector);
 
     auto agent = std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
-                                                config.logger, signature_,
+                                                config.logger, *signature_,
                                                 config_manager_);
     collector_ = agent;
 

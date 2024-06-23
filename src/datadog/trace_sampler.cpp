@@ -6,11 +6,12 @@
 #include <limits>
 
 #include "collector_response.h"
+#include "datadog/sampling_priority.h"
 #include "json.hpp"
 #include "sampling_decision.h"
-#include "sampling_priority.h"
 #include "sampling_util.h"
 #include "span_data.h"
+#include "trace_sampler_config_final.h"
 
 namespace datadog {
 namespace tracing {

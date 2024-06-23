@@ -9,7 +9,7 @@
 
 #include <memory>
 
-#include "clock.h"
+#include "datadog/clock.h"
 
 namespace datadog {
 namespace tracing {

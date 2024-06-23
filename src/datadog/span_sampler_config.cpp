@@ -1,13 +1,16 @@
-#include "span_sampler_config.h"
+#include "datadog/span_sampler_config.h"
 
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 
+#include "datadog/expected.h"
 #include "environment.h"
-#include "expected.h"
 #include "json.hpp"
+#include "rate.h"
+#include "span_sampler_config_final.h"
 
 namespace datadog {
 namespace tracing {

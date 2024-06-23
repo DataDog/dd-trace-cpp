@@ -1,4 +1,4 @@
-#include "version.h"
+#include "datadog/version.h"
 
 namespace datadog {
 namespace tracing {

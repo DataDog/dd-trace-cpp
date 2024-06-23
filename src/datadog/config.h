@@ -1,7 +1,7 @@
 #pragma once
 
-#include "error.h"
-#include "optional.h"
+#include "datadog/error.h"
+#include "datadog/optional.h"
 
 namespace datadog {
 namespace tracing {

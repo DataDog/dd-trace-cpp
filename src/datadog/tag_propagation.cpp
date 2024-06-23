@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <sstream>
 
-#include "error.h"
+#include "datadog/error.h"
 #include "string_util.h"
 
 namespace datadog {
