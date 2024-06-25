@@ -1,4 +1,4 @@
-use dd_trace_rust::{integrations, tracing_datadog_sdk::DDTraceLayer};
+use dd_trace_rust::{integrations, tracing_datadog_sdk::DatadogLayer};
 use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
 
 mod test_lib;
@@ -12,7 +12,7 @@ async fn handler(req: axum::extract::Request) -> axum::http::StatusCode {
 fn test_axum() {
     let tracer = test_lib::test_tracer();
     let _guard = tracing::subscriber::set_default(
-        Registry::default().with(DDTraceLayer::new(tracer.clone())),
+        Registry::default().with(DatadogLayer::new(tracer.clone())),
     );
 
     tokio::runtime::Builder::new_current_thread()
@@ -22,9 +22,7 @@ fn test_axum() {
         .block_on(async {
             let app: axum::Router = axum::Router::<()>::new()
                 .route("/", axum::routing::any(handler))
-                .layer(tower_layer::layer_fn(move |inner| {
-                    integrations::axum::DatadogTracing::new(tracer.clone(), inner)
-                }));
+                .layer(integrations::axum::datadog_layer(tracer));
 
             let (tx, rx) = tokio::sync::oneshot::channel::<()>();
 
@@ -40,7 +38,7 @@ fn test_axum() {
 
             let client: reqwest_middleware::ClientWithMiddleware =
                 reqwest_middleware::ClientBuilder::new(reqwest::Client::builder().build().unwrap())
-                    .with(integrations::reqwest::DatadoggMiddleware {})
+                    .with(integrations::reqwest::datadog_middleware())
                     .build();
 
             let req: reqwest::Request = client

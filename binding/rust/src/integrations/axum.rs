@@ -1,4 +1,4 @@
-use std::{convert::Infallible, fmt::Write, future::Future, pin::Pin};
+use std::{convert::Infallible, fmt::Write, future::Future, marker::PhantomData, pin::Pin};
 
 use axum::{
     body::Body,
@@ -6,9 +6,30 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use tower_service::Service;
-use tracing::{field, Instrument, Level};
+use tracing::{field, Instrument};
 
 use crate::{datadog_sdk, tracing_datadog_sdk};
+
+pub fn datadog_layer<S>(tracer: datadog_sdk::Tracer) -> DatadogLayer<S> {
+    DatadogLayer {
+        tracer,
+        _inner: PhantomData,
+    }
+}
+
+#[derive(Clone)]
+pub struct DatadogLayer<S> {
+    tracer: datadog_sdk::Tracer,
+    _inner: PhantomData<S>,
+}
+
+impl<S> tower_layer::Layer<S> for DatadogLayer<S> {
+    type Service = DatadogTracing<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        DatadogTracing::new(self.tracer.clone(), inner)
+    }
+}
 
 #[derive(Clone)]
 pub struct DatadogTracing<S> {
@@ -70,7 +91,11 @@ where
             async {
                 let res = match ret.await {
                     Ok(res) => res,
-                    Err(e) => match e.into() {},
+                    Err(e) =>
+                    {
+                        #[allow(unreachable_code)]
+                        match e.into() {}
+                    }
                 };
                 let res = res.into_response();
                 let status = res.status().as_u16();

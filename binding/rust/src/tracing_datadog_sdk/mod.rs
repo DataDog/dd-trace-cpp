@@ -42,7 +42,7 @@ pub fn with_current_ddspan<
     });
 }
 
-pub struct DDTraceLayer<S> {
+pub struct DatadogLayer<S> {
     pub tracer: datadog_sdk::Tracer,
     get_context: WithContext,
     _registry: PhantomData<S>,
@@ -59,7 +59,7 @@ pub fn set_span_source(dd_span: &mut datadog_sdk::Span, meta: &tracing::Metadata
     }
 }
 
-impl<S> DDTraceLayer<S>
+impl<S> DatadogLayer<S>
 where
     S: Subscriber + for<'a> registry::LookupSpan<'a>,
 {
@@ -89,7 +89,7 @@ where
     }
 }
 
-impl<S> Layer<S> for DDTraceLayer<S>
+impl<S> Layer<S> for DatadogLayer<S>
 where
     S: Subscriber + for<'a> registry::LookupSpan<'a> + Debug,
     for<'a> <S as registry::LookupSpan<'a>>::Data: Debug,

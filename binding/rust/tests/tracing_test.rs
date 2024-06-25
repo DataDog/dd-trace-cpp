@@ -15,7 +15,7 @@ fn test_tracing() {
 
     let tracer = test_lib::test_tracer();
     let subscriber = tracing_subscriber::Registry::default().with(
-        dd_trace_rust::tracing_datadog_sdk::DDTraceLayer::new(tracer),
+        dd_trace_rust::tracing_datadog_sdk::DatadogLayer::new(tracer),
     );
     tracing::subscriber::with_default(subscriber, || {
         let root = span!(tracing::Level::TRACE, "app_start", val = 1);

@@ -20,4 +20,4 @@ http = "1"
 built = "0.7"
 
 [dev-dependencies]
-tokio = "1"
+tokio = { version = "1", features = ["rt-multi-thread"] }

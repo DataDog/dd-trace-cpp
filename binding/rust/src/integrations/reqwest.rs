@@ -1,20 +1,23 @@
 use reqwest::{Request, Response};
 use reqwest_middleware::{Middleware, Next};
-use tracing::{Instrument, field};
+use tracing::{field, Instrument};
 
 use crate::tracing_datadog_sdk;
 
-pub struct DatadoggMiddleware {}
+pub fn datadog_middleware() -> DatadogMiddleware {
+    DatadogMiddleware {}
+}
+
+pub struct DatadogMiddleware {}
 
 #[async_trait::async_trait]
-impl Middleware for DatadoggMiddleware {
+impl Middleware for DatadogMiddleware {
     async fn handle(
         &self,
         mut req: Request,
         extensions: &mut http::Extensions,
         next: Next<'_>,
     ) -> reqwest_middleware::Result<Response> {
-        
         let span = tracing::info_span!(
             "http.client.request",
             "span.kind" = "client",
