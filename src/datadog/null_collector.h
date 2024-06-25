@@ -16,6 +16,8 @@ class NullCollector : public Collector {
     return {};
   }
 
+  void flush() override {}
+
   nlohmann::json config_json() const override;
 };
 

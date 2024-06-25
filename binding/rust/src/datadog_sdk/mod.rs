@@ -186,6 +186,15 @@ impl Tracer {
         }
         Span { inner }
     }
+
+    pub fn flush(&self) {
+        let Some(tracer) = self.inner.as_ref().map(|t| t.as_ref().0.as_ptr()) else {
+            return ;
+        };
+        unsafe {
+            bindings::datadog_sdk_tracer_flush(tracer);
+        }
+    }
 }
 
 #[derive(Debug)]

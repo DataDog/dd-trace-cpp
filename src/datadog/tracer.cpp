@@ -326,6 +326,9 @@ Expected<Span> Tracer::extract_or_create_span(const DictReader& reader,
   }
   return maybe_span;
 }
+void Tracer::flush() {
+  collector_->flush();
+}
 
 }  // namespace tracing
 }  // namespace datadog

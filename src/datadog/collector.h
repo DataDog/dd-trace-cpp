@@ -42,6 +42,8 @@ class Collector {
   //   may be omitted if the derived class has no configuration.
   virtual nlohmann::json config_json() const = 0;
 
+  virtual void flush() {};
+
   virtual ~Collector() {}
 };
 

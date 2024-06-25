@@ -58,7 +58,6 @@ class DatadogAgent : public Collector {
   RemoteConfigurationManager remote_config_;
   TracerSignature tracer_signature_;
 
-  void flush();
   void send_telemetry(StringView, std::string);
   void send_heartbeat_and_telemetry();
   void send_app_closing();
@@ -73,6 +72,8 @@ class DatadogAgent : public Collector {
   Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) override;
+
+  void flush() override;
 
   void send_app_started(
       const std::unordered_map<ConfigName, ConfigMetadata>& config_metadata);

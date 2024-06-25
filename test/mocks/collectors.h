@@ -27,6 +27,8 @@ struct MockCollector : public Collector {
     return {};
   }
 
+  void flush() override {};
+
   nlohmann::json config_json() const override;
 
   SpanData& first_span() const {
@@ -73,6 +75,8 @@ struct PriorityCountingCollector : public Collector {
   }
 
   nlohmann::json config_json() const override;
+
+  void flush() override {};
 
   const SpanData& root_span(
       const std::vector<std::unique_ptr<SpanData>>& spans) {
@@ -144,6 +148,8 @@ struct FailureCollector : public Collector {
                       const std::shared_ptr<TraceSampler>&) override {
     return failure;
   }
+
+  void flush() override {};
 
   nlohmann::json config_json() const override;
 };

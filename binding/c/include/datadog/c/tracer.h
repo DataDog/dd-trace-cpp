@@ -75,6 +75,8 @@ datadog_sdk_tracer_t* datadog_sdk_tracer_new(datadog_sdk_conf_t* conf_handle);
 // @param tracer_handle Tracer handle to release
 void datadog_sdk_tracer_free(datadog_sdk_tracer_t* tracer_handle);
 
+void datadog_sdk_tracer_flush(datadog_sdk_tracer_t* tracer_handle);
+
 // Create a span using a Tracer.
 //
 // @param   tracer_handle Tracer handle use to create the span
