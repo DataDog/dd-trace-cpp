@@ -2,8 +2,6 @@ include(FetchContent)
 
 # No need to build curl executable
 SET(BUILD_CURL_EXE OFF)
-SET(BUILD_SHARED_LIBS OFF)
-SET(BUILD_STATIC_LIBS ON)
 set(BUILD_LIBCURL_DOCS OFF)
 set(BUILD_MISC_DOCS OFF)
 

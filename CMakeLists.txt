@@ -1,8 +1,15 @@
 # Note: Make sure that this version is the same as that in
 # "./CheckRequiredCMakeVersion.cmake".
 cmake_minimum_required(VERSION 3.24)
+cmake_policy(SET CMP0077 NEW)
 
 project(dd-trace-cpp)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(BUILD_STATIC_LIBS "Build static libraries" OFF)
@@ -25,12 +32,6 @@ endif ()
 # Linking this library requires libcurl and threads.
 find_package(Threads REQUIRED)
 include(cmake/deps/curl.cmake)
-
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
 file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/datadog/version.cpp DD_TRACE_VERSION_CPP_CONTENTS REGEX "#define DD_TRACE_VERSION( |_NUM )")
 string(REGEX MATCH "#define DD_TRACE_VERSION \"[^\"]*" DD_TRACE_VERSION ${DD_TRACE_VERSION_CPP_CONTENTS})
