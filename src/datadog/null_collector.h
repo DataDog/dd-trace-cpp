@@ -16,7 +16,14 @@ class NullCollector : public Collector {
     return {};
   }
 
-  nlohmann::json config_json() const override;
+  std::string config() const override {
+    // clang-format off
+    return R"({
+        {"type", "datadog::tracing::NullCollector"},
+        {"config", {}}
+    })";
+    // clang-format on
+  };
 };
 
 }  // namespace tracing

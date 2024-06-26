@@ -27,7 +27,7 @@ struct MockCollector : public Collector {
     return {};
   }
 
-  nlohmann::json config_json() const override;
+  std::string config() const override;
 
   SpanData& first_span() const {
     REQUIRE(chunks.size() >= 1);
@@ -57,7 +57,7 @@ struct MockCollectorWithResponse : public MockCollector {
     return {};
   }
 
-  nlohmann::json config_json() const override;
+  std::string config() const override;
 };
 
 struct PriorityCountingCollector : public Collector {
@@ -72,7 +72,7 @@ struct PriorityCountingCollector : public Collector {
     return {};
   }
 
-  nlohmann::json config_json() const override;
+  std::string config() const override;
 
   const SpanData& root_span(
       const std::vector<std::unique_ptr<SpanData>>& spans) {
@@ -134,7 +134,7 @@ struct PriorityCountingCollectorWithResponse
     return {};
   }
 
-  nlohmann::json config_json() const override;
+  std::string config() const override;
 };
 
 struct FailureCollector : public Collector {
@@ -145,5 +145,5 @@ struct FailureCollector : public Collector {
     return failure;
   }
 
-  nlohmann::json config_json() const override;
+  std::string config() const override;
 };
