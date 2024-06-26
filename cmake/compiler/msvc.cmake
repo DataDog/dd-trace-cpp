@@ -44,6 +44,7 @@ target_compile_options(dd_trace_cpp-specs
 target_link_options(dd_trace_cpp-specs
   INTERFACE
     ws2_32
+    wsock32
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug|RelWithDebInfo")
