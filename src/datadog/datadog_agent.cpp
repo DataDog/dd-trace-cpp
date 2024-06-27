@@ -286,7 +286,7 @@ void DatadogAgent::flush() {
     response_handlers.insert(std::move(chunk.response_handler));
   }
 
-  std::cerr << "flushing " << tracer_signature_.library_language << " " << tracer_signature_.library_language_version << " " << tracer_signature_.library_version << "\n";
+  std::cerr << "flushing " << tracer_signature_.library_language << " " << tracer_signature_.library_language_version << " " << tracer_signature_.library_version << " " << trace_chunks.size() << " traces\n";
 
   // This is the callback for setting request headers.
   // It's invoked synchronously (before `post` returns).

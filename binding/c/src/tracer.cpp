@@ -109,8 +109,8 @@ void datadog_sdk_tracer_free(datadog_sdk_tracer_t* tracer_handle) {
 }
 
 void datadog_sdk_tracer_flush(datadog_sdk_tracer_t* tracer_handle) {
-    auto* tracer = static_cast<dd::Tracer*>(tracer_handle);
-    tracer->flush();
+  auto* tracer = static_cast<dd::Tracer*>(tracer_handle);
+  tracer->flush();
 }
 
 datadog_sdk_span_t* datadog_sdk_tracer_create_span(

@@ -1,7 +1,9 @@
 use std::any::TypeId;
+use std::fmt::Display;
 use std::io::Write;
 use std::{fmt::Debug, marker::PhantomData};
 
+use tracing::field::Visit;
 use tracing::{span, Level, Subscriber};
 use tracing_subscriber::{layer, registry, Layer};
 
@@ -127,8 +129,8 @@ where
 
         attrs
             .values()
-            .record(&mut SpanAttributesVisitor { s: &mut dd_span });
-    
+            .record(&mut SpanAttributesVisitor::new(&mut dd_span));
+
         set_span_source(&mut dd_span, attrs.metadata());
 
         let Some(new_span) = ctx.span(id) else {
@@ -149,7 +151,7 @@ where
         let Some(mut dd_span) = extensions.get_mut::<datadog_sdk::Span>() else {
             return
         };
-        values.record(&mut SpanAttributesVisitor { s: &mut dd_span });
+        values.record(&mut SpanAttributesVisitor::new(&mut dd_span));
     }
 
     // SAFETY: this is safe because the `WithContext` function pointer is valid
@@ -167,10 +169,50 @@ where
     fn on_close(&self, id: span::Id, _ctx: layer::Context<'_, S>) {
         eprintln!("on_close {id:?}",);
     }
+
+    fn on_event(&self, event: &tracing::Event<'_>, ctx: layer::Context<'_, S>) {
+        eprintln!("on_event {event:?}");
+        let _ = (|| {
+            if event.metadata().level() == &Level::ERROR {
+                let span = ctx.event_span(event)?;
+                let mut extensions = span.extensions_mut();
+                let dd_span = extensions.get_mut::<datadog_sdk::Span>()?;
+
+                let mut visitor = SpanAttributesVisitor::new(dd_span).error_event();
+                event.record(&mut visitor);
+                if !visitor.error_was_recorded {
+                    dd_span.set_error(true);
+                }
+            }
+            Some(())
+        })();
+    }
 }
 
 struct SpanAttributesVisitor<'a> {
     s: &'a mut datadog_sdk::Span,
+    is_recording_error_event: bool,
+    error_was_recorded: bool,
+}
+
+impl<'a> SpanAttributesVisitor<'a> {
+    fn new(s: &'a mut datadog_sdk::Span) -> Self {
+        Self {
+            s,
+            is_recording_error_event: false,
+            error_was_recorded: false,
+        }
+    }
+
+    fn error_event(mut self) -> Self {
+        self.is_recording_error_event = true;
+        self
+    }
+
+    fn record_basic<T: Display>(&mut self, field: &tracing::field::Field, value: T) {
+        let mut buf = [0_u8; 128];
+        self.record_str(field, display(&mut buf, value));
+    }
 }
 
 impl<'a> tracing::field::Visit for SpanAttributesVisitor<'a> {
@@ -179,37 +221,38 @@ impl<'a> tracing::field::Visit for SpanAttributesVisitor<'a> {
         _field: &tracing::field::Field,
         value: &(dyn std::error::Error + 'static),
     ) {
-        self.s.set_error(true);
+        self.error_was_recorded = true;
         self.s.set_error_message(&value.to_string());
     }
 
     fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
-        self.s.set_tag(field.name(), value)
+        if field.name() == "message" && self.is_recording_error_event {
+            self.error_was_recorded = true;
+            self.s.set_error_message(value);
+        } else {
+            self.s.set_tag(field.name(), value)
+        }
     }
 
     fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
-        let mut buf = [0_u8; 128];
-        self.s.set_tag(field.name(), display(&mut buf, value));
+        self.record_basic(field, value)
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
-        let mut buf = [0_u8; 128];
-        self.s.set_tag(field.name(), display(&mut buf, value));
+        self.record_basic(field, value)
     }
 
     fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
-        let mut buf = [0_u8; 128];
-        self.s.set_tag(field.name(), display(&mut buf, value));
+        self.record_basic(field, value)
     }
 
     fn record_f64(&mut self, field: &tracing::field::Field, value: f64) {
-        let mut buf = [0_u8; 128];
-        self.s.set_tag(field.name(), display(&mut buf, value));
+        self.record_basic(field, value)
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         let v = format!("{:?}", value);
-        self.s.set_tag(field.name(), &v);
+        self.record_str(field, &v)
     }
 }
 

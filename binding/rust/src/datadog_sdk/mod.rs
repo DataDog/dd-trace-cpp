@@ -252,6 +252,7 @@ impl Span {
             return ;
         };
         let message = str_to_ffi_view(message);
+        eprintln!("rust: called set error");
         unsafe { bindings::datadog_sdk_span_set_error_message(inner, message) }
     }
 
