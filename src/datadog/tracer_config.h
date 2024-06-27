@@ -19,6 +19,7 @@
 #include "span_defaults.h"
 #include "span_sampler_config.h"
 #include "trace_sampler_config.h"
+#include "tracer_signature.h"
 
 namespace datadog {
 namespace tracing {
@@ -163,6 +164,13 @@ struct TracerConfig {
   // programmatic value in Datadog's Active Configuration, whereas it is
   // actually the default value for the integration.
   Optional<bool> report_service_as_default;
+
+  Optional<std::string> library_version;
+
+  Optional<std::string> library_language;
+
+  Optional<std::string> library_language_version;
+
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -199,6 +207,10 @@ class FinalizedTracerConfig final {
   bool delegate_trace_sampling;
   bool report_traces;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+
+  std::string library_version;
+  std::string library_language;
+  std::string library_language_version;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

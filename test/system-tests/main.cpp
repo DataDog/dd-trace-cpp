@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
   auto finalized_config = datadog::tracing::finalize_config(config);
   if (auto error = finalized_config.if_error()) {
     logger->log_error(error->with_prefix("unable to initialize tracer:"));
-    return 1;
+    return 1; 
   }
 
   RequestHandler handler(*finalized_config, event_scheduler, logger);
