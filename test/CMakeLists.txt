@@ -41,7 +41,7 @@ add_executable(tests
 target_link_libraries(tests 
   PRIVATE
     # TODO: Remove dependency on libcurl
-    libcurl
+    CURL::libcurl_static
     dd_trace_cpp-static
     dd_trace::specs
 )

@@ -14,6 +14,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_STATIC_LIBS "Build static libraries" ON)
 
+set(DD_TRACE_TRANSPORT "curl" CACHE STRING "HTTP transport that dd-trace-cpp uses to communicate with the Datadog Agent, can be either 'none' or 'curl'")
+
 # Consumer of the library using FetchContent do not need
 # to build unit tests, fuzzers and examples.
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -29,7 +31,7 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif ()
 
-# Linking this library requires libcurl and threads.
+# Linking this library requires threads.
 find_package(Threads REQUIRED)
 include(cmake/deps/curl.cmake)
 
@@ -38,6 +40,8 @@ string(REGEX MATCH "#define DD_TRACE_VERSION \"[^\"]*" DD_TRACE_VERSION ${DD_TRA
 string(REGEX REPLACE "[^\"]+\"" "" DD_TRACE_VERSION ${DD_TRACE_VERSION})
 message(STATUS "dd-trace-cpp version=[${DD_TRACE_VERSION}]")
 unset(DD_TRACE_VERSION_CPP_CONTENTS)
+
+message(STATUS "dd-trace-cpp transport=${DD_TRACE_TRANSPORT}")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   message(STATUS "Compiler: MSVC ${CMAKE_CXX_COMPILER_VERSION}")
@@ -72,8 +76,6 @@ endif ()
 add_library(dd_trace_cpp-objects OBJECT)
 add_library(dd_trace::obj ALIAS dd_trace_cpp-objects)
 
-add_dependencies(dd_trace_cpp-objects libcurl)
-
 target_sources(dd_trace_cpp-objects
   PRIVATE
     src/datadog/base64.cpp
@@ -81,10 +83,8 @@ target_sources(dd_trace_cpp-objects
     src/datadog/clock.cpp
     src/datadog/config_manager.cpp
     src/datadog/collector_response.cpp
-    src/datadog/curl.cpp
     src/datadog/datadog_agent_config.cpp
     src/datadog/datadog_agent.cpp
-    src/datadog/default_http_client_curl.cpp
 #     src/datadog/default_http_client_null.cpp use libcurl
     src/datadog/environment.cpp
     src/datadog/error.cpp
@@ -208,10 +208,13 @@ target_sources(dd_trace_cpp-objects PUBLIC
 #     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 # )
 
+add_dependencies(dd_trace_cpp-objects libcurl_object Threads::Threads)
+
 target_link_libraries(dd_trace_cpp-objects
-  PRIVATE
-    libcurl
+  PUBLIC
+    # libcurl_object
     Threads::Threads
+  PRIVATE
     dd_trace::specs
 )
 
@@ -220,11 +223,27 @@ if (BUILD_SHARED_LIBS)
   add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
   add_library(dd_trace::shared ALIAS dd_trace_cpp-shared)
 
-  add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)
+  if (DD_TRACE_TRANSPORT STREQUAL "curl")
+    add_dependencies(dd_trace_cpp-shared CURL::libcurl_shared)
+
+    target_sources(dd_trace_cpp-shared
+      PRIVATE
+        src/datadog/curl.cpp
+        src/datadog/default_http_client_curl.cpp
+    )
+
+    target_link_libraries(dd_trace_cpp-shared
+      PRIVATE
+        CURL::libcurl_shared
+    )
+  endif ()
+
+  add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects CURL::libcurl_shared)
 
   target_link_libraries(dd_trace_cpp-shared
     PUBLIC
       dd_trace::obj
+      CURL::libcurl_shared
     PRIVATE
       dd_trace::specs
   )
@@ -242,6 +261,21 @@ endif ()
 if (BUILD_STATIC_LIBS)
   add_library(dd_trace_cpp-static STATIC $<TARGET_OBJECTS:dd_trace_cpp-objects>)
   add_library(dd_trace::static ALIAS dd_trace_cpp-static)
+
+  if (DD_TRACE_TRANSPORT STREQUAL "curl")
+    add_dependencies(dd_trace_cpp-static CURL::libcurl_static)
+
+    target_sources(dd_trace_cpp-static
+      PRIVATE
+        src/datadog/curl.cpp
+        src/datadog/default_http_client_curl.cpp
+    )
+
+    target_link_libraries(dd_trace_cpp-static 
+      PRIVATE
+        CURL::libcurl_static
+    )
+  endif ()
 
   add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
 

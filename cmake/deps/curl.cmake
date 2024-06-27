@@ -24,6 +24,8 @@ set(CURL_DISABLE_INSTALL ON)
 set(CURL_DISABLE_ALTSVC ON)
 set(CURL_DISABLE_SRP ON)
 
+set(SHARE_LIB_OBJECT ON)
+
 FetchContent_Declare(
   curl
   URL "https://github.com/curl/curl/releases/download/curl-8_8_0/curl-8.8.0.tar.gz"
