@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <regex>
 #include <utility>
 
 #include "hex.h"
@@ -16,18 +15,6 @@
 namespace datadog {
 namespace tracing {
 namespace {
-
-// Note that match group 0 is the entire match.
-constexpr StringView k_traceparent_pattern =
-    "([0-9a-f]{2})"  // hex version number (match group 1)
-    "-"
-    "([0-9a-f]{32})"  // hex trace ID (match group 2)
-    "-"
-    "([0-9a-f]{16})"  // hex parent span ID (match group 3)
-    "-"
-    "([0-9a-f]{2})"  // hex "trace-flags" (match group 4)
-    "($|-.*)";  // either the end, or a hyphen preceding further fields (match
-                // group 5)
 
 // Return a predicate that returns whether its `char` argument is any of the
 // following:
@@ -49,55 +36,74 @@ auto verboten(int lowest_ascii, int highest_ascii,
 // entry of the specified `headers`. Return `nullopt` on success. Return a value
 // for the `tags::internal::w3c_extraction_error` tag if an error occurs.
 Optional<std::string> extract_traceparent(ExtractedData& result,
-                                          const DictReader& headers) {
-  const auto maybe_traceparent = headers.lookup("traceparent");
-  if (!maybe_traceparent) {
-    return nullopt;
+                                          StringView traceparent) {
+  enum class state : char {
+    version,
+    trace_id,
+    parent_span_id,
+    trace_flags
+  } internal_state = state::version;
+
+  if (traceparent.size() < 55) return "malformed_traceparent";
+
+  StringView version;
+  std::size_t beg = 0;
+  for (std::size_t i = 0; i < traceparent.size(); ++i) {
+    switch (internal_state) {
+      case state::version: {
+        if (i > 2) return "malformed_traceparent";
+        if (traceparent[i] == '-') {
+          version = StringView(traceparent.data() + beg, i - beg);
+          // TODO: verify version != "00"
+          if (version == "ff") return "invalid_version";
+
+          beg = i + 1;
+          internal_state = state::trace_id;
+        }
+      } break;
+
+      case state::trace_id: {
+        if (i > 35) return "malformed_traceparent";
+        if (traceparent[i] == '-') {
+          result.trace_id = *TraceID::parse_hex(
+              StringView(traceparent.data() + beg, i - beg));
+          if (result.trace_id == 0) return "trace_id_zero";
+
+          beg = i + 1;
+          internal_state = state::parent_span_id;
+        }
+      } break;
+
+      case state::parent_span_id: {
+        if (i > 52) return "malformed_traceparent";
+        if (traceparent[i] == '-') {
+          result.parent_id =
+              *parse_uint64(StringView(traceparent.data() + beg, i - beg), 16);
+          if (result.parent_id == 0) return "parent_id_zero";
+
+          beg = i + 1;
+          internal_state = state::trace_flags;
+          goto handle_trace_flag;
+        }
+      } break;
+
+      default:
+        break;
+    }
   }
 
-  const auto traceparent = trim(*maybe_traceparent);
-
-  static const std::regex regex{k_traceparent_pattern.data()};
-
-  std::cmatch match;
-  if (!std::regex_match(traceparent.data(),
-                        traceparent.data() + traceparent.size(), match,
-                        regex)) {
+  if (internal_state != state::trace_flags) {
     return "malformed_traceparent";
   }
 
-  assert(match.ready());
-  assert(match.size() == 6);
-
-  const auto to_string_view = [traceparent_beg = traceparent.data()](
-                                  const std::cmatch& match,
-                                  const std::size_t index) {
-    assert(index < match.size());
-    return StringView(traceparent_beg + match.position(index),
-                      std::size_t(match.length(index)));
-  };
-
-  const auto version = to_string_view(match, 1);
-  if (version == "ff") {
-    return "invalid_version";
-  }
-
-  if (version == "00" && !to_string_view(match, 5).empty()) {
+handle_trace_flag:
+  auto left = traceparent.size() - beg;
+  if (left < 2 ||
+      (left > 2 && (version == "00" || traceparent[beg + 2] != '-')))
     return "malformed_traceparent";
-  }
 
-  result.trace_id = *TraceID::parse_hex(to_string_view(match, 2));
-  if (result.trace_id == 0) {
-    return "trace_id_zero";
-  }
-
-  result.parent_id = *parse_uint64(to_string_view(match, 3), 16);
-  if (*result.parent_id == 0) {
-    return "parent_id_zero";
-  }
-
-  const auto flags = *parse_uint64(to_string_view(match, 4), 16);
-  result.sampling_priority = int(flags & 1);
+  auto trace_flags = *parse_uint64(StringView(traceparent.data() + beg, 2), 16);
+  result.sampling_priority = trace_flags & 0x01;
 
   return nullopt;
 }
@@ -284,7 +290,13 @@ Expected<ExtractedData> extract_w3c(
   ExtractedData result;
   result.style = PropagationStyle::W3C;
 
-  if (auto error_tag_value = extract_traceparent(result, headers)) {
+  const auto maybe_traceparent = headers.lookup("traceparent");
+  if (!maybe_traceparent) {
+    return ExtractedData{};
+  }
+
+  if (auto error_tag_value =
+          extract_traceparent(result, trim(*maybe_traceparent))) {
     span_tags[tags::internal::w3c_extraction_error] =
         std::move(*error_tag_value);
     return ExtractedData{};
