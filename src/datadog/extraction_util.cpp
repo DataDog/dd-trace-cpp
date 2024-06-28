@@ -71,7 +71,7 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
   if (!found) {
     return result;
   }
-  auto parsed_id = parse_uint64(*found, base);
+  auto parsed_id = parse_uint64(trim(*found), base);
   if (auto* error = parsed_id.if_error()) {
     std::string prefix;
     prefix += "Could not extract ";
@@ -127,7 +127,7 @@ Expected<ExtractedData> extract_datadog(
   result.parent_id = *parent_id;
 
   if (auto found = headers.lookup("x-datadog-sampling-priority")) {
-    auto sampling_priority = parse_int(*found, 10);
+    auto sampling_priority = parse_int(trim(*found), 10);
     if (auto* error = sampling_priority.if_error()) {
       std::string prefix;
       prefix +=
@@ -166,7 +166,7 @@ Expected<ExtractedData> extract_b3(
   result.style = PropagationStyle::B3;
 
   if (auto found = headers.lookup("x-b3-traceid")) {
-    auto parsed = TraceID::parse_hex(*found);
+    auto parsed = TraceID::parse_hex(trim(*found));
     if (auto* error = parsed.if_error()) {
       std::string prefix = "Could not extract B3-style trace ID from \"";
       append(prefix, *found);
@@ -185,7 +185,7 @@ Expected<ExtractedData> extract_b3(
 
   const StringView sampling_priority_header = "x-b3-sampled";
   if (auto found = headers.lookup(sampling_priority_header)) {
-    auto sampling_priority = parse_int(*found, 10);
+    auto sampling_priority = parse_int(trim(*found), 10);
     if (auto* error = sampling_priority.if_error()) {
       std::string prefix;
       prefix += "Could not extract B3-style sampling priority from ";
