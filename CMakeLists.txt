@@ -199,20 +199,18 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/w3c_propagation.h
 )
 
-# TODO: define public/private
 # Headers location are different depending of whether we are building 
 # or installing the library.
-# target_include_directories(dd_trace_cpp-objects
-#   PUBLIC
-#     $<INSTALL_INTERFACE:src>
-#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-# )
+target_include_directories(dd_trace_cpp-objects
+  PUBLIC
+    $<INSTALL_INTERFACE:src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
 
-add_dependencies(dd_trace_cpp-objects libcurl_object Threads::Threads)
+add_dependencies(dd_trace_cpp-objects Threads::Threads)
 
 target_link_libraries(dd_trace_cpp-objects
   PUBLIC
-    # libcurl_object
     Threads::Threads
   PRIVATE
     dd_trace::specs
