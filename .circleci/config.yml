@@ -1,5 +1,16 @@
 version: 2.1
 
+main_branch_only: &main_branch_only
+  requires:
+    - build-bazel
+    - build-and-test-cmake
+    - build-and-test-windows-bazel
+    - build-and-test-windows-cmake
+  filters:
+    branches:
+      only:
+        - main
+
 orbs:
   codecov: codecov/codecov@4.0.1
 
@@ -12,6 +23,26 @@ executors:
     docker:
       - image: "datadog/docker-library:dd-trace-cpp-ci"
     resource_class: arm.xlarge
+
+commands:
+  run_timeout:
+    description: "Run a command for a specified duration"
+    parameters:
+      command:
+        type: string
+      duration:
+        type: string
+      description:
+        type: string
+    steps:
+      - run:
+          name: << parameters.description >>
+          command: |
+            set +e
+            timeout << parameters.duration >> << parameters.command >>
+            if [[ $? -eq 124 ]]; then
+              exit 0
+            fi
 
 jobs:
   format:
@@ -171,6 +202,25 @@ jobs:
       - store_artifacts:
           path: logs_cpp_parametric_dev.tar.gz
 
+  fuzz-testing:
+    docker:
+    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    resource_class: xlarge
+    environment:
+      MAKE_JOB_COUNT: 8
+    steps:
+      - checkout
+      - run: bin/with-toolchain llvm cmake . -B .build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_FUZZERS=1 -DDD_TRACE_ENABLE_SANITIZE=1
+      - run: cmake --build .build -j ${MAKE_JOB_COUNT} --target dd_trace_cpp-fuzzers
+      - run_timeout: 
+          description: Run W3C propagation fuzzer
+          command: ./.build/fuzz/w3c-propagation/w3c-propagation-fuzz
+          duration: 5m
+      - run: 
+          description: Run Base64 fuzzer
+          command: timeout 5m ./.build/fuzz/base64/base64-fuzz
+          duration: 5m
+
 workflows:
   pull-request:
     jobs:
@@ -199,12 +249,6 @@ workflows:
         requires:
           - build-and-test-cmake
     - system-tests:
-        requires:
-          - build-bazel
-          - build-and-test-cmake
-          - build-and-test-windows-bazel
-          - build-and-test-windows-cmake
-        filters:
-          branches:
-            only:
-              - main
+        <<: *main_branch_only
+    - fuzz-testing:
+        <<: *main_branch_only
