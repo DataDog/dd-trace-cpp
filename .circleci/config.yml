@@ -40,6 +40,7 @@ commands:
           command: |
             set +e
             timeout << parameters.duration >> << parameters.command >>
+            # `124` is the exit code timeout returns when the duration is reached
             if [[ $? -eq 124 ]]; then
               exit 0
             fi
@@ -216,7 +217,7 @@ jobs:
           description: Run W3C propagation fuzzer
           command: ./.build/fuzz/w3c-propagation/w3c-propagation-fuzz
           duration: 5m
-      - run: 
+      - run_timeout: 
           description: Run Base64 fuzzer
           command: timeout 5m ./.build/fuzz/base64/base64-fuzz
           duration: 5m
