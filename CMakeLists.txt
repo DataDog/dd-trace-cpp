@@ -34,6 +34,7 @@ endif ()
 # Linking this library requires threads.
 find_package(Threads REQUIRED)
 include(cmake/deps/curl.cmake)
+include(cmake/utils.cmake)
 
 file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/datadog/version.cpp DD_TRACE_VERSION_CPP_CONTENTS REGEX "#define DD_TRACE_VERSION( |_NUM )")
 string(REGEX MATCH "#define DD_TRACE_VERSION \"[^\"]*" DD_TRACE_VERSION ${DD_TRACE_VERSION_CPP_CONTENTS})

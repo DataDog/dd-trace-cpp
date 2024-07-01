@@ -20,7 +20,7 @@ namespace {
 dd::Tracer& tracer_singleton() {
   thread_local auto tracer = []() {
     dd::TracerConfig config;
-    config.defaults.service = "fuzzer";
+    config.service = "fuzzer";
     config.collector = std::make_shared<dd::NullCollector>();
 
     const auto finalized_config = dd::finalize_config(config);
@@ -70,8 +70,10 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, size_t size) {
   for (const char* begin_tracestate = begin_traceparent;
        begin_tracestate <= end; ++begin_tracestate) {
     MockDictReader reader;
-    reader.traceparent = dd::range(begin_traceparent, begin_tracestate);
-    reader.tracestate = dd::range(begin_tracestate, end);
+    reader.traceparent =
+        dd::StringView(begin_traceparent, begin_tracestate - begin_traceparent);
+    reader.tracestate =
+        dd::StringView(begin_tracestate, end - begin_tracestate);
 
     const auto span = tracer.extract_span(reader);
     if (!span) {
