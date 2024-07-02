@@ -35,6 +35,7 @@ commands:
           name: "Kick off << parameters.project >> pipeline"
           command: |
             curl -X POST -H "Content-Type: application/json" -u "${CI_API_TOKEN}" \
+                 --data -d '{ "parameters": { "dd-trace-cpp-commit": $CIRCLE_SHA1 } }' \
                  --url "https://circleci.com/api/v2/project/github/DataDog/<< parameters.project >>/pipeline"
 
 jobs:
@@ -219,40 +220,39 @@ jobs:
     steps:
       - push-pipeline:
           project: "nginx-datadog"
-      - push-pipeline:
-          project: "httpd-datadog"
+      # - push-github-pipeline:
+      #     project: "httpd-datadog"
 
 workflows:
   pull-request:
     jobs:
-    - notify-downstream-projects
-    # - format
-    # - shellcheck
-    # - build-and-test-cmake:
-    #     matrix:
-    #       parameters:
-    #         toolchain: ["gnu", "llvm"]
-    #         arch: ["amd64", "arm64"]
-    # - build-bazel:
-    #     matrix:
-    #       parameters:
-    #         toolchain: ["gnu", "llvm"]
-    #         arch: ["amd64", "arm64"]
-    #         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
-    # - build-and-test-windows-cmake:
-    #     matrix:
-    #       parameters:
-    #         arch: ["amd64"]
-    # - build-and-test-windows-bazel:
-    #     matrix:
-    #       parameters:
-    #         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
-    # - coverage:
-    #     requires:
-    #       - build-and-test-cmake
-    # - system-tests:
-    #     <<: *main_branch_only
-    # - fuzz-testing:
-    #     <<: *main_branch_only
-    # - notify-downstream-projects:
-    #     <<: *main_branch_only
+    - format
+    - shellcheck
+    - build-and-test-cmake:
+        matrix:
+          parameters:
+            toolchain: ["gnu", "llvm"]
+            arch: ["amd64", "arm64"]
+    - build-bazel:
+        matrix:
+          parameters:
+            toolchain: ["gnu", "llvm"]
+            arch: ["amd64", "arm64"]
+            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
+    - build-and-test-windows-cmake:
+        matrix:
+          parameters:
+            arch: ["amd64"]
+    - build-and-test-windows-bazel:
+        matrix:
+          parameters:
+            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
+    - coverage:
+        requires:
+          - build-and-test-cmake
+    - system-tests:
+        <<: *main_branch_only
+    - fuzz-testing:
+        <<: *main_branch_only
+    - notify-downstream-projects:
+        <<: *main_branch_only
