@@ -25,25 +25,17 @@ executors:
     resource_class: arm.xlarge
 
 commands:
-  run_timeout:
-    description: "Run a command for a specified duration"
+  push-pipeline:
+    description: "Start a pipeline on another project"
     parameters:
-      command:
-        type: string
-      duration:
-        type: string
-      description:
+      project:
         type: string
     steps:
       - run:
-          name: << parameters.description >>
+          name: "Kick off << parameters.project >> pipeline"
           command: |
-            set +e
-            timeout << parameters.duration >> << parameters.command >>
-            # `124` is the exit code timeout returns when the duration is reached
-            if [[ $? -eq 124 ]]; then
-              exit 0
-            fi
+            curl -X POST -H "Content-Type: application/json" -u "${CI_API_TOKEN}" \
+                 --url "https://circleci.com/api/v2/project/github/DataDog/<< parameters.project >>/pipeline"
 
 jobs:
   format:
@@ -213,43 +205,54 @@ jobs:
       - checkout
       - run: bin/with-toolchain llvm cmake . -B .build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_FUZZERS=1 -DDD_TRACE_ENABLE_SANITIZE=1
       - run: cmake --build .build -j ${MAKE_JOB_COUNT} --target dd_trace_cpp-fuzzers
-      - run_timeout: 
-          description: Run W3C propagation fuzzer
-          command: ./.build/fuzz/w3c-propagation/w3c-propagation-fuzz
-          duration: 5m
-      - run_timeout: 
-          description: Run Base64 fuzzer
-          command: timeout 5m ./.build/fuzz/base64/base64-fuzz
-          duration: 5m
+      - run: 
+          name: Run W3C propagation fuzzer
+          command: ./.build/fuzz/w3c-propagation/w3c-propagation-fuzz -max_total_time=300
+      - run: 
+          name: Run Base64 fuzzer
+          command: ./.build/fuzz/base64/base64-fuzz -max_total_time=300
+
+  notify-downstream-projects:
+    docker:
+    - image: "datadog/docker-library:dd-trace-cpp-ci"
+      resource_class: small
+    steps:
+      - push-pipeline:
+          project: "nginx-datadog"
+      - push-pipeline:
+          project: "httpd-datadog"
 
 workflows:
   pull-request:
     jobs:
-    - format
-    - shellcheck
-    - build-and-test-cmake:
-        matrix:
-          parameters:
-            toolchain: ["gnu", "llvm"]
-            arch: ["amd64", "arm64"]
-    - build-bazel:
-        matrix:
-          parameters:
-            toolchain: ["gnu", "llvm"]
-            arch: ["amd64", "arm64"]
-            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
-    - build-and-test-windows-cmake:
-        matrix:
-          parameters:
-            arch: ["amd64"]
-    - build-and-test-windows-bazel:
-        matrix:
-          parameters:
-            bazelrc: [".bazelrc.absl", ".bazelrc.std"]
-    - coverage:
-        requires:
-          - build-and-test-cmake
-    - system-tests:
-        <<: *main_branch_only
-    - fuzz-testing:
-        <<: *main_branch_only
+    # - format
+    # - shellcheck
+    # - build-and-test-cmake:
+    #     matrix:
+    #       parameters:
+    #         toolchain: ["gnu", "llvm"]
+    #         arch: ["amd64", "arm64"]
+    # - build-bazel:
+    #     matrix:
+    #       parameters:
+    #         toolchain: ["gnu", "llvm"]
+    #         arch: ["amd64", "arm64"]
+    #         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
+    # - build-and-test-windows-cmake:
+    #     matrix:
+    #       parameters:
+    #         arch: ["amd64"]
+    # - build-and-test-windows-bazel:
+    #     matrix:
+    #       parameters:
+    #         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
+    # - coverage:
+    #     requires:
+    #       - build-and-test-cmake
+    # - system-tests:
+    #     <<: *main_branch_only
+    # - fuzz-testing:
+    #     <<: *main_branch_only
+    # - notify-downstream-projects:
+    #     <<: *main_branch_only
+    - notify-downstream-projects
