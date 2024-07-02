@@ -215,7 +215,7 @@ jobs:
   notify-downstream-projects:
     docker:
     - image: "datadog/docker-library:dd-trace-cpp-ci"
-      resource_class: small
+    resource_class: small
     steps:
       - push-pipeline:
           project: "nginx-datadog"
@@ -225,6 +225,7 @@ jobs:
 workflows:
   pull-request:
     jobs:
+    - notify-downstream-projects
     # - format
     # - shellcheck
     # - build-and-test-cmake:
@@ -255,4 +256,3 @@ workflows:
     #     <<: *main_branch_only
     # - notify-downstream-projects:
     #     <<: *main_branch_only
-    - notify-downstream-projects
