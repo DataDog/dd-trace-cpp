@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 #include "extracted_data.h"
-#include "json.hpp"
 #include "logger.h"
 #include "parse_util.h"
 #include "string_util.h"
@@ -17,9 +16,6 @@
 namespace datadog {
 namespace tracing {
 namespace {
-
-constexpr StringView sampling_delegation_request_header =
-    "x-datadog-delegate-trace-sampling";
 
 // Decode the specified `trace_tags` and integrate them into the specified
 // `result`. If an error occurs, add a `tags::internal::propagation_error` tag
@@ -75,7 +71,7 @@ Expected<Optional<std::uint64_t>> extract_id_header(const DictReader& headers,
   if (!found) {
     return result;
   }
-  auto parsed_id = parse_uint64(*found, base);
+  auto parsed_id = parse_uint64(trim(*found), base);
   if (auto* error = parsed_id.if_error()) {
     std::string prefix;
     prefix += "Could not extract ";
@@ -130,29 +126,24 @@ Expected<ExtractedData> extract_datadog(
   }
   result.parent_id = *parent_id;
 
-  if (auto sampling_delegation_header =
-          headers.lookup(sampling_delegation_request_header)) {
-    result.delegate_sampling_decision = true;
-    // If the trace sampling decision is being delegated to us, then we don't
-    // interpret the sampling priority (if any) included in the request.
-  } else {
-    result.delegate_sampling_decision = false;
-
-    const StringView sampling_priority_header = "x-datadog-sampling-priority";
-    if (auto found = headers.lookup(sampling_priority_header)) {
-      auto sampling_priority = parse_int(*found, 10);
-      if (auto* error = sampling_priority.if_error()) {
-        std::string prefix;
-        prefix += "Could not extract Datadog-style sampling priority from ";
-        append(prefix, sampling_priority_header);
-        prefix += ": ";
-        append(prefix, *found);
-        prefix += ' ';
-        return error->with_prefix(prefix);
-      }
-
-      result.sampling_priority = *sampling_priority;
+  if (auto found = headers.lookup("x-datadog-sampling-priority")) {
+    auto sampling_priority = parse_int(trim(*found), 10);
+    if (auto* error = sampling_priority.if_error()) {
+      std::string prefix;
+      prefix +=
+          "Could not extract Datadog-style sampling priority from "
+          "x-datadog-sampling-priority: ";
+      append(prefix, *found);
+      prefix += ' ';
+      return error->with_prefix(prefix);
     }
+
+    result.sampling_priority = *sampling_priority;
+  }
+
+  if (auto sampling_delegation_header =
+          headers.lookup("x-datadog-delegate-trace-sampling")) {
+    result.delegate_sampling_decision = true;
   }
 
   auto origin = headers.lookup("x-datadog-origin");
@@ -175,7 +166,7 @@ Expected<ExtractedData> extract_b3(
   result.style = PropagationStyle::B3;
 
   if (auto found = headers.lookup("x-b3-traceid")) {
-    auto parsed = TraceID::parse_hex(*found);
+    auto parsed = TraceID::parse_hex(trim(*found));
     if (auto* error = parsed.if_error()) {
       std::string prefix = "Could not extract B3-style trace ID from \"";
       append(prefix, *found);
@@ -194,7 +185,7 @@ Expected<ExtractedData> extract_b3(
 
   const StringView sampling_priority_header = "x-b3-sampled";
   if (auto found = headers.lookup(sampling_priority_header)) {
-    auto sampling_priority = parse_int(*found, 10);
+    auto sampling_priority = parse_int(trim(*found), 10);
     if (auto* error = sampling_priority.if_error()) {
       std::string prefix;
       prefix += "Could not extract B3-style sampling priority from ";
@@ -223,15 +214,15 @@ std::string extraction_error_prefix(
   std::ostringstream stream;
   stream << "While extracting trace context";
   if (style) {
-    stream << " in the " << to_json(*style) << " propagation style";
+    stream << " in the " << to_string_view(*style) << " propagation style";
   }
-  auto it = headers_examined.begin();
-  if (it != headers_examined.end()) {
-    stream << " from the following headers: [";
-    stream << nlohmann::json(it->first + ": " + it->second);
+
+  if (!headers_examined.empty()) {
+    auto it = headers_examined.begin();
+    stream << " from the following headers: [" << it->first << ": "
+           << it->second;
     for (++it; it != headers_examined.end(); ++it) {
-      stream << ", ";
-      stream << nlohmann::json(it->first + ": " + it->second);
+      stream << ", " << it->first << ": " << it->second;
     }
     stream << "]";
   }

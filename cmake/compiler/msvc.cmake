@@ -41,6 +41,11 @@ target_compile_options(dd_trace_cpp-specs
     /D_WIN32_WINNT=${win_ver}
 )
 
+target_link_options(dd_trace_cpp-specs
+  INTERFACE
+    ws2_32.lib
+)
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug|RelWithDebInfo")
   target_compile_options(dd_trace_cpp-specs
     INTERFACE
