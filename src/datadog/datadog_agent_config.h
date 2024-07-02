@@ -21,6 +21,7 @@
 #include "config.h"
 #include "expected.h"
 #include "http_client.h"
+#include "remote_config/listener.h"
 #include "string_view.h"
 
 namespace datadog {
@@ -40,6 +41,9 @@ struct DatadogAgentConfig {
   // Datadog Agent.  If `event_scheduler` is null, then a
   // `ThreadedEventScheduler` instance will be used instead.
   std::shared_ptr<EventScheduler> event_scheduler = nullptr;
+  // A list of Remote Configuration listeners.
+  std::vector<std::shared_ptr<remote_config::Listener>>
+      remote_configuration_listeners;
   // A URL at which the Datadog Agent can be contacted.
   // The following formats are supported:
   //
@@ -77,6 +81,8 @@ class FinalizedDatadogAgentConfig {
   bool remote_configuration_enabled;
   std::shared_ptr<HTTPClient> http_client;
   std::shared_ptr<EventScheduler> event_scheduler;
+  std::vector<std::shared_ptr<remote_config::Listener>>
+      remote_configuration_listeners;
   HTTPClient::URL url;
   std::chrono::steady_clock::duration flush_interval;
   std::chrono::steady_clock::duration request_timeout;

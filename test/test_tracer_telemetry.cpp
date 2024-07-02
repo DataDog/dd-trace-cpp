@@ -95,7 +95,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
       SECTION("generates a configuration change event") {
         SECTION("empty configuration generate a valid payload") {
           auto config_change_message = nlohmann::json::parse(
-              tracer_telemetry.configuration_change({}), nullptr, false);
+              tracer_telemetry.configuration_change(), nullptr, false);
           REQUIRE(config_change_message.is_discarded() == false);
 
           CHECK(config_change_message["request_type"] ==
@@ -111,9 +111,9 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
               {ConfigName::REPORT_TRACES, "", ConfigMetadata::Origin::DEFAULT,
                Error{Error::Code::OTHER, "empty field"}}};
 
+          tracer_telemetry.capture_configuration_change(new_config);
           auto config_change_message = nlohmann::json::parse(
-              tracer_telemetry.configuration_change(new_config), nullptr,
-              false);
+              tracer_telemetry.configuration_change(), nullptr, false);
           REQUIRE(config_change_message.is_discarded() == false);
 
           CHECK(config_change_message["request_type"] ==

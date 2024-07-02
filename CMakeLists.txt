@@ -103,7 +103,7 @@ target_sources(dd_trace_cpp-objects
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp
     src/datadog/rate.cpp
-    src/datadog/remote_config.cpp
+    src/datadog/remote_config/remote_config.cpp
     src/datadog/runtime_id.cpp
     src/datadog/span.cpp
     src/datadog/span_data.cpp
@@ -137,7 +137,6 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/cerr_logger.h
   src/datadog/clock.h
   src/datadog/config_manager.h
-  src/datadog/config_update.h
   src/datadog/collector.h
   src/datadog/collector_response.h
   # src/datadog/curl.h except for curl.h
@@ -170,7 +169,9 @@ target_sources(dd_trace_cpp-objects PUBLIC
   src/datadog/propagation_style.h
   src/datadog/random.h
   src/datadog/rate.h
-  src/datadog/remote_config.h
+  src/datadog/remote_config/remote_config.h
+  src/datadog/remote_config/capability.h
+  src/datadog/remote_config/listener.h
   src/datadog/runtime_id.h
   src/datadog/sampling_decision.h
   src/datadog/sampling_mechanism.h
@@ -204,11 +205,10 @@ target_sources(dd_trace_cpp-objects PUBLIC
 # or installing the library.
 target_include_directories(dd_trace_cpp-objects
   PUBLIC
-    $<INSTALL_INTERFACE:src>
+    $<INSTALL_INTERFACE:src/datadog>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/datadog>
 )
-
-add_dependencies(dd_trace_cpp-objects Threads::Threads)
 
 target_link_libraries(dd_trace_cpp-objects
   PUBLIC

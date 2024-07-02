@@ -78,6 +78,9 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
     result.event_scheduler = user_config.event_scheduler;
   }
 
+  result.remote_configuration_listeners =
+      user_config.remote_configuration_listeners;
+
   if (auto flush_interval_milliseconds =
           value_or(env_config->flush_interval_milliseconds,
                    user_config.flush_interval_milliseconds, 2000);

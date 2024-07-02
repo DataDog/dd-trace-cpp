@@ -105,6 +105,8 @@ class TracerTelemetry {
   std::vector<std::pair<std::reference_wrapper<Metric>, MetricSnapshot>>
       metrics_snapshots_;
 
+  std::vector<ConfigMetadata> configuration_snapshot_;
+
   nlohmann::json generate_telemetry_body(std::string request_type);
 
   nlohmann::json generate_configuration_field(
@@ -129,6 +131,8 @@ class TracerTelemetry {
   // collect timestamped "points" of values. These values are later submitted
   // in `generate-metrics` messages.
   void capture_metrics();
+  void capture_configuration_change(
+      const std::vector<ConfigMetadata>& new_configuration);
   // Constructs a messsage-batch containing `app-heartbeat`, and if metrics
   // have been modified, a `generate-metrics` message.
   std::string heartbeat_and_telemetry();
@@ -136,8 +140,7 @@ class TracerTelemetry {
   // been modified, a `generate-metrics` message.
   std::string app_closing();
   // Construct an `app-client-configuration-change` message.
-  std::string configuration_change(
-      const std::vector<ConfigMetadata>& new_configuration);
+  std::string configuration_change();
 };
 
 }  // namespace tracing

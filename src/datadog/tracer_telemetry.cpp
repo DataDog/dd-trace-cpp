@@ -230,6 +230,13 @@ void TracerTelemetry::capture_metrics() {
   }
 }
 
+void TracerTelemetry::capture_configuration_change(
+    const std::vector<ConfigMetadata>& new_configuration) {
+  configuration_snapshot_.insert(configuration_snapshot_.begin(),
+                                 new_configuration.begin(),
+                                 new_configuration.end());
+}
+
 std::string TracerTelemetry::heartbeat_and_telemetry() {
   auto batch_payloads = nlohmann::json::array();
 
@@ -281,6 +288,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
   auto telemetry_body = generate_telemetry_body("message-batch");
   telemetry_body["payload"] = batch_payloads;
   auto message_batch_payload = telemetry_body.dump();
+
   return message_batch_payload;
 }
 
@@ -335,22 +343,26 @@ std::string TracerTelemetry::app_closing() {
   auto telemetry_body = generate_telemetry_body("message-batch");
   telemetry_body["payload"] = batch_payloads;
   auto message_batch_payload = telemetry_body.dump();
+
   return message_batch_payload;
 }
 
-std::string TracerTelemetry::configuration_change(
-    const std::vector<ConfigMetadata>& new_configuration) {
+std::string TracerTelemetry::configuration_change() {
   auto configuration_json = nlohmann::json::array();
-  for (const auto& config_metadata : new_configuration) {
+  for (const auto& config_metadata : configuration_snapshot_) {
     // if (config_metadata.value.empty()) continue;
     configuration_json.emplace_back(
         generate_configuration_field(config_metadata));
   }
 
-  auto configuration_change =
-      generate_telemetry_body("app-client-configuration-change");
-  configuration_change["payload"] =
-      nlohmann::json{{"configuration", configuration_json}};
+  // clang-format off
+  auto configuration_change = nlohmann::json({
+    {"request_type", "app-client-configuration-change"},
+    {"payload", nlohmann::json{
+      {"configuration", configuration_json}
+    }}
+  });
+  // clang-format on
 
   return configuration_change.dump();
 }

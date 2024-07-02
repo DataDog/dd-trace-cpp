@@ -77,16 +77,71 @@ Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
   return parsed_rules;
 }
 
+ConfigManager::Update parse_dynamic_config(const nlohmann::json& j) {
+  ConfigManager::Update config_update;
+
+  if (auto sampling_rate_it = j.find("tracing_sampling_rate");
+      sampling_rate_it != j.cend() && sampling_rate_it->is_number()) {
+    config_update.trace_sampling_rate = sampling_rate_it->get<double>();
+  }
+
+  if (auto tags_it = j.find("tracing_tags");
+      tags_it != j.cend() && tags_it->is_array()) {
+    config_update.tags = tags_it->get<std::vector<StringView>>();
+  }
+
+  if (auto tracing_enabled_it = j.find("tracing_enabled");
+      tracing_enabled_it != j.cend() && tracing_enabled_it->is_boolean()) {
+    config_update.report_traces = tracing_enabled_it->get<bool>();
+  }
+
+  if (auto tracing_sampling_rules_it = j.find("tracing_sampling_rules");
+      tracing_sampling_rules_it != j.cend() &&
+      tracing_sampling_rules_it->is_array()) {
+    config_update.trace_sampling_rules = &(*tracing_sampling_rules_it);
+  }
+
+  return config_update;
+}
+
 }  // namespace
 
-ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
+namespace rc = datadog::remote_config;
+
+ConfigManager::ConfigManager(const FinalizedTracerConfig& config,
+                             const std::shared_ptr<TracerTelemetry>& telemetry)
     : clock_(config.clock),
       default_metadata_(config.metadata),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock_)),
       rules_(config.trace_sampler.rules),
       span_defaults_(std::make_shared<SpanDefaults>(config.defaults)),
-      report_traces_(config.report_traces) {}
+      report_traces_(config.report_traces),
+      telemetry_(telemetry) {}
+
+rc::Products ConfigManager::get_products() { return rc::product::APM_TRACING; }
+
+rc::Capabilities ConfigManager::get_capabilities() {
+  using namespace rc::capability;
+  return APM_TRACING_SAMPLE_RATE | APM_TRACING_TAGS | APM_TRACING_ENABLED |
+         APM_TRACING_SAMPLE_RULES;
+}
+
+Optional<std::string> ConfigManager::on_update(const Configuration& config) {
+  const auto config_json = nlohmann::json::parse(config.content);
+  auto config_update = parse_dynamic_config(config_json.at("lib_config"));
+
+  auto config_metadata = apply_update(config_update);
+  telemetry_->capture_configuration_change(config_metadata);
+
+  // TODO:
+  return nullopt;
+}
+
+void ConfigManager::on_revert(const Configuration&) {
+  auto config_metadata = apply_update({});
+  telemetry_->capture_configuration_change(config_metadata);
+}
 
 std::shared_ptr<TraceSampler> ConfigManager::trace_sampler() {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -103,7 +158,8 @@ bool ConfigManager::report_traces() {
   return report_traces_.value();
 }
 
-std::vector<ConfigMetadata> ConfigManager::update(const ConfigUpdate& conf) {
+std::vector<ConfigMetadata> ConfigManager::apply_update(
+    const ConfigManager::Update& conf) {
   std::vector<ConfigMetadata> metadata;
 
   std::lock_guard<std::mutex> lock(mutex_);
@@ -209,8 +265,6 @@ void ConfigManager::reset_config(ConfigName name, T& conf,
   conf.reset();
   metadata.emplace_back(default_metadata_[name]);
 }
-
-std::vector<ConfigMetadata> ConfigManager::reset() { return update({}); }
 
 nlohmann::json ConfigManager::config_json() const {
   std::lock_guard<std::mutex> lock(mutex_);
