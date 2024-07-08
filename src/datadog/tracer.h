@@ -76,9 +76,9 @@ class Tracer {
   // new trace (see `create_span`).  Optionally specify a `config` indicating
   // the attributes of the span.  If a failure occurs, then return an error.
   // Note that the absence of a span to extract is not considered an error.
-  Expected<Span> extract_or_create_span(const DictReader& reader);
-  Expected<Span> extract_or_create_span(const DictReader& reader,
-                                        const SpanConfig& config);
+  Span extract_or_create_span(const DictReader& reader);
+  Span extract_or_create_span(const DictReader& reader,
+                              const SpanConfig& config);
 
   // Return a JSON object describing this Tracer's configuration. It is the same
   // JSON object that was logged when this Tracer was created.

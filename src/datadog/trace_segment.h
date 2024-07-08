@@ -38,6 +38,7 @@
 #include "optional.h"
 #include "propagation_style.h"
 #include "sampling_decision.h"
+#include "sampling_priority.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {
@@ -147,6 +148,7 @@ class TraceSegment {
   // Set the sampling decision to be a local, manual decision with the specified
   // sampling `priority`.  Overwrite any previous sampling decision.
   void override_sampling_priority(int priority);
+  void override_sampling_priority(SamplingPriority priority);
 
  private:
   // If `sampling_decision_` is null, use `trace_sampler_` to make a

@@ -263,8 +263,7 @@ TEST_CASE("span extraction") {
     const std::unordered_map<std::string, std::string> no_headers;
     MockDictReader reader{no_headers};
     auto span = tracer.extract_or_create_span(reader);
-    REQUIRE(span);
-    REQUIRE(!span->parent_id());
+    REQUIRE(!span.parent_id());
   }
 
   SECTION("extraction failures") {
@@ -561,8 +560,7 @@ TEST_CASE("span extraction") {
       auto span = tracer.extract_or_create_span(reader);
       auto method = "extract_or_create_span";
       CAPTURE(method);
-      REQUIRE(span);
-      checks(test_case, *span);
+      checks(test_case, span);
     }
   }
 
