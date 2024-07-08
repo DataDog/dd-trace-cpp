@@ -165,9 +165,9 @@ jobs:
     resource_class: large
     steps:
       - run:
-          name: Install python 3.9
+          name: Install python 3.12
           command: |
-            sudo apt-get install python3.9-full python3.9-dev python3.9-venv
+            sudo apt-get install python3.12-full python3.12-dev python3.12-venv
             echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$BASH_ENV"
       - run:
           name: Clone system-tests
@@ -182,10 +182,10 @@ jobs:
           command: |
             cd system-tests
             pyenv local system
-            python3.9 --version
-            python3.9 -m pip install wheel
-            python3.9 -m pip install -r requirements.txt
-            sudo ln -sf /usr/bin/python3.9 /usr/bin/python
+            python3.12 --version
+            python3.12 -m pip install wheel
+            python3.12 -m pip install -r requirements.txt
+            sudo ln -sf /usr/bin/python3.12 /usr/bin/python
 
       - run:
           name: Run Parametric tests
