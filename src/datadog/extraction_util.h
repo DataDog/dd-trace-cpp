@@ -3,16 +3,16 @@
 // This component provides facilities for extracting trace context from a
 // `DictReader`. It is used by `Tracer::extract_trace`. See `tracer.cpp`.
 
+#include <datadog/dict_reader.h>
+#include <datadog/expected.h>
+#include <datadog/optional.h>
+#include <datadog/propagation_style.h>
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#include "dict_reader.h"
-#include "expected.h"
-#include "optional.h"
-#include "propagation_style.h"
 
 namespace datadog {
 namespace tracing {

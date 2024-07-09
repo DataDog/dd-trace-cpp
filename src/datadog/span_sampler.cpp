@@ -1,8 +1,8 @@
 #include "span_sampler.h"
 
-#include "json.hpp"
-#include "sampling_mechanism.h"
-#include "sampling_priority.h"
+#include <datadog/sampling_mechanism.h>
+#include <datadog/sampling_priority.h>
+
 #include "sampling_util.h"
 #include "span_data.h"
 

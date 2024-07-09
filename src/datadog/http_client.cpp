@@ -1,8 +1,6 @@
-#include "http_client.h"
+#include <datadog/http_client.h>
 
 #include <algorithm>
-
-#include "string_util.h"
 
 namespace datadog {
 namespace tracing {

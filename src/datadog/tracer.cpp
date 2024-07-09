@@ -1,30 +1,30 @@
-#include "tracer.h"
+#include <datadog/dict_reader.h>
+#include <datadog/id_generator.h>
+#include <datadog/logger.h>
+#include <datadog/runtime_id.h>
+#include <datadog/span.h>
+#include <datadog/span_config.h>
+#include <datadog/trace_segment.h>
+#include <datadog/tracer.h>
+#include <datadog/tracer_signature.h>
+#include <datadog/version.h>
 
 #include <algorithm>
 #include <cassert>
 
+#include "config_manager.h"
 #include "datadog_agent.h"
-#include "dict_reader.h"
 #include "environment.h"
 #include "extracted_data.h"
 #include "extraction_util.h"
 #include "hex.h"
 #include "json.hpp"
-#include "logger.h"
-#include "parse_util.h"
 #include "platform_util.h"
-#include "runtime_id.h"
-#include "span.h"
-#include "span_config.h"
 #include "span_data.h"
 #include "span_sampler.h"
-#include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
-#include "trace_sampler_config.h"
-#include "trace_segment.h"
-#include "tracer_signature.h"
-#include "version.h"
+#include "tracer_telemetry.h"
 #include "w3c_propagation.h"
 
 namespace datadog {
@@ -90,8 +90,8 @@ std::string Tracer::config() const {
     {"runtime_id", runtime_id_.string()},
     {"collector", collector_->config()},
     {"span_sampler", span_sampler_->config_json()},
-    {"injection_styles", to_json(injection_styles_)},
-    {"extraction_styles", to_json(extraction_styles_)},
+    {"injection_styles", join_propagation_styles(injection_styles_)},
+    {"extraction_styles", join_propagation_styles(extraction_styles_)},
     {"tags_header_size", tags_header_max_size_},
     {"environment_variables", environment::to_json()},
   });

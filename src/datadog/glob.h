@@ -11,7 +11,7 @@
 // The patterns are here called "glob patterns," though they are different from
 // the patterns used in Unix shells.
 
-#include "string_view.h"
+#include <datadog/string_view.h>
 
 namespace datadog {
 namespace tracing {

@@ -5,6 +5,8 @@
 // thread. It is the default implementation used if
 // `DatadogAgent::event_scheduler` is not specified.
 
+#include <datadog/event_scheduler.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <functional>
@@ -13,8 +15,6 @@
 #include <queue>
 #include <thread>
 #include <vector>
-
-#include "event_scheduler.h"
 
 namespace datadog {
 namespace tracing {

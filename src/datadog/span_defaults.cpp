@@ -1,4 +1,4 @@
-#include "span_defaults.h"
+#include <datadog/span_defaults.h>
 
 #include "json.hpp"
 

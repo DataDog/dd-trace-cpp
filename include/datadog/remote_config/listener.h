@@ -3,7 +3,7 @@
 #include <string>
 
 #include "capability.h"
-#include "optional.h"
+#include "datadog/optional.h"
 #include "product.h"
 
 namespace datadog {

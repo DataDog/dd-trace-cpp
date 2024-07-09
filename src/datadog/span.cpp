@@ -1,15 +1,15 @@
-#include "span.h"
+#include <datadog/dict_writer.h>
+#include <datadog/optional.h>
+#include <datadog/span.h>
+#include <datadog/span_config.h>
+#include <datadog/string_view.h>
+#include <datadog/trace_segment.h>
 
 #include <cassert>
 #include <string>
 
-#include "dict_writer.h"
-#include "optional.h"
-#include "span_config.h"
 #include "span_data.h"
-#include "string_view.h"
 #include "tags.h"
-#include "trace_segment.h"
 
 namespace datadog {
 namespace tracing {

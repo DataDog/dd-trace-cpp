@@ -1,4 +1,4 @@
-#include "trace_sampler_config.h"
+#include <datadog/trace_sampler_config.h>
 
 #include <cmath>
 #include <unordered_set>

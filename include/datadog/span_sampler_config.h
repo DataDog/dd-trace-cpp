@@ -12,7 +12,6 @@
 
 #include "config.h"
 #include "expected.h"
-#include "json_fwd.hpp"
 #include "logger.h"
 #include "optional.h"
 #include "rate.h"

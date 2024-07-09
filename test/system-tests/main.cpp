@@ -2,11 +2,12 @@
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
+#include <datadog/version.h>
 
 #include <chrono>
 #include <csignal>
-#include <datadog/json.hpp>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -26,7 +27,7 @@ std::optional<uint16_t> get_port() {
       return std::nullopt;
     }
 
-    uint16_t port = std::atoi(port_env);
+    uint16_t port = static_cast<uint16_t>(std::atoi(port_env));
     return port;
   } catch (...) {
     return std::nullopt;

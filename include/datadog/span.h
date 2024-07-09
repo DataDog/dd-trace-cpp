@@ -46,7 +46,6 @@
 #include <memory>
 
 #include "clock.h"
-#include "error.h"
 #include "optional.h"
 #include "string_view.h"
 #include "trace_id.h"

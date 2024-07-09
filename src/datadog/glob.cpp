@@ -1,7 +1,6 @@
 #include "glob.h"
 
 #include <cctype>
-#include <cstdint>
 
 namespace datadog {
 namespace tracing {

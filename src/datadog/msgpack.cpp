@@ -1,11 +1,11 @@
 #include "msgpack.h"
 
+#include <datadog/error.h>
+
 #include <cassert>
 #include <climits>
 #include <limits>
 #include <type_traits>
-
-#include "error.h"
 
 namespace datadog {
 namespace tracing {

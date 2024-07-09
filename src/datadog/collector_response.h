@@ -13,11 +13,11 @@
 // See `TraceSampler::handle_collector_response` in `trace_sampler.h` for more
 // information.
 
+#include <datadog/rate.h>
+#include <datadog/string_view.h>
+
 #include <string>
 #include <unordered_map>
-
-#include "rate.h"
-#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

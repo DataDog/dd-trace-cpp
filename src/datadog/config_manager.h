@@ -5,14 +5,15 @@
 // It utilizes a mutex to ensure thread safety when updating or accessing
 // the configuration.
 
+#include <datadog/clock.h>
+#include <datadog/optional.h>
+#include <datadog/remote_config/listener.h>
+#include <datadog/span_defaults.h>
+#include <datadog/tracer_config.h>
+
 #include <mutex>
 
-#include "clock.h"
 #include "json.hpp"
-#include "optional.h"
-#include "remote_config/listener.h"
-#include "span_defaults.h"
-#include "tracer_config.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {

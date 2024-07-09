@@ -14,24 +14,23 @@
 #include <memory>
 
 #include "clock.h"
-#include "config_manager.h"
-#include "error.h"
 #include "expected.h"
 #include "id_generator.h"
-#include "json_fwd.hpp"
 #include "optional.h"
 #include "span.h"
 #include "tracer_config.h"
 #include "tracer_signature.h"
-#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
 
+class TracerTelemetry;
+class ConfigManager;
 class DictReader;
 struct SpanConfig;
 class TraceSampler;
 class SpanSampler;
+class IDGenerator;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;

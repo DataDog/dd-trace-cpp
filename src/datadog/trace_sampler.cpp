@@ -1,14 +1,14 @@
 #include "trace_sampler.h"
 
+#include <datadog/sampling_decision.h>
+#include <datadog/sampling_priority.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <limits>
 
 #include "collector_response.h"
-#include "json.hpp"
-#include "sampling_decision.h"
-#include "sampling_priority.h"
 #include "sampling_util.h"
 #include "span_data.h"
 

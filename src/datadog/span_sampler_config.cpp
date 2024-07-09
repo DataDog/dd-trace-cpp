@@ -1,4 +1,5 @@
-#include "span_sampler_config.h"
+#include <datadog/expected.h>
+#include <datadog/span_sampler_config.h>
 
 #include <cmath>
 #include <fstream>
@@ -6,7 +7,6 @@
 #include <unordered_set>
 
 #include "environment.h"
-#include "expected.h"
 #include "json.hpp"
 
 namespace datadog {

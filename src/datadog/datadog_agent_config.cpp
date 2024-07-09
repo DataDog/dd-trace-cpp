@@ -1,4 +1,4 @@
-#include "datadog_agent_config.h"
+#include <datadog/datadog_agent_config.h>
 
 #include <algorithm>
 #include <chrono>

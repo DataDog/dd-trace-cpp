@@ -69,20 +69,7 @@ std::string join(const std::vector<StringView>& values, StringView separator) {
 std::string join_propagation_styles(
     const std::vector<PropagationStyle>& values) {
   return join(values, ",", [](std::string& result, PropagationStyle style) {
-    switch (style) {
-      case PropagationStyle::B3:
-        result += "b3";
-        break;
-      case PropagationStyle::DATADOG:
-        result += "datadog";
-        break;
-      case PropagationStyle::W3C:
-        result += "tracecontext";
-        break;
-      case PropagationStyle::NONE:
-        result += "none";
-        break;
-    }
+    result += std::string(to_string_view(style));
   });
 }
 

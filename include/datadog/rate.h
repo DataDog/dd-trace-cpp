@@ -8,8 +8,6 @@
 // zero value. The static member functions `Rate::one` and `Rate::zero` are
 // provided for convenience.
 
-#include <variant>
-
 #include "expected.h"
 
 namespace datadog {

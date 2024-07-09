@@ -7,10 +7,10 @@
 // `CerrLogger` is the default logger used by `Tracer` unless otherwise
 // configured in `TracerConfig`.
 
+#include <datadog/logger.h>
+
 #include <mutex>
 #include <sstream>
-
-#include "logger.h"
 
 namespace datadog {
 namespace tracing {

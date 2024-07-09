@@ -6,7 +6,6 @@
 
 #include "optional.h"
 #include "rate.h"
-#include "sampling_mechanism.h"
 
 namespace datadog {
 namespace tracing {

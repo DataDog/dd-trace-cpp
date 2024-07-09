@@ -4,7 +4,7 @@
 #include <datadog/threaded_event_scheduler.h>
 
 #include <cassert>
-#include <datadog/json.hpp>
+#include <nlohmann/json.hpp>
 
 struct ManualScheduler : public datadog::tracing::EventScheduler {
   std::function<void()> flush_traces = nullptr;

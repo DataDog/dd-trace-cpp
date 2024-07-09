@@ -5,9 +5,6 @@
 // one `std::vector<PropagationStyle>` for extraction and another for injection.
 // See `tracer_config.h`.
 
-#include <vector>
-
-#include "json_fwd.hpp"
 #include "optional.h"
 #include "string_view.h"
 
@@ -28,8 +25,6 @@ enum class PropagationStyle {
 };
 
 StringView to_string_view(PropagationStyle style);
-nlohmann::json to_json(PropagationStyle style);
-nlohmann::json to_json(const std::vector<PropagationStyle>& styles);
 
 Optional<PropagationStyle> parse_propagation_style(StringView text);
 
