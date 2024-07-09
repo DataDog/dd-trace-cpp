@@ -1,15 +1,15 @@
 #include "w3c_propagation.h"
 
+#include <datadog/propagation_style.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <regex>
 #include <utility>
 
-#include "dict_reader.h"
 #include "hex.h"
 #include "parse_util.h"
-#include "propagation_style.h"
 #include "string_util.h"
 #include "tags.h"
 

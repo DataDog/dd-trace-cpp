@@ -11,7 +11,6 @@
 // structure.
 
 #include <datadog/span_config.h>
-#include <datadog/tags.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 

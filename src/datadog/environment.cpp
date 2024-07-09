@@ -2,8 +2,6 @@
 
 #include <cstdlib>
 
-#include "json.hpp"
-
 namespace datadog {
 namespace tracing {
 namespace environment {

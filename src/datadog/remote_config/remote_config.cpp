@@ -1,5 +1,9 @@
 #include "remote_config.h"
 
+#include <datadog/remote_config/capability.h>
+#include <datadog/remote_config/listener.h>
+#include <datadog/string_view.h>
+
 #include <cassert>
 #include <regex>
 #include <unordered_set>
@@ -7,9 +11,6 @@
 #include "base64.h"
 #include "json.hpp"
 #include "random.h"
-#include "remote_config/capability.h"
-#include "remote_config/listener.h"
-#include "string_view.h"
 
 using namespace datadog::tracing;
 using namespace nlohmann::literals;

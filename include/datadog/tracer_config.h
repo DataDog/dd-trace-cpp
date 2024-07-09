@@ -10,9 +10,7 @@
 #include <vector>
 
 #include "clock.h"
-#include "config.h"
 #include "datadog_agent_config.h"
-#include "error.h"
 #include "expected.h"
 #include "propagation_style.h"
 #include "runtime_id.h"

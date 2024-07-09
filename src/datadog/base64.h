@@ -1,8 +1,8 @@
 #pragma once
 
-#include <string>
+#include <datadog/string_view.h>
 
-#include "string_view.h"
+#include <string>
 
 namespace datadog {
 namespace tracing {

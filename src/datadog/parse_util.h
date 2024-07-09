@@ -2,13 +2,13 @@
 
 // This component provides parsing-related miscellanea.
 
+#include <datadog/expected.h>
+#include <datadog/string_view.h>
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include "expected.h"
-#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

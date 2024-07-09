@@ -4,14 +4,16 @@
 // in the `PropagationStyle::W3C` style. These functions decode and encode the
 // "traceparent" and "tracestate" HTTP request headers.
 
+#include <datadog/dict_reader.h>
+#include <datadog/expected.h>
+#include <datadog/optional.h>
+#include <datadog/trace_id.h>
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 
-#include "expected.h"
 #include "extracted_data.h"
-#include "optional.h"
-#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {

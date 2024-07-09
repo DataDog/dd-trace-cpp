@@ -10,6 +10,8 @@
 // [1]: https://curl.se/libcurl/
 
 #include <curl/curl.h>
+#include <datadog/clock.h>
+#include <datadog/http_client.h>
 
 #include <chrono>
 #include <functional>
@@ -17,9 +19,7 @@
 #include <string>
 #include <thread>
 
-#include "clock.h"
-#include "http_client.h"
-#include "json_fwd.hpp"
+#include "json.hpp"
 
 namespace datadog {
 namespace tracing {

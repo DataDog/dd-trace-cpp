@@ -1,5 +1,7 @@
 #include "parse_util.h"
 
+#include <datadog/error.h>
+
 #include <algorithm>
 #include <cctype>
 #include <charconv>
@@ -8,7 +10,6 @@
 #include <sstream>
 #include <string>
 
-#include "error.h"
 #include "string_util.h"
 
 namespace datadog {

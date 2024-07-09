@@ -8,10 +8,10 @@
 //
 // [1]: https://en.wikipedia.org/wiki/Token_bucket
 
-#include <vector>
+#include <datadog/clock.h>
+#include <datadog/rate.h>
 
-#include "clock.h"
-#include "rate.h"
+#include <vector>
 
 namespace datadog {
 namespace tracing {

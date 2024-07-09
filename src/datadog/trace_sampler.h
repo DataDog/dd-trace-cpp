@@ -83,16 +83,17 @@
 // configured via `TraceSamplerConfig::max_per_second` or the
 // `DD_TRACE_RATE_LIMIT` environment variable.
 
+#include <datadog/clock.h>
+#include <datadog/optional.h>
+#include <datadog/rate.h>
+#include <datadog/trace_sampler_config.h>
+
 #include <mutex>
 #include <string>
 #include <unordered_map>
 
-#include "clock.h"
-#include "json_fwd.hpp"
+#include "json.hpp"
 #include "limiter.h"
-#include "optional.h"
-#include "rate.h"
-#include "trace_sampler_config.h"
 
 namespace datadog {
 namespace tracing {

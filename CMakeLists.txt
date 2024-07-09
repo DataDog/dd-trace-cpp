@@ -34,6 +34,7 @@ endif ()
 # Linking this library requires threads.
 find_package(Threads REQUIRED)
 include(cmake/deps/curl.cmake)
+include(cmake/deps/json.cmake)
 include(cmake/utils.cmake)
 
 file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/datadog/version.cpp DD_TRACE_VERSION_CPP_CONTENTS REGEX "#define DD_TRACE_VERSION( |_NUM )")
@@ -77,7 +78,14 @@ endif ()
 add_library(dd_trace_cpp-objects OBJECT)
 add_library(dd_trace::obj ALIAS dd_trace_cpp-objects)
 
+file(GLOB_RECURSE public_header_files ${CMAKE_SOURCE_DIR}/include/*.h)
+
 target_sources(dd_trace_cpp-objects
+  PUBLIC
+    FILE_SET public_headers
+    TYPE HEADERS
+    BASE_DIRS include
+    FILES ${public_header_files}
   PRIVATE
     src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
@@ -86,7 +94,6 @@ target_sources(dd_trace_cpp-objects
     src/datadog/collector_response.cpp
     src/datadog/datadog_agent_config.cpp
     src/datadog/datadog_agent.cpp
-#     src/datadog/default_http_client_null.cpp use libcurl
     src/datadog/environment.cpp
     src/datadog/error.cpp
     src/datadog/extraction_util.cpp
@@ -102,6 +109,7 @@ target_sources(dd_trace_cpp-objects
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp
     src/datadog/rate.cpp
+    src/datadog/remote_config/product.cpp
     src/datadog/remote_config/remote_config.cpp
     src/datadog/runtime_id.cpp
     src/datadog/span.cpp
@@ -125,88 +133,14 @@ target_sources(dd_trace_cpp-objects
     src/datadog/w3c_propagation.cpp
 )
 
-# This library's public headers are just its source headers.
-target_sources(dd_trace_cpp-objects PUBLIC
-  FILE_SET public_headers
-  TYPE HEADERS
-  BASE_DIRS src/
-  FILES
-  src/datadog/base64.h
-  src/datadog/config.h
-  src/datadog/cerr_logger.h
-  src/datadog/clock.h
-  src/datadog/config_manager.h
-  src/datadog/collector.h
-  src/datadog/collector_response.h
-  # src/datadog/curl.h except for curl.h
-  src/datadog/datadog_agent_config.h
-  src/datadog/datadog_agent.h
-  src/datadog/default_http_client.h
-  src/datadog/dict_reader.h
-  src/datadog/dict_writer.h
-  src/datadog/environment.h
-  src/datadog/error.h
-  src/datadog/event_scheduler.h
-  src/datadog/expected.h
-  src/datadog/extracted_data.h
-  src/datadog/extraction_util.h
-  src/datadog/glob.h
-  src/datadog/hex.h
-  src/datadog/http_client.h
-  src/datadog/id_generator.h
-  src/datadog/injection_options.h
-  src/datadog/json_fwd.hpp
-  src/datadog/json.hpp
-  src/datadog/limiter.h
-  src/datadog/logger.h
-  src/datadog/metrics.h
-  src/datadog/msgpack.h
-  src/datadog/null_collector.h
-  src/datadog/optional.h
-  src/datadog/parse_util.h
-  src/datadog/platform_util.h
-  src/datadog/propagation_style.h
-  src/datadog/random.h
-  src/datadog/rate.h
-  src/datadog/remote_config/remote_config.h
-  src/datadog/remote_config/capability.h
-  src/datadog/remote_config/listener.h
-  src/datadog/runtime_id.h
-  src/datadog/sampling_decision.h
-  src/datadog/sampling_mechanism.h
-  src/datadog/sampling_priority.h
-  src/datadog/sampling_util.h
-  src/datadog/span_config.h
-  src/datadog/span_data.h
-  src/datadog/span_defaults.h
-  src/datadog/span.h
-  src/datadog/span_matcher.h
-  src/datadog/span_sampler_config.h
-  src/datadog/span_sampler.h
-  src/datadog/string_util.h
-  src/datadog/string_view.h
-  src/datadog/tag_propagation.h
-  src/datadog/tags.h
-  src/datadog/threaded_event_scheduler.h
-  src/datadog/tracer_config.h
-  src/datadog/tracer_signature.h
-  src/datadog/tracer_telemetry.h
-  src/datadog/tracer.h
-  src/datadog/trace_id.h
-  src/datadog/trace_sampler_config.h
-  src/datadog/trace_sampler.h
-  src/datadog/trace_segment.h
-  src/datadog/version.h
-  src/datadog/w3c_propagation.h
-)
-
 # Headers location are different depending of whether we are building 
 # or installing the library.
 target_include_directories(dd_trace_cpp-objects
   PUBLIC
-    $<INSTALL_INTERFACE:src/datadog>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/datadog>
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/datadog
 )
 
 target_link_libraries(dd_trace_cpp-objects
@@ -251,7 +185,6 @@ if (BUILD_SHARED_LIBS)
     FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    # For Windows
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 endif ()
@@ -289,7 +222,6 @@ if (BUILD_STATIC_LIBS)
     FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    # For Windows
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 endif ()

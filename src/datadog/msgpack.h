@@ -11,14 +11,13 @@
 //
 // [1]: https://msgpack.org/index.html
 
-#include <climits>
+#include <datadog/expected.h>
+#include <datadog/string_view.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <utility>
-
-#include "expected.h"
-#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

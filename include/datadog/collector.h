@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "expected.h"
-#include "optional.h"
 
 namespace datadog {
 namespace tracing {
