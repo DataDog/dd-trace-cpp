@@ -1109,6 +1109,131 @@ TEST_CASE("span extraction") {
     REQUIRE(span_tags.empty());
   }
 
+  SECTION("W3C Phase 3 support - Preferring tracecontext") {
+    // Tests behavior from system-test
+    // test_headers_tracecontext.py::test_tracestate_w3c_p_extract_datadog_w3c
+    struct TestCase {
+      int line;
+      std::string name;
+      std::string traceparent;
+      Optional<std::string> tracestate;
+      Optional<std::string> dd_trace_id;
+      Optional<std::string> dd_parent_id;
+      Optional<std::string> dd_tags;
+      Optional<std::uint64_t> expected_parent_id;
+      Optional<std::string> expected_datadog_w3c_parent_id = {};
+    };
+
+    auto test_case = GENERATE(values<TestCase>({
+        {
+            __LINE__, "identical trace info",
+            "00-11111111111111110000000000000001-000000003ade68b1-"
+            "01",                               // traceparent
+            "dd=s:2;p:000000003ade68b1,foo=1",  // tracestate
+            "1",                                // x-datadog-trace-id
+            "987654321",                        // x-datadog-parent-id
+            "_dd.p.tid=1111111111111111",       // x-datadog-tags
+            987654321,                          // expected_parent_id
+            nullopt,  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__, "trace ids do not match",
+            "00-11111111111111110000000000000002-000000003ade68b1-"
+            "01",                               // traceparent
+            "dd=s:2;p:000000000000000a,foo=1",  // tracestate
+            "2",                                // x-datadog-trace-id
+            "10",                               // x-datadog-parent-id
+            "_dd.p.tid=2222222222222222",       // x-datadog-tags
+            10,                                 // expected_parent_id
+            nullopt,  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__, "same trace, non-matching parent ids",
+            "00-11111111111111110000000000000003-000000003ade68b1-"
+            "01",                               // traceparent
+            "dd=s:2;p:000000000000000a,foo=1",  // tracestate
+            "3",                                // x-datadog-trace-id
+            "10",                               // x-datadog-parent-id
+            "_dd.p.tid=1111111111111111",       // x-datadog-tags
+            987654321,                          // expected_parent_id
+            "000000000000000a",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__, "non-matching span, missing p value",
+            "00-00000000000000000000000000000004-000000003ade68b1-"
+            "01",                // traceparent
+            "dd=s:2,foo=1",      // tracestate
+            "4",                 // x-datadog-trace-id
+            "10",                // x-datadog-parent-id
+            nullopt,             // x-datadog-tags
+            987654321,           // expected_parent_id
+            "000000000000000a",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__, "non-matching span, non-matching p value",
+            "00-00000000000000000000000000000005-000000003ade68b1-"
+            "01",                               // traceparent
+            "dd=s:2;p:8fffffffffffffff,foo=1",  // tracestate
+            "5",                                // x-datadog-trace-id
+            "10",                               // x-datadog-parent-id
+            nullopt,                            // x-datadog-tags
+            987654321,                          // expected_parent_id
+            "8fffffffffffffff",  // expected_datadog_w3c_parent_id,
+        },
+    }));
+
+    CAPTURE(test_case.name);
+    CAPTURE(test_case.line);
+    CAPTURE(test_case.traceparent);
+    CAPTURE(test_case.tracestate);
+    CAPTURE(test_case.dd_trace_id);
+    CAPTURE(test_case.dd_parent_id);
+    CAPTURE(test_case.dd_tags);
+
+    const auto collector = std::make_shared<MockCollector>();
+    const auto logger = std::make_shared<MockLogger>();
+
+    TracerConfig config;
+    config.collector = collector;
+    config.logger = logger;
+    config.service = "service1";
+    config.delegate_trace_sampling = false;
+    std::vector<PropagationStyle> extraction_styles{
+        PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C};
+    config.extraction_styles = extraction_styles;
+
+    auto valid_config = finalize_config(config);
+    REQUIRE(valid_config);
+    Tracer tracer{*valid_config};
+
+    std::unordered_map<std::string, std::string> headers;
+    headers["traceparent"] = test_case.traceparent;
+    if (test_case.tracestate) {
+      headers["tracestate"] = *test_case.tracestate;
+    }
+    if (test_case.dd_trace_id) {
+      headers["x-datadog-trace-id"] = *test_case.dd_trace_id;
+    }
+    if (test_case.dd_parent_id) {
+      headers["x-datadog-parent-id"] = *test_case.dd_parent_id;
+    }
+    if (test_case.dd_tags) {
+      headers["x-datadog-tags"] = *test_case.dd_tags;
+    }
+    MockDictReader reader{headers};
+
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+
+    REQUIRE(span->parent_id() == test_case.expected_parent_id);
+    REQUIRE(span->lookup_tag(tags::internal::w3c_parent_id) ==
+            test_case.expected_datadog_w3c_parent_id);
+  }
+
   SECTION("_dd.parent_id") {
     auto finalized_config = finalize_config(config);
     REQUIRE(finalized_config);
