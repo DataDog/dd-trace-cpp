@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "extracted_data.h"
+#include "hex.h"
 #include "logger.h"
 #include "parse_util.h"
 #include "string_util.h"
@@ -287,14 +288,32 @@ ExtractedData merge(const std::vector<ExtractedData>& contexts) {
                data.trace_id == found->trace_id;
       });
 
+  const auto dd = std::find_if(
+      contexts.begin(), contexts.end(), [&](const ExtractedData& data) {
+        return data.style == PropagationStyle::DATADOG &&
+               data.trace_id == found->trace_id;
+      });
+
   if (other != contexts.end()) {
-    result.datadog_w3c_parent_id = other->datadog_w3c_parent_id;
     result.additional_w3c_tracestate = other->additional_w3c_tracestate;
     result.additional_datadog_w3c_tracestate =
         other->additional_datadog_w3c_tracestate;
     result.headers_examined.insert(result.headers_examined.end(),
                                    other->headers_examined.begin(),
                                    other->headers_examined.end());
+
+    if (result.parent_id != other->parent_id) {
+      if (other->datadog_w3c_parent_id &&
+          other->datadog_w3c_parent_id != "0000000000000000") {
+        result.datadog_w3c_parent_id = other->datadog_w3c_parent_id;
+      } else if (dd != contexts.end() && dd->parent_id.has_value()) {
+        result.datadog_w3c_parent_id = hex_padded(dd->parent_id.value());
+        // TODO: Do we add the result.headers_examined for all of the dd ones?
+        // Or just the x-datadog-parent-id?
+      }
+
+      result.parent_id = other->parent_id;
+    }
   }
 
   return result;
