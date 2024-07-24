@@ -633,13 +633,13 @@ TEST_CASE("injecting W3C traceparent header") {
       int sampling_priority;
       std::string expected_flags;
     };
-    const auto& [sampling_priority, expected_flags] = GENERATE(
+    auto test_case = GENERATE(
         values<TestCase>({{-1, "00"}, {0, "00"}, {1, "01"}, {2, "01"}}));
 
-    CAPTURE(sampling_priority);
-    CAPTURE(expected_flags);
+    CAPTURE(test_case.sampling_priority);
+    CAPTURE(test_case.expected_flags);
 
-    span.trace_segment().override_sampling_priority(sampling_priority);
+    span.trace_segment().override_sampling_priority(test_case.sampling_priority);
 
     MockDictWriter writer;
     span.inject(writer);
@@ -649,7 +649,7 @@ TEST_CASE("injecting W3C traceparent header") {
     // The "cafebabe"s come from `expected_id`.
     const std::string expected =
         "00-000000000000000000000000cafebabe-00000000cafebabe-" +
-        expected_flags;
+        test_case.expected_flags;
     REQUIRE(found->second == expected);
   }
 }

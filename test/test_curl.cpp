@@ -359,7 +359,7 @@ TEST_CASE("setopt failures", "[curl]") {
 #define CASE(OPTION) \
   { OPTION, #OPTION }
 
-  const auto &[which_fails, name] = GENERATE(
+  auto test_case = GENERATE(
       values<TestCase>({CASE(CURLOPT_ERRORBUFFER), CASE(CURLOPT_HEADERDATA),
                         CASE(CURLOPT_HEADERFUNCTION), CASE(CURLOPT_HTTPHEADER),
                         CASE(CURLOPT_POST), CASE(CURLOPT_POSTFIELDS),
@@ -369,9 +369,9 @@ TEST_CASE("setopt failures", "[curl]") {
 
 #undef CASE
 
-  CAPTURE(name);
+  CAPTURE(test_case.name);
   MockCurlLibrary library;
-  library.fail = which_fails;
+  library.fail = test_case.which_fails;
 
   const auto clock = default_clock;
   const auto logger = std::make_shared<NullLogger>();
@@ -379,7 +379,7 @@ TEST_CASE("setopt failures", "[curl]") {
 
   const auto ignore = [](auto &&...) {};
   HTTPClient::URL url;
-  if (which_fails == CURLOPT_UNIX_SOCKET_PATH) {
+  if (test_case.which_fails == CURLOPT_UNIX_SOCKET_PATH) {
     url.scheme = "unix";
     url.path = "/foo/bar.sock";
   } else {
