@@ -150,7 +150,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   AuditedReader audited_reader{reader};
 
   auto span_data = std::make_unique<SpanData>();
-  std::vector<ExtractedData> extracted_contexts;
+  Optional<PropagationStyle> first_style_with_trace_id;
+  Optional<PropagationStyle> first_style_with_parent_id;
+  std::unordered_map<PropagationStyle,ExtractedData> extracted_contexts;
 
   for (const auto style : extraction_styles_) {
     using Extractor = decltype(&extract_datadog);  // function pointer
@@ -175,11 +177,34 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       return error->with_prefix(
           extraction_error_prefix(style, audited_reader.entries_found));
     }
-    extracted_contexts.push_back(std::move(*data));
-    extracted_contexts.back().headers_examined = audited_reader.entries_found;
+
+    if (!first_style_with_trace_id && (*data).trace_id.has_value()) {
+      first_style_with_trace_id = style;
+    }
+
+    if (!first_style_with_parent_id && (*data).parent_id.has_value()) {
+      first_style_with_parent_id = style;
+    }
+
+    (*data).headers_examined = audited_reader.entries_found;
+    extracted_contexts.emplace(style, std::move(*data));
   }
 
-  auto merged_context = merge(extracted_contexts);
+  ExtractedData merged_context;
+  if (!first_style_with_trace_id) {
+    // Nothing extracted a trace ID. Return the first context that includes a
+    // parent ID, if any, or otherwise just return an empty `ExtractedData`.
+    // The purpose of looking for a parent ID is to allow for the error
+    // "extracted a parent ID without a trace ID," if that's what happened.
+    if (first_style_with_parent_id) {
+      auto other = extracted_contexts.find(*first_style_with_parent_id);
+      assert(other != extracted_contexts.end());
+      merged_context = other->second;
+    }
+  }
+  else {
+    merged_context = merge(*first_style_with_trace_id, extracted_contexts);
+  }
 
   // Some information might be missing.
   // Here are the combinations considered:

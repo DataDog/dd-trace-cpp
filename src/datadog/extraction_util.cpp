@@ -251,68 +251,44 @@ void AuditedReader::visit(
   });
 }
 
-ExtractedData merge(const std::vector<ExtractedData>& contexts) {
+ExtractedData merge(const PropagationStyle first_style,
+  const std::unordered_map<PropagationStyle, ExtractedData>& contexts) {
   ExtractedData result;
-
-  const auto found = std::find_if(
-      contexts.begin(), contexts.end(),
-      [](const ExtractedData& data) { return data.trace_id.has_value(); });
-
-  if (found == contexts.end()) {
-    // Nothing extracted a trace ID. Return the first context that includes a
-    // parent ID, if any, or otherwise just return an empty `ExtractedData`.
-    // The purpose of looking for a parent ID is to allow for the error
-    // "extracted a parent ID without a trace ID," if that's what happened.
-    const auto other = std::find_if(
-        contexts.begin(), contexts.end(),
-        [](const ExtractedData& data) { return data.parent_id.has_value(); });
-    if (other != contexts.end()) {
-      result = *other;
-    }
-    return result;
-  }
 
   // `found` refers to the first extracted context that yielded a trace ID.
   // This will be our main context.
   //
-  // If the style of `found` is not W3C, then examine the remaining contexts
-  // for W3C-style tracestate that we might want to include in `result`.
-  result = *found;
-  if (result.style == PropagationStyle::W3C) {
+  // If the W3C style is present and its trace-id matches, we'll update the main context
+  // with tracestate information that we want to include in `result`.
+  // We may also need to use Datadog header information (only when the trace-id matches).
+  const auto found = contexts.find(first_style);
+  if (found == contexts.end()) {
     return result;
   }
+  result = found->second;
 
-  const auto other =
-      std::find_if(found + 1, contexts.end(), [&](const ExtractedData& data) {
-        return data.style == PropagationStyle::W3C &&
-               data.trace_id == found->trace_id;
-      });
+  const auto w3c = contexts.find(PropagationStyle::W3C);
+  const auto dd = contexts.find(PropagationStyle::DATADOG);
 
-  const auto dd = std::find_if(
-      contexts.begin(), contexts.end(), [&](const ExtractedData& data) {
-        return data.style == PropagationStyle::DATADOG &&
-               data.trace_id == found->trace_id;
-      });
-
-  if (other != contexts.end()) {
-    result.additional_w3c_tracestate = other->additional_w3c_tracestate;
+  if (w3c != contexts.end() && w3c->second.trace_id == result.trace_id) {
+    result.additional_w3c_tracestate = w3c->second.additional_w3c_tracestate;
     result.additional_datadog_w3c_tracestate =
-        other->additional_datadog_w3c_tracestate;
+        w3c->second.additional_datadog_w3c_tracestate;
     result.headers_examined.insert(result.headers_examined.end(),
-                                   other->headers_examined.begin(),
-                                   other->headers_examined.end());
+                                   w3c->second.headers_examined.begin(),
+                                   w3c->second.headers_examined.end());
 
-    if (result.parent_id != other->parent_id) {
-      if (other->datadog_w3c_parent_id &&
-          other->datadog_w3c_parent_id != "0000000000000000") {
-        result.datadog_w3c_parent_id = other->datadog_w3c_parent_id;
-      } else if (dd != contexts.end() && dd->parent_id.has_value()) {
-        result.datadog_w3c_parent_id = hex_padded(dd->parent_id.value());
+    if (result.parent_id != w3c->second.parent_id) {
+      if (w3c->second.datadog_w3c_parent_id &&
+          w3c->second.datadog_w3c_parent_id != "0000000000000000") {
+        result.datadog_w3c_parent_id = w3c->second.datadog_w3c_parent_id;
+      } else if (dd != contexts.end() && dd->second.trace_id == result.trace_id && dd->second.parent_id.has_value()) {
+        result.datadog_w3c_parent_id = hex_padded(dd->second.parent_id.value());
         // TODO: Do we add the result.headers_examined for all of the dd ones?
         // Or just the x-datadog-parent-id?
       }
 
-      result.parent_id = other->parent_id;
+      result.parent_id = w3c->second.parent_id;
     }
   }
 
