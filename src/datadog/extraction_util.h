@@ -70,9 +70,11 @@ struct AuditedReader : public DictReader {
 // particular propagation style, into one `ExtractedData` that includes fields
 // from compatible elements of `contexts`, and return the resulting
 // `ExtractedData`. The `first_style` specifies the first configured extraction
-// propagation style that has been extracted and the other contexts will be merged
-// with it, so long as the trace-ids match.
-ExtractedData merge(const PropagationStyle first_style, const std::unordered_map<PropagationStyle,ExtractedData>& contexts);
+// propagation style that has been extracted and the other contexts will be
+// merged with it, so long as the trace-ids match.
+ExtractedData merge(
+    const PropagationStyle first_style,
+    const std::unordered_map<PropagationStyle, ExtractedData>& contexts);
 
 }  // namespace tracing
 }  // namespace datadog

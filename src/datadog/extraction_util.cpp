@@ -251,20 +251,22 @@ void AuditedReader::visit(
   });
 }
 
-ExtractedData merge(const PropagationStyle first_style,
-  const std::unordered_map<PropagationStyle, ExtractedData>& contexts) {
+ExtractedData merge(
+    const PropagationStyle first_style,
+    const std::unordered_map<PropagationStyle, ExtractedData>& contexts) {
   ExtractedData result;
-
-  // `found` refers to the first extracted context that yielded a trace ID.
-  // This will be our main context.
-  //
-  // If the W3C style is present and its trace-id matches, we'll update the main context
-  // with tracestate information that we want to include in `result`.
-  // We may also need to use Datadog header information (only when the trace-id matches).
   const auto found = contexts.find(first_style);
   if (found == contexts.end()) {
     return result;
   }
+
+  // `found` refers to the first extracted context that yielded a trace ID.
+  // This will be our main context.
+  //
+  // If the W3C style is present and its trace-id matches, we'll update the main
+  // context with tracestate information that we want to include in `result`. We
+  // may also need to use Datadog header information (only when the trace-id
+  // matches).
   result = found->second;
 
   const auto w3c = contexts.find(PropagationStyle::W3C);
@@ -282,7 +284,9 @@ ExtractedData merge(const PropagationStyle first_style,
       if (w3c->second.datadog_w3c_parent_id &&
           w3c->second.datadog_w3c_parent_id != "0000000000000000") {
         result.datadog_w3c_parent_id = w3c->second.datadog_w3c_parent_id;
-      } else if (dd != contexts.end() && dd->second.trace_id == result.trace_id && dd->second.parent_id.has_value()) {
+      } else if (dd != contexts.end() &&
+                 dd->second.trace_id == result.trace_id &&
+                 dd->second.parent_id.has_value()) {
         result.datadog_w3c_parent_id = hex_padded(dd->second.parent_id.value());
         // TODO: Do we add the result.headers_examined for all of the dd ones?
         // Or just the x-datadog-parent-id?

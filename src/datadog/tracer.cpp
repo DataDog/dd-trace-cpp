@@ -152,7 +152,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   auto span_data = std::make_unique<SpanData>();
   Optional<PropagationStyle> first_style_with_trace_id;
   Optional<PropagationStyle> first_style_with_parent_id;
-  std::unordered_map<PropagationStyle,ExtractedData> extracted_contexts;
+  std::unordered_map<PropagationStyle, ExtractedData> extracted_contexts;
 
   for (const auto style : extraction_styles_) {
     using Extractor = decltype(&extract_datadog);  // function pointer
@@ -201,8 +201,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       assert(other != extracted_contexts.end());
       merged_context = other->second;
     }
-  }
-  else {
+  } else {
     merged_context = merge(*first_style_with_trace_id, extracted_contexts);
   }
 

@@ -639,7 +639,8 @@ TEST_CASE("injecting W3C traceparent header") {
     CAPTURE(test_case.sampling_priority);
     CAPTURE(test_case.expected_flags);
 
-    span.trace_segment().override_sampling_priority(test_case.sampling_priority);
+    span.trace_segment().override_sampling_priority(
+        test_case.sampling_priority);
 
     MockDictWriter writer;
     span.inject(writer);
