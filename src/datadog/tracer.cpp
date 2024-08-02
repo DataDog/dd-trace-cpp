@@ -178,15 +178,15 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
           extraction_error_prefix(style, audited_reader.entries_found));
     }
 
-    if (!first_style_with_trace_id && (*data).trace_id.has_value()) {
+    if (!first_style_with_trace_id && data->trace_id.has_value()) {
       first_style_with_trace_id = style;
     }
 
-    if (!first_style_with_parent_id && (*data).parent_id.has_value()) {
+    if (!first_style_with_parent_id && data->parent_id.has_value()) {
       first_style_with_parent_id = style;
     }
 
-    (*data).headers_examined = audited_reader.entries_found;
+    data->headers_examined = audited_reader.entries_found;
     extracted_contexts.emplace(style, std::move(*data));
   }
 
