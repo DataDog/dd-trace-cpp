@@ -288,8 +288,6 @@ ExtractedData merge(
                  dd->second.trace_id == result.trace_id &&
                  dd->second.parent_id.has_value()) {
         result.datadog_w3c_parent_id = hex_padded(dd->second.parent_id.value());
-        // TODO: Do we add the result.headers_examined for all of the dd ones?
-        // Or just the x-datadog-parent-id?
       }
 
       result.parent_id = w3c->second.parent_id;
