@@ -60,6 +60,9 @@ class Logger {
 
   virtual void log_error(const Error&);
   virtual void log_error(StringView);
+
+  virtual void log_debug(const LogFunc&);
+  virtual void log_debug(StringView);
 };
 
 }  // namespace tracing
