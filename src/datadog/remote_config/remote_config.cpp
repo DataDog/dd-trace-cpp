@@ -30,9 +30,14 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
   return res;
 }
 
-Optional<product::Flag> parse_config_path(StringView config_path) {
+struct ConfigKeyData {
+  product::Flag product;
+  StringView config_id;
+};
+
+Optional<ConfigKeyData> parse_config_path(StringView config_path) {
   static const std::regex path_reg(
-      "^(datadog/\\d+|employee)/([^/]+)/[^/]+/[^/]+$");
+      "^(datadog/\\d+|employee)/([^/]+)/([^/]+)/[^/]+$");
 
   std::cmatch match;
   if (!std::regex_match(config_path.data(),
@@ -42,12 +47,14 @@ Optional<product::Flag> parse_config_path(StringView config_path) {
   }
 
   assert(match.ready());
-  assert(match.size() == 3);
+  assert(match.size() == 4);
 
   StringView product_sv(config_path.data() + match.position(2),
                         std::size_t(match.length(2)));
+  StringView config_id_sv{config_path.data() + match.position(3),
+                          static_cast<std::size_t>(match.length(3))};
 
-  return parse_product(product_sv);
+  return {{parse_product(product_sv), config_id_sv}};
 }
 
 }  // namespace
@@ -199,14 +206,16 @@ void Manager::process_response(const nlohmann::json& json) {
       auto config_path = client_config.get<StringView>();
       visited_config.emplace(config_path);
 
-      const auto product = parse_config_path(config_path);
-      if (!product) {
+      const auto config_key_data = parse_config_path(config_path);
+      if (!config_key_data) {
         std::string reason{config_path};
         reason += " is an invalid configuration path";
 
         error(reason);
         return;
       }
+
+      const auto product = config_key_data->product;
 
       const auto& config_metadata =
           targets.at("/signed/targets"_json_pointer).at(config_path);
@@ -231,41 +240,48 @@ void Manager::process_response(const nlohmann::json& json) {
         return;
       }
 
-      auto decoded_config =
-          base64_decode(target_it.value().at("raw").get<StringView>());
-
-      const auto config_json = nlohmann::json::parse(decoded_config);
+      auto raw_data = target_it->at("raw").get<StringView>();
+      auto decoded_config = base64_decode(raw_data);
 
       Configuration new_config;
-      new_config.id = config_json.at("id");
+      auto&& config_id = config_key_data->config_id;
+      new_config.id = std::string{config_id.data(), config_id.size()};
       new_config.path = std::string{config_path};
       new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
       new_config.content = std::move(decoded_config);
-      new_config.version = config_json.at("revision");
-      new_config.product = *product;
+      new_config.version = config_metadata.at("/custom/v"_json_pointer);
+      new_config.product = product;
 
-      const auto& targeted_service = config_json.at("service_target");
-      if (targeted_service.at("service").get<StringView>() !=
-              tracer_signature_.default_service ||
-          targeted_service.at("env").get<StringView>() !=
-              tracer_signature_.default_environment) {
-        new_config.state = Configuration::State::error;
-        new_config.error_message = "Wrong service targeted";
-      } else {
-        for (const auto& listener : listeners_per_product_[*product]) {
-          // Q: Two listeners on the same product. What should be the behaviour
-          // if one of the listeners report an error?
-          // R(@dmehala): Unspecified. For now, the config is marked with an
-          // error.
-          if (auto error_msg = listener->on_update(new_config)) {
-            new_config.state = Configuration::State::error;
-            new_config.error_message = std::move(*error_msg);
-          } else {
-            new_config.state = Configuration::State::acknowledged;
-          }
+      // TODO: should be moved to the listener
+      if (product == product::Flag::APM_TRACING) {
+        const auto config_json = nlohmann::json::parse(new_config.content);
+        new_config.version = config_json.at("revision");
+
+        const auto& targeted_service = config_json.at("service_target");
+        if (targeted_service.at("service").get<StringView>() !=
+                tracer_signature_.default_service ||
+            targeted_service.at("env").get<StringView>() !=
+                tracer_signature_.default_environment) {
+          new_config.state = Configuration::State::error;
+          new_config.error_message = "Wrong service targeted";
+          goto skip_listeners;
         }
       }
 
+      for (const auto& listener : listeners_per_product_[product]) {
+        // Q: Two listeners on the same product. What should be the behaviour
+        // if one of the listeners report an error?
+        // R(@dmehala): Unspecified. For now, the config is marked with an
+        // error.
+        if (auto error_msg = listener->on_update(new_config)) {
+          new_config.state = Configuration::State::error;
+          new_config.error_message = std::move(*error_msg);
+        } else {
+          new_config.state = Configuration::State::acknowledged;
+        }
+      }
+
+    skip_listeners:
       applied_config_[std::string{config_path}] = new_config;
     }
 
