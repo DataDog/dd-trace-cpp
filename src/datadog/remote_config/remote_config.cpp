@@ -10,6 +10,7 @@
 #include "../string_view.h"
 #include "capability.h"
 #include "listener.h"
+#include "product.h"
 
 using namespace datadog::tracing;
 using namespace nlohmann::literals;
@@ -205,6 +206,9 @@ void Manager::process_response(const nlohmann::json& json) {
 
         error(reason);
         return;
+      }
+      if (product != product::Flag::APM_TRACING) {
+        continue;
       }
 
       const auto& config_metadata =
