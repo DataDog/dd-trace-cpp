@@ -4,12 +4,13 @@
 #include <regex>
 #include <unordered_set>
 
-#include "base64.h"
-#include "json.hpp"
-#include "random.h"
-#include "remote_config/capability.h"
-#include "remote_config/listener.h"
-#include "string_view.h"
+#include "../base64.h"
+#include "../json.hpp"
+#include "../random.h"
+#include "../string_view.h"
+#include "capability.h"
+#include "listener.h"
+#include "product.h"
 
 using namespace datadog::tracing;
 using namespace nlohmann::literals;
@@ -205,6 +206,9 @@ void Manager::process_response(const nlohmann::json& json) {
 
         error(reason);
         return;
+      }
+      if (product != product::Flag::APM_TRACING) {
+        continue;
       }
 
       const auto& config_metadata =

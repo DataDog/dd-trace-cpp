@@ -2,8 +2,8 @@
 
 #include <string>
 
+#include "../optional.h"
 #include "capability.h"
-#include "optional.h"
 #include "product.h"
 
 namespace datadog {
