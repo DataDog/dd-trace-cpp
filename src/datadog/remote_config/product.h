@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <string>
 
-#include "string_util.h"
-#include "string_view.h"
+#include "../string_util.h"
+#include "../string_view.h"
 
 namespace datadog {
 namespace remote_config {

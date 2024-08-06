@@ -207,7 +207,6 @@ target_include_directories(dd_trace_cpp-objects
   PUBLIC
     $<INSTALL_INTERFACE:src/datadog>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/datadog>
 )
 
 target_link_libraries(dd_trace_cpp-objects

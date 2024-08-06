@@ -18,13 +18,13 @@
 #include <set>
 #include <string>
 
-#include "logger.h"
-#include "optional.h"
-#include "remote_config/listener.h"
-#include "runtime_id.h"
-#include "string_view.h"
-#include "trace_sampler_config.h"
-#include "tracer_signature.h"
+#include "../logger.h"
+#include "../optional.h"
+#include "../runtime_id.h"
+#include "../string_view.h"
+#include "../trace_sampler_config.h"
+#include "../tracer_signature.h"
+#include "listener.h"
 
 namespace datadog {
 namespace remote_config {

@@ -4,12 +4,12 @@
 #include <regex>
 #include <unordered_set>
 
-#include "base64.h"
-#include "json.hpp"
-#include "random.h"
-#include "remote_config/capability.h"
-#include "remote_config/listener.h"
-#include "string_view.h"
+#include "../base64.h"
+#include "../json.hpp"
+#include "../random.h"
+#include "../string_view.h"
+#include "capability.h"
+#include "listener.h"
 
 using namespace datadog::tracing;
 using namespace nlohmann::literals;
