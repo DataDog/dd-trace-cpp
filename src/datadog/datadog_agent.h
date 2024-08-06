@@ -82,7 +82,7 @@ class DatadogAgent : public Collector {
 
   void get_and_apply_remote_configuration_updates();
 
-  nlohmann::json config_json() const override;
+  std::string config() const override;
 };
 
 }  // namespace tracing

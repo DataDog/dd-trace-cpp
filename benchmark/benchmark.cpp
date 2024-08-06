@@ -33,8 +33,8 @@ struct SerializingCollector : public dd::Collector {
     return dd::msgpack_encode(buffer, spans);
   }
 
-  nlohmann::json config_json() const override {
-    return nlohmann::json::object({{"type", "SerializingCollector"}});
+  std::string config() const override {
+    return nlohmann::json::object({{"type", "SerializingCollector"}}).dump();
   }
 };
 

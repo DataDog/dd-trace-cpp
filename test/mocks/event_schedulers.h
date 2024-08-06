@@ -21,7 +21,7 @@ struct MockEventScheduler : public EventScheduler {
     return [this]() { cancelled = true; };
   }
 
-  nlohmann::json config_json() const override {
-    return nlohmann::json::object({{"type", "MockEventScheduler"}});
+  std::string config() const override {
+    return nlohmann::json::object({{"type", "MockEventScheduler"}}).dump();
   }
 };
