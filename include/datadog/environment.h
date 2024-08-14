@@ -17,7 +17,7 @@
 #include <datadog/optional.h>
 #include <datadog/string_view.h>
 
-#include "json.hpp"
+#include "json_fwd.hpp"
 
 namespace datadog {
 namespace tracing {

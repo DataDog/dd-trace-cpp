@@ -1,4 +1,5 @@
 #include <datadog/dict_reader.h>
+#include <datadog/environment.h>
 #include <datadog/id_generator.h>
 #include <datadog/logger.h>
 #include <datadog/runtime_id.h>
@@ -14,7 +15,6 @@
 
 #include "config_manager.h"
 #include "datadog_agent.h"
-#include "environment.h"
 #include "extracted_data.h"
 #include "extraction_util.h"
 #include "hex.h"

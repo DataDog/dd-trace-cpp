@@ -1,3 +1,4 @@
+#include <datadog/environment.h>
 #include <datadog/string_view.h>
 #include <datadog/tracer_config.h>
 
@@ -12,7 +13,6 @@
 
 #include "cerr_logger.h"
 #include "datadog_agent.h"
-#include "environment.h"
 #include "json.hpp"
 #include "parse_util.h"
 #include "string_util.h"

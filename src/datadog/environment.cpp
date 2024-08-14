@@ -1,6 +1,8 @@
-#include "environment.h"
+#include <datadog/environment.h>
 
 #include <cstdlib>
+
+#include "json.hpp"
 
 namespace datadog {
 namespace tracing {
