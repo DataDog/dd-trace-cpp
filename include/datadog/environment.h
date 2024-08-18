@@ -17,8 +17,6 @@
 #include <datadog/optional.h>
 #include <datadog/string_view.h>
 
-#include "json_fwd.hpp"
-
 namespace datadog {
 namespace tracing {
 namespace environment {
@@ -80,7 +78,7 @@ StringView name(Variable variable);
 // `nullopt` if that variable is not set in the environment.
 Optional<StringView> lookup(Variable variable);
 
-nlohmann::json to_json();
+std::string to_json();
 
 }  // namespace environment
 }  // namespace tracing

@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "json.hpp"
+#include "json_serializer.h"
 #include "parse_util.h"
 #include "string_util.h"
 
@@ -47,7 +48,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
         "service", "name", "resource", "tags", "sample_rate"};
 
     for (const auto &json_rule : json_rules) {
-      auto matcher = SpanMatcher::from_json(json_rule);
+      auto matcher = from_json(json_rule);
       if (auto *error = matcher.if_error()) {
         std::string prefix;
         prefix += "Unable to create a rule from ";
@@ -134,7 +135,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
 std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
   nlohmann::json res;
   for (const auto &r : rules) {
-    auto j = r.to_json();
+    auto j = nlohmann::json(static_cast<SpanMatcher>(r));
     j["sample_rate"] = r.sample_rate;
     res.emplace_back(std::move(j));
   }
@@ -143,12 +144,6 @@ std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
 }
 
 }  // namespace
-
-nlohmann::json TraceSamplerRule::to_json() const {
-  auto j = matcher.to_json();
-  j["sample_rate"] = rate.value();
-  return j;
-}
 
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
@@ -182,7 +177,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       prefix +=
           "Unable to parse sample_rate in trace sampling rule with root span "
           "pattern ";
-      prefix += rule.to_json().dump();
+      prefix += nlohmann::json(rule).dump();
       prefix += ": ";
       return error->with_prefix(prefix);
     }

@@ -97,7 +97,7 @@ std::string Tracer::config() const {
     {"injection_styles", injection_styles_},
     {"extraction_styles", extraction_styles_},
     {"tags_header_size", tags_header_max_size_},
-    {"environment_variables", environment::to_json()},
+    {"environment_variables", nlohmann::json::parse(environment::to_json())},
   });
   // clang-format on
 

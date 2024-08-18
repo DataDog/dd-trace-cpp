@@ -13,7 +13,6 @@
 #include <unordered_map>
 
 #include "expected.h"
-#include "json_fwd.hpp"
 
 namespace datadog {
 namespace tracing {
@@ -29,9 +28,6 @@ struct SpanMatcher {
   std::unordered_map<std::string, std::string> tags;
 
   bool match(const SpanData&) const;
-  nlohmann::json to_json() const;
-
-  static Expected<SpanMatcher> from_json(const nlohmann::json&);
 
   bool operator==(const SpanMatcher& other) const {
     return (service == other.service && name == other.name &&

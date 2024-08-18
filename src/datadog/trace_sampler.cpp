@@ -9,11 +9,21 @@
 #include <limits>
 
 #include "collector_response.h"
+#include "json_serializer.h"
 #include "sampling_util.h"
 #include "span_data.h"
 
 namespace datadog {
 namespace tracing {
+namespace {
+
+nlohmann::json to_json(const TraceSamplerRule& rule) {
+  nlohmann::json j = rule.matcher;
+  j["sample_rate"] = rule.rate.value();
+  return j;
+}
+
+}  // namespace
 
 TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config,
                            const Clock& clock)
@@ -105,7 +115,7 @@ void TraceSampler::handle_collector_response(
 nlohmann::json TraceSampler::config_json() const {
   std::vector<nlohmann::json> rules;
   for (const auto& rule : rules_) {
-    rules.push_back(rule.to_json());
+    rules.push_back(to_json(rule));
   }
 
   return nlohmann::json::object({

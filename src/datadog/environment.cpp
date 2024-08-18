@@ -19,7 +19,7 @@ Optional<StringView> lookup(Variable variable) {
   return StringView{value};
 }
 
-nlohmann::json to_json() {
+std::string to_json() {
   auto result = nlohmann::json::object({});
 
   for (const char *name : variable_names) {
@@ -28,7 +28,7 @@ nlohmann::json to_json() {
     }
   }
 
-  return result;
+  return result.dump();
 }
 
 }  // namespace environment

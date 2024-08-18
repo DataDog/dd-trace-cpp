@@ -1,5 +1,6 @@
 #include "config_manager.h"
 
+#include "json_serializer.h"
 #include "parse_util.h"
 #include "string_util.h"
 #include "trace_sampler.h"
@@ -7,6 +8,20 @@
 namespace datadog {
 namespace tracing {
 namespace {
+
+nlohmann::json to_json(const SpanDefaults& defaults) {
+  auto result = nlohmann::json::object({});
+#define TO_JSON(FIELD) \
+  if (!defaults.FIELD.empty()) result[#FIELD] = defaults.FIELD
+  TO_JSON(service);
+  TO_JSON(service_type);
+  TO_JSON(environment);
+  TO_JSON(version);
+  TO_JSON(name);
+  TO_JSON(tags);
+#undef TO_JSON
+  return result;
+}
 
 using Rules = std::vector<TraceSamplerRule>;
 
@@ -20,7 +35,7 @@ Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
   }
 
   for (const auto& json_rule : json_rules) {
-    auto matcher = SpanMatcher::from_json(json_rule);
+    auto matcher = from_json(json_rule);
     if (auto* error = matcher.if_error()) {
       std::string prefix;
       return error->with_prefix(prefix);
