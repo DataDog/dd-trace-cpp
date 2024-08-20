@@ -1,7 +1,6 @@
-#include "error.h"
+#include <datadog/error.h>
 
 #include <ostream>
-#include <sstream>
 
 namespace datadog {
 namespace tracing {

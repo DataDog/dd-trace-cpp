@@ -1,5 +1,7 @@
 #include "extraction_util.h"
 
+#include <datadog/logger.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <sstream>
@@ -8,7 +10,6 @@
 
 #include "extracted_data.h"
 #include "hex.h"
-#include "logger.h"
 #include "parse_util.h"
 #include "string_util.h"
 #include "tag_propagation.h"

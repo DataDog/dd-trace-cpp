@@ -1,6 +1,5 @@
-#include "logger.h"
-
-#include "error.h"
+#include <datadog/error.h>
+#include <datadog/logger.h>
 
 namespace datadog {
 namespace tracing {

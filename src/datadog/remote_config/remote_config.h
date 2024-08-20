@@ -12,19 +12,19 @@
 // It interacts with the `ConfigManager` to seamlessly apply or revert
 // configurations based on responses received from the remote source.
 
+#include <datadog/logger.h>
+#include <datadog/optional.h>
+#include <datadog/remote_config/listener.h>
+#include <datadog/runtime_id.h>
+#include <datadog/string_view.h>
+#include <datadog/trace_sampler_config.h>
+#include <datadog/tracer_signature.h>
+
 #include <array>
 #include <cstdint>
 #include <memory>
 #include <set>
 #include <string>
-
-#include "logger.h"
-#include "optional.h"
-#include "remote_config/listener.h"
-#include "runtime_id.h"
-#include "string_view.h"
-#include "trace_sampler_config.h"
-#include "tracer_signature.h"
 
 namespace datadog {
 namespace remote_config {

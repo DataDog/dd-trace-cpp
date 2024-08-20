@@ -1,4 +1,4 @@
-#include "rate.h"
+#include <datadog/rate.h>
 
 #include <string>
 

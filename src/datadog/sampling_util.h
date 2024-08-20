@@ -3,10 +3,10 @@
 // This component provides sampling-related miscellanea.  It's used by both
 // `TraceSampler` and `SpanSampler`.
 
+#include <datadog/rate.h>
+
 #include <cstdint>
 #include <limits>
-
-#include "rate.h"
 
 namespace datadog {
 namespace tracing {

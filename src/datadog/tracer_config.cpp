@@ -1,4 +1,6 @@
-#include "tracer_config.h"
+#include <datadog/environment.h>
+#include <datadog/string_view.h>
+#include <datadog/tracer_config.h>
 
 #include <algorithm>
 #include <cassert>
@@ -11,11 +13,9 @@
 
 #include "cerr_logger.h"
 #include "datadog_agent.h"
-#include "environment.h"
 #include "json.hpp"
 #include "parse_util.h"
 #include "string_util.h"
-#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -36,7 +36,7 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
 
     std::string message;
     message += "The propagation style ";
-    message += to_json(styles.back()).dump();
+    message += std::string(to_string_view(styles.back()));
     message += " is duplicated in: ";
     append(message, input);
     return Error{Error::DUPLICATE_PROPAGATION_STYLE, std::move(message)};

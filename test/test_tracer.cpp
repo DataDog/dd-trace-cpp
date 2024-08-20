@@ -2040,8 +2040,8 @@ TEST_CASE("heterogeneous extraction") {
 
   CAPTURE(test_case.line);
   CAPTURE(test_case.description);
-  CAPTURE(to_json(test_case.extraction_styles));
-  CAPTURE(to_json(test_case.injection_styles));
+  CAPTURE(test_case.extraction_styles);
+  CAPTURE(test_case.injection_styles);
   CAPTURE(test_case.extracted_headers);
   CAPTURE(test_case.expected_injected_headers);
 

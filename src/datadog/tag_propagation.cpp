@@ -1,10 +1,11 @@
 #include "tag_propagation.h"
 
+#include <datadog/error.h>
+
 #include <algorithm>
 #include <cstddef>
 #include <sstream>
 
-#include "error.h"
 #include "string_util.h"
 
 namespace datadog {

@@ -1,5 +1,12 @@
 #include "datadog_agent.h"
 
+#include <datadog/datadog_agent_config.h>
+#include <datadog/dict_writer.h>
+#include <datadog/http_client.h>
+#include <datadog/logger.h>
+#include <datadog/string_view.h>
+#include <datadog/tracer.h>
+
 #include <cassert>
 #include <chrono>
 #include <string>
@@ -8,16 +15,10 @@
 #include <unordered_set>
 
 #include "collector_response.h"
-#include "datadog_agent_config.h"
-#include "dict_writer.h"
-#include "http_client.h"
 #include "json.hpp"
-#include "logger.h"
 #include "msgpack.h"
 #include "span_data.h"
-#include "string_view.h"
 #include "trace_sampler.h"
-#include "tracer.h"
 
 namespace datadog {
 namespace tracing {
@@ -242,7 +243,7 @@ Expected<void> DatadogAgent::send(
   return nullopt;
 }
 
-nlohmann::json DatadogAgent::config_json() const {
+std::string DatadogAgent::config() const {
   // clang-format off
   return nlohmann::json::object({
     {"type", "datadog::tracing::DatadogAgent"},
@@ -253,10 +254,10 @@ nlohmann::json DatadogAgent::config_json() const {
       {"flush_interval_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_).count() },
       {"request_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(request_timeout_).count() },
       {"shutdown_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(shutdown_timeout_).count() },
-      {"http_client", http_client_->config_json()},
-      {"event_scheduler", event_scheduler_->config_json()},
+      {"http_client", http_client_->config()},
+      {"event_scheduler", event_scheduler_->config()},
     })},
-  });
+  }).dump();
   // clang-format on
 }
 

@@ -1,5 +1,11 @@
 #include "curl.h"
 
+#include <datadog/dict_reader.h>
+#include <datadog/dict_writer.h>
+#include <datadog/http_client.h>
+#include <datadog/logger.h>
+#include <datadog/string_view.h>
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -13,14 +19,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "clock.h"
-#include "dict_reader.h"
-#include "dict_writer.h"
-#include "http_client.h"
-#include "json.hpp"
-#include "logger.h"
 #include "string_util.h"
-#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -272,8 +271,8 @@ void Curl::drain(std::chrono::steady_clock::time_point deadline) {
   impl_->drain(deadline);
 }
 
-nlohmann::json Curl::config_json() const {
-  return nlohmann::json::object({{"type", "datadog::tracing::Curl"}});
+std::string Curl::config() const {
+  return nlohmann::json::object({{"type", "datadog::tracing::Curl"}}).dump();
 }
 
 CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger, const Clock &clock,

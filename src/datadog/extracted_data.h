@@ -3,14 +3,14 @@
 // This component provides a `struct`, `ExtractedData`, that stores fields
 // extracted from trace context. It's an implementation detail of this library.
 
+#include <datadog/optional.h>
+#include <datadog/propagation_style.h>
+#include <datadog/trace_id.h>
+
 #include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "optional.h"
-#include "propagation_style.h"
-#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {

@@ -28,7 +28,7 @@ namespace datadog {
 namespace tracing {
 
 std::ostream& operator<<(std::ostream& stream, PropagationStyle style) {
-  return stream << to_json(style).dump();
+  return stream << to_string_view(style);
 }
 
 }  // namespace tracing

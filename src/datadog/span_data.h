@@ -3,17 +3,16 @@
 // This component provides a `struct`, `SpanData`, that contains all data fields
 // relevant to `Span`. `SpanData` is what is consumed by `Collector`.
 
-#include <cstddef>
+#include <datadog/clock.h>
+#include <datadog/expected.h>
+#include <datadog/optional.h>
+#include <datadog/string_view.h>
+#include <datadog/trace_id.h>
+
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include "clock.h"
-#include "expected.h"
-#include "optional.h"
-#include "string_view.h"
-#include "trace_id.h"
 
 namespace datadog {
 namespace tracing {

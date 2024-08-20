@@ -1,12 +1,12 @@
-#include "span_sampler_config.h"
+#include <datadog/environment.h>
+#include <datadog/expected.h>
+#include <datadog/span_sampler_config.h>
 
 #include <cmath>
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
 
-#include "environment.h"
-#include "expected.h"
 #include "json.hpp"
 
 namespace datadog {
@@ -279,7 +279,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   return result;
 }
 
-nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule &rule) {
+std::string to_string(const FinalizedSpanSamplerConfig::Rule &rule) {
   // Get the base class's fields, then add our own.
   auto result = static_cast<const SpanMatcher &>(rule).to_json();
   result["sample_rate"] = double(rule.sample_rate);
@@ -287,7 +287,7 @@ nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule &rule) {
     result["max_per_second"] = *rule.max_per_second;
   }
 
-  return result;
+  return result.dump();
 }
 
 }  // namespace tracing

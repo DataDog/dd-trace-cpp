@@ -24,7 +24,6 @@
 #include <datadog/clock.h>
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
-#include <datadog/sampling_decision.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
 #include <datadog/trace_segment.h>

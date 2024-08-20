@@ -1,4 +1,12 @@
-#include "trace_segment.h"
+#include <datadog/collector.h>
+#include <datadog/dict_reader.h>
+#include <datadog/dict_writer.h>
+#include <datadog/error.h>
+#include <datadog/injection_options.h>
+#include <datadog/logger.h>
+#include <datadog/optional.h>
+#include <datadog/span_defaults.h>
+#include <datadog/trace_segment.h>
 
 #include <cassert>
 #include <string>
@@ -6,24 +14,19 @@
 #include <utility>
 #include <vector>
 
-#include "collector.h"
 #include "collector_response.h"
-#include "dict_reader.h"
-#include "dict_writer.h"
-#include "error.h"
+#include "config_manager.h"
 #include "hex.h"
-#include "injection_options.h"
 #include "json.hpp"
-#include "logger.h"
-#include "optional.h"
+#include "metrics.h"
 #include "platform_util.h"
 #include "random.h"
 #include "span_data.h"
-#include "span_defaults.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
+#include "tracer_telemetry.h"
 #include "w3c_propagation.h"
 
 namespace datadog {

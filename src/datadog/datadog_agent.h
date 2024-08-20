@@ -6,18 +6,19 @@
 // `DatadogAgent` is configured by `DatadogAgentConfig`.  See
 // `datadog_agent_config.h`.
 
+#include <datadog/clock.h>
+#include <datadog/collector.h>
+#include <datadog/event_scheduler.h>
+#include <datadog/http_client.h>
+#include <datadog/tracer_signature.h>
+
 #include <memory>
 #include <mutex>
 #include <vector>
 
-#include "clock.h"
-#include "collector.h"
 #include "config_manager.h"
-#include "event_scheduler.h"
-#include "http_client.h"
 #include "metrics.h"
 #include "remote_config/remote_config.h"
-#include "tracer_signature.h"
 #include "tracer_telemetry.h"
 
 namespace datadog {
@@ -82,7 +83,7 @@ class DatadogAgent : public Collector {
 
   void get_and_apply_remote_configuration_updates();
 
-  nlohmann::json config_json() const override;
+  std::string config() const override;
 };
 
 }  // namespace tracing

@@ -1,9 +1,9 @@
-#include "trace_sampler_config.h"
+#include <datadog/environment.h>
+#include <datadog/trace_sampler_config.h>
 
 #include <cmath>
 #include <unordered_set>
 
-#include "environment.h"
 #include "json.hpp"
 #include "parse_util.h"
 #include "string_util.h"

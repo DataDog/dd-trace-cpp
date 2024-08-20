@@ -1,4 +1,7 @@
 /bazel-*
 /.build/
 /.coverage/
+
+dist/
+out/
 MODULE.bazel.lock

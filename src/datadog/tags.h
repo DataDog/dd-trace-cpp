@@ -3,10 +3,11 @@
 // This component provides symbols for all span tag names that have special
 // meaning.
 
+#include <datadog/string_view.h>
+
 #include <string>
 
 #include "string_util.h"
-#include "string_view.h"
 
 namespace datadog {
 namespace tracing {

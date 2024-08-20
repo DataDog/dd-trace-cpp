@@ -18,14 +18,15 @@
 // See `span_matcher.h` for a description of how spans are matched by span
 // sampling rules.
 
+#include <datadog/clock.h>
+#include <datadog/sampling_decision.h>
+#include <datadog/span_sampler_config.h>
+
 #include <memory>
 #include <mutex>
 
-#include "clock.h"
-#include "json_fwd.hpp"
+#include "json.hpp"
 #include "limiter.h"
-#include "sampling_decision.h"
-#include "span_sampler_config.h"
 
 namespace datadog {
 namespace tracing {

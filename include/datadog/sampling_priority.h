@@ -11,8 +11,6 @@
 // value does not denote any relationship among the different kinds of sampling
 // decisions.
 
-#include "sampling_mechanism.h"
-
 namespace datadog {
 namespace tracing {
 

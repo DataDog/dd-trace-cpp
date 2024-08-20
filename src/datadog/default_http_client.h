@@ -7,9 +7,9 @@
 // `default_http_client` is implemented in either `default_http_client_curl.cpp`
 // or `default_http_client_null.cpp`.
 
-#include <memory>
+#include <datadog/clock.h>
 
-#include "clock.h"
+#include <memory>
 
 namespace datadog {
 namespace tracing {

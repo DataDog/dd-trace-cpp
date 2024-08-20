@@ -12,7 +12,6 @@
 
 #include "config.h"
 #include "expected.h"
-#include "json_fwd.hpp"
 #include "logger.h"
 #include "optional.h"
 #include "rate.h"
@@ -56,7 +55,7 @@ class FinalizedSpanSamplerConfig {
 Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
                                                      Logger&);
 
-nlohmann::json to_json(const FinalizedSpanSamplerConfig::Rule&);
+std::string to_string(const FinalizedSpanSamplerConfig::Rule&);
 
 }  // namespace tracing
 }  // namespace datadog
