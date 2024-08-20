@@ -122,7 +122,7 @@ Code coverage reports are available [here][2].
 
 Contributing
 ------------
-See the [contributing guidelines](CONTRIBUTING.md).
+See the [contributing guidelines](CONTRIBUTING.md) and the [maintainer docs](doc/maintainers.md) for information on the overall structure of the repository.
 
 [1]: https://cmake.org/
 [2]: https://datadog.github.io/dd-trace-cpp-coverage
