@@ -73,9 +73,8 @@ nlohmann::json SpanSampler::config_json() const {
   }
 
   return nlohmann::json::object({
-                                    {"rules", rules},
-                                })
-      .dump();
+      {"rules", rules},
+  });
 }
 
 }  // namespace tracing

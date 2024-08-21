@@ -83,15 +83,19 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 }
 
+void to_json(nlohmann::json& j, const PropagationStyle& style) {
+  j = to_string_view(style);
+}
+
 std::string Tracer::config() const {
   // clang-format off
   auto config = nlohmann::json::object({
     {"version", tracer_version_string},
     {"runtime_id", runtime_id_.string()},
-    {"collector", collector_->config()},
+    {"collector", nlohmann::json::parse(collector_->config())},
     {"span_sampler", span_sampler_->config_json()},
-    {"injection_styles", join_propagation_styles(injection_styles_)},
-    {"extraction_styles", join_propagation_styles(extraction_styles_)},
+    {"injection_styles", injection_styles_},
+    {"extraction_styles", extraction_styles_},
     {"tags_header_size", tags_header_max_size_},
     {"environment_variables", environment::to_json()},
   });
