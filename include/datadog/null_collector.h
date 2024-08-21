@@ -19,8 +19,8 @@ class NullCollector : public Collector {
   std::string config() const override {
     // clang-format off
     return R"({
-        {"type", "datadog::tracing::NullCollector"},
-        {"config", {}}
+        "type": "datadog::tracing::NullCollector",
+        "config": {}
     })";
     // clang-format on
   };
