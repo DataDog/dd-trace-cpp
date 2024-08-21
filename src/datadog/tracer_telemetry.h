@@ -96,6 +96,7 @@ class TracerTelemetry {
 
     } trace_api;
   } metrics_;
+
   // Each metric has an associated MetricSnapshot that contains the data points,
   // represented as a timestamp and the value of that metric.
   using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
@@ -115,7 +116,8 @@ class TracerTelemetry {
                   const std::shared_ptr<Logger>& logger,
                   const TracerSignature& tracer_signature,
                   const std::string& integration_name,
-                  const std::string& integration_version);
+                  const std::string& integration_version,
+                  const std::vector<Metric*> additional_metrics);
   inline bool enabled() { return enabled_; }
   inline bool debug() { return debug_; }
   // Provides access to the telemetry metrics for updating the values.

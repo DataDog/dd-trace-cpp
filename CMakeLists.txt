@@ -20,8 +20,8 @@ endif()
 
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
-elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(DD_TRACE_ENABLE_SANITIZE ON)
+# elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+#   set(DD_TRACE_ENABLE_SANITIZE ON)
 endif ()
 
 # Linking this library requires libcurl and threads.

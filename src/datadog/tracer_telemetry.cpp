@@ -56,7 +56,8 @@ TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
                                  const std::shared_ptr<Logger>& logger,
                                  const TracerSignature& tracer_signature,
                                  const std::string& integration_name,
-                                 const std::string& integration_version)
+                                 const std::string& integration_version,
+                                 const std::vector<Metric*> additional_metrics)
     : enabled_(enabled),
       clock_(clock),
       logger_(logger),
@@ -96,6 +97,10 @@ TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
                                     MetricSnapshot{});
     metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
                                     MetricSnapshot{});
+
+    for (auto& m : additional_metrics) {
+      metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
+    }
   }
 }
 
@@ -222,11 +227,15 @@ void TracerTelemetry::capture_metrics() {
                               clock_().wall.time_since_epoch())
                               .count();
   for (auto& m : metrics_snapshots_) {
-    auto value = m.first.get().capture_and_reset_value();
-    if (value == 0) {
+    if (m.first.get().type() == "distribution") {
       continue;
+    } else {
+      auto value = m.first.get().capture_and_reset_value();
+      if (value == 0) {
+        continue;
+      }
+      m.second.emplace_back(timepoint, value);
     }
-    m.second.emplace_back(timepoint, value);
   }
 }
 
@@ -238,6 +247,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
   });
   batch_payloads.emplace_back(std::move(heartbeat));
 
+  auto distribution_series = nlohmann::json::array();
   auto metrics = nlohmann::json::array();
   for (auto& m : metrics_snapshots_) {
     auto& metric = m.first.get();
@@ -251,6 +261,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
             {"type", metric.type()},
             {"points", points},
             {"common", metric.common()},
+            {"namespace", metric.tel_namespace()},
         }));
       } else if (type == "gauge") {
         // gauge metrics have a interval
@@ -261,6 +272,23 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
             {"interval", 10},
             {"points", points},
             {"common", metric.common()},
+            {"namespace", metric.tel_namespace()},
+        }));
+      }
+    } else {
+      if (metric.type() == "distribution") {
+        auto& histo = static_cast<HistogramMetric&>(m.first.get());
+        if (histo.empty()) {
+          continue;
+        }
+
+        auto values = histo.capture_and_reset_values();
+        distribution_series.emplace_back(nlohmann::json::object({
+            {"metric", metric.name()},
+            {"points", std::move(values)},
+            {"tags", metric.tags()},
+            {"common", metric.common()},
+            {"namespace", metric.tel_namespace()},
         }));
       }
     }
@@ -271,11 +299,21 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
     auto generate_metrics = nlohmann::json::object({
         {"request_type", "generate-metrics"},
         {"payload", nlohmann::json::object({
-                        {"namespace", "tracers"},
+                        /*{"namespace", "tracers"},*/
                         {"series", metrics},
                     })},
     });
     batch_payloads.emplace_back(std::move(generate_metrics));
+  }
+
+  if (!distribution_series.empty()) {
+    auto distribution_payload = nlohmann::json({
+        {"request_type", "distributions"},
+        {"payload", nlohmann::json({
+                        {"series", distribution_series},
+                    })},
+    });
+    batch_payloads.emplace_back(std::move(distribution_payload));
   }
 
   auto telemetry_body = generate_telemetry_body("message-batch");

@@ -14,6 +14,7 @@
 #include "datadog_agent_config.h"
 #include "error.h"
 #include "expected.h"
+#include "metrics.h"
 #include "propagation_style.h"
 #include "runtime_id.h"
 #include "span_defaults.h"
@@ -163,6 +164,8 @@ struct TracerConfig {
   // programmatic value in Datadog's Active Configuration, whereas it is
   // actually the default value for the integration.
   Optional<bool> report_service_as_default;
+
+  std::vector<Metric*> additional_metrics;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -198,6 +201,7 @@ class FinalizedTracerConfig final {
   std::string integration_version;
   bool delegate_trace_sampling;
   bool report_traces;
+  std::vector<Metric*> additional_metrics;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
 };
 

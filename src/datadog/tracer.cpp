@@ -44,7 +44,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
                  config.defaults.environment},
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
           config.report_telemetry, config.clock, logger_, signature_,
-          config.integration_name, config.integration_version)),
+          config.integration_name, config.integration_version,
+          config.additional_metrics)),
       span_sampler_(
           std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
       generator_(generator),
