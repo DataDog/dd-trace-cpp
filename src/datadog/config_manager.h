@@ -76,6 +76,7 @@ class ConfigManager : public remote_config::Listener {
   DynamicConfig<std::shared_ptr<const SpanDefaults>> span_defaults_;
   DynamicConfig<bool> report_traces_;
 
+  const TracerSignature& tracer_signature_;
   std::shared_ptr<TracerTelemetry> telemetry_;
 
  private:
@@ -85,6 +86,7 @@ class ConfigManager : public remote_config::Listener {
 
  public:
   ConfigManager(const FinalizedTracerConfig& config,
+                const TracerSignature& signature,
                 const std::shared_ptr<TracerTelemetry>& telemetry);
   ~ConfigManager() override{};
 

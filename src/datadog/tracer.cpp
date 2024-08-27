@@ -30,6 +30,10 @@
 namespace datadog {
 namespace tracing {
 
+void to_json(nlohmann::json& j, const PropagationStyle& style) {
+  j = to_string_view(style);
+}
+
 Tracer::Tracer(const FinalizedTracerConfig& config)
     : Tracer(config, default_id_generator(config.generate_128bit_trace_ids)) {}
 
@@ -43,8 +47,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
           config.report_telemetry, config.clock, logger_, signature_,
           config.integration_name, config.integration_version)),
-      config_manager_(
-          std::make_shared<ConfigManager>(config, tracer_telemetry_)),
+      config_manager_(std::make_shared<ConfigManager>(config, signature_,
+                                                      tracer_telemetry_)),
       collector_(/* see constructor body */),
       span_sampler_(
           std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
@@ -81,10 +85,6 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       log << "DATADOG TRACER CONFIGURATION - " << configuration;
     });
   }
-}
-
-void to_json(nlohmann::json& j, const PropagationStyle& style) {
-  j = to_string_view(style);
 }
 
 std::string Tracer::config() const {

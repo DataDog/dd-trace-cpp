@@ -30,12 +30,12 @@ constexpr std::array<uint8_t, sizeof(uint64_t)> capabilities_byte_array(
   return res;
 }
 
-struct ConfigKeyData {
+struct ConfigKeyMetadata final {
   product::Flag product;
   StringView config_id;
 };
 
-Optional<ConfigKeyData> parse_config_path(StringView config_path) {
+Optional<ConfigKeyMetadata> parse_config_path(StringView config_path) {
   static const std::regex path_reg(
       "^(datadog/\\d+|employee)/([^/]+)/([^/]+)/[^/]+$");
 
@@ -206,8 +206,8 @@ void Manager::process_response(const nlohmann::json& json) {
       auto config_path = client_config.get<StringView>();
       visited_config.emplace(config_path);
 
-      const auto config_key_data = parse_config_path(config_path);
-      if (!config_key_data) {
+      const auto config_key_metadata = parse_config_path(config_path);
+      if (!config_key_metadata) {
         std::string reason{config_path};
         reason += " is an invalid configuration path";
 
@@ -215,7 +215,7 @@ void Manager::process_response(const nlohmann::json& json) {
         return;
       }
 
-      const auto product = config_key_data->product;
+      const auto product = config_key_metadata->product;
 
       const auto& config_metadata =
           targets.at("/signed/targets"_json_pointer).at(config_path);
@@ -244,29 +244,12 @@ void Manager::process_response(const nlohmann::json& json) {
       auto decoded_config = base64_decode(raw_data);
 
       Configuration new_config;
-      auto&& config_id = config_key_data->config_id;
-      new_config.id = std::string{config_id.data(), config_id.size()};
+      new_config.id = std::string{config_key_metadata->config_id};
       new_config.path = std::string{config_path};
       new_config.hash = config_metadata.at("/hashes/sha256"_json_pointer);
       new_config.content = std::move(decoded_config);
       new_config.version = config_metadata.at("/custom/v"_json_pointer);
       new_config.product = product;
-
-      // TODO: should be moved to the listener
-      if (product == product::Flag::APM_TRACING) {
-        const auto config_json = nlohmann::json::parse(new_config.content);
-        new_config.version = config_json.at("revision");
-
-        const auto& targeted_service = config_json.at("service_target");
-        if (targeted_service.at("service").get<StringView>() !=
-                tracer_signature_.default_service ||
-            targeted_service.at("env").get<StringView>() !=
-                tracer_signature_.default_environment) {
-          new_config.state = Configuration::State::error;
-          new_config.error_message = "Wrong service targeted";
-          goto skip_listeners;
-        }
-      }
 
       for (const auto& listener : listeners_per_product_[product]) {
         // Q: Two listeners on the same product. What should be the behaviour
@@ -281,7 +264,6 @@ void Manager::process_response(const nlohmann::json& json) {
         }
       }
 
-    skip_listeners:
       applied_config_[std::string{config_path}] = new_config;
     }
 
