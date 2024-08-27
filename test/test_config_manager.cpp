@@ -29,13 +29,32 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
   auto tracer_telemetry = std::make_shared<TracerTelemetry>(
       false, default_clock, nullptr, tracer_signature, "", "");
 
-  ConfigManager config_manager(*finalize_config(config), tracer_telemetry);
+  ConfigManager config_manager(*finalize_config(config), tracer_signature,
+                               tracer_telemetry);
 
   rc::Listener::Configuration config_update{/* id = */ "id",
                                             /* path = */ "",
                                             /* content = */ "",
                                             /* version = */ 1,
                                             rc::product::Flag::APM_TRACING};
+
+  SECTION(
+      "configuration updates targetting the wrong tracer reports an error") {
+    // clang-format off
+    auto test_case = GENERATE(values<std::string>({
+      R"({ "service_target": { "service": "not-testsvc", "env": "test" } })",
+      R"({ "service_target": { "service": "testsvc", "env": "not-test" } })"
+    }));
+    // clang-format on
+
+    CAPTURE(test_case);
+
+    config_update.content = test_case;
+
+    // TODO: targetting wrong procut -> error
+    const auto err = config_manager.on_update(config_update);
+    CHECK(err);
+  }
 
   SECTION("handling of `tracing_sampling_rate`") {
     // SECTION("invalid value") {
