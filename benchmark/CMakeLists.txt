@@ -15,4 +15,14 @@ set(BENCHMARK_DOWNLOAD_DEPENDENCIES ON)
 set(BENCHMARK_ENABLE_TESTING OFF)
 add_subdirectory(google-benchmark)
 
-target_link_libraries(dd_trace_cpp-benchmark benchmark::benchmark dd_trace_cpp-static)
+target_include_directories(dd_trace_cpp-benchmark
+  PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
+
+target_link_libraries(dd_trace_cpp-benchmark 
+  PRIVATE
+    benchmark::benchmark
+    dd_trace::static
+    nlohmann_json::nlohmann_json
+)
