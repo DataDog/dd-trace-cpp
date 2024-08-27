@@ -3,9 +3,7 @@
 #include <datadog/logger.h>
 #include <datadog/span_data.h>
 #include <datadog/tracer.h>
-#include <datadog/tracer_config.h>
 
-#include <datadog/json.hpp>
 #include <memory>
 
 #include "hasher.h"
@@ -34,7 +32,7 @@ struct SerializingCollector : public dd::Collector {
   }
 
   std::string config() const override {
-    return nlohmann::json::object({{"type", "SerializingCollector"}}).dump();
+    return R"({"type": "SerializingCollector"})";
   }
 };
 

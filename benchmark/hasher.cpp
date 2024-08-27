@@ -15,7 +15,6 @@
 #include "hasher.h"
 
 #include <datadog/span_config.h>
-#include <datadog/tags.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -97,8 +96,8 @@ int sha256_traced(Digest &digest, const fs::path &path,
       Digest hash;
       const fs::path &child = entry;
       if (sha256_traced(hash, child, span)) {
-        span.set_error_message(
-                     "unable to calculate digest of " + child.u8string());
+        span.set_error_message("unable to calculate digest of " +
+                               child.u8string());
         return 1;
       }
       children.emplace_back(child, hash);
