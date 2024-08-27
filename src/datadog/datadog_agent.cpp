@@ -254,8 +254,8 @@ std::string DatadogAgent::config() const {
       {"flush_interval_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_).count() },
       {"request_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(request_timeout_).count() },
       {"shutdown_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(shutdown_timeout_).count() },
-      {"http_client", http_client_->config()},
-      {"event_scheduler", event_scheduler_->config()},
+      {"http_client", nlohmann::json::parse(http_client_->config())},
+      {"event_scheduler", nlohmann::json::parse(event_scheduler_->config())},
     })},
   }).dump();
   // clang-format on
