@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "catch.hpp"
 #include "datadog/json.hpp"
 #include "datadog/remote_config/remote_config.h"
@@ -184,10 +186,13 @@ REMOTE_CONFIG_TEST("response processing") {
 
     rc.process_response(response_json);
 
-    // Next payload should contains an error.
+    // Next payload should contain an error.
     const auto payload = rc.make_request_payload();
     CHECK(payload.contains("/client/state/has_error"_json_pointer) == true);
     CHECK(payload.contains("/client/state/error"_json_pointer) == true);
+
+    // targets_version should not have been updated.
+    CHECK(payload["client"]["state"]["targets_version"] == 0);
   }
 
   SECTION("update dispatch") {
@@ -268,6 +273,36 @@ REMOTE_CONFIG_TEST("response processing") {
           CHECK(!config_state.contains("apply_error"));
         }
       }
+    }
+
+    SECTION("cached_target_files is correctly populated") {
+      auto payload = rc.make_request_payload();
+
+      auto cached_target_files = payload.find("cached_target_files");
+      REQUIRE(cached_target_files != payload.end());
+
+      REQUIRE(cached_target_files->is_array());
+      REQUIRE(cached_target_files->size() == 3);
+
+      std::sort(cached_target_files->begin(), cached_target_files->end(),
+                [](const auto& a, const auto& b) {
+                  return a.at("path").template get<std::string_view>() <
+                         b.at("path").template get<std::string_view>();
+                });
+
+      const auto ctf = cached_target_files->at(0);
+      REQUIRE(ctf.at("path").get<std::string_view>() ==
+              "employee/AGENT_CONFIG/test_rc_update/flare_conf");
+      REQUIRE(ctf.at("length").get<std::uint64_t>() == 381UL);
+
+      auto hashes = ctf.at("hashes");
+
+      REQUIRE(hashes.is_array());
+      REQUIRE(hashes.size() == 1);
+
+      const auto h = hashes.at(0);
+      REQUIRE(h.at("algorithm").get<std::string_view>() == "sha256");
+      REQUIRE(h.at("hash").get<std::string_view>().size() == 64U);
     }
 
     SECTION("same config update should not trigger listeners") {

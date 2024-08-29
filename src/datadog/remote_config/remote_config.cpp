@@ -154,12 +154,12 @@ nlohmann::json Manager::make_request_payload() {
       nlohmann::json cached_file = {
           {"path", config.path},
           {"length", config.content.size()},
-          {"hashes", {{"algorithm", "sha256"}, {"hash", config.hash}}}};
+          {"hashes", {{{"algorithm", "sha256"}, {"hash", config.hash}}}}};
 
       cached_target_files.emplace_back(std::move(cached_file));
     }
 
-    j["cached_target"] = cached_target_files;
+    j["cached_target_files"] = cached_target_files;
     j["client"]["state"]["config_states"] = config_states;
   }
 
@@ -168,12 +168,26 @@ nlohmann::json Manager::make_request_payload() {
 
 void Manager::process_response(const nlohmann::json& json) {
   state_.error_message = nullopt;
+  struct UpdateTargetsVersion {
+    decltype(state_)& state;
+    std::uint64_t new_targets_version;
+
+    ~UpdateTargetsVersion() noexcept {
+      // if there was a global error, the old targets_version should be sent in
+      // the next request (at least this is what the system-tests expect)
+      if ((!state.error_message || state.error_message->empty()) &&
+          new_targets_version != std::uint64_t(-1)) {
+        state.targets_version = new_targets_version;
+      }
+    }
+  } update_targets_version{state_, std::uint64_t(-1)};
 
   try {
     const auto targets = nlohmann::json::parse(
         base64_decode(json.at("targets").get<StringView>()));
 
-    state_.targets_version = targets.at("/signed/version"_json_pointer);
+    update_targets_version.new_targets_version =
+        targets.at("/signed/version"_json_pointer).get<std::uint64_t>();
     state_.opaque_backend_state =
         targets.at("/signed/custom/opaque_backend_state"_json_pointer);
 
