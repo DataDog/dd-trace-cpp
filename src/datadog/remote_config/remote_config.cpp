@@ -168,28 +168,10 @@ nlohmann::json Manager::make_request_payload() {
 
 void Manager::process_response(const nlohmann::json& json) {
   state_.error_message = nullopt;
-  struct UpdateTargetsVersion {
-    decltype(state_)& state;
-    std::uint64_t new_targets_version;
-
-    ~UpdateTargetsVersion() noexcept {
-      // if there was a global error, the old targets_version should be sent in
-      // the next request (at least this is what the system-tests expect)
-      if ((!state.error_message || state.error_message->empty()) &&
-          new_targets_version != std::uint64_t(-1)) {
-        state.targets_version = new_targets_version;
-      }
-    }
-  } update_targets_version{state_, std::uint64_t(-1)};
 
   try {
     const auto targets = nlohmann::json::parse(
         base64_decode(json.at("targets").get<StringView>()));
-
-    update_targets_version.new_targets_version =
-        targets.at("/signed/version"_json_pointer).get<std::uint64_t>();
-    state_.opaque_backend_state =
-        targets.at("/signed/custom/opaque_backend_state"_json_pointer);
 
     const auto client_configs_it = json.find("client_configs");
 
@@ -210,6 +192,11 @@ void Manager::process_response(const nlohmann::json& json) {
       for (const auto& listener : listeners_) {
         listener->on_post_process();
       }
+
+      state_.targets_version =
+          targets.at("/signed/version"_json_pointer).get<std::uint64_t>();
+      state_.opaque_backend_state =
+          targets.at("/signed/custom/opaque_backend_state"_json_pointer);
       return;
     }
 
@@ -297,6 +284,10 @@ void Manager::process_response(const nlohmann::json& json) {
     for (const auto& listener : listeners_) {
       listener->on_post_process();
     }
+    state_.targets_version =
+        targets.at("/signed/version"_json_pointer).get<std::uint64_t>();
+    state_.opaque_backend_state =
+        targets.at("/signed/custom/opaque_backend_state"_json_pointer);
   } catch (const nlohmann::json::exception& json_exception) {
     std::string reason = "Failed to parse the response: ";
     reason += json_exception.what();

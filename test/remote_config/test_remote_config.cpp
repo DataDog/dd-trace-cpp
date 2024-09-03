@@ -172,6 +172,12 @@ REMOTE_CONFIG_TEST("response processing") {
           "client_configs": ["employee/APM_TRACING/valid_conf_path/config"],
           "target_files": [{"path": "employee/APM_TRACING/valid_conf_path/config", "raw": "eyJmb28iOiAiYmFyIn0="}]
       })",
+      /// invalid configuration path
+      R"({
+          "targets": "eyJzaWduZWQiOiB7InZlcnNpb24iOiAyLCAidGFyZ2V0cyI6IHsiZW1wbG95ZWUvQVBNX1RSQUNJTkcvdmFsaWRfY29uZl9wYXRoL2NvbmZpZyI6IHt9LCAiYmFyIjoge319LCJjdXN0b20iOiB7Im9wYXF1ZV9iYWNrZW5kX3N0YXRlIjogIjE1In19fQ==",
+          "client_configs": ["foo"],
+          "target_files": [{"path": "foo", "raw": "eyJmb28iOiAiYmFyIn0="}]
+      })",
     }));
     // clang-format on
 
@@ -191,8 +197,10 @@ REMOTE_CONFIG_TEST("response processing") {
     CHECK(payload.contains("/client/state/has_error"_json_pointer) == true);
     CHECK(payload.contains("/client/state/error"_json_pointer) == true);
 
-    // targets_version should not have been updated.
+    // `targets_version` and `backend_client_state` should not have been
+    // updated.
     CHECK(payload["client"]["state"]["targets_version"] == 0);
+    CHECK(payload["client"]["state"]["backend_client_state"] == "");
   }
 
   SECTION("update dispatch") {
@@ -252,8 +260,22 @@ REMOTE_CONFIG_TEST("response processing") {
     CHECK(agent_listener->count_on_revert == 0);
     CHECK(agent_listener->count_on_post_process == 1);
 
-    SECTION("config states are reported on next payload") {
+    SECTION("next request payload is correctly populated") {
       const auto payload = rc.make_request_payload();
+
+      // Verify client state is reported
+      REQUIRE(payload.contains("/client/state"_json_pointer) == true);
+      const auto& client_state = payload.at("/client/state"_json_pointer);
+      CHECK(client_state.at("targets_version") == 66204320);
+      CHECK(
+          client_state.at("backend_client_state") ==
+          "eyJ2ZXJzaW9uIjoyLCJzdGF0ZSI6eyJmaWxlX2hhc2hlcyI6eyJkYXRhZG9nLzEwMDAx"
+          "MjU4NDAvQVBNX1RSQUNJTkcvODI3ZWFjZjhkYmMzYWIxNDM0ZDMyMWNiODFkZmJmN2Fm"
+          "ZTY1NGE0YjYxMTFjZjE2NjBiNzFjY2Y4OTc4MTkzOC8yOTA4NmJkYmU1MDZlNjhiNTBm"
+          "MzA1NTgyM2EzZGE1Y2UwNTI4ZjE2NDBkNTJjZjg4NjE4MTZhYWE5ZmNlYWY0IjpbIm9Y"
+          "ZDJpeUMzeC9oRWsxeXVhY1hGN1lqcXJpTk9BWUtuZzFtWE01NVZKTHc9Il19fX0=");
+
+      // Verify config states are reported
       REQUIRE(payload.contains("/client/state/config_states"_json_pointer) ==
               true);
 
@@ -273,36 +295,25 @@ REMOTE_CONFIG_TEST("response processing") {
           CHECK(!config_state.contains("apply_error"));
         }
       }
-    }
 
-    SECTION("cached_target_files is correctly populated") {
-      auto payload = rc.make_request_payload();
-
+      // Verify `cached_target_files` is reported
       auto cached_target_files = payload.find("cached_target_files");
       REQUIRE(cached_target_files != payload.end());
-
       REQUIRE(cached_target_files->is_array());
       REQUIRE(cached_target_files->size() == 3);
 
-      std::sort(cached_target_files->begin(), cached_target_files->end(),
-                [](const auto& a, const auto& b) {
-                  return a.at("path").template get<std::string_view>() <
-                         b.at("path").template get<std::string_view>();
-                });
-
       const auto ctf = cached_target_files->at(0);
-      REQUIRE(ctf.at("path").get<std::string_view>() ==
-              "employee/AGENT_CONFIG/test_rc_update/flare_conf");
-      REQUIRE(ctf.at("length").get<std::uint64_t>() == 381UL);
+      CHECK(ctf.at("path").get<std::string_view>() ==
+            "employee/AGENT_CONFIG/test_rc_update/flare_conf");
+      CHECK(ctf.at("length").get<std::uint64_t>() == 381UL);
 
       auto hashes = ctf.at("hashes");
-
       REQUIRE(hashes.is_array());
       REQUIRE(hashes.size() == 1);
 
       const auto h = hashes.at(0);
-      REQUIRE(h.at("algorithm").get<std::string_view>() == "sha256");
-      REQUIRE(h.at("hash").get<std::string_view>().size() == 64U);
+      CHECK(h.at("algorithm").get<std::string_view>() == "sha256");
+      CHECK(h.at("hash").get<std::string_view>().size() == 64U);
     }
 
     SECTION("same config update should not trigger listeners") {
