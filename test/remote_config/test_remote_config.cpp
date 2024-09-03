@@ -297,12 +297,18 @@ REMOTE_CONFIG_TEST("response processing") {
       }
 
       // Verify `cached_target_files` is reported
-      auto cached_target_files = payload.find("cached_target_files");
-      REQUIRE(cached_target_files != payload.end());
-      REQUIRE(cached_target_files->is_array());
-      REQUIRE(cached_target_files->size() == 3);
+      REQUIRE(payload.contains("/cached_target_files"_json_pointer) == true);
+      auto cached_target_files = payload["cached_target_files"];
+      REQUIRE(cached_target_files.is_array());
+      REQUIRE(cached_target_files.size() == 3);
 
-      const auto ctf = cached_target_files->at(0);
+      std::sort(cached_target_files.begin(), cached_target_files.end(),
+                [](const auto& a, const auto& b) {
+                  return a.at("path").template get<std::string_view>() <
+                         b.at("path").template get<std::string_view>();
+                });
+
+      const auto ctf = cached_target_files.at(0);
       CHECK(ctf.at("path").get<std::string_view>() ==
             "employee/AGENT_CONFIG/test_rc_update/flare_conf");
       CHECK(ctf.at("length").get<std::uint64_t>() == 381UL);
