@@ -154,12 +154,12 @@ nlohmann::json Manager::make_request_payload() {
       nlohmann::json cached_file = {
           {"path", config.path},
           {"length", config.content.size()},
-          {"hashes", {{"algorithm", "sha256"}, {"hash", config.hash}}}};
+          {"hashes", {{{"algorithm", "sha256"}, {"hash", config.hash}}}}};
 
       cached_target_files.emplace_back(std::move(cached_file));
     }
 
-    j["cached_target"] = cached_target_files;
+    j["cached_target_files"] = cached_target_files;
     j["client"]["state"]["config_states"] = config_states;
   }
 
@@ -172,10 +172,6 @@ void Manager::process_response(const nlohmann::json& json) {
   try {
     const auto targets = nlohmann::json::parse(
         base64_decode(json.at("targets").get<StringView>()));
-
-    state_.targets_version = targets.at("/signed/version"_json_pointer);
-    state_.opaque_backend_state =
-        targets.at("/signed/custom/opaque_backend_state"_json_pointer);
 
     const auto client_configs_it = json.find("client_configs");
 
@@ -196,6 +192,11 @@ void Manager::process_response(const nlohmann::json& json) {
       for (const auto& listener : listeners_) {
         listener->on_post_process();
       }
+
+      state_.targets_version =
+          targets.at("/signed/version"_json_pointer).get<std::uint64_t>();
+      state_.opaque_backend_state =
+          targets.at("/signed/custom/opaque_backend_state"_json_pointer);
       return;
     }
 
@@ -283,6 +284,10 @@ void Manager::process_response(const nlohmann::json& json) {
     for (const auto& listener : listeners_) {
       listener->on_post_process();
     }
+    state_.targets_version =
+        targets.at("/signed/version"_json_pointer).get<std::uint64_t>();
+    state_.opaque_backend_state =
+        targets.at("/signed/custom/opaque_backend_state"_json_pointer);
   } catch (const nlohmann::json::exception& json_exception) {
     std::string reason = "Failed to parse the response: ";
     reason += json_exception.what();
