@@ -8,6 +8,7 @@
 #include <unordered_set>
 
 #include "json.hpp"
+#include "json_serializer.h"
 
 namespace datadog {
 namespace tracing {
@@ -16,7 +17,7 @@ namespace {
 std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
   nlohmann::json res;
   for (const auto &r : rules) {
-    auto j = r.to_json();
+    nlohmann::json j = r;
     j["sample_rate"] = r.sample_rate;
     if (r.max_per_second) {
       j["max_per_second"] = *r.max_per_second;
@@ -63,7 +64,7 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
       "service", "name", "resource", "tags", "sample_rate", "max_per_second"};
 
   for (const auto &json_rule : json_rules) {
-    auto matcher = SpanMatcher::from_json(json_rule);
+    auto matcher = from_json(json_rule);
     if (auto *error = matcher.if_error()) {
       std::string prefix;
       prefix += "Unable to create a rule from ";
@@ -248,7 +249,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
       prefix +=
           "Unable to parse sample_rate in span sampling rule with span "
           "pattern ";
-      prefix += rule.to_json().dump();
+      prefix += nlohmann::json(static_cast<SpanMatcher>(rule)).dump();
       prefix += ": ";
       return error->with_prefix(prefix);
     }
@@ -261,7 +262,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
              std::end(allowed_types))) {
       std::string message;
       message += "Span sampling rule with pattern ";
-      message += rule.to_json().dump();
+      message += nlohmann::json(static_cast<SpanMatcher>(rule)).dump();
       message +=
           " should have a max_per_second value greater than zero, but the "
           "following value was given: ";
@@ -281,7 +282,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
 
 std::string to_string(const FinalizedSpanSamplerConfig::Rule &rule) {
   // Get the base class's fields, then add our own.
-  auto result = static_cast<const SpanMatcher &>(rule).to_json();
+  nlohmann::json result = static_cast<const SpanMatcher &>(rule);
   result["sample_rate"] = double(rule.sample_rate);
   if (rule.max_per_second) {
     result["max_per_second"] = *rule.max_per_second;

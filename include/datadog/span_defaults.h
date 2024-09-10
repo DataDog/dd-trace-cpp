@@ -7,8 +7,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "json_fwd.hpp"
-
 namespace datadog {
 namespace tracing {
 
@@ -21,9 +19,12 @@ struct SpanDefaults {
   std::unordered_map<std::string, std::string> tags;
 };
 
-nlohmann::json to_json(const SpanDefaults&);
-
-bool operator==(const SpanDefaults&, const SpanDefaults&);
+inline bool operator==(const SpanDefaults& lhs, const SpanDefaults& rhs) {
+#define EQ(FIELD) lhs.FIELD == rhs.FIELD
+  return EQ(service) && EQ(service_type) && EQ(environment) && EQ(version) &&
+         EQ(name) && EQ(tags);
+#undef EQ
+}
 
 }  // namespace tracing
 }  // namespace datadog

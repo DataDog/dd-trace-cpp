@@ -24,8 +24,6 @@ struct TraceSamplerRule final {
   Rate rate;
   SpanMatcher matcher;
   SamplingMechanism mechanism;
-
-  nlohmann::json to_json() const;
 };
 
 struct TraceSamplerConfig {

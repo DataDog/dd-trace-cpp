@@ -26,6 +26,8 @@
 #include <set>
 #include <string>
 
+#include "json.hpp"
+
 namespace datadog {
 namespace remote_config {
 

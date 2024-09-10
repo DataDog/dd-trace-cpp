@@ -114,7 +114,6 @@ target_sources(dd_trace_cpp-objects
     src/datadog/runtime_id.cpp
     src/datadog/span.cpp
     src/datadog/span_data.cpp
-    src/datadog/span_defaults.cpp
     src/datadog/span_matcher.cpp
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp
