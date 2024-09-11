@@ -356,16 +356,12 @@ std::string TracerTelemetry::configuration_change() {
         generate_configuration_field(config_metadata));
   }
 
-  // clang-format off
-  auto configuration_change = nlohmann::json({
-    {"request_type", "app-client-configuration-change"},
-    {"payload", nlohmann::json{
-      {"configuration", configuration_json}
-    }}
-  });
-  // clang-format on
+  auto telemetry_body =
+      generate_telemetry_body("app-client-configuration-change");
+  telemetry_body["payload"] =
+      nlohmann::json{{"configuration", configuration_json}};
 
-  return configuration_change.dump();
+  return telemetry_body.dump();
 }
 
 }  // namespace tracing
