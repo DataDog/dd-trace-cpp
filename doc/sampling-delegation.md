@@ -182,8 +182,8 @@ This granularity of control is useful in NGINX, where one `location` (i.e.
 upstream or backend) might be configured for sampling delegation, while another
 `location` might not.
 
-[1]: ../src/datadog/tracer_config.h
-[2]: ../src/datadog/trace_segment.h
+[1]: ../include/datadog/tracer_config.h
+[2]: ../include/datadog/trace_segment.h
 [3]: ../src/datadog/trace_segment.cpp
-[4]: ../src/datadog/sampling_decision.h
-[5]: ../src/datadog/sampling_decision.h
+[4]: ../include/datadog/sampling_decision.h
+[5]: ../include/datadog/sampling_decision.h

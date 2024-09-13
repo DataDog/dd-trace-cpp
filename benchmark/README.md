@@ -6,7 +6,7 @@ resource consumption of a test tracing scenario.
 The benchmark uses [Google Benchmark][1], whose source is included as a git
 submodule under `./google-benchmark`.
 
-The scenario that's measured is similar to the [../example][3] setup.  A trace
+The scenario that's measured is similar to the [../examples/hasher][3] setup.  A trace
 is created whose structure reflects that of a particular file directory
 structure.  The directory structure, in this case, is the source tree of the
 [Tiny C Compiler][4], whose source is included as a git submodule under
@@ -30,7 +30,7 @@ This benchmark is intended to be driven by Datadog's internal benchmarking
 platform.  See [../.gitlab/benchmarks.yml][7].
 
 [1]: https://github.com/google/benchmark
-[3]: ../example
+[3]: ../examples/hasher
 [4]: https://bellard.org/tcc/
 [6]: ../bin/benchmark
 [7]: ../.gitlab/benchmarks.yml
