@@ -3,7 +3,7 @@ Unit Tests
 This directory contains the unit tests for dd-trace-cpp.
 
 The testing library used is [Catch2][1], vendored here as a single header,
-[catch.hpp](catch.cpp) (see the [Makefile](Makefile)).
+[catch.hpp](catch.hpp) (see the [Makefile](Makefile)).
 
 [../bin/test](../bin/test) builds and runs the unit tests.
 

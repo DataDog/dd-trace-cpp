@@ -10,7 +10,7 @@ file or directory encountered.
 The program produces a trace of this calculation, where each file encountered
 is a span whose duration is the time it took to hash the file.
 
-[../bin/hasher-example](../bin/hasher-example) builds and runs this example.
+The [bin/hasher-example](../../bin/hasher-example) script builds and runs this example.
 
 ![example console usage](console.png)
 
