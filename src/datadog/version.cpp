@@ -3,7 +3,7 @@
 namespace datadog {
 namespace tracing {
 
-#define DD_TRACE_VERSION "v0.2.2"
+#define DD_TRACE_VERSION "v1.0.0"
 
 const char* const tracer_version = DD_TRACE_VERSION;
 const char* const tracer_version_string =
