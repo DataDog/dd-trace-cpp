@@ -25,6 +25,7 @@ cc_library(
       "src/datadog/random.cpp",
       "src/datadog/rate.cpp",
       "src/datadog/remote_config/remote_config.cpp",
+      "src/datadog/remote_config/product.cpp",
       "src/datadog/runtime_id.cpp",
       "src/datadog/span.cpp",
       "src/datadog/span_data.cpp",
@@ -115,7 +116,7 @@ cc_library(
       "include/datadog/remote_config/product.h",
     ],
     strip_include_prefix = "include/",
-    copts = ["-Isrc/datadog"],
+    includes = ["src/datadog"],
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_absl//absl/strings",
