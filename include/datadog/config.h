@@ -25,6 +25,8 @@ enum class ConfigName : char {
   TRACE_SAMPLING_LIMIT,
   TRACE_SAMPLING_RULES,
   SPAN_SAMPLING_RULES,
+  TRACE_BAGGAGE_MAX_BYTES,
+  TRACE_BAGGAGE_MAX_ITEMS,
 };
 
 // Represents metadata for configuration parameters

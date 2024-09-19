@@ -109,6 +109,7 @@ target_sources(dd_trace_cpp-objects
     src/datadog/telemetry/configuration.cpp
     src/datadog/telemetry/metrics.cpp
     src/datadog/telemetry/telemetry.cpp
+    src/datadog/baggage.cpp
     src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp

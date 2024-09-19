@@ -18,6 +18,8 @@ StringView to_string_view(PropagationStyle style) {
       return "B3";
     case PropagationStyle::W3C:
       return "tracecontext";  // for compatibility with OpenTelemetry
+    case PropagationStyle::BAGGAGE:
+      return "baggage";
     default:
       assert(style == PropagationStyle::NONE);
       return "none";
@@ -38,8 +40,6 @@ Optional<PropagationStyle> parse_propagation_style(StringView text) {
   auto token = std::string{text};
   to_lower(token);
 
-  // Note: Make sure that these strings are consistent (modulo case) with
-  // `to_json`, above.
   if (token == "datadog") {
     return PropagationStyle::DATADOG;
   } else if (token == "b3" || token == "b3multi") {
@@ -48,6 +48,8 @@ Optional<PropagationStyle> parse_propagation_style(StringView text) {
     return PropagationStyle::W3C;
   } else if (token == "none") {
     return PropagationStyle::NONE;
+  } else if (token == "baggage") {
+    return PropagationStyle::BAGGAGE;
   }
 
   return nullopt;

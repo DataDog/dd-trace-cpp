@@ -21,6 +21,7 @@ add_executable(tests
     telemetry/test_metrics.cpp
 
     # test cases
+    test_baggage.cpp
     test_base64.cpp
     test_cerr_logger.cpp
     test_curl.cpp

@@ -13,11 +13,13 @@
 #include <cstddef>
 #include <memory>
 
+#include "baggage.h"
 #include "clock.h"
 #include "expected.h"
 #include "id_generator.h"
 #include "optional.h"
 #include "span.h"
+#include "span_config.h"
 #include "tracer_config.h"
 #include "tracer_signature.h"
 
@@ -47,6 +49,9 @@ class Tracer {
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
   bool sampling_delegation_enabled_;
+  std::size_t baggage_max_items_;
+  std::size_t baggage_max_bytes_;
+  bool baggage_enabled_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:
@@ -78,8 +83,23 @@ class Tracer {
   Span extract_or_create_span(const DictReader& reader,
                               const SpanConfig& config);
 
-  // Return a JSON object describing this Tracer's configuration. It is the same
-  // JSON object that was logged when this Tracer was created.
+  // Create a baggage.
+  Baggage create_baggage();
+
+  // Return the extracted baggage from the specified `reader`.
+  // An error is returned if an error occurs during extraction.
+  Expected<Baggage, Baggage::Error> extract_baggage(const DictReader& reader);
+
+  // Return the extracted baggage from the specified `reader`, or an empty
+  // baggage is there is no baggage to extract if an error occurs during
+  // extraction.
+  Baggage extract_or_create_baggage(const DictReader& reader);
+
+  // Inject baggage into the specified `reader`.
+  Expected<void> inject(const Baggage& baggage, DictWriter& writer);
+
+  // Return a JSON object describing this Tracer's configuration. It is the
+  // same JSON object that was logged when this Tracer was created.
   std::string config() const;
 };
 
