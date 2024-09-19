@@ -161,6 +161,9 @@ struct TracerConfig {
   // programmatic value in Datadog's Active Configuration, whereas it is
   // actually the default value for the integration.
   Optional<bool> report_service_as_default;
+
+  Optional<std::size_t> max_baggage_items;
+  Optional<std::size_t> max_baggage_bytes;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -197,6 +200,8 @@ class FinalizedTracerConfig final {
   bool delegate_trace_sampling;
   bool report_traces;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::size_t max_baggage_items;
+  std::size_t max_baggage_bytes;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

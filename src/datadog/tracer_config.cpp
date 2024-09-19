@@ -137,6 +137,27 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     env_cfg.generate_128bit_trace_ids = !falsy(*enabled_env);
   }
 
+  // Baggage
+  if (auto baggage_items_env =
+          lookup(environment::DD_TRACE_BAGGAGE_MAX_ITEMS)) {
+    auto maybe_value = parse_uint64(*baggage_items_env, 10);
+    if (auto *error = maybe_value.if_error()) {
+      return *error;
+    }
+
+    env_cfg.max_baggage_items = std::move(*maybe_value);
+  }
+
+  if (auto baggage_bytes_env =
+          lookup(environment::DD_TRACE_BAGGAGE_MAX_BYTES)) {
+    auto maybe_value = parse_uint64(*baggage_bytes_env, 10);
+    if (auto *error = maybe_value.if_error()) {
+      return *error;
+    }
+
+    env_cfg.max_baggage_bytes = std::move(*maybe_value);
+  }
+
   // PropagationStyle
   // Print a warning if a questionable combination of environment variables is
   // defined.
@@ -368,6 +389,12 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       value_or(env_config->integration_name, user_config.integration_name, "");
   final_config.integration_version = value_or(
       env_config->integration_version, user_config.integration_version, "");
+
+  // Baggage
+  final_config.max_baggage_items = value_or(env_config->max_baggage_items,
+                                            user_config.max_baggage_items, 64);
+  final_config.max_baggage_bytes = value_or(
+      env_config->max_baggage_bytes, user_config.max_baggage_bytes, 8192);
 
   if (user_config.runtime_id) {
     final_config.runtime_id = user_config.runtime_id;
