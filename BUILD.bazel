@@ -4,6 +4,7 @@ cc_library(
       "src/datadog/telemetry/configuration.cpp",
       "src/datadog/telemetry/metrics.cpp",
       "src/datadog/telemetry/telemetry.cpp",
+      "src/datadog/baggage.cpp",
       "src/datadog/base64.cpp",
       "src/datadog/cerr_logger.cpp",
       "src/datadog/clock.cpp",
@@ -77,6 +78,7 @@ cc_library(
       "src/datadog/w3c_propagation.h",
     ],
     hdrs = [
+      "include/datadog/baggage.h",
       "include/datadog/clock.h",
       "include/datadog/collector.h",
       "include/datadog/config.h",

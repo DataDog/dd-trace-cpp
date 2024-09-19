@@ -131,6 +131,27 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     env_cfg.generate_128bit_trace_ids = !falsy(*enabled_env);
   }
 
+  // Baggage
+  if (auto baggage_items_env =
+          lookup(environment::DD_TRACE_BAGGAGE_MAX_ITEMS)) {
+    auto maybe_value = parse_uint64(*baggage_items_env, 10);
+    if (auto *error = maybe_value.if_error()) {
+      return *error;
+    }
+
+    env_cfg.baggage_max_items = std::move(*maybe_value);
+  }
+
+  if (auto baggage_bytes_env =
+          lookup(environment::DD_TRACE_BAGGAGE_MAX_BYTES)) {
+    auto maybe_value = parse_uint64(*baggage_bytes_env, 10);
+    if (auto *error = maybe_value.if_error()) {
+      return *error;
+    }
+
+    env_cfg.baggage_max_bytes = std::move(*maybe_value);
+  }
+
   // PropagationStyle
   // Print a warning if a questionable combination of environment variables is
   // defined.
@@ -289,7 +310,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   // Extraction Styles
   const std::vector<PropagationStyle> default_propagation_styles{
-      PropagationStyle::DATADOG, PropagationStyle::W3C};
+      PropagationStyle::DATADOG, PropagationStyle::W3C,
+      PropagationStyle::BAGGAGE};
 
   std::tie(origin, final_config.extraction_styles) =
       pick(env_config->extraction_styles, user_config.extraction_styles,
@@ -356,6 +378,32 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.integration_version =
       value_or(env_config->integration_version, user_config.integration_version,
                tracer_version);
+
+  // Baggage
+  std::tie(origin, final_config.baggage_max_items) =
+      pick(env_config->baggage_max_items, user_config.baggage_max_items, 64);
+  final_config.metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS] =
+      ConfigMetadata(ConfigName::TRACE_BAGGAGE_MAX_ITEMS,
+                     to_string(final_config.baggage_max_items), origin);
+
+  std::tie(origin, final_config.baggage_max_bytes) =
+      pick(env_config->baggage_max_bytes, user_config.baggage_max_bytes, 8192);
+  final_config.metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES] =
+      ConfigMetadata(ConfigName::TRACE_BAGGAGE_MAX_BYTES,
+                     to_string(final_config.baggage_max_bytes), origin);
+
+  if (final_config.baggage_max_items <= 0 ||
+      final_config.baggage_max_bytes < 3) {
+    auto it = std::remove(final_config.extraction_styles.begin(),
+                          final_config.extraction_styles.end(),
+                          PropagationStyle::BAGGAGE);
+    final_config.extraction_styles.erase(it);
+
+    it = std::remove(final_config.injection_styles.begin(),
+                     final_config.injection_styles.end(),
+                     PropagationStyle::BAGGAGE);
+    final_config.injection_styles.erase(it);
+  }
 
   if (user_config.runtime_id) {
     final_config.runtime_id = user_config.runtime_id;
