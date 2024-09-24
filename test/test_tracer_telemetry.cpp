@@ -45,8 +45,8 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
   const std::string ignore{""};
 
-  TracerTelemetry tracer_telemetry{true,   clock, logger, tracer_signature,
-                                   ignore, ignore};
+  TracerTelemetry tracer_telemetry{true,   clock,  logger, tracer_signature,
+                                   ignore, ignore, {}};
 
   SECTION("generates app-started message") {
     SECTION("Without a defined integration") {
@@ -63,7 +63,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
     SECTION("With an integration") {
       TracerTelemetry tracer_telemetry{
-          true, clock, logger, tracer_signature, "nginx", "1.25.2"};
+          true, clock, logger, tracer_signature, "nginx", "1.25.2", {}};
       auto app_started_message = tracer_telemetry.app_started({});
       auto app_started = nlohmann::json::parse(app_started_message);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);

@@ -10,6 +10,7 @@
 #include <datadog/collector.h>
 #include <datadog/event_scheduler.h>
 #include <datadog/http_client.h>
+#include <datadog/metrics.h>
 #include <datadog/tracer_signature.h>
 
 #include <memory>
@@ -17,7 +18,6 @@
 #include <vector>
 
 #include "config_manager.h"
-#include "metrics.h"
 #include "remote_config/remote_config.h"
 #include "tracer_telemetry.h"
 

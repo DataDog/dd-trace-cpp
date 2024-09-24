@@ -27,7 +27,8 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
   config.environment = "test";
 
   auto tracer_telemetry = std::make_shared<TracerTelemetry>(
-      false, default_clock, nullptr, tracer_signature, "", "");
+      false, default_clock, nullptr, tracer_signature, "", "",
+      std::vector<Metric*>{});
 
   ConfigManager config_manager(*finalize_config(config), tracer_signature,
                                tracer_telemetry);

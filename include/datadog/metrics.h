@@ -26,17 +26,19 @@ class Metric {
   // common telemetry metric, or a language-specific metric that is prefixed
   // with the language name.
   bool common_;
+  std::string namespace_;
 
  protected:
   std::atomic<uint64_t> value_ = 0;
-  Metric(std::string name, std::string type, std::vector<std::string> tags,
-         bool common);
+  Metric(std::string tel_namespace, std::string name, std::string type,
+         std::vector<std::string> tags, bool common);
 
  public:
   // Accessors for name, type, tags, common and capture_and_reset_value are used
   // when producing the JSON message for reporting metrics.
   std::string name();
   std::string type();
+  std::string tel_namespace();
   std::vector<std::string> tags();
   bool common();
   uint64_t value();
@@ -47,7 +49,8 @@ class Metric {
 // number of actions, or incrementing the current number of actions by 1.
 class CounterMetric : public Metric {
  public:
-  CounterMetric(std::string name, std::vector<std::string> tags, bool common);
+  CounterMetric(std::string name, std::vector<std::string> tags, bool common,
+                std::string tel_namespace = "tracers");
   void inc();
   void add(uint64_t amount);
 };
@@ -57,7 +60,8 @@ class CounterMetric : public Metric {
 // state by 1.
 class GaugeMetric : public Metric {
  public:
-  GaugeMetric(std::string name, std::vector<std::string> tags, bool common);
+  GaugeMetric(std::string name, std::vector<std::string> tags, bool common,
+              std::string tel_namespace = "tracers");
   void set(uint64_t value);
   void inc();
   void add(uint64_t amount);
@@ -65,5 +69,16 @@ class GaugeMetric : public Metric {
   void sub(uint64_t amount);
 };
 
+class HistogramMetric : public Metric {
+  static constexpr uint64_t max_size_ = 100;
+  std::vector<uint64_t> values_;
+
+ public:
+  HistogramMetric(std::string name, std::vector<std::string> tags, bool common,
+                  std::string tel_namespace);
+  inline bool empty() const { return values_.empty(); };
+  void set(uint64_t value);
+  std::vector<uint64_t> capture_and_reset_values();
+};
 }  // namespace tracing
 }  // namespace datadog

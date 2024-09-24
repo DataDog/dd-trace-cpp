@@ -369,6 +369,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.integration_version = value_or(
       env_config->integration_version, user_config.integration_version, "");
 
+  final_config.additional_metrics = std::move(user_config.additional_metrics);
+
   if (user_config.runtime_id) {
     final_config.runtime_id = user_config.runtime_id;
   }

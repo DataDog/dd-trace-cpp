@@ -25,6 +25,7 @@ class Collector;
 class Logger;
 class SpanSampler;
 class TraceSampler;
+class Metric;
 
 struct TracerConfig {
   // Set the service name.
@@ -161,6 +162,8 @@ struct TracerConfig {
   // programmatic value in Datadog's Active Configuration, whereas it is
   // actually the default value for the integration.
   Optional<bool> report_service_as_default;
+
+  std::vector<Metric*> additional_metrics;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -197,6 +200,7 @@ class FinalizedTracerConfig final {
   bool delegate_trace_sampling;
   bool report_traces;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::vector<Metric*> additional_metrics;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

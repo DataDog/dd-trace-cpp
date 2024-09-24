@@ -30,13 +30,13 @@
 // configuration has been updated by a Remote Configuration event.
 #include <datadog/clock.h>
 #include <datadog/config.h>
+#include <datadog/metrics.h>
 #include <datadog/runtime_id.h>
 #include <datadog/tracer_signature.h>
 
 #include <vector>
 
 #include "json.hpp"
-#include "metrics.h"
 #include "platform_util.h"
 
 namespace datadog {
@@ -118,7 +118,8 @@ class TracerTelemetry {
                   const std::shared_ptr<Logger>& logger,
                   const TracerSignature& tracer_signature,
                   const std::string& integration_name,
-                  const std::string& integration_version);
+                  const std::string& integration_version,
+                  const std::vector<Metric*> additional_metrics);
   inline bool enabled() { return enabled_; }
   inline bool debug() { return debug_; }
   // Provides access to the telemetry metrics for updating the values.

@@ -1,6 +1,7 @@
 #include <datadog/collector_response.h>
 #include <datadog/datadog_agent.h>
 #include <datadog/datadog_agent_config.h>
+#include <datadog/metric.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -198,7 +199,7 @@ TEST_CASE("Remote Configuration", "[datadog_agent]") {
 
   auto telemetry = std::make_shared<TracerTelemetry>(
       finalized->report_telemetry, finalized->clock, finalized->logger,
-      signature, "", "");
+      signature, "", "", std::vector<Metric*>{});
 
   auto config_manager =
       std::make_shared<ConfigManager>(*finalized, signature, telemetry);

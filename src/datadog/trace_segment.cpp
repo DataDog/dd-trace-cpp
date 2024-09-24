@@ -4,6 +4,7 @@
 #include <datadog/error.h>
 #include <datadog/injection_options.h>
 #include <datadog/logger.h>
+#include <datadog/metrics.h>
 #include <datadog/optional.h>
 #include <datadog/span_defaults.h>
 #include <datadog/trace_segment.h>
@@ -18,7 +19,6 @@
 #include "config_manager.h"
 #include "hex.h"
 #include "json.hpp"
-#include "metrics.h"
 #include "platform_util.h"
 #include "random.h"
 #include "span_data.h"
