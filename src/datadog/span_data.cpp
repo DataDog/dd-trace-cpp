@@ -47,7 +47,8 @@ void SpanData::apply_config(const SpanDefaults& defaults,
   if (!environment.empty()) {
     tags.insert_or_assign(tags::environment, environment);
   }
-  std::string version = config.version.value_or(defaults.version);
+  std::string version = config.version.value_or(
+      service.compare(defaults.service) == 0 ? defaults.version : "");
   if (!version.empty()) {
     tags.insert_or_assign(tags::version, version);
   }
