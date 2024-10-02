@@ -5,3 +5,4 @@
 dist/
 out/
 MODULE.bazel.lock
+.vscode
