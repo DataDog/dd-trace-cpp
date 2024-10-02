@@ -86,7 +86,9 @@ void RequestHandler::on_span_start(const httplib::Request& req,
 
   if (auto service =
           utils::get_if_exists<std::string_view>(request_json, "service")) {
-    span_cfg.service = *service;
+    if (!service->empty()) {
+      span_cfg.service = *service;
+    }
   }
 
   if (auto service_type =
