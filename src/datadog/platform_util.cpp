@@ -189,6 +189,26 @@ int get_process_id() {
 #endif
 }
 
+std::string get_process_name() {
+#if defined(__APPLE__) || defined(__FreeBSD__)
+  return getprogname();
+#elif defined(__linux__) || defined(__unix__)
+  return program_invocation_short_name;
+#elif defined(_MSC_VER)
+  TCHAR szExeFileName[MAX_PATH];
+  GetModuleFileName(NULL, szExeFileName, MAX_PATH);
+#ifdef UNICODE
+  std::wstring wStr(szExeFileName);
+  std::string path = std::string(wStr.begin(), wStr.end());
+#else
+  std::string path = std::string(szExeFileName);
+#endif
+  return path.substr(path.find_last_of("/\\") + 1);
+#else
+  return "unknown-service";
+#endif
+}
+
 int at_fork_in_child(void (*on_fork)()) {
 #if defined(_MSC_VER)
   // Windows does not have `fork`, and so this is not relevant there.

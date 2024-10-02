@@ -145,16 +145,21 @@ class SomewhatSecureTemporaryFile : public std::fstream {
 TEST_CASE("TracerConfig::defaults") {
   TracerConfig config;
 
-  SECTION("service is required") {
+  SECTION("service is not required") {
     SECTION("empty") {
       auto finalized = finalize_config(config);
-      REQUIRE(!finalized);
-      REQUIRE(finalized.error().code == Error::SERVICE_NAME_REQUIRED);
+      REQUIRE(finalized);
+#ifdef _MSC_VER
+      REQUIRE(finalized->defaults.service == "tests.exe");
+#else
+      REQUIRE(finalized->defaults.service == "tests");
+#endif
     }
     SECTION("nonempty") {
       config.service = "testsvc";
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
+      REQUIRE(finalized->defaults.service == "testsvc");
     }
   }
 

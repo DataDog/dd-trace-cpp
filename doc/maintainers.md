@@ -385,7 +385,6 @@ david@ein:~/src/dd-trace-cpp/src/datadog$ sed -n 's/^\s*\(\w\+\)\s*=\s*[0-9]\+,\
       1 SPAN_SAMPLING_RULES_MAX_PER_SECOND_WRONG_TYPE
       1 SPAN_SAMPLING_RULES_INVALID_JSON
       1 SPAN_SAMPLING_RULES_FILE_IO
-      1 SERVICE_NAME_REQUIRED
       1 RULE_WRONG_TYPE
       1 RULE_TAG_WRONG_TYPE
       1 RULE_PROPERTY_WRONG_TYPE
