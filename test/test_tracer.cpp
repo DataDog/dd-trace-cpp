@@ -90,6 +90,18 @@ TEST_CASE("tracer span defaults") {
   REQUIRE(overrides.name != config.name);
   REQUIRE(overrides.tags != config.tags);
 
+  // Test behaviors when the config overrides the service but leaves other
+  // fields empty
+  SpanConfig overrides_with_empty_values;
+  overrides_with_empty_values.service = "barsvc";
+
+  REQUIRE(overrides_with_empty_values.service != config.service);
+  REQUIRE(overrides_with_empty_values.service_type != config.service_type);
+  REQUIRE(overrides_with_empty_values.environment != config.environment);
+  REQUIRE(overrides_with_empty_values.version != config.version);
+  REQUIRE(overrides_with_empty_values.name != config.name);
+  REQUIRE(overrides_with_empty_values.tags != config.tags);
+
   // Some of the sections below create a span from extracted trace context.
   const std::unordered_map<std::string, std::string> headers{
       {"x-datadog-trace-id", "123"}, {"x-datadog-parent-id", "456"}};
@@ -117,6 +129,9 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(root.version() == config.version);
     REQUIRE(root.name == config.name);
     REQUIRE_THAT(root.tags, ContainsSubset(*config.tags));
+
+    REQUIRE(root.tags.count(tags::version) == 1);
+    REQUIRE(root.tags.find(tags::version)->second == config.version);
   }
 
   SECTION("can be overridden in a root span") {
@@ -141,6 +156,9 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(root.version() == overrides.version);
     REQUIRE(root.name == overrides.name);
     REQUIRE_THAT(root.tags, ContainsSubset(overrides.tags));
+
+    REQUIRE(root.tags.count(tags::version) == 1);
+    REQUIRE(root.tags.find(tags::version)->second == overrides.version);
   }
 
   SECTION("are honored in an extracted span") {
@@ -165,6 +183,9 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(span.version() == config.version);
     REQUIRE(span.name == config.name);
     REQUIRE_THAT(span.tags, ContainsSubset(*config.tags));
+
+    REQUIRE(span.tags.count(tags::version) == 1);
+    REQUIRE(span.tags.find(tags::version)->second == config.version);
   }
 
   SECTION("can be overridden in an extracted span") {
@@ -189,6 +210,9 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(span.version() == overrides.version);
     REQUIRE(span.name == overrides.name);
     REQUIRE_THAT(span.tags, ContainsSubset(overrides.tags));
+
+    REQUIRE(span.tags.count(tags::version) == 1);
+    REQUIRE(span.tags.find(tags::version)->second == overrides.version);
   }
 
   SECTION("are honored in a child span") {
@@ -216,6 +240,9 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(child.version() == config.version);
     REQUIRE(child.name == config.name);
     REQUIRE_THAT(child.tags, ContainsSubset(*config.tags));
+
+    REQUIRE(child.tags.count(tags::version) == 1);
+    REQUIRE(child.tags.find(tags::version)->second == config.version);
   }
 
   SECTION("can be overridden in a child span") {
@@ -243,6 +270,40 @@ TEST_CASE("tracer span defaults") {
     REQUIRE(child.version() == overrides.version);
     REQUIRE(child.name == overrides.name);
     REQUIRE_THAT(child.tags, ContainsSubset(overrides.tags));
+
+    REQUIRE(child.tags.count(tags::version) == 1);
+    REQUIRE(child.tags.find(tags::version)->second == overrides.version);
+  }
+
+  SECTION("can be overridden in a child span with empty values") {
+    {
+      auto parent = tracer.create_span();
+      auto child = parent.create_child(overrides_with_empty_values);
+      (void)child;
+    }
+    REQUIRE(logger->error_count() == 0);
+
+    // Get the finished span from the collector and verify that its
+    // properties have the configured default values.
+    REQUIRE(collector->chunks.size() == 1);
+    const auto& chunk = collector->chunks.front();
+    // One span for the parent, and another for the child.
+    REQUIRE(chunk.size() == 2);
+    // The parent will be first, so the child is last.
+    auto& child_ptr = chunk.back();
+    REQUIRE(child_ptr);
+    const auto& child = *child_ptr;
+
+    REQUIRE(child.service ==
+            overrides_with_empty_values.service);  // only service is set
+    REQUIRE(child.service_type == config.service_type);
+    REQUIRE(child.environment() == config.environment);
+    REQUIRE(child.version() == nullopt);  // version is not inherited since the
+                                          // service name is different
+    REQUIRE(child.name == config.name);
+    REQUIRE_THAT(child.tags, ContainsSubset(*config.tags));
+
+    REQUIRE(child.tags.count(tags::version) == 0);
   }
 }
 
