@@ -55,12 +55,6 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
           { "dd_trace_agent_url", tracer_cfg["environment_variables"]["DD_TRACE_AGENT_URL"]}
         }
       }
-      // { "dd_runtime_metrics_enabled", "null"},
-      // { "dd_tags", "null"},
-      // { "dd_trace_propagation_style", "null"},
-      // { "dd_trace_debug", tracer_cfg["defaults"]["environment"]["DD_TRACE_DEBUG"]},
-      // { "dd_trace_otel_enabled", "false"},
-      // { "dd_log_level", "null"}
     };
   // clang-format on
 
