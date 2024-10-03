@@ -42,7 +42,7 @@ void RequestHandler::set_error(const char* const file, int line,
   return
 
 void RequestHandler::on_trace_config(const httplib::Request& /* req */,
-                                   httplib::Response& res) {
+                                     httplib::Response& res) {
   auto tracer_cfg = nlohmann::json::parse(tracer_.config());
 
   // clang-format off
@@ -64,12 +64,11 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
     };
   // clang-format on
 
-  if (tracer_cfg.contains("trace_sampler"))
-  {
+  if (tracer_cfg.contains("trace_sampler")) {
     auto trace_sampler_cfg = tracer_cfg["trace_sampler"];
-    if (trace_sampler_cfg.contains("max_per_second"))
-    {
-      response_body["config"]["dd_trace_rate_limit"] = std::to_string((int)trace_sampler_cfg["max_per_second"]);
+    if (trace_sampler_cfg.contains("max_per_second")) {
+      response_body["config"]["dd_trace_rate_limit"] =
+          std::to_string((int)trace_sampler_cfg["max_per_second"]);
     }
   }
 

@@ -91,9 +91,9 @@ int main(int argc, char* argv[]) {
 
   httplib::Server svr;
   svr.Get("/trace/config",
-           [&handler](const httplib::Request& req, httplib::Response& res) {
-             handler.on_trace_config(req, res);
-           });
+          [&handler](const httplib::Request& req, httplib::Response& res) {
+            handler.on_trace_config(req, res);
+          });
   svr.Post("/trace/span/start",
            [&handler](const httplib::Request& req, httplib::Response& res) {
              handler.on_span_start(req, res);
