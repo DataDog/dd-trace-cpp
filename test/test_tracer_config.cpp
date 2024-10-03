@@ -715,8 +715,8 @@ TEST_CASE("TracerConfig::trace_sampler") {
 
     SECTION("must be >0 and a finite number") {
       auto limit = GENERATE(0.0, -1.0, std::nan(""),
-                            std::numeric_limits<double>::infinity(),
-                            -std::numeric_limits<double>::infinity());
+                            std::numeric_limits<int>::infinity(),
+                            -std::numeric_limits<int>::infinity());
 
       CAPTURE(limit);
       CAPTURE(std::fpclassify(limit));
@@ -744,9 +744,11 @@ TEST_CASE("TracerConfig::trace_sampler") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
-          {"trailing space", "23   ", {Error::INVALID_DOUBLE}},
-          {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
+          {"nonsense", "nonsense", {Error::INVALID_INTEGER}},
+          {"trailing space", "23   ", {Error::INVALID_INTEGER}},
+          {"out of range of double",
+           "123e9999999999",
+           {Error::INVALID_INTEGER}},
           // Some C++ standard libraries parse "nan" and "inf" as the
           // corresponding special floating point values. Other standard
           // libraries consider "nan" and "inf" invalid.
@@ -755,17 +757,17 @@ TEST_CASE("TracerConfig::trace_sampler") {
           // (0.0, Inf) allowed.
           {"NaN",
            "NaN",
-           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+           {Error::INVALID_INTEGER, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
           {"nan",
            "nan",
-           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+           {Error::INVALID_INTEGER, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
           {"inf",
            "inf",
-           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+           {Error::INVALID_INTEGER, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
           {"Inf",
            "Inf",
-           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
-          {"below range", "-0.1", {Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+           {Error::INVALID_INTEGER, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"below range", "-0.1", {Error::INVALID_INTEGER}},
           {"zero (also below range)",
            "0",
            {Error::MAX_PER_SECOND_OUT_OF_RANGE}},
@@ -926,7 +928,7 @@ TEST_CASE("TracerConfig::span_sampler") {
         "TracerConfig::span_sampler.rules") {
       SpanSamplerConfig::Rule config_rule;
       config_rule.service = "foosvc";
-      config_rule.max_per_second = 9.2;
+      config_rule.max_per_second = 9;
       config.span_sampler.rules.push_back(config_rule);
 
       auto rules_json = R"json([
@@ -982,7 +984,7 @@ TEST_CASE("TracerConfig::span_sampler") {
            Error::RULE_WRONG_TYPE},
           {"sample_rate must be a number", R"json([{"sample_rate": true}])json",
            Error::SPAN_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE},
-          {"max_per_second must be a number (or absent)",
+          {"max_per_second must be an integer (or absent)",
            R"json([{"max_per_second": false}])json",
            Error::SPAN_SAMPLING_RULES_MAX_PER_SECOND_WRONG_TYPE},
           {"no unknown properties", R"json([{"extension": "denied!"}])json",
@@ -1005,7 +1007,7 @@ TEST_CASE("TracerConfig::span_sampler") {
         // This rule will be overridden.
         SpanSamplerConfig::Rule config_rule;
         config_rule.service = "foosvc";
-        config_rule.max_per_second = 9.2;
+        config_rule.max_per_second = 9;
         config.span_sampler.rules.push_back(config_rule);
 
         auto rules_file_json = R"json([

@@ -23,7 +23,7 @@ namespace tracing {
 struct SpanSamplerConfig {
   struct Rule : public SpanMatcher {
     double sample_rate = 1.0;
-    Optional<double> max_per_second;
+    Optional<int> max_per_second;
 
     Rule(const SpanMatcher&);
     Rule() = default;
@@ -45,7 +45,7 @@ class FinalizedSpanSamplerConfig {
  public:
   struct Rule : public SpanMatcher {
     Rate sample_rate;
-    Optional<double> max_per_second;
+    Optional<int> max_per_second;
   };
 
   std::vector<Rule> rules;

@@ -38,7 +38,7 @@ struct SamplingDecision {
   Optional<Rate> limiter_effective_rate;
   // The per-second maximum allowed number of "keeps" configured for the limiter
   // consulted in this decision, if any.
-  Optional<double> limiter_max_per_second;
+  Optional<int> limiter_max_per_second;
   // The provenance of this decision.
   Origin origin;
 };

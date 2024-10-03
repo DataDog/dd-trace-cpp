@@ -105,14 +105,14 @@ TEST_CASE("trace sampling rate limiter") {
   // second does not exceed that allowed by the configured limit.
   struct TestCase {
     std::string name;
-    double max_per_second;
+    int max_per_second;
     std::size_t burst_size;
     std::size_t expected_kept_count;
   };
 
-  auto test_case = GENERATE(values<TestCase>({{"allow one", 1.0, 100, 1},
-                                              {"allow all", 100.0, 100, 100},
-                                              {"allow some", 10.0, 100, 10}}));
+  auto test_case = GENERATE(values<TestCase>({{"allow one", 1, 100, 1},
+                                              {"allow all", 100, 100, 100},
+                                              {"allow some", 10, 100, 10}}));
 
   CAPTURE(test_case.name);
   CAPTURE(test_case.max_per_second);

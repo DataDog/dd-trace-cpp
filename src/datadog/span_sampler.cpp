@@ -10,7 +10,7 @@ namespace datadog {
 namespace tracing {
 
 SpanSampler::SynchronizedLimiter::SynchronizedLimiter(const Clock& clock,
-                                                      double max_per_second)
+                                                      int max_per_second)
     : limiter(clock, max_per_second) {}
 
 SpanSampler::Rule::Rule(const FinalizedSpanSamplerConfig::Rule& rule,

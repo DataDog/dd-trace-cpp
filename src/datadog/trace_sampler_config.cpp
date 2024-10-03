@@ -118,7 +118,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
   }
 
   if (auto limit_env = lookup(environment::DD_TRACE_RATE_LIMIT)) {
-    auto maybe_max_per_second = parse_double(*limit_env);
+    auto maybe_max_per_second = parse_int(*limit_env, 10);
     if (auto *error = maybe_max_per_second.if_error()) {
       std::string prefix;
       prefix += "While parsing ";

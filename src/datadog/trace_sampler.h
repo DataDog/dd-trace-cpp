@@ -110,7 +110,7 @@ class TraceSampler {
   std::unordered_map<std::string, Rate> collector_sample_rates_;
   std::vector<TraceSamplerRule> rules_;
   Limiter limiter_;
-  double limiter_max_per_second_;
+  int limiter_max_per_second_;
 
  public:
   TraceSampler(const FinalizedTraceSamplerConfig& config, const Clock& clock);
