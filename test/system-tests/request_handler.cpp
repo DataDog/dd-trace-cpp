@@ -41,6 +41,35 @@ void RequestHandler::set_error(const char* const file, int line,
   set_error(__FILE__, __LINE__, msg, res); \
   return
 
+void RequestHandler::on_trace_config(const httplib::Request& /* req */,
+                                     httplib::Response& res) {
+  auto tracer_cfg = nlohmann::json::parse(tracer_.config());
+
+  // clang-format off
+    auto response_body = nlohmann::json{
+      { "config", {
+          { "dd_service", tracer_cfg["defaults"]["service"]},
+          { "dd_env", tracer_cfg["defaults"]["environment"]},
+          { "dd_version", tracer_cfg["environment_variables"]["version"]},
+          { "dd_trace_enabled", tracer_cfg["environment_variables"]["report_traces"]},
+          { "dd_trace_agent_url", tracer_cfg["environment_variables"]["DD_TRACE_AGENT_URL"]}
+        }
+      }
+    };
+  // clang-format on
+
+  if (tracer_cfg.contains("trace_sampler")) {
+    auto trace_sampler_cfg = tracer_cfg["trace_sampler"];
+    if (trace_sampler_cfg.contains("max_per_second")) {
+      response_body["config"]["dd_trace_rate_limit"] =
+          std::to_string((int)trace_sampler_cfg["max_per_second"]);
+    }
+  }
+
+  logger_->log_info(response_body.dump());
+  res.set_content(response_body.dump(), "application/json");
+}
+
 void RequestHandler::on_span_start(const httplib::Request& req,
                                    httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);
@@ -50,7 +79,9 @@ void RequestHandler::on_span_start(const httplib::Request& req,
 
   if (auto service =
           utils::get_if_exists<std::string_view>(request_json, "service")) {
-    span_cfg.service = *service;
+    if (!service->empty()) {
+      span_cfg.service = *service;
+    }
   }
 
   if (auto service_type =

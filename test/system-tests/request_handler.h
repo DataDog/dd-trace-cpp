@@ -19,6 +19,7 @@ class RequestHandler final {
   void set_error(const char* const file, int line, const std::string& reason,
                  httplib::Response& res);
 
+  void on_trace_config(const httplib::Request& req, httplib::Response& res);
   void on_span_start(const httplib::Request& req, httplib::Response& res);
   void on_span_end(const httplib::Request& req, httplib::Response& res);
   void on_set_meta(const httplib::Request& req, httplib::Response& res);
