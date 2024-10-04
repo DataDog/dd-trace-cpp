@@ -228,10 +228,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   result.metadata[ConfigName::TRACE_SAMPLING_LIMIT] = ConfigMetadata(
       ConfigName::TRACE_SAMPLING_LIMIT, std::to_string(max_per_second), origin);
 
-  const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
-  if (!(max_per_second > 0) ||
-      std::find(std::begin(allowed_types), std::end(allowed_types),
-                std::fpclassify(max_per_second)) == std::end(allowed_types)) {
+  if (!(max_per_second > 0)) {
     std::string message;
     message +=
         "Trace sampling max_per_second must be greater than zero, but the "

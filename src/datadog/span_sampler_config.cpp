@@ -254,12 +254,8 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
       return error->with_prefix(prefix);
     }
 
-    const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
     if (rule.max_per_second &&
-        (!(*rule.max_per_second > 0) ||
-         std::find(std::begin(allowed_types), std::end(allowed_types),
-                   std::fpclassify(*rule.max_per_second)) ==
-             std::end(allowed_types))) {
+        (!(*rule.max_per_second > 0))) {
       std::string message;
       message += "Span sampling rule with pattern ";
       message += nlohmann::json(static_cast<SpanMatcher>(rule)).dump();
