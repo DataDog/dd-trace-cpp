@@ -37,7 +37,19 @@ Optional<StringView> SpanData::version() const {
 
 void SpanData::apply_config(const SpanDefaults& defaults,
                             const SpanConfig& config, const Clock& clock) {
-  service = config.service.value_or(defaults.service);
+  std::string version;
+  if (config.service) {
+    service = *config.service;
+    version = config.version.value_or("");
+  } else {
+    service = defaults.service;
+    version = defaults.version;
+  }
+
+  if (!version.empty()) {
+    tags.insert_or_assign(tags::version, version);
+  }
+
   name = config.name.value_or(defaults.name);
 
   for (const auto& item : defaults.tags) {
@@ -47,11 +59,7 @@ void SpanData::apply_config(const SpanDefaults& defaults,
   if (!environment.empty()) {
     tags.insert_or_assign(tags::environment, environment);
   }
-  std::string version = config.version.value_or(
-      service.compare(defaults.service) == 0 ? defaults.version : "");
-  if (!version.empty()) {
-    tags.insert_or_assign(tags::version, version);
-  }
+
   for (const auto& [key, value] : config.tags) {
     tags.insert_or_assign(key, value);
   }

@@ -278,8 +278,7 @@ TEST_CASE("tracer span defaults") {
   SECTION("can be overridden in a child span with empty values") {
     {
       auto parent = tracer.create_span();
-      auto child = parent.create_child(overrides_with_empty_values);
-      (void)child;
+      parent.create_child(overrides_with_empty_values);
     }
     REQUIRE(logger->error_count() == 0);
 
