@@ -191,17 +191,20 @@ int get_process_id() {
 
 std::string get_process_name() {
 #if defined(__APPLE__) || defined(__FreeBSD__)
-  return getprogname();
+  char* process_name = getprogname();
+  return (process_name != nullptr) ? process_name : "unknown-service";
 #elif defined(__linux__) || defined(__unix__)
   return program_invocation_short_name;
 #elif defined(_MSC_VER)
-  TCHAR szExeFileName[MAX_PATH];
-  GetModuleFileName(NULL, szExeFileName, MAX_PATH);
+  TCHAR exe_name[MAX_PATH];
+  if (GetModuleFileName(NULL, exe_name, MAX_PATH) <= 0) {
+    return "unknown-service";
+  } 
 #ifdef UNICODE
-  std::wstring wStr(szExeFileName);
+  std::wstring wStr(exe_name);
   std::string path = std::string(wStr.begin(), wStr.end());
 #else
-  std::string path = std::string(szExeFileName);
+  std::string path = std::string(exe_name);
 #endif
   return path.substr(path.find_last_of("/\\") + 1);
 #else
