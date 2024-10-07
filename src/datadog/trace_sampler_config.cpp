@@ -224,7 +224,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   }
 
   const auto [origin, max_per_second] =
-      pick(env_config->max_per_second, config.max_per_second, 200);
+      pick(env_config->max_per_second, config.max_per_second, 100);
   result.metadata[ConfigName::TRACE_SAMPLING_LIMIT] = ConfigMetadata(
       ConfigName::TRACE_SAMPLING_LIMIT, std::to_string(max_per_second), origin);
 

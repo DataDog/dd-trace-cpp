@@ -707,10 +707,10 @@ TEST_CASE("TracerConfig::trace_sampler") {
   }
 
   SECTION("max_per_second") {
-    SECTION("defaults to 200") {
+    SECTION("defaults to 100") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
-      REQUIRE(finalized->trace_sampler.max_per_second == 200);
+      REQUIRE(finalized->trace_sampler.max_per_second == 100);
     }
 
     SECTION("must be >0 and a finite number") {
