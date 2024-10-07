@@ -199,7 +199,7 @@ std::string get_process_name() {
   TCHAR exe_name[MAX_PATH];
   if (GetModuleFileName(NULL, exe_name, MAX_PATH) <= 0) {
     return "unknown-service";
-  } 
+  }
 #ifdef UNICODE
   std::wstring wStr(exe_name);
   std::string path = std::string(wStr.begin(), wStr.end());
