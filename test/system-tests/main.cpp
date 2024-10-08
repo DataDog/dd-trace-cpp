@@ -77,8 +77,6 @@ int main(int argc, char* argv[]) {
   datadog::tracing::TracerConfig config;
   config.logger = logger;
   config.agent.event_scheduler = event_scheduler;
-  config.service = "cpp-parametric-test";
-  config.environment = "staging";
   config.name = "http.request";
 
   auto finalized_config = datadog::tracing::finalize_config(config);

@@ -24,7 +24,7 @@ struct Error {
   // versions.
   enum Code {
     OTHER = 1,
-    SERVICE_NAME_REQUIRED = 2,
+    // SERVICE_NAME_REQUIRED = 2,
     MESSAGEPACK_ENCODE_FAILURE = 3,
     CURL_REQUEST_FAILURE = 4,
     DATADOG_AGENT_NULL_HTTP_CLIENT = 5,

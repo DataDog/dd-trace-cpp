@@ -15,6 +15,7 @@
 #include "datadog_agent.h"
 #include "json.hpp"
 #include "parse_util.h"
+#include "platform_util.h"
 #include "string_util.h"
 
 namespace datadog {
@@ -263,7 +264,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       pick(env_config->service, user_config.service, "");
 
   if (final_config.defaults.service.empty()) {
-    return Error{Error::SERVICE_NAME_REQUIRED, "Service name is required."};
+    final_config.defaults.service = get_process_name();
   }
 
   final_config.metadata[ConfigName::SERVICE_NAME] = ConfigMetadata(
