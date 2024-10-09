@@ -53,7 +53,7 @@ The library has been tested and is compatible on the following CPU architecture,
 ### Requirements
 `dd-trace-cpp` requires a [supported](#platform-support) C++17 compiler.
 
-A recent version of CMake is required (`3.24`), which might not be in your
+A recent version of CMake is required (`3.22`), which might not be in your
 system's package manager. [bin/install-cmake](bin/install-cmake) is an installer
 for a recent CMake.
 
