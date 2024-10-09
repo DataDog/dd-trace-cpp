@@ -82,10 +82,7 @@ file(GLOB_RECURSE public_header_files ${CMAKE_SOURCE_DIR}/include/*.h)
 
 target_sources(dd_trace_cpp-objects
   PUBLIC
-    FILE_SET public_headers
-    TYPE HEADERS
-    BASE_DIRS include
-    FILES ${public_header_files}
+    ${public_header_files}
   PRIVATE
     src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
@@ -181,10 +178,15 @@ if (BUILD_SHARED_LIBS)
 
   install(TARGETS dd_trace_cpp-objects dd_trace_cpp-shared
     EXPORT dd_trace_cpp-export
-    FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+
+  # Install headers separately
+  install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
   )
 endif ()
 
@@ -218,9 +220,14 @@ if (BUILD_STATIC_LIBS)
 
   install(TARGETS dd_trace_cpp-objects dd_trace_cpp-static
     EXPORT dd_trace_cpp-export
-    FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+
+  # Then, install the public headers separately
+  install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
   )
 endif ()
