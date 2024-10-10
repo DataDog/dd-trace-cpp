@@ -98,7 +98,7 @@ std::tuple<std::string, std::string> get_windows_info() {
   // application manifest, which is the lowest version supported by the
   // application. Use `RtlGetVersion` to obtain the accurate OS version
   // regardless of the manifest.
-  using RtlGetVersion = auto(*)(LPOSVERSIONINFOEXW)->NTSTATUS;
+  using RtlGetVersion = auto (*)(LPOSVERSIONINFOEXW)->NTSTATUS;
 
   RtlGetVersion func =
       (RtlGetVersion)GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
@@ -191,7 +191,7 @@ int get_process_id() {
 
 std::string get_process_name() {
 #if defined(__APPLE__) || defined(__FreeBSD__)
-  char* process_name = getprogname();
+  const char* process_name = getprogname();
   return (process_name != nullptr) ? process_name : "unknown-service";
 #elif defined(__linux__) || defined(__unix__)
   return program_invocation_short_name;
