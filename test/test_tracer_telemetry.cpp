@@ -54,7 +54,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
       auto app_started = nlohmann::json::parse(app_started_message);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
       REQUIRE(app_started["request_type"] == "message-batch");
-      REQUIRE(app_started["payload"].size() == 1);
+      REQUIRE(app_started["payload"].size() == 2);
 
       auto& app_started_payload = app_started["payload"][0];
       CHECK(app_started_payload["request_type"] == "app-started");
@@ -89,7 +89,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
       REQUIRE(app_started["request_type"] == "message-batch");
       REQUIRE(app_started["payload"].is_array());
-      REQUIRE(app_started["payload"].size() == 1);
+      REQUIRE(app_started["payload"].size() == 2);
 
       auto& app_started_payload = app_started["payload"][0];
       CHECK(app_started_payload["request_type"] == "app-started");

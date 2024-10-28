@@ -87,6 +87,9 @@ target_sources(dd_trace_cpp-objects
     BASE_DIRS include
     FILES ${public_header_files}
   PRIVATE
+    src/datadog/telemetry/configuration.cpp
+    src/datadog/telemetry/metrics.cpp
+    src/datadog/telemetry/telemetry.cpp
     src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
@@ -102,7 +105,6 @@ target_sources(dd_trace_cpp-objects
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
-    src/datadog/metrics.cpp
     src/datadog/msgpack.cpp
     src/datadog/parse_util.cpp
     src/datadog/platform_util.cpp

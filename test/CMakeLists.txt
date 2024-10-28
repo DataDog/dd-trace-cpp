@@ -16,6 +16,10 @@ add_executable(tests
     # utilities
     matchers.cpp
 
+    # telemetry test cases
+    telemetry/test_configuration.cpp
+    telemetry/test_metrics.cpp
+
     # test cases
     test_base64.cpp
     test_cerr_logger.cpp
@@ -24,7 +28,6 @@ add_executable(tests
     test_datadog_agent.cpp
     test_glob.cpp
     test_limiter.cpp
-    test_metrics.cpp
     test_msgpack.cpp
     test_parse_util.cpp
     test_smoke.cpp

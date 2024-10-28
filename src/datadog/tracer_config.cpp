@@ -4,11 +4,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cctype>
-#include <cstddef>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "cerr_logger.h"
@@ -124,10 +121,6 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   }
   if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
     env_cfg.report_traces = !falsy(*enabled_env);
-  }
-  if (auto enabled_env =
-          lookup(environment::DD_INSTRUMENTATION_TELEMETRY_ENABLED)) {
-    env_cfg.report_telemetry = !falsy(*enabled_env);
   }
   if (auto trace_delegate_sampling_env =
           lookup(environment::DD_TRACE_DELEGATE_SAMPLING)) {
@@ -333,13 +326,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.metadata[ConfigName::REPORT_TRACES] = ConfigMetadata(
       ConfigName::REPORT_TRACES, to_string(final_config.report_traces), origin);
 
-  // Report telemetry
-  std::tie(origin, final_config.report_telemetry) =
-      pick(env_config->report_telemetry, user_config.report_telemetry, true);
-  final_config.metadata[ConfigName::REPORT_TELEMETRY] =
-      ConfigMetadata(ConfigName::REPORT_TELEMETRY,
-                     to_string(final_config.report_traces), origin);
-
   // Report hostname
   final_config.report_hostname =
       value_or(env_config->report_hostname, user_config.report_hostname, false);
@@ -399,6 +385,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     final_config.span_sampler = std::move(*span_sampler_config);
   } else {
     return std::move(span_sampler_config.error());
+  }
+
+  if (auto telemetry_final_config =
+          telemetry::finalize_config(user_config.telemetry)) {
+    final_config.telemetry = std::move(*telemetry_final_config);
+  } else {
+    return std::move(telemetry_final_config.error());
   }
 
   return final_config;

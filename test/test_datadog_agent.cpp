@@ -28,7 +28,7 @@ TEST_CASE("CollectorResponse", "[datadog_agent]") {
   // Tests currently only cover sending traces to the agent.
   // Submiting telemetry performs essentially the same steps, but may be added
   // in the future.
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
   auto finalized = finalize_config(config);
   REQUIRE(finalized);
 
@@ -189,7 +189,7 @@ TEST_CASE("Remote Configuration", "[datadog_agent]") {
   config.logger = logger;
   config.agent.event_scheduler = event_scheduler;
   config.agent.http_client = http_client;
-  config.report_telemetry = false;
+  config.telemetry.enabled = false;
 
   auto finalized = finalize_config(config);
   REQUIRE(finalized);
@@ -197,7 +197,7 @@ TEST_CASE("Remote Configuration", "[datadog_agent]") {
   const TracerSignature signature(RuntimeID::generate(), "testsvc", "test");
 
   auto telemetry = std::make_shared<TracerTelemetry>(
-      finalized->report_telemetry, finalized->clock, finalized->logger,
+      finalized->telemetry.enabled, finalized->clock, finalized->logger,
       signature, "", "");
 
   auto config_manager =

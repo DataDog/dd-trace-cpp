@@ -4,6 +4,8 @@
 // `Tracer`.  `Tracer` is instantiated with a `FinalizedTracerConfig`, which
 // must be obtained from the result of a call to `finalize_config`.
 
+#include <datadog/telemetry/configuration.h>
+
 #include <cstddef>
 #include <memory>
 #include <variant>
@@ -73,12 +75,9 @@ struct TracerConfig {
   // variable.
   Optional<bool> report_traces;
 
-  // `report_telemetry` indicates whether telemetry about the tracer will be
-  // sent to a collector (`true`) or discarded on completion (`false`).  If
-  // `report_telemetry` is `false`, then this feature is disabled.
-  // `report_telemetry` is overridden by the
-  // `DD_INSTRUMENTATION_TELEMETRY_ENABLED` environment variable.
-  Optional<bool> report_telemetry;
+  // `telemetry` configures the telemetry module. See
+  // `telemetry/configuration.h` By default, the telemetry module is enabled.
+  telemetry::Configuration telemetry;
 
   // `delegate_trace_sampling` indicates whether the tracer will consult a child
   // service for a trace sampling decision, and prefer the resulting decision
@@ -180,6 +179,7 @@ class FinalizedTracerConfig final {
 
   FinalizedTraceSamplerConfig trace_sampler;
   FinalizedSpanSamplerConfig span_sampler;
+  telemetry::FinalizedConfiguration telemetry;
 
   std::vector<PropagationStyle> injection_styles;
   std::vector<PropagationStyle> extraction_styles;
@@ -189,7 +189,6 @@ class FinalizedTracerConfig final {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool generate_128bit_trace_ids;
-  bool report_telemetry;
   Optional<RuntimeID> runtime_id;
   Clock clock;
   std::string integration_name;

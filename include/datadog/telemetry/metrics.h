@@ -11,7 +11,7 @@
 #include <vector>
 
 namespace datadog {
-namespace tracing {
+namespace telemetry {
 
 class Metric {
   // The name of the metric that will be published. A transformation occurs
@@ -20,6 +20,8 @@ class Metric {
   std::string name_;
   // The type of the metric. This will currently be count or gauge.
   std::string type_;
+  // Namespace of the metric.
+  std::string scope_;
   // Tags associated with this specific instance of the metric.
   std::vector<std::string> tags_;
   // This affects the transformation of the metric name, where it can be a
@@ -29,14 +31,15 @@ class Metric {
 
  protected:
   std::atomic<uint64_t> value_ = 0;
-  Metric(std::string name, std::string type, std::vector<std::string> tags,
-         bool common);
+  Metric(std::string name, std::string type, std::string scope,
+         std::vector<std::string> tags, bool common);
 
  public:
   // Accessors for name, type, tags, common and capture_and_reset_value are used
   // when producing the JSON message for reporting metrics.
   std::string name();
   std::string type();
+  std::string scope();
   std::vector<std::string> tags();
   bool common();
   uint64_t value();
@@ -47,7 +50,8 @@ class Metric {
 // number of actions, or incrementing the current number of actions by 1.
 class CounterMetric : public Metric {
  public:
-  CounterMetric(std::string name, std::vector<std::string> tags, bool common);
+  CounterMetric(std::string name, std::string scope,
+                std::vector<std::string> tags, bool common);
   void inc();
   void add(uint64_t amount);
 };
@@ -57,7 +61,8 @@ class CounterMetric : public Metric {
 // state by 1.
 class GaugeMetric : public Metric {
  public:
-  GaugeMetric(std::string name, std::vector<std::string> tags, bool common);
+  GaugeMetric(std::string name, std::string scope,
+              std::vector<std::string> tags, bool common);
   void set(uint64_t value);
   void inc();
   void add(uint64_t amount);
@@ -65,5 +70,5 @@ class GaugeMetric : public Metric {
   void sub(uint64_t amount);
 };
 
-}  // namespace tracing
+}  // namespace telemetry
 }  // namespace datadog
