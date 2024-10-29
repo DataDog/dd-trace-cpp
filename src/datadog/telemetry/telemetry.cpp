@@ -26,8 +26,8 @@ Telemetry::Telemetry(FinalizedConfiguration config,
                                             tracing::get_process_name(), "");
 
   tracer_telemetry_ = std::make_shared<tracing::TracerTelemetry>(
-      config.enabled, tracing::default_clock, logger, tracer_signature,
-      config.integration_name, config.integration_version, metrics);
+      config_.enabled, tracing::default_clock, logger_, tracer_signature,
+      config_.integration_name, config_.integration_version, metrics);
 
   tracing::DatadogAgentConfig dd_config;
   dd_config.http_client = http_client_;
@@ -35,13 +35,13 @@ Telemetry::Telemetry(FinalizedConfiguration config,
   dd_config.remote_configuration_enabled = false;
 
   auto final_cfg =
-      tracing::finalize_config(dd_config, logger, tracing::default_clock);
+      tracing::finalize_config(dd_config, logger_, tracing::default_clock);
   if (!final_cfg) {
     return;
   }
 
   datadog_agent_ = std::make_shared<tracing::DatadogAgent>(
-      *final_cfg, tracer_telemetry_, logger, tracer_signature,
+      *final_cfg, tracer_telemetry_, logger_, tracer_signature,
       std::vector<std::shared_ptr<remote_config::Listener>>{});
 }
 
