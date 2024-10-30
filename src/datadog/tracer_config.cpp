@@ -351,10 +351,11 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
                      to_string(final_config.delegate_trace_sampling), origin);
 
   // Integration name & version
-  final_config.integration_name =
-      value_or(env_config->integration_name, user_config.integration_name, "");
-  final_config.integration_version = value_or(
-      env_config->integration_version, user_config.integration_version, "");
+  final_config.integration_name = value_or(
+      env_config->integration_name, user_config.integration_name, "datadog");
+  final_config.integration_version =
+      value_or(env_config->integration_version, user_config.integration_version,
+               tracer_version);
 
   if (user_config.runtime_id) {
     final_config.runtime_id = user_config.runtime_id;

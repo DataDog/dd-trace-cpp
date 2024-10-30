@@ -9,19 +9,23 @@
 namespace datadog::telemetry {
 
 struct Configuration {
-  // Turn on or off telemetry module
-  // Enabled by default.
-  // Overwritten by `DD_INSTRUMENTATION_TELEMETRY_ENABLED` env var.
+  // Enable or disable the telemetry module.
+  // Default: enabled.
+  // Can be overriden by the `DD_INSTRUMENTATION_TELEMETRY_ENABLED` environment
+  // variable.
   tracing::Optional<bool> enabled;
-  // Turn on or off metrics reporting
-  // Overwritten by `DD_TELEMETRY_METRICS_ENABLED` env var.
+  // Enable or disable telemetry metrics.
+  // Default: enabled.
+  // Can be overriden by the `DD_TELEMETRY_METRICS_ENABLED` environment
+  // variable.
   tracing::Optional<bool> report_metrics;
-  // Interval of metrics payload
-  // Overwritten by `DD_TELEMETRY_METRICS_INTERVAL_SECONDS` env var.
-  tracing::Optional<int> metrics_interval_seconds;
-  // Interval of heartbeat payload
-  // Overwritten by `DD_TELEMETRY_HEARTBEAT_INTERVAL` env var.
-  tracing::Optional<int> heartbeat_interval_seconds;
+  // Interval at which the metrics payload will be sent.
+  // Can be overriden by `DD_TELEMETRY_METRICS_INTERVAL_SECONDS` environment
+  // variable.
+  tracing::Optional<double> metrics_interval_seconds;
+  // Interval at which the heartbeat payload will be sent.
+  // Can be overriden by `DD_TELEMETRY_HEARTBEAT_INTERVAL` environment variable.
+  tracing::Optional<double> heartbeat_interval_seconds;
   // `integration_name` is the name of the product integrating this library.
   // Example: "nginx", "envoy" or "istio".
   tracing::Optional<std::string> integration_name;
