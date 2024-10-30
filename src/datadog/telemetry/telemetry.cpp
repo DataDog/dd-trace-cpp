@@ -11,13 +11,9 @@ namespace datadog {
 namespace telemetry {
 
 Telemetry::Telemetry(FinalizedConfiguration config,
-                     std::shared_ptr<tracing::EventScheduler> scheduler,
-                     std::shared_ptr<tracing::HTTPClient> http_client,
                      std::shared_ptr<tracing::Logger> logger,
                      std::vector<std::shared_ptr<Metric>> metrics)
-    : config_(std::move(config)),
-      http_client_(std::move(http_client)),
-      logger_(std::move(logger)) {
+    : config_(std::move(config)), logger_(std::move(logger)) {
   if (!config_.enabled) {
     return;
   }
@@ -30,8 +26,6 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       config_.integration_name, config_.integration_version, metrics);
 
   tracing::DatadogAgentConfig dd_config;
-  dd_config.http_client = http_client_;
-  dd_config.event_scheduler = scheduler;
   dd_config.remote_configuration_enabled = false;
 
   auto final_cfg =
