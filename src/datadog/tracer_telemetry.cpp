@@ -64,7 +64,8 @@ TracerTelemetry::TracerTelemetry(
       host_info_(get_host_info()),
       tracer_signature_(tracer_signature),
       integration_name_(integration_name),
-      integration_version_(integration_version) {
+integration_version_(integration_version),
+  user_metrics_(user_metrics_){
   if (enabled_) {
     if (integration_name_.empty()) {
       integration_name_ = "datadog";
@@ -101,7 +102,7 @@ TracerTelemetry::TracerTelemetry(
     metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
                                     MetricSnapshot{});
 
-    for (auto& m : user_metrics) {
+    for (auto& m : user_metrics_) {
       metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
     }
   }
