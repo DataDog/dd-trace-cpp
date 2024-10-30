@@ -116,7 +116,7 @@ jobs:
         name: Building
         command: |
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch << parameters.arch >> 
-          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_TESTING=1 -G Ninja .
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DDD_TRACE_STATIC_CRT=1 -DDD_TRACE_BUILD_TESTING=1 -G Ninja .
           cmake --build build -j $env:MAKE_JOB_COUNT -v
     - run:
         name: Testing

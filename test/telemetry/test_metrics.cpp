@@ -1,13 +1,14 @@
 // This test covers operations defined for metrics defined in `metrics.h`.
 
-#include <datadog/metrics.h>
+#include <datadog/telemetry/metrics.h>
 
 #include "test.h"
 
-using namespace datadog::tracing;
+using namespace datadog::telemetry;
 
-TEST_CASE("Counter metrics") {
-  CounterMetric metric = {"test.counter.metric", {"testing-testing:123"}, true};
+TEST_CASE("Counter metrics", "[telemetry.metrics]") {
+  CounterMetric metric = {
+      "test.counter.metric", "test_scope", {"testing-testing:123"}, true};
 
   metric.inc();
   metric.add(41);
@@ -17,8 +18,9 @@ TEST_CASE("Counter metrics") {
   REQUIRE(metric.value() == 0);
 }
 
-TEST_CASE("Gauge metrics") {
-  GaugeMetric metric = {"test.gauge.metric", {"testing-testing:123"}, true};
+TEST_CASE("Gauge metrics", "[telemetry.metrics]") {
+  GaugeMetric metric = {
+      "test.gauge.metric", "test_scope", {"testing-testing:123"}, true};
   metric.set(40);
   metric.inc();
   metric.add(10);

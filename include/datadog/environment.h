@@ -23,34 +23,38 @@ namespace environment {
 
 // To enforce correspondence between `enum Variable` and `variable_names`, the
 // preprocessor is used so that the DD_* symbols are listed exactly once.
-#define LIST_ENVIRONMENT_VARIABLES(MACRO)       \
-  MACRO(DD_AGENT_HOST)                          \
-  MACRO(DD_ENV)                                 \
-  MACRO(DD_INSTRUMENTATION_TELEMETRY_ENABLED)   \
-  MACRO(DD_PROPAGATION_STYLE_EXTRACT)           \
-  MACRO(DD_PROPAGATION_STYLE_INJECT)            \
-  MACRO(DD_REMOTE_CONFIGURATION_ENABLED)        \
-  MACRO(DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS) \
-  MACRO(DD_SERVICE)                             \
-  MACRO(DD_SPAN_SAMPLING_RULES)                 \
-  MACRO(DD_SPAN_SAMPLING_RULES_FILE)            \
-  MACRO(DD_TRACE_DELEGATE_SAMPLING)             \
-  MACRO(DD_TRACE_PROPAGATION_STYLE_EXTRACT)     \
-  MACRO(DD_TRACE_PROPAGATION_STYLE_INJECT)      \
-  MACRO(DD_TRACE_PROPAGATION_STYLE)             \
-  MACRO(DD_TAGS)                                \
-  MACRO(DD_TRACE_AGENT_PORT)                    \
-  MACRO(DD_TRACE_AGENT_URL)                     \
-  MACRO(DD_TRACE_DEBUG)                         \
-  MACRO(DD_TRACE_ENABLED)                       \
-  MACRO(DD_TRACE_RATE_LIMIT)                    \
-  MACRO(DD_TRACE_REPORT_HOSTNAME)               \
-  MACRO(DD_TRACE_SAMPLE_RATE)                   \
-  MACRO(DD_TRACE_SAMPLING_RULES)                \
-  MACRO(DD_TRACE_STARTUP_LOGS)                  \
-  MACRO(DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH)   \
-  MACRO(DD_VERSION)                             \
-  MACRO(DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)
+#define LIST_ENVIRONMENT_VARIABLES(MACRO)            \
+  MACRO(DD_AGENT_HOST)                               \
+  MACRO(DD_ENV)                                      \
+  MACRO(DD_INSTRUMENTATION_TELEMETRY_ENABLED)        \
+  MACRO(DD_PROPAGATION_STYLE_EXTRACT)                \
+  MACRO(DD_PROPAGATION_STYLE_INJECT)                 \
+  MACRO(DD_REMOTE_CONFIGURATION_ENABLED)             \
+  MACRO(DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS)      \
+  MACRO(DD_SERVICE)                                  \
+  MACRO(DD_SPAN_SAMPLING_RULES)                      \
+  MACRO(DD_SPAN_SAMPLING_RULES_FILE)                 \
+  MACRO(DD_TRACE_DELEGATE_SAMPLING)                  \
+  MACRO(DD_TRACE_PROPAGATION_STYLE_EXTRACT)          \
+  MACRO(DD_TRACE_PROPAGATION_STYLE_INJECT)           \
+  MACRO(DD_TRACE_PROPAGATION_STYLE)                  \
+  MACRO(DD_TAGS)                                     \
+  MACRO(DD_TRACE_AGENT_PORT)                         \
+  MACRO(DD_TRACE_AGENT_URL)                          \
+  MACRO(DD_TRACE_DEBUG)                              \
+  MACRO(DD_TRACE_ENABLED)                            \
+  MACRO(DD_TRACE_RATE_LIMIT)                         \
+  MACRO(DD_TRACE_REPORT_HOSTNAME)                    \
+  MACRO(DD_TRACE_SAMPLE_RATE)                        \
+  MACRO(DD_TRACE_SAMPLING_RULES)                     \
+  MACRO(DD_TRACE_STARTUP_LOGS)                       \
+  MACRO(DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH)        \
+  MACRO(DD_VERSION)                                  \
+  MACRO(DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED) \
+  MACRO(DD_TELEMETRY_HEARTBEAT_INTERVAL)             \
+  MACRO(DD_TELEMETRY_METRICS_ENABLED)                \
+  MACRO(DD_TELEMETRY_METRICS_INTERVAL_SECONDS)       \
+  MACRO(DD_TELEMETRY_DEBUG)
 
 #define WITH_COMMA(ARG) ARG,
 

@@ -31,12 +31,12 @@
 #include <datadog/clock.h>
 #include <datadog/config.h>
 #include <datadog/runtime_id.h>
+#include <datadog/telemetry/metrics.h>
 #include <datadog/tracer_signature.h>
 
 #include <vector>
 
 #include "json.hpp"
-#include "metrics.h"
 #include "platform_util.h"
 
 namespace datadog {
@@ -62,38 +62,42 @@ class TracerTelemetry {
   // telemetry.
   struct {
     struct {
-      CounterMetric spans_created = {
-          "spans_created", {"integration_name:datadog"}, true};
-      CounterMetric spans_finished = {
-          "spans_finished", {"integration_name:datadog"}, true};
+      telemetry::CounterMetric spans_created = {
+          "spans_created", "tracers", {}, true};
+      telemetry::CounterMetric spans_finished = {
+          "spans_finished", "tracers", {}, true};
 
-      CounterMetric trace_segments_created_new = {
-          "trace_segments_created", {"new_continued:new"}, true};
-      CounterMetric trace_segments_created_continued = {
-          "trace_segments_created", {"new_continued:continued"}, true};
-      CounterMetric trace_segments_closed = {
-          "trace_segments_closed", {"integration_name:datadog"}, true};
+      telemetry::CounterMetric trace_segments_created_new = {
+          "trace_segments_created", "tracers", {"new_continued:new"}, true};
+      telemetry::CounterMetric trace_segments_created_continued = {
+          "trace_segments_created",
+          "tracers",
+          {"new_continued:continued"},
+          true};
+      telemetry::CounterMetric trace_segments_closed = {
+          "trace_segments_closed", "tracers", {}, true};
     } tracer;
     struct {
-      CounterMetric requests = {"trace_api.requests", {}, true};
+      telemetry::CounterMetric requests = {
+          "trace_api.requests", "tracers", {}, true};
 
-      CounterMetric responses_1xx = {
-          "trace_api.responses", {"status_code:1xx"}, true};
-      CounterMetric responses_2xx = {
-          "trace_api.responses", {"status_code:2xx"}, true};
-      CounterMetric responses_3xx = {
-          "trace_api.responses", {"status_code:3xx"}, true};
-      CounterMetric responses_4xx = {
-          "trace_api.responses", {"status_code:4xx"}, true};
-      CounterMetric responses_5xx = {
-          "trace_api.responses", {"status_code:5xx"}, true};
+      telemetry::CounterMetric responses_1xx = {
+          "trace_api.responses", "tracers", {"status_code:1xx"}, true};
+      telemetry::CounterMetric responses_2xx = {
+          "trace_api.responses", "tracers", {"status_code:2xx"}, true};
+      telemetry::CounterMetric responses_3xx = {
+          "trace_api.responses", "tracers", {"status_code:3xx"}, true};
+      telemetry::CounterMetric responses_4xx = {
+          "trace_api.responses", "tracers", {"status_code:4xx"}, true};
+      telemetry::CounterMetric responses_5xx = {
+          "trace_api.responses", "tracers", {"status_code:5xx"}, true};
 
-      CounterMetric errors_timeout = {
-          "trace_api.errors", {"type:timeout"}, true};
-      CounterMetric errors_network = {
-          "trace_api.errors", {"type:network"}, true};
-      CounterMetric errors_status_code = {
-          "trace_api.errors", {"type:status_code"}, true};
+      telemetry::CounterMetric errors_timeout = {
+          "trace_api.errors", "tracers", {"type:timeout"}, true};
+      telemetry::CounterMetric errors_network = {
+          "trace_api.errors", "tracers", {"type:network"}, true};
+      telemetry::CounterMetric errors_status_code = {
+          "trace_api.errors", "tracers", {"type:status_code"}, true};
 
     } trace_api;
   } metrics_;
@@ -103,7 +107,8 @@ class TracerTelemetry {
   // This uses a reference_wrapper so references to internal metric values can
   // be captured, and be iterated trivially when the values need to be
   // snapshotted and published in telemetry messages.
-  std::vector<std::pair<std::reference_wrapper<Metric>, MetricSnapshot>>
+  std::vector<
+      std::pair<std::reference_wrapper<telemetry::Metric>, MetricSnapshot>>
       metrics_snapshots_;
 
   std::vector<ConfigMetadata> configuration_snapshot_;
@@ -114,11 +119,13 @@ class TracerTelemetry {
       const ConfigMetadata& config_metadata);
 
  public:
-  TracerTelemetry(bool enabled, const Clock& clock,
-                  const std::shared_ptr<Logger>& logger,
-                  const TracerSignature& tracer_signature,
-                  const std::string& integration_name,
-                  const std::string& integration_version);
+  TracerTelemetry(
+      bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
+      const TracerSignature& tracer_signature,
+      const std::string& integration_name,
+      const std::string& integration_version,
+      const std::vector<std::shared_ptr<telemetry::Metric>>& user_metrics =
+          std::vector<std::shared_ptr<telemetry::Metric>>{});
   inline bool enabled() { return enabled_; }
   inline bool debug() { return debug_; }
   // Provides access to the telemetry metrics for updating the values.

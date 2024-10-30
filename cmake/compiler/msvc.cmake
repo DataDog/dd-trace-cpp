@@ -33,6 +33,16 @@ set(WINDOWS_EXPORT_ALL_SYMBOLS ON)
 add_library(dd_trace_cpp-specs INTERFACE)
 add_library(dd_trace::specs ALIAS dd_trace_cpp-specs)
 
+if (DD_TRACE_STATIC_CRT)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+  # set_target_properties(dd_trace_cpp-specs
+  #   PROPERTIES
+  #     MSVC_RUNTIME_LIBRARY  "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  # )
+endif ()
+
 target_compile_options(dd_trace_cpp-specs
   INTERFACE
     /W4

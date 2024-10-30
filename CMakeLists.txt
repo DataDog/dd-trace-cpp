@@ -14,6 +14,14 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_STATIC_LIBS "Build static libraries" ON)
 
+if (WIN32)
+  option(DD_TRACE_STATIC_CRT "Build dd-trace-cpp with static CRT with MSVC" OFF)
+endif ()
+
+if (DD_TRACE_STATIC_CRT)
+  set(CURL_STATIC_CRT ON)
+endif ()
+
 set(DD_TRACE_TRANSPORT "curl" CACHE STRING "HTTP transport that dd-trace-cpp uses to communicate with the Datadog Agent, can be either 'none' or 'curl'")
 
 # Consumer of the library using FetchContent do not need
@@ -46,6 +54,9 @@ unset(DD_TRACE_VERSION_CPP_CONTENTS)
 message(STATUS "dd-trace-cpp transport=${DD_TRACE_TRANSPORT}")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  if (BUILD_SHARED_LIBS AND BUILD_STATIC_LIBS)
+    message(FATAL_ERROR "Can't build both static and shared libary for MSVC")
+  endif ()
   message(STATUS "Compiler: MSVC ${CMAKE_CXX_COMPILER_VERSION}")
   include(cmake/compiler/msvc.cmake)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -87,6 +98,9 @@ target_sources(dd_trace_cpp-objects
     BASE_DIRS include
     FILES ${public_header_files}
   PRIVATE
+    src/datadog/telemetry/configuration.cpp
+    src/datadog/telemetry/metrics.cpp
+    src/datadog/telemetry/telemetry.cpp
     src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
@@ -102,7 +116,6 @@ target_sources(dd_trace_cpp-objects
     src/datadog/id_generator.cpp
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
-    src/datadog/metrics.cpp
     src/datadog/msgpack.cpp
     src/datadog/parse_util.cpp
     src/datadog/platform_util.cpp

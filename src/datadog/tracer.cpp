@@ -45,7 +45,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       signature_{runtime_id_, config.defaults.service,
                  config.defaults.environment},
       tracer_telemetry_(std::make_shared<TracerTelemetry>(
-          config.report_telemetry, config.clock, logger_, signature_,
+          config.telemetry.enabled, config.clock, logger_, signature_,
           config.integration_name, config.integration_version)),
       config_manager_(std::make_shared<ConfigManager>(config, signature_,
                                                       tracer_telemetry_)),

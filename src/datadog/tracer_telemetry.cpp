@@ -53,11 +53,11 @@ std::string to_string(datadog::tracing::ConfigName name) {
 
 }  // namespace
 
-TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
-                                 const std::shared_ptr<Logger>& logger,
-                                 const TracerSignature& tracer_signature,
-                                 const std::string& integration_name,
-                                 const std::string& integration_version)
+TracerTelemetry::TracerTelemetry(
+    bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
+    const TracerSignature& tracer_signature,
+    const std::string& integration_name, const std::string& integration_version,
+    const std::vector<std::shared_ptr<telemetry::Metric>>& user_metrics)
     : enabled_(enabled),
       clock_(clock),
       logger_(logger),
@@ -66,6 +66,9 @@ TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
       integration_name_(integration_name),
       integration_version_(integration_version) {
   if (enabled_) {
+    if (integration_name_.empty()) {
+      integration_name_ = "datadog";
+    }
     // Register all the metrics that we're tracking by adding them to the
     // metrics_snapshots_ container. This allows for simpler iteration logic
     // when using the values in `generate-metrics` messages.
@@ -97,6 +100,10 @@ TracerTelemetry::TracerTelemetry(bool enabled, const Clock& clock,
                                     MetricSnapshot{});
     metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
                                     MetricSnapshot{});
+
+    for (auto& m : user_metrics) {
+      metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
+    }
   }
 }
 
@@ -258,6 +265,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
             {"tags", metric.tags()},
             {"type", metric.type()},
             {"points", points},
+            {"namespace", metric.scope()},
             {"common", metric.common()},
         }));
       } else if (type == "gauge") {
@@ -266,6 +274,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
             {"metric", metric.name()},
             {"tags", metric.tags()},
             {"type", metric.type()},
+            {"namespace", metric.scope()},
             {"interval", 10},
             {"points", points},
             {"common", metric.common()},
@@ -279,7 +288,6 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
     auto generate_metrics = nlohmann::json::object({
         {"request_type", "generate-metrics"},
         {"payload", nlohmann::json::object({
-                        {"namespace", "tracers"},
                         {"series", metrics},
                     })},
     });
@@ -314,6 +322,7 @@ std::string TracerTelemetry::app_closing() {
             {"type", metric.type()},
             {"points", points},
             {"common", metric.common()},
+            {"namespace", metric.scope()},
         }));
       } else if (type == "gauge") {
         // gauge metrics have a interval
@@ -324,6 +333,7 @@ std::string TracerTelemetry::app_closing() {
             {"interval", 10},
             {"points", points},
             {"common", metric.common()},
+            {"namespace", metric.scope()},
         }));
       }
     }
@@ -334,7 +344,6 @@ std::string TracerTelemetry::app_closing() {
     auto generate_metrics = nlohmann::json::object({
         {"request_type", "generate-metrics"},
         {"payload", nlohmann::json::object({
-                        {"namespace", "tracers"},
                         {"series", metrics},
                     })},
     });
