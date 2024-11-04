@@ -118,6 +118,8 @@ class TracerTelemetry {
   nlohmann::json generate_configuration_field(
       const ConfigMetadata& config_metadata);
 
+  std::vector<std::shared_ptr<telemetry::Metric>> user_metrics_;
+
  public:
   TracerTelemetry(
       bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
