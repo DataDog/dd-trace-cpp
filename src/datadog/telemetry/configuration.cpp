@@ -1,6 +1,7 @@
 #include <datadog/config.h>
 #include <datadog/environment.h>
 #include <datadog/telemetry/configuration.h>
+#include <datadog/version.h>
 
 #include "parse_util.h"
 
@@ -25,7 +26,7 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
 
   if (auto metrics_interval_seconds =
           lookup(environment::DD_TELEMETRY_METRICS_INTERVAL_SECONDS)) {
-    auto maybe_value = parse_uint64(*metrics_interval_seconds, 10);
+    auto maybe_value = parse_double(*metrics_interval_seconds);
     if (auto error = maybe_value.if_error()) {
       return *error;
     }
@@ -34,7 +35,7 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
 
   if (auto heartbeat_interval_seconds =
           lookup(environment::DD_TELEMETRY_HEARTBEAT_INTERVAL)) {
-    auto maybe_value = parse_uint64(*heartbeat_interval_seconds, 10);
+    auto maybe_value = parse_double(*heartbeat_interval_seconds);
     if (auto error = maybe_value.if_error()) {
       return *error;
     }
@@ -81,30 +82,35 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
   // metrics_interval_seconds
   auto metrics_interval = pick(env_config->metrics_interval_seconds,
                                user_config.metrics_interval_seconds, 60);
-  if (metrics_interval.second <= 0) {
-    // TBD
-    return Error{};
+  if (metrics_interval.second <= 0.) {
+    return Error{Error::Code::OUT_OF_RANGE_INTEGER,
+                 "Telemetry metrics polling interval must be a positive value"};
   }
-  result.metrics_interval = std::chrono::seconds(metrics_interval.second);
+  result.metrics_interval =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::duration<double>(metrics_interval.second));
 
   // heartbeat_interval_seconds
   auto heartbeat_interval = pick(env_config->heartbeat_interval_seconds,
                                  user_config.heartbeat_interval_seconds, 10);
-  if (heartbeat_interval.second <= 0) {
-    // TBD
-    return Error{};
+  if (heartbeat_interval.second <= 0.) {
+    return Error{
+        Error::Code::OUT_OF_RANGE_INTEGER,
+        "Telemetry heartbeat polling interval must be a positive value"};
   }
-  result.heartbeat_interval = std::chrono::seconds(heartbeat_interval.second);
+  result.heartbeat_interval =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::duration<double>(heartbeat_interval.second));
 
   // integration_name
   std::tie(origin, result.integration_name) =
       pick(env_config->integration_name, user_config.integration_name,
-           std::string(""));
+           std::string("datadog"));
 
   // integration_version
   std::tie(origin, result.integration_version) =
       pick(env_config->integration_version, user_config.integration_version,
-           std::string(""));
+           tracing::tracer_version);
 
   return result;
 }

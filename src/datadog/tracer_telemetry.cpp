@@ -67,9 +67,6 @@ TracerTelemetry::TracerTelemetry(
       integration_version_(integration_version),
       user_metrics_(user_metrics) {
   if (enabled_) {
-    if (integration_name_.empty()) {
-      integration_name_ = "datadog";
-    }
     // Register all the metrics that we're tracking by adding them to the
     // metrics_snapshots_ container. This allows for simpler iteration logic
     // when using the values in `generate-metrics` messages.
