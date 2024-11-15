@@ -94,13 +94,6 @@ void RequestHandler::on_span_start(const httplib::Request& req,
     span_cfg.resource = *resource;
   }
 
-  if (auto origin =
-          utils::get_if_exists<std::string_view>(request_json, "origin")) {
-    logger_->log_info(
-        "[start_span] origin, but this can only be set via the "
-        "'x-datadog-origin' header");
-  }
-
   auto success = [](const datadog::tracing::Span& span,
                     httplib::Response& res) {
     // clang-format off
