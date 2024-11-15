@@ -25,6 +25,7 @@ class RequestHandler final {
   void on_set_meta(const httplib::Request& req, httplib::Response& res);
   void on_set_metric(const httplib::Request& /* req */, httplib::Response& res);
   void on_inject_headers(const httplib::Request& req, httplib::Response& res);
+  void on_extract_headers(const httplib::Request& req, httplib::Response& res);
   void on_span_flush(const httplib::Request& /* req */, httplib::Response& res);
   void on_stats_flush(const httplib::Request& /* req */,
                       httplib::Response& res);

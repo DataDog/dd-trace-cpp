@@ -116,8 +116,8 @@ void RequestHandler::on_span_start(const httplib::Request& req,
   if (auto parent_id =
           utils::get_if_exists<uint64_t>(request_json, "parent_id")) {
     if (*parent_id != 0) {
-      auto parent_span_it = active_spans_.find(*parent_id);
-      if (parent_span_it == active_spans_.cend()) {
+      auto parent_span_it = spans_.find(*parent_id);
+      if (parent_span_it == spans_.cend()) {
         const auto msg = "on_span_start: span not found for id " +
                          std::to_string(*parent_id);
         VALIDATION_ERROR(res, msg);
@@ -125,25 +125,14 @@ void RequestHandler::on_span_start(const httplib::Request& req,
 
       auto span = parent_span_it->second.create_child(span_cfg);
       success(span, res);
-      active_spans_.emplace(span.id(), std::move(span));
-      return;
-    }
-  }
-
-  if (auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
-          request_json, "http_headers")) {
-    if (!http_headers->empty()) {
-      auto span = tracer_.extract_or_create_span(
-          utils::HeaderReader(*http_headers), span_cfg);
-      success(span, res);
-      active_spans_.emplace(span.id(), std::move(span));
+      spans_.emplace(span.id(), std::move(span));
       return;
     }
   }
 
   auto span = tracer_.create_span(span_cfg);
   success(span, res);
-  active_spans_.emplace(span.id(), std::move(span));
+  spans_.emplace(span.id(), std::move(span));
 }
 
 void RequestHandler::on_span_end(const httplib::Request& req,
@@ -155,14 +144,13 @@ void RequestHandler::on_span_end(const httplib::Request& req,
     VALIDATION_ERROR(res, "on_span_end: missing `span_id` field.");
   }
 
-  auto span_it = active_spans_.find(*span_id);
-  if (span_it == active_spans_.cend()) {
+  auto span_it = spans_.find(*span_id);
+  if (span_it == spans_.cend()) {
     const auto msg =
         "on_span_end: span not found for id " + std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
   }
 
-  active_spans_.erase(span_it);
   res.status = 200;
 }
 
@@ -175,8 +163,8 @@ void RequestHandler::on_set_meta(const httplib::Request& req,
     VALIDATION_ERROR(res, "on_set_meta: missing `span_id` field.");
   }
 
-  auto span_it = active_spans_.find(*span_id);
-  if (span_it == active_spans_.cend()) {
+  auto span_it = spans_.find(*span_id);
+  if (span_it == spans_.cend()) {
     const auto msg =
         "on_set_meta: span not found for id " + std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
@@ -198,8 +186,8 @@ void RequestHandler::on_set_metric(const httplib::Request& /* req */,
     VALIDATION_ERROR(res, "on_set_meta: missing `span_id` field.");
   }
 
-  auto span_it = active_spans_.find(*span_id);
-  if (span_it == active_spans_.cend()) {
+  auto span_it = spans_.find(*span_id);
+  if (span_it == spans_.cend()) {
     const auto msg =
         "on_set_meta: span not found for id " + std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
@@ -221,8 +209,8 @@ void RequestHandler::on_inject_headers(const httplib::Request& req,
     VALIDATION_ERROR(res, "on_inject_headers: missing `span_id` field.");
   }
 
-  auto span_it = active_spans_.find(*span_id);
-  if (span_it == active_spans_.cend()) {
+  auto span_it = spans_.find(*span_id);
+  if (span_it == spans_.cend()) {
     const auto msg =
         "on_inject_headers: span not found for id " + std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
@@ -240,9 +228,38 @@ void RequestHandler::on_inject_headers(const httplib::Request& req,
   res.set_content(response_json.dump(), "application/json");
 }
 
+
+void RequestHandler::on_extract_headers(const httplib::Request& req,
+                                       httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+  auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(request_json, "http_headers");
+  if (!http_headers) {
+    VALIDATION_ERROR(res, "on_extract_headers: missing `http_headers` field.");
+  }
+
+  auto span = tracer_.extract_span(
+      utils::HeaderReader(*http_headers), span_cfg);
+
+  auto success = [](const datadog::tracing::Span& span,
+                    httplib::Response& res) {
+    // clang-format off
+      const auto response_body = nlohmann::json{
+        { "span_id", span.id() }
+      };
+    // clang-format on
+
+    res.set_content(response_body.dump(), "application/json");
+  };
+
+  success(span, res);
+  spans_.emplace(span.id(), std::move(span));
+}
+
+
 void RequestHandler::on_span_flush(const httplib::Request& /* req */,
                                    httplib::Response& res) {
   scheduler_->flush_telemetry();
+  spans_.clear();
   res.status = 200;
 }
 
@@ -261,8 +278,8 @@ void RequestHandler::on_span_error(const httplib::Request& req,
     VALIDATION_ERROR(res, "on_span_error: missing `span_id` field.");
   }
 
-  auto span_it = active_spans_.find(*span_id);
-  if (span_it == active_spans_.cend()) {
+  auto span_it = spans_.find(*span_id);
+  if (span_it == spans_.cend()) {
     const auto msg =
         "on_span_error: span not found for id " + std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
