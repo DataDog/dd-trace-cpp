@@ -37,7 +37,7 @@ class SpanSampler {
     std::mutex mutex;
     Limiter limiter;
 
-    SynchronizedLimiter(const Clock&, double max_per_second);
+    SynchronizedLimiter(const Clock&, int max_per_second);
   };
 
   class Rule : public FinalizedSpanSamplerConfig::Rule {
