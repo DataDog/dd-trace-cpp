@@ -230,6 +230,7 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
     VALIDATION_ERROR(res, "on_extract_headers: missing `http_headers` field.");
   }
 
+  datadog::tracing::SpanConfig span_cfg;
   auto span = tracer_.extract_span(
       utils::HeaderReader(*http_headers), span_cfg);
 

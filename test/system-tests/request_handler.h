@@ -35,7 +35,7 @@ class RequestHandler final {
   datadog::tracing::Tracer tracer_;
   std::shared_ptr<ManualScheduler> scheduler_;
   std::shared_ptr<DeveloperNoiseLogger> logger_;
-  std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
+  std::unordered_map<uint64_t, datadog::tracing::Span> spans_;
 
 #undef VALIDATION_ERROR
 };
