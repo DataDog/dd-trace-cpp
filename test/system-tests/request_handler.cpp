@@ -221,34 +221,29 @@ void RequestHandler::on_inject_headers(const httplib::Request& req,
   res.set_content(response_json.dump(), "application/json");
 }
 
-
 void RequestHandler::on_extract_headers(const httplib::Request& req,
-                                       httplib::Response& res) {
+                                        httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);
-  auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(request_json, "http_headers");
+  auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
+      request_json, "http_headers");
   if (!http_headers) {
     VALIDATION_ERROR(res, "on_extract_headers: missing `http_headers` field.");
   }
 
   datadog::tracing::SpanConfig span_cfg;
-  auto span = tracer_.extract_span(
-      utils::HeaderReader(*http_headers), span_cfg);
+  auto span =
+      tracer_.extract_span(utils::HeaderReader(*http_headers), span_cfg);
+  if (auto error = span.if_error()) {
+    VALIDATION_ERROR(res, error->with_prefix("on_extract_headers: ").message);
+  }
 
-  auto success = [](const datadog::tracing::Span& span,
-                    httplib::Response& res) {
-    // clang-format off
-      const auto response_body = nlohmann::json{
-        { "span_id", span.id() }
-      };
-    // clang-format on
-
-    res.set_content(response_body.dump(), "application/json");
+  const auto response_body = nlohmann::json{
+      {"span_id", span->id()},
   };
 
-  success(span, res);
-  spans_.emplace(span.id(), std::move(span));
+  res.set_content(response_body.dump(), "application/json");
+  spans_.emplace(span->id(), std::move(*span));
 }
-
 
 void RequestHandler::on_span_flush(const httplib::Request& /* req */,
                                    httplib::Response& res) {
