@@ -24,6 +24,15 @@ endif ()
 
 set(DD_TRACE_TRANSPORT "curl" CACHE STRING "HTTP transport that dd-trace-cpp uses to communicate with the Datadog Agent, can be either 'none' or 'curl'")
 
+if(DD_TRACE_TRANSPORT STREQUAL "curl")
+  include(cmake/deps/curl.cmake)
+  message(STATUS "DD_TRACE_TRANSPORT is set to 'curl', including curl")
+elseif(DD_TRACE_TRANSPORT STREQUAL "none")
+    message(STATUS "DD_TRACE_TRANSPORT is set to 'none', no default transport will be included")
+else()
+  message(FATAL_ERROR "Invalid value for DD_TRACE_TRANSPORT: ${DD_TRACE_TRANSPORT}")
+endif()
+
 # Consumer of the library using FetchContent do not need
 # to build unit tests, fuzzers and examples.
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -41,7 +50,6 @@ endif ()
 
 # Linking this library requires threads.
 find_package(Threads REQUIRED)
-include(cmake/deps/curl.cmake)
 include(cmake/deps/json.cmake)
 include(cmake/utils.cmake)
 
@@ -180,6 +188,11 @@ if (BUILD_SHARED_LIBS)
       PRIVATE
         CURL::libcurl_shared
     )
+  else()
+    target_sources(dd_trace_cpp-shared
+      PRIVATE
+        src/datadog/default_http_client_null.cpp
+    )
   endif ()
 
   add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects CURL::libcurl_shared)
@@ -218,6 +231,11 @@ if (BUILD_STATIC_LIBS)
       PRIVATE
         CURL::libcurl_static
     )
+  else()
+    target_sources(dd_trace_cpp-static
+      PRIVATE
+        src/datadog/default_http_client_null.cpp
+    ) 
   endif ()
 
   add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
