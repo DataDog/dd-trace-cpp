@@ -238,7 +238,7 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   }
 
   const auto response_body = nlohmann::json{
-      {"span_id", span->id()},
+      {"span_id", span->parent_id()},
   };
 
   res.set_content(response_body.dump(), "application/json");
