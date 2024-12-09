@@ -395,6 +395,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     return std::move(telemetry_final_config.error());
   }
 
+  final_config.additional_metrics = user_config.additional_metrics;
+
   return final_config;
 }
 

@@ -5,6 +5,7 @@
 // must be obtained from the result of a call to `finalize_config`.
 
 #include <datadog/telemetry/configuration.h>
+#include <datadog/telemetry/metrics.h>
 
 #include <cstddef>
 #include <memory>
@@ -160,6 +161,8 @@ struct TracerConfig {
   // programmatic value in Datadog's Active Configuration, whereas it is
   // actually the default value for the integration.
   Optional<bool> report_service_as_default;
+
+  std::vector<std::shared_ptr<telemetry::Metric>> additional_metrics;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -196,6 +199,7 @@ class FinalizedTracerConfig final {
   bool delegate_trace_sampling;
   bool report_traces;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::vector<std::shared_ptr<telemetry::Metric>> additional_metrics;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
