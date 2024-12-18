@@ -28,7 +28,7 @@ body:
   - type: textarea
     attributes:
       label: Error Logs
-      description: "Please provide any error logs from the tracer (`DD_TRACE_DEBUG=true` can help)"
+      description: "Please provide any error logs from the tracer"
     validations:
       required: false
 
