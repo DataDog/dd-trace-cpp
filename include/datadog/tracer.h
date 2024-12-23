@@ -18,6 +18,7 @@
 #include "id_generator.h"
 #include "optional.h"
 #include "span.h"
+#include "extraction_util.h"
 #include "tracer_config.h"
 #include "tracer_signature.h"
 
@@ -61,6 +62,9 @@ class Tracer {
   Span create_span();
   Span create_span(const SpanConfig& config);
 
+  // ...
+  Expected<ExtractedData> extract_headers(const DictReader& reader, std::unique_ptr<SpanData> span_data);
+
   // Return a span whose parent and other context is parsed from the specified
   // `reader`, and whose attributes are determined by the optionally specified
   // `config`.  If there is no tracing information in `reader`, then return an
@@ -69,6 +73,9 @@ class Tracer {
   Expected<Span> extract_span(const DictReader& reader);
   Expected<Span> extract_span(const DictReader& reader,
                               const SpanConfig& config);
+  Expected<Span> extract_span(ExtractedData& merged_context,
+                              const SpanConfig& config, 
+                              std::unique_ptr<SpanData> span_data);
 
   // Return a span extracted from the specified `reader` (see `extract_span`).
   // If there is no span to extract, then return a span that is the root of a
