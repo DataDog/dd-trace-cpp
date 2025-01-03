@@ -16,6 +16,7 @@
 #include "config_manager.h"
 #include "datadog_agent.h"
 #include "extracted_data.h"
+#include "extraction_util.h"
 #include "hex.h"
 #include "json.hpp"
 #include "platform_util.h"
@@ -142,9 +143,17 @@ Span Tracer::create_span(const SpanConfig& config) {
   return span;
 }
 
-Expected<ExtractedData> Tracer::extract_headers(const DictReader& reader, std::unique_ptr<SpanData> span_data) {
+Expected<Span> Tracer::extract_span(const DictReader& reader) {
+  return extract_span(reader, SpanConfig{});
+}
+
+Expected<Span> Tracer::extract_span(const DictReader& reader,
+                                    const SpanConfig& config) {
   assert(!extraction_styles_.empty());
+
   AuditedReader audited_reader{reader};
+
+  auto span_data = std::make_unique<SpanData>();
   Optional<PropagationStyle> first_style_with_trace_id;
   Optional<PropagationStyle> first_style_with_parent_id;
   std::unordered_map<PropagationStyle, ExtractedData> extracted_contexts;
@@ -263,26 +272,6 @@ Expected<ExtractedData> Tracer::extract_headers(const DictReader& reader, std::u
                                              merged_context.headers_examined));
   }
 
-  return std::move(merged_context);
-}
-
-Expected<Span> Tracer::extract_span(const DictReader& reader) {
-  return extract_span(reader, SpanConfig{});
-}
-
-Expected<Span> Tracer::extract_span(const DictReader& reader,
-                                    const SpanConfig& config) {
-  auto span_data = std::make_unique<SpanData>();
-  auto merged_context = extract_headers(reader, std::move(span_data));
-  if (auto* error = merged_context.if_error()) {
-    return *error;
-  }
-  return extract_span(*merged_context, config, std::move(span_data));
-}
-
-Expected<Span> Tracer::extract_span(ExtractedData& merged_context,
-                                    const SpanConfig& config, 
-                                    std::unique_ptr<SpanData> span_data) {
   // We're done extracting fields.  Now create the span.
   // This is similar to what we do in `create_span`.
   span_data->apply_config(*config_manager_->span_defaults(), config, clock_);
