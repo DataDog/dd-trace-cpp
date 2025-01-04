@@ -5,8 +5,6 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
-#include <datadog/json.hpp>
-
 #include "httplib.h"
 #include "utils.h"
 
@@ -108,24 +106,26 @@ void RequestHandler::on_span_start(const httplib::Request& req,
 
   if (auto parent_id =
           utils::get_if_exists<uint64_t>(request_json, "parent_id")) {
-    if (*parent_id != 0) {
-      auto parent_span_it = spans_.find(*parent_id);
-      if (parent_span_it == spans_.cend()) {
-        const auto msg = "on_span_start: span not found for id " +
-                         std::to_string(*parent_id);
-        VALIDATION_ERROR(res, msg);
-      }
-
+    auto parent_span_it = spans_.find(*parent_id);
+    auto parent_header_it = http_headers_.find(*parent_id);
+    if (parent_span_it != spans_.cend()) {
       auto span = parent_span_it->second.create_child(span_cfg);
       success(span, res);
       spans_.emplace(span.id(), std::move(span));
-      return;
+    } else if (parent_header_it == http_headers_.cend()) {
+      auto span = tracer_.extract_span(utils::HeaderReader(*parent_header_it), span_cfg);
+      success(span, res);
+      spans_.emplace(span.id(), std::move(span));
+    } else {
+      const auto msg = "on_span_start: span or http_headers not found for id " +
+                        std::to_string(*parent_id);
+      VALIDATION_ERROR(res, msg);
     }
+  } else {
+    auto span = tracer_.create_span(span_cfg);
+    success(span, res);
+    spans_.emplace(span.id(), std::move(span));
   }
-
-  auto span = tracer_.create_span(span_cfg);
-  success(span, res);
-  spans_.emplace(span.id(), std::move(span));
 }
 
 void RequestHandler::on_span_end(const httplib::Request& req,
@@ -238,17 +238,18 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   }
 
   const auto response_body = nlohmann::json{
-      {"span_id", span->id()},
+      {"span_id", span->parent_id()},
   };
 
   res.set_content(response_body.dump(), "application/json");
-  spans_.emplace(span->id(), std::move(*span));
+  http_headers_.emplace(span->parent_id(), std::move(*http_headers));
 }
 
 void RequestHandler::on_span_flush(const httplib::Request& /* req */,
                                    httplib::Response& res) {
   scheduler_->flush_telemetry();
   spans_.clear();
+  http_headers_.clear();
   res.status = 200;
 }
 

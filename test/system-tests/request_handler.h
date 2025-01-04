@@ -4,6 +4,7 @@
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
+#include <datadog/json.hpp>
 
 #include "developer_noise.h"
 #include "httplib.h"
@@ -36,6 +37,7 @@ class RequestHandler final {
   std::shared_ptr<ManualScheduler> scheduler_;
   std::shared_ptr<DeveloperNoiseLogger> logger_;
   std::unordered_map<uint64_t, datadog::tracing::Span> spans_;
+  std::unordered_map<uint64_t, nlohmann::json::array_t> http_headers_;
 
 #undef VALIDATION_ERROR
 };
