@@ -115,18 +115,21 @@ void RequestHandler::on_span_start(const httplib::Request& req,
       success(span, res);
       active_spans_.emplace(span.id(), std::move(span));
     } else if (parent_header_it != http_headers_.cend()) {
-      auto span = tracer_.extract_span(utils::HeaderReader(parent_header_it->second), span_cfg);
+      auto span = tracer_.extract_span(
+          utils::HeaderReader(parent_header_it->second), span_cfg);
       if (span) {
         success(*span, res);
         active_spans_.emplace(span->id(), std::move(*span));
       } else {
-        const auto msg = "on_span_start: unable to create span from http_headers identified by parent_id " +
-                          std::to_string(*parent_id);
+        const auto msg =
+            "on_span_start: unable to create span from http_headers identified "
+            "by parent_id " +
+            std::to_string(*parent_id);
         VALIDATION_ERROR(res, msg);
       }
     } else {
       const auto msg = "on_span_start: span or http_headers not found for id " +
-                        std::to_string(*parent_id);
+                       std::to_string(*parent_id);
       VALIDATION_ERROR(res, msg);
     }
   } else {
@@ -246,11 +249,11 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
     VALIDATION_ERROR(res, error->with_prefix("on_extract_headers: ").message);
   }
 
-// clang-format off
+  // clang-format off
   const auto response_body = nlohmann::json{
       {"span_id", span->parent_id().value() },
   };
-// clang-format on
+  // clang-format on
 
   res.set_content(response_body.dump(), "application/json");
   http_headers_.emplace(span->parent_id().value(), std::move(*http_headers));

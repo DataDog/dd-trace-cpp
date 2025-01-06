@@ -4,6 +4,7 @@
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
+
 #include <datadog/json.hpp>
 
 #include "developer_noise.h"
