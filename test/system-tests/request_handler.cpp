@@ -250,7 +250,7 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   auto span =
       tracer_.extract_span(utils::HeaderReader(*http_headers), span_cfg);
 
-  if (auto error = span.if_error()) {
+  if (span.if_error()) {
     // clang-format off
     const auto response_body_fail = nlohmann::json{
         {"span_id", nullptr},
