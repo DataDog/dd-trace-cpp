@@ -256,9 +256,9 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   // clang-format on
 
   res.set_content(response_body.dump(), "application/json");
-  http_headers_.emplace(span->parent_id().value(), std::move(*http_headers));
+  http_headers_[span->parent_id().value()] = std::move(*http_headers);
   // The span below will not be finished and flushed.
-  extract_headers_spans_.emplace(span->parent_id().value(), std::move(*span));
+  extract_headers_spans_.push_back(std::move(*span));
 }
 
 void RequestHandler::on_span_flush(const httplib::Request& /* req */,
