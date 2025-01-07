@@ -127,10 +127,14 @@ void RequestHandler::on_span_start(const httplib::Request& req,
             std::to_string(*parent_id);
         VALIDATION_ERROR(res, msg);
       }
-    } else {
+    } else if (*parent_id != 0) {
       const auto msg = "on_span_start: span or http_headers not found for id " +
                        std::to_string(*parent_id);
       VALIDATION_ERROR(res, msg);
+    } else {
+      auto span = tracer_.create_span(span_cfg);
+      success(span, res);
+      active_spans_.emplace(span.id(), std::move(span));
     }
   } else {
     auto span = tracer_.create_span(span_cfg);
@@ -245,8 +249,15 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   // The span below will not be finished and flushed.
   auto span =
       tracer_.extract_span(utils::HeaderReader(*http_headers), span_cfg);
+
   if (auto error = span.if_error()) {
-    VALIDATION_ERROR(res, error->with_prefix("on_extract_headers: ").message);
+    // clang-format off
+    const auto response_body_fail = nlohmann::json{
+        {"span_id", nullptr},
+    };
+    // clang-format on
+    res.set_content(response_body_fail.dump(), "application/json");
+    return;
   }
 
   // clang-format off
