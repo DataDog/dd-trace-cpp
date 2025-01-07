@@ -38,6 +38,7 @@ class RequestHandler final {
   std::shared_ptr<ManualScheduler> scheduler_;
   std::shared_ptr<DeveloperNoiseLogger> logger_;
   std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
+  std::unordered_map<uint64_t, datadog::tracing::Span> extract_headers_spans_;
   std::unordered_map<uint64_t, nlohmann::json::array_t> http_headers_;
 
 #undef VALIDATION_ERROR
