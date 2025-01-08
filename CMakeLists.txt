@@ -109,6 +109,9 @@ target_sources(dd_trace_cpp-objects
     src/datadog/telemetry/configuration.cpp
     src/datadog/telemetry/metrics.cpp
     src/datadog/telemetry/telemetry.cpp
+    src/datadog/propagation/extraction_util.cpp
+    src/datadog/propagation/propagation.cpp
+    src/datadog/propagation/w3c_propagation.cpp
     src/datadog/base64.cpp
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
@@ -118,7 +121,6 @@ target_sources(dd_trace_cpp-objects
     src/datadog/datadog_agent.cpp
     src/datadog/environment.cpp
     src/datadog/error.cpp
-    src/datadog/extraction_util.cpp
     src/datadog/glob.cpp
     src/datadog/http_client.cpp
     src/datadog/id_generator.cpp
@@ -150,7 +152,6 @@ target_sources(dd_trace_cpp-objects
     src/datadog/trace_sampler.cpp
     src/datadog/trace_segment.cpp
     src/datadog/version.cpp
-    src/datadog/w3c_propagation.cpp
 )
 
 # Headers location are different depending of whether we are building 

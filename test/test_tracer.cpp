@@ -7,6 +7,7 @@
 #include <datadog/optional.h>
 #include <datadog/parse_util.h>
 #include <datadog/platform_util.h>
+#include <datadog/propagation/w3c_propagation.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_data.h>
@@ -17,7 +18,6 @@
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
-#include <datadog/w3c_propagation.h>
 
 #include <chrono>
 #include <ctime>

@@ -70,6 +70,30 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
   res.set_content(response_body.dump(), "application/json");
 }
 
+void RequestHandler::on_extract_header(const httplib::Request& req,
+                                       httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+
+  auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
+      request_json, "http_headers");
+  if (!http_headers) {
+    const auto msg = "on_extract_header: missing `http_headers` field";
+    VALIDATION_ERROR(res, msg);
+  }
+
+  if (http_headers->empty()) {
+    const auto msg = "on_extract_header: `http_headers` is empty";
+    VALIDATION_ERROR(res, msg);
+  }
+
+  auto span =
+      tracer_.extract_or_create_span(utils::HeaderReader(*http_headers));
+  /*success(span, res);*/
+  /*active_spans_.emplace(span.id(), std::move(span));*/
+
+  res.set_content("", "application/json");
+}
+
 void RequestHandler::on_span_start(const httplib::Request& req,
                                    httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);

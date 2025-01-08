@@ -29,12 +29,18 @@ class RequestHandler final {
   void on_stats_flush(const httplib::Request& /* req */,
                       httplib::Response& res);
   void on_span_error(const httplib::Request& req, httplib::Response& res);
+  void on_extract_header(const httplib::Request& req, httplib::Response& res);
 
  private:
   datadog::tracing::Tracer tracer_;
   std::shared_ptr<ManualScheduler> scheduler_;
   std::shared_ptr<DeveloperNoiseLogger> logger_;
   std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
+
+  /*std::unordered_map<uint64_t,*/
+  /*                   std::variant<datadog::SpanView,
+   * datadog::tracing::Span>>*/
+  /*    active_spans_;*/
 
 #undef VALIDATION_ERROR
 };

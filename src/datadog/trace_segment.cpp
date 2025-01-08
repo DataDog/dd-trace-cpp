@@ -15,19 +15,17 @@
 #include <utility>
 #include <vector>
 
-#include "collector_response.h"
 #include "config_manager.h"
 #include "hex.h"
 #include "json.hpp"
 #include "platform_util.h"
-#include "random.h"
+#include "propagation/w3c_propagation.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
 #include "tracer_telemetry.h"
-#include "w3c_propagation.h"
 
 namespace datadog {
 namespace tracing {
