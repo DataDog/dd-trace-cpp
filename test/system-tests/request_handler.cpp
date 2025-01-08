@@ -70,6 +70,33 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
   res.set_content(response_body.dump(), "application/json");
 }
 
+void RequestHandler::on_extract_headers(const httplib::Request& req,
+                                        httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+
+  auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
+      request_json, "http_headers");
+
+  if (!http_headers) {
+    const auto msg = "on_extract_headers: missing `http_headers` field";
+    VALIDATION_ERROR(res, msg);
+  }
+
+  if (http_headers->empty()) {
+    const auto msg = "on_extract_headers: `http_headers` is empty";
+    VALIDATION_ERROR(res, msg);
+  }
+
+  auto maybe_span = tracer_.extract_span(utils::HeaderReader(*http_headers));
+  if (auto error = maybe_span.if_error()) {
+    VALIDATION_ERROR(res, error->message);
+  }
+
+  FakeSpan span;
+  active_spans_.emplace(span.id, std::move(span));
+  return;
+}
+
 void RequestHandler::on_span_start(const httplib::Request& req,
                                    httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);
@@ -123,20 +150,22 @@ void RequestHandler::on_span_start(const httplib::Request& req,
         VALIDATION_ERROR(res, msg);
       }
 
-      auto span = parent_span_it->second.create_child(span_cfg);
-      success(span, res);
-      active_spans_.emplace(span.id(), std::move(span));
-      return;
-    }
-  }
+      std::visit(
+          [&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, FakeSpan>) {
+              // TBD
+              (void)arg;
+            } else if constexpr (std::is_same_v<T, datadog::tracing::Span>) {
+              auto span = arg.create_child(span_cfg);
+              success(span, res);
+              active_spans_.emplace(span.id(), std::move(span));
+            } else {
+              static_assert(false, "unhandled type");
+            }
+          },
+          parent_span_it->second);
 
-  if (auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
-          request_json, "http_headers")) {
-    if (!http_headers->empty()) {
-      auto span = tracer_.extract_or_create_span(
-          utils::HeaderReader(*http_headers), span_cfg);
-      success(span, res);
-      active_spans_.emplace(span.id(), std::move(span));
       return;
     }
   }
@@ -182,9 +211,18 @@ void RequestHandler::on_set_meta(const httplib::Request& req,
     VALIDATION_ERROR(res, msg);
   }
 
-  auto& span = span_it->second;
-  span.set_tag(request_json.at("key").get<std::string_view>(),
-               request_json.at("value").get<std::string_view>());
+  std::visit(
+      [&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, FakeSpan>) {
+        } else if constexpr (std::is_same_v<T, datadog::tracing::Span>) {
+          arg.set_tag(request_json.at("key").get<std::string_view>(),
+                      request_json.at("value").get<std::string_view>());
+        } else {
+          static_assert(false, "unhandled type");
+        }
+      },
+      span_it->second);
 
   res.status = 200;
 }
@@ -205,9 +243,18 @@ void RequestHandler::on_set_metric(const httplib::Request& /* req */,
     VALIDATION_ERROR(res, msg);
   }
 
-  auto& span = span_it->second;
-  span.set_metric(request_json.at("key").get<std::string_view>(),
-                  request_json.at("value").get<double>());
+  std::visit(
+      [&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, FakeSpan>) {
+        } else if constexpr (std::is_same_v<T, datadog::tracing::Span>) {
+          arg.set_metric(request_json.at("key").get<std::string_view>(),
+                         request_json.at("value").get<double>());
+        } else {
+          static_assert(false, "unhandled type");
+        }
+      },
+      span_it->second);
 
   res.status = 200;
 }
@@ -235,7 +282,11 @@ void RequestHandler::on_inject_headers(const httplib::Request& req,
   // clang-format on
 
   utils::HeaderWriter writer(response_json["http_headers"]);
-  span_it->second.inject(writer);
+
+  if (std::holds_alternative<datadog::tracing::Span>(span_it->second)) {
+    auto& span = std::get<datadog::tracing::Span>(span_it->second);
+    span.inject(writer);
+  }
 
   res.set_content(response_json.dump(), "application/json");
 }
@@ -268,21 +319,23 @@ void RequestHandler::on_span_error(const httplib::Request& req,
     VALIDATION_ERROR(res, msg);
   }
 
-  auto& span = span_it->second;
+  if (std::holds_alternative<datadog::tracing::Span>(span_it->second)) {
+    auto& span = std::get<datadog::tracing::Span>(span_it->second);
 
-  if (auto type =
-          utils::get_if_exists<std::string_view>(request_json, "type")) {
-    if (!type->empty()) span.set_error_type(*type);
-  }
+    if (auto type =
+            utils::get_if_exists<std::string_view>(request_json, "type")) {
+      if (!type->empty()) span.set_error_type(*type);
+    }
 
-  if (auto message =
-          utils::get_if_exists<std::string_view>(request_json, "message")) {
-    if (!message->empty()) span.set_error_message(*message);
-  }
+    if (auto message =
+            utils::get_if_exists<std::string_view>(request_json, "message")) {
+      if (!message->empty()) span.set_error_message(*message);
+    }
 
-  if (auto stack =
-          utils::get_if_exists<std::string_view>(request_json, "stack")) {
-    if (!stack->empty()) span.set_error_stack(*stack);
+    if (auto stack =
+            utils::get_if_exists<std::string_view>(request_json, "stack")) {
+      if (!stack->empty()) span.set_error_stack(*stack);
+    }
   }
 
   res.status = 200;

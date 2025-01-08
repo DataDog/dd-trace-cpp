@@ -94,6 +94,10 @@ int main(int argc, char* argv[]) {
           });
   svr.Post("/trace/span/start",
            [&handler](const httplib::Request& req, httplib::Response& res) {
+             handler.on_extract_headers(req, res);
+           });
+  svr.Post("/trace/span/start",
+           [&handler](const httplib::Request& req, httplib::Response& res) {
              handler.on_span_start(req, res);
            });
   svr.Post("/trace/span/finish",

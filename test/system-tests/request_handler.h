@@ -5,7 +5,10 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <variant>
+
 #include "developer_noise.h"
+#include "fake_span.h"
 #include "httplib.h"
 #include "manual_scheduler.h"
 #include "utils.h"
@@ -20,6 +23,7 @@ class RequestHandler final {
                  httplib::Response& res);
 
   void on_trace_config(const httplib::Request& req, httplib::Response& res);
+  void on_extract_headers(const httplib::Request& req, httplib::Response& res);
   void on_span_start(const httplib::Request& req, httplib::Response& res);
   void on_span_end(const httplib::Request& req, httplib::Response& res);
   void on_set_meta(const httplib::Request& req, httplib::Response& res);
@@ -34,7 +38,9 @@ class RequestHandler final {
   datadog::tracing::Tracer tracer_;
   std::shared_ptr<ManualScheduler> scheduler_;
   std::shared_ptr<DeveloperNoiseLogger> logger_;
-  std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
+
+  std::unordered_map<uint64_t, std::variant<FakeSpan, datadog::tracing::Span>>
+      active_spans_;
 
 #undef VALIDATION_ERROR
 };
