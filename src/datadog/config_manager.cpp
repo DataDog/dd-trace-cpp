@@ -151,14 +151,6 @@ Optional<std::string> ConfigManager::on_update(const Configuration& config) {
 
   const auto config_json = nlohmann::json::parse(config.content);
 
-  const auto& targeted_service = config_json.at("service_target");
-  if (targeted_service.at("service").get<StringView>() !=
-          tracer_signature_.default_service ||
-      targeted_service.at("env").get<StringView>() !=
-          tracer_signature_.default_environment) {
-    return "Wrong service targeted";
-  }
-
   auto config_update = parse_dynamic_config(config_json.at("lib_config"));
 
   auto config_metadata = apply_update(config_update);

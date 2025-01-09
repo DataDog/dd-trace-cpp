@@ -38,24 +38,6 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
                                             /* version = */ 1,
                                             rc::product::Flag::APM_TRACING};
 
-  SECTION(
-      "configuration updates targetting the wrong tracer reports an error") {
-    // clang-format off
-    auto test_case = GENERATE(values<std::string>({
-      R"({ "service_target": { "service": "not-testsvc", "env": "test" } })",
-      R"({ "service_target": { "service": "testsvc", "env": "not-test" } })"
-    }));
-    // clang-format on
-
-    CAPTURE(test_case);
-
-    config_update.content = test_case;
-
-    // TODO: targetting wrong procut -> error
-    const auto err = config_manager.on_update(config_update);
-    CHECK(err);
-  }
-
   SECTION("handling of `tracing_sampling_rate`") {
     // SECTION("invalid value") {
     //   config_update.content = R"({
