@@ -1,8 +1,7 @@
 #pragma once
 
 // This component provides a `class`, `NullCollector`, that implements the
-// `Collector` interface in terms of a no-op. It's used by `Tracer` in lieu
-// of a `DatadogAgent` whenever `TracerConfig::report_traces` is `false`.
+// `Collector` interface in terms of a no-op. It's used in unit tests.
 
 #include "collector.h"
 
