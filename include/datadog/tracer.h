@@ -71,10 +71,9 @@ class Tracer {
                               const SpanConfig& config);
 
   // Return a span extracted from the specified `reader` (see `extract_span`).
-  // If there is no span to extract, then return a span that is the root of a
-  // new trace (see `create_span`).  Optionally specify a `config` indicating
-  // the attributes of the span.  If a failure occurs, then return an error.
-  // Note that the absence of a span to extract is not considered an error.
+  // If there is no span to extract, or if an error occurs during extraction,
+  // then return a span that is the root of a new trace (see `create_span`).
+  // Optionally specify a `config` indicating the attributes of the span.
   Span extract_or_create_span(const DictReader& reader);
   Span extract_or_create_span(const DictReader& reader,
                               const SpanConfig& config);
