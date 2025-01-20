@@ -94,13 +94,6 @@ void RequestHandler::on_span_start(const httplib::Request& req,
     span_cfg.resource = *resource;
   }
 
-  if (auto origin =
-          utils::get_if_exists<std::string_view>(request_json, "origin")) {
-    logger_->log_info(
-        "[start_span] origin, but this can only be set via the "
-        "'x-datadog-origin' header");
-  }
-
   auto success = [](const datadog::tracing::Span& span,
                     httplib::Response& res) {
     // clang-format off
@@ -113,37 +106,50 @@ void RequestHandler::on_span_start(const httplib::Request& req,
     res.set_content(response_body.dump(), "application/json");
   };
 
-  if (auto parent_id =
-          utils::get_if_exists<uint64_t>(request_json, "parent_id")) {
-    if (*parent_id != 0) {
-      auto parent_span_it = active_spans_.find(*parent_id);
-      if (parent_span_it == active_spans_.cend()) {
-        const auto msg = "on_span_start: span not found for id " +
-                         std::to_string(*parent_id);
-        VALIDATION_ERROR(res, msg);
-      }
+  auto parent_id = utils::get_if_exists<uint64_t>(request_json, "parent_id");
 
-      auto span = parent_span_it->second.create_child(span_cfg);
-      success(span, res);
-      active_spans_.emplace(span.id(), std::move(span));
-      return;
-    }
+  // No `parent_id` field OR parent is `0` -> create a span.
+  if (!parent_id || *parent_id == 0) {
+    auto span = tracer_.create_span(span_cfg);
+    success(span, res);
+    active_spans_.emplace(span.id(), std::move(span));
+    return;
   }
 
-  if (auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
-          request_json, "http_headers")) {
-    if (!http_headers->empty()) {
-      auto span = tracer_.extract_or_create_span(
-          utils::HeaderReader(*http_headers), span_cfg);
-      success(span, res);
-      active_spans_.emplace(span.id(), std::move(span));
-      return;
-    }
+  // If there's a parent ID -> Extract using the tracing context stored earlier
+  //                        OR -> Create a child span from the span.
+  auto parent_span_it = active_spans_.find(*parent_id);
+  if (parent_span_it != active_spans_.cend()) {
+    auto span = parent_span_it->second.create_child(span_cfg);
+    success(span, res);
+    active_spans_.emplace(span.id(), std::move(span));
+    return;
   }
 
-  auto span = tracer_.create_span(span_cfg);
-  success(span, res);
-  active_spans_.emplace(span.id(), std::move(span));
+  auto context_it = tracing_context_.find(*parent_id);
+  if (context_it != tracing_context_.cend()) {
+    auto span =
+        tracer_.extract_span(utils::HeaderReader(context_it->second), span_cfg);
+    if (!span) {
+      const auto msg =
+          "on_span_start: unable to create span from http_headers "
+          "identified "
+          "by parent_id " +
+          std::to_string(*parent_id);
+      VALIDATION_ERROR(res, msg);
+      return;
+    }
+    success(*span, res);
+    active_spans_.emplace(span->id(), std::move(*span));
+    return;
+  }
+
+  // Safeguard
+  if (*parent_id != 0) {
+    const auto msg = "on_span_start: span or http_headers not found for id " +
+                     std::to_string(*parent_id);
+    VALIDATION_ERROR(res, msg);
+  }
 }
 
 void RequestHandler::on_span_end(const httplib::Request& req,
@@ -162,7 +168,6 @@ void RequestHandler::on_span_end(const httplib::Request& req,
     VALIDATION_ERROR(res, msg);
   }
 
-  active_spans_.erase(span_it);
   res.status = 200;
 }
 
@@ -240,9 +245,42 @@ void RequestHandler::on_inject_headers(const httplib::Request& req,
   res.set_content(response_json.dump(), "application/json");
 }
 
+void RequestHandler::on_extract_headers(const httplib::Request& req,
+                                        httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+  auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
+      request_json, "http_headers");
+  if (!http_headers) {
+    VALIDATION_ERROR(res, "on_extract_headers: missing `http_headers` field.");
+  }
+
+  auto span = tracer_.extract_span(utils::HeaderReader(*http_headers));
+
+  if (span.if_error()) {
+    const auto response_body_fail = nlohmann::json{
+        {"span_id", nullptr},
+    };
+    res.set_content(response_body_fail.dump(), "application/json");
+    return;
+  }
+
+  const auto response_body = nlohmann::json{
+      {"span_id", span->parent_id().value()},
+  };
+
+  tracing_context_[*span->parent_id()] = std::move(*http_headers);
+
+  // The span below will not be finished and flushed.
+  blackhole_.emplace_back(std::move(*span));
+
+  res.set_content(response_body.dump(), "application/json");
+}
+
 void RequestHandler::on_span_flush(const httplib::Request& /* req */,
                                    httplib::Response& res) {
   scheduler_->flush_telemetry();
+  active_spans_.clear();
+  tracing_context_.clear();
   res.status = 200;
 }
 

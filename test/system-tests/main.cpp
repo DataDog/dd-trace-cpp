@@ -108,6 +108,10 @@ int main(int argc, char* argv[]) {
            [&handler](const httplib::Request& req, httplib::Response& res) {
              handler.on_inject_headers(req, res);
            });
+  svr.Post("/trace/span/extract_headers",
+           [&handler](const httplib::Request& req, httplib::Response& res) {
+             handler.on_extract_headers(req, res);
+           });
   svr.Post("/trace/span/flush",
            [&handler](const httplib::Request& req, httplib::Response& res) {
              handler.on_span_flush(req, res);
