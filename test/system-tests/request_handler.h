@@ -38,8 +38,19 @@ class RequestHandler final {
   std::shared_ptr<ManualScheduler> scheduler_;
   std::shared_ptr<DeveloperNoiseLogger> logger_;
   std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
-  std::vector<datadog::tracing::Span> extract_headers_spans_;
-  std::unordered_map<uint64_t, nlohmann::json::array_t> http_headers_;
+  std::unordered_map<uint64_t, nlohmann::json::array_t> tracing_context_;
+
+  // Previously, `/trace/span/start` was used to create new spans or create
+  // child spans from the extracted tracing context.
+  //
+  // The logic has been split into two distinct endpoint, with the addition of
+  // `extract_headers`. However, the public API does not expose a method to just
+  // extract tracing context.
+  //
+  // For now, the workaround is to extract and create a span from tracing
+  // context and keep the span alive until the process terminate, thus
+  // explaining the name :)
+  std::vector<datadog::tracing::Span> blackhole_;
 
 #undef VALIDATION_ERROR
 };
