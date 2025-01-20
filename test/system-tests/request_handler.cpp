@@ -6,7 +6,6 @@
 #include <datadog/tracer_config.h>
 
 #include <datadog/json.hpp>
-#include <type_traits>
 
 #include "httplib.h"
 #include "utils.h"
