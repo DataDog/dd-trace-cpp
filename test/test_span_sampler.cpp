@@ -48,7 +48,7 @@ namespace {
 struct SpanSamplingTags {
   Optional<double> mechanism;
   Optional<double> rule_rate;
-  Optional<double> max_per_second;
+  Optional<int> max_per_second;
 };
 
 SpanSamplingTags span_sampling_tags(const SpanData& span) {
@@ -292,7 +292,7 @@ TEST_CASE("span rule limiter") {
   struct TestCase {
     std::string name;
     std::size_t num_spans;
-    Optional<double> max_per_second;
+    Optional<int> max_per_second;
     std::size_t expected_count;
   };
 
