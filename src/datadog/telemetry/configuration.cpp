@@ -24,6 +24,11 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
     env_cfg.report_metrics = !falsy(*metrics_enabled);
   }
 
+  if (auto logs_enabled =
+          lookup(environment::DD_TELEMETRY_LOG_COLLECTION_ENABLED)) {
+    env_cfg.report_logs = !falsy(*logs_enabled);
+  }
+
   if (auto metrics_interval_seconds =
           lookup(environment::DD_TELEMETRY_METRICS_INTERVAL_SECONDS)) {
     auto maybe_value = parse_double(*metrics_interval_seconds);
@@ -66,10 +71,15 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
     // NOTE(@dmehala): if the telemetry module is disabled then report metrics
     // is also disabled.
     result.report_metrics = false;
+    result.report_logs = false;
   } else {
     // report_metrics
     std::tie(origin, result.report_metrics) =
         pick(env_config->report_metrics, user_config.report_metrics, true);
+
+    // report_logs
+    std::tie(origin, result.report_logs) =
+        pick(env_config->report_logs, user_config.report_logs, true);
   }
 
   // debug

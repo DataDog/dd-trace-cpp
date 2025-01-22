@@ -1,8 +1,6 @@
 #include <datadog/environment.h>
 #include <datadog/telemetry/configuration.h>
 
-#include <chrono>
-
 #include "../common/environment.h"
 #include "../test.h"
 
@@ -19,6 +17,7 @@ TELEMETRY_CONFIGURATION_TEST("defaults") {
   REQUIRE(cfg);
   CHECK(cfg->debug == false);
   CHECK(cfg->enabled == true);
+  CHECK(cfg->report_logs == true);
   CHECK(cfg->report_metrics == true);
   CHECK(cfg->metrics_interval == 60s);
   CHECK(cfg->heartbeat_interval == 10s);
@@ -27,6 +26,7 @@ TELEMETRY_CONFIGURATION_TEST("defaults") {
 TELEMETRY_CONFIGURATION_TEST("code override") {
   telemetry::Configuration cfg;
   cfg.enabled = false;
+  cfg.report_logs = false;
   cfg.report_metrics = false;
   cfg.metrics_interval_seconds = 1;
   cfg.heartbeat_interval_seconds = 2;
@@ -37,6 +37,7 @@ TELEMETRY_CONFIGURATION_TEST("code override") {
   REQUIRE(final_cfg);
   CHECK(final_cfg->enabled == false);
   CHECK(final_cfg->debug == false);
+  CHECK(final_cfg->report_logs == false);
   CHECK(final_cfg->report_metrics == false);
   CHECK(final_cfg->metrics_interval == 1s);
   CHECK(final_cfg->heartbeat_interval == 2s);
@@ -48,11 +49,13 @@ TELEMETRY_CONFIGURATION_TEST("enabled and report metrics precedence") {
   SECTION("enabled takes precedence over metrics enabled") {
     telemetry::Configuration cfg;
     cfg.enabled = false;
+    cfg.report_logs = true;
     cfg.report_metrics = true;
 
     auto final_cfg = finalize_config(cfg);
     REQUIRE(final_cfg);
     CHECK(final_cfg->enabled == false);
+    CHECK(final_cfg->report_logs == false);
     CHECK(final_cfg->report_metrics == false);
   }
 }
@@ -82,6 +85,14 @@ TELEMETRY_CONFIGURATION_TEST("environment environment override") {
     auto final_cfg = telemetry::finalize_config(cfg);
     REQUIRE(final_cfg);
     CHECK(final_cfg->report_metrics == false);
+  }
+
+  SECTION("Override `report_logs` field") {
+    cfg.report_logs = true;
+    ddtest::EnvGuard env("DD_TELEMETRY_LOG_COLLECTION_ENABLED", "false");
+    auto final_cfg = telemetry::finalize_config(cfg);
+    REQUIRE(final_cfg);
+    CHECK(final_cfg->report_logs == false);
   }
 
   SECTION("Override metrics interval") {
