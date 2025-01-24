@@ -29,6 +29,9 @@ class Telemetry {
             std::vector<std::shared_ptr<Metric>> metrics);
 
   ~Telemetry() = default;
+
+  void log_error(std::string message);
+  void log_warning(std::string message);
 };
 
 }  // namespace telemetry

@@ -45,9 +45,14 @@ namespace tracing {
 class Logger;
 struct SpanDefaults;
 
+struct LogMessage final {
+  std::string message;
+  std::string level;
+};
+
 class TracerTelemetry {
   bool enabled_ = false;
-  bool debug_ = false;
+  bool debug_ = true;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
   HostInfo host_info_;
@@ -120,6 +125,8 @@ class TracerTelemetry {
 
   std::vector<std::shared_ptr<telemetry::Metric>> user_metrics_;
 
+  std::vector<LogMessage> logs_;
+
  public:
   TracerTelemetry(
       bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
@@ -151,6 +158,10 @@ class TracerTelemetry {
   std::string app_closing();
   // Construct an `app-client-configuration-change` message.
   std::string configuration_change();
+
+  inline void log(std::string message, std::string level) {
+    logs_.emplace_back(LogMessage{std::move(message), std::move(level)});
+  }
 };
 
 }  // namespace tracing

@@ -292,6 +292,27 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
     batch_payloads.emplace_back(std::move(generate_metrics));
   }
 
+  if (!logs_.empty()) {
+    auto encoded_logs = nlohmann::json::array();
+    for (const auto& log : logs_) {
+      auto encoded =
+          nlohmann::json{{"message", log.message}, {"level", log.level}};
+      encoded_logs.emplace_back(std::move(encoded));
+    }
+
+    assert(!encoded_logs.empty());
+
+    auto logs_payload = nlohmann::json::object({
+        {"request_type", "logs"},
+        {"payload",
+         nlohmann::json{
+             {"logs", encoded_logs},
+         }},
+    });
+
+    batch_payloads.emplace_back(std::move(logs_payload));
+  }
+
   auto telemetry_body = generate_telemetry_body("message-batch");
   telemetry_body["payload"] = batch_payloads;
   auto message_batch_payload = telemetry_body.dump();
@@ -346,6 +367,27 @@ std::string TracerTelemetry::app_closing() {
                     })},
     });
     batch_payloads.emplace_back(std::move(generate_metrics));
+  }
+
+  if (!logs_.empty()) {
+    auto encoded_logs = nlohmann::json::array();
+    for (const auto& log : logs_) {
+      auto encoded =
+          nlohmann::json{{"message", log.message}, {"level", log.level}};
+      encoded_logs.emplace_back(std::move(encoded));
+    }
+
+    assert(!encoded_logs.empty());
+
+    auto logs_payload = nlohmann::json::object({
+        {"request_type", "logs"},
+        {"payload",
+         nlohmann::json{
+             {"logs", encoded_logs},
+         }},
+    });
+
+    batch_payloads.emplace_back(std::move(logs_payload));
   }
 
   auto telemetry_body = generate_telemetry_body("message-batch");
