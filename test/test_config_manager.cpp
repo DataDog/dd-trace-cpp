@@ -29,8 +29,7 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
   auto tracer_telemetry = std::make_shared<TracerTelemetry>(
       false, default_clock, nullptr, tracer_signature, "", "");
 
-  ConfigManager config_manager(*finalize_config(config), tracer_signature,
-                               tracer_telemetry);
+  ConfigManager config_manager(*finalize_config(config), tracer_telemetry);
 
   rc::Listener::Configuration config_update{/* id = */ "id",
                                             /* path = */ "",
