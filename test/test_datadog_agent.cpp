@@ -200,8 +200,7 @@ TEST_CASE("Remote Configuration", "[datadog_agent]") {
       finalized->telemetry.enabled, finalized->clock, finalized->logger,
       signature, "", "");
 
-  auto config_manager =
-      std::make_shared<ConfigManager>(*finalized, signature, telemetry);
+  auto config_manager = std::make_shared<ConfigManager>(*finalized, telemetry);
 
   const auto& agent_config =
       std::get<FinalizedDatadogAgentConfig>(finalized->collector);

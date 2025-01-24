@@ -124,7 +124,6 @@ ConfigManager::Update parse_dynamic_config(const nlohmann::json& j) {
 namespace rc = datadog::remote_config;
 
 ConfigManager::ConfigManager(const FinalizedTracerConfig& config,
-                             const TracerSignature& tracer_signature,
                              const std::shared_ptr<TracerTelemetry>& telemetry)
     : clock_(config.clock),
       default_metadata_(config.metadata),
@@ -133,7 +132,6 @@ ConfigManager::ConfigManager(const FinalizedTracerConfig& config,
       rules_(config.trace_sampler.rules),
       span_defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       report_traces_(config.report_traces),
-      tracer_signature_(tracer_signature),
       telemetry_(telemetry) {}
 
 rc::Products ConfigManager::get_products() { return rc::product::APM_TRACING; }
@@ -150,14 +148,6 @@ Optional<std::string> ConfigManager::on_update(const Configuration& config) {
   }
 
   const auto config_json = nlohmann::json::parse(config.content);
-
-  const auto& targeted_service = config_json.at("service_target");
-  if (targeted_service.at("service").get<StringView>() !=
-          tracer_signature_.default_service ||
-      targeted_service.at("env").get<StringView>() !=
-          tracer_signature_.default_environment) {
-    return "Wrong service targeted";
-  }
 
   auto config_update = parse_dynamic_config(config_json.at("lib_config"));
 
