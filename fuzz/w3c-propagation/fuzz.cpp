@@ -10,8 +10,6 @@
 #include <cstdlib>
 #include <functional>
 #include <memory>
-#include <string>
-#include <unordered_map>
 
 namespace dd = datadog::tracing;
 
@@ -22,6 +20,7 @@ dd::Tracer& tracer_singleton() {
     dd::TracerConfig config;
     config.service = "fuzzer";
     config.collector = std::make_shared<dd::NullCollector>();
+    config.extraction_styles = {dd::PropagationStyle::W3C};
 
     const auto finalized_config = dd::finalize_config(config);
     if (!finalized_config) {

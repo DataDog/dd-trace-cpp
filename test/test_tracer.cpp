@@ -730,15 +730,27 @@ TEST_CASE("span extraction") {
 
         {__LINE__, "invalid: trace ID zero",
          "00-00000000000000000000000000000000-00f067aa0ba902b7-00", // traceparent
-         "trace_id_zero"}, // expected_error_tag_value
+         "malformed_traceid"}, // expected_error_tag_value
 
         {__LINE__, "invalid: parent ID zero",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-00", // traceparent
-         "parent_id_zero"}, // expected_error_tag_value
+         "malformed_parentid"}, // expected_error_tag_value
 
         {__LINE__, "invalid: trailing characters when version is zero",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-foo", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
+      
+        {__LINE__, "invalid: non hex trace ID",
+         "00-abcdefghijklmnopqrstuvxyzabcdefg-00f067aa0ba902b7-00", // traceparent
+         "malformed_traceid"}, // expected_error_tag_value
+
+        {__LINE__, "invalid: non hex parent ID",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-abcdefghijklmnop-00", // traceparent
+         "malformed_parentid"}, // expected_error_tag_value
+
+        {__LINE__, "invalid: non hex trace tag ID",
+         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-xy", // traceparent
+         "malformed_traceflags"}, // expected_error_tag_value
     }));
     // clang-format on
 
