@@ -54,7 +54,6 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
         if (i > 2) return "malformed_traceparent";
         if (traceparent[i] == '-') {
           version = StringView(traceparent.data() + beg, i - beg);
-          // TODO: verify version != "00"
           if (version == "ff") return "invalid_version";
 
           beg = i + 1;
@@ -65,9 +64,12 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
       case state::trace_id: {
         if (i > 35) return "malformed_traceparent";
         if (traceparent[i] == '-') {
-          result.trace_id = *TraceID::parse_hex(
-              StringView(traceparent.data() + beg, i - beg));
-          if (result.trace_id == 0) return "trace_id_zero";
+          auto maybe_trace_id =
+              TraceID::parse_hex(StringView(traceparent.data() + beg, i - beg));
+          if (maybe_trace_id.if_error() || *maybe_trace_id == 0)
+            return "malformed_traceid";
+
+          result.trace_id = *maybe_trace_id;
 
           beg = i + 1;
           internal_state = state::parent_span_id;
@@ -77,9 +79,12 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
       case state::parent_span_id: {
         if (i > 52) return "malformed_traceparent";
         if (traceparent[i] == '-') {
-          result.parent_id =
-              *parse_uint64(StringView(traceparent.data() + beg, i - beg), 16);
-          if (result.parent_id == 0) return "parent_id_zero";
+          auto maybe_parent_id =
+              parse_uint64(StringView(traceparent.data() + beg, i - beg), 16);
+          if (maybe_parent_id.if_error() || *maybe_parent_id == 0)
+            return "malformed_parentid";
+
+          result.parent_id = *maybe_parent_id;
 
           beg = i + 1;
           internal_state = state::trace_flags;
@@ -102,8 +107,11 @@ handle_trace_flag:
       (left > 2 && (version == "00" || traceparent[beg + 2] != '-')))
     return "malformed_traceparent";
 
-  auto trace_flags = *parse_uint64(StringView(traceparent.data() + beg, 2), 16);
-  result.sampling_priority = trace_flags & 0x01;
+  auto maybe_trace_flags =
+      parse_uint64(StringView(traceparent.data() + beg, 2), 16);
+  if (maybe_trace_flags.if_error()) return "malformed_traceflags";
+
+  result.sampling_priority = *maybe_trace_flags & 0x01;
 
   return nullopt;
 }
