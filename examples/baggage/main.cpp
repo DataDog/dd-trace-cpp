@@ -67,7 +67,7 @@ int main() {
 
   CinReader reader;
   std::cout << "Enter baggage (or 'CTRL+C' to quit): ";
-  while (std::cin >> reader) {
+  while (std::getline(std::cin, reader.input)) {
     auto baggage = tracer.extract_baggage(reader);
     if (!baggage) {
       std::cout << "Error parsing \"" << reader.input

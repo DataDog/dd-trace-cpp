@@ -1,7 +1,5 @@
 #include <datadog/baggage.h>
 
-#include <cctype>
-
 namespace datadog {
 namespace tracing {
 
@@ -30,7 +28,7 @@ parse_baggage(StringView input, size_t max_capacity) {
   for (size_t i = 0; i < end; ++i) {
     switch (internal_state) {
       case state::leading_spaces_key: {
-        if (!std::isspace(input[i])) {
+        if (input[i] != ' ') {
           if (result.size() == max_capacity)
             return Baggage::Error::MAXIMUM_CAPACITY_REACHED;
 
@@ -46,13 +44,13 @@ parse_baggage(StringView input, size_t max_capacity) {
         } else if (input[i] == '=') {
           key = StringView{input.data() + beg, tmp_end - beg + 1};
           internal_state = state::leading_spaces_value;
-        } else if (!std::isspace(input[i])) {
+        } else if (input[i] != ' ') {
           tmp_end = i;
         }
       } break;
 
       case state::leading_spaces_value: {
-        if (!std::isspace(input[i])) {
+        if (input[i] != ' ') {
           beg = i;
           tmp_end = i;
           internal_state = state::value;
@@ -66,7 +64,7 @@ parse_baggage(StringView input, size_t max_capacity) {
           beg = i;
           tmp_end = i;
           internal_state = state::leading_spaces_key;
-        } else if (!std::isspace(input[i])) {
+        } else if (input[i] != ' ') {
           tmp_end = i;
         }
       } break;
@@ -165,6 +163,7 @@ Expected<Baggage, Baggage::Error> Baggage::extract(const DictReader& headers,
     return Error::MISSING_HEADER;
   }
 
+  // TODO(@dmehala): Avoid allocation
   auto bv = parse_baggage(*found, max_capacity);
   if (auto error = bv.if_error()) {
     return *error;
