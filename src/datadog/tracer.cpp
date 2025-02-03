@@ -61,7 +61,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       tags_header_max_size_(config.tags_header_size),
       sampling_delegation_enabled_(config.delegate_trace_sampling),
       baggage_max_items_(config.baggage_max_items),
-      baggage_max_bytes_(config.baggage_max_bytes) {
+      baggage_max_bytes_(config.baggage_max_bytes),
+      baggage_injection_enabled_(false),
+      baggage_extraction_enabled_(false) {
   if (config.report_hostname) {
     hostname_ = get_hostname();
   }

@@ -130,7 +130,11 @@ void Baggage::visit(std::function<void(StringView, StringView)>&& visitor) {
 }
 
 Expected<void> Baggage::inject(DictWriter& writer, size_t max_bytes) const {
+  if (baggage_.empty()) return {};
+
+  // TODO(@dmehala): Memory alloc optimization, (re)use fixed size buffer.
   std::string res;
+  res.reserve(max_bytes);
 
   auto it = baggage_.cbegin();
   res += it->first;
