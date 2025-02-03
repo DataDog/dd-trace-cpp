@@ -39,6 +39,11 @@ BAGGAGE_TEST("extract") {
             Baggage(),
         },
         {
+            "only spaces",
+            "                  ",
+            Baggage::Error::MALFORMED_BAGGAGE_HEADER,
+        },
+        {
             "valid",
             "key1=value1,key2=value2",
             Baggage({{"key1", "value1"}, {"key2", "value2"}}),

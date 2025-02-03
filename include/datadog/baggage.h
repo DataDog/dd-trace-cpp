@@ -11,7 +11,7 @@
 namespace datadog {
 namespace tracing {
 
-/// OpenTelemetry-like implement of the Baggage concept.
+/// OpenTelemetry-like implementation of the Baggage concept.
 /// Baggage is a key-value store meant to propagate data across services and
 /// processes boundaries.
 ///

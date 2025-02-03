@@ -1,115 +1,87 @@
 #include <datadog/baggage.h>
 
-#include <sstream>
+#include <cctype>
 
 namespace datadog {
 namespace tracing {
 
 namespace {
 
-std::string trim(const std::string& str) {
-  size_t start = str.find_first_not_of(' ');
-  size_t end = str.find_last_not_of(' ');
-  return (start == std::string::npos || end == std::string::npos)
-             ? ""
-             : str.substr(start, end - start + 1);
-}
-
 Expected<std::unordered_map<std::string, std::string>, Baggage::Error>
 parse_baggage(StringView input, size_t max_capacity) {
   std::unordered_map<std::string, std::string> result;
-  std::stringstream ss(std::string{input});
-  std::string pair;
+  if (input.empty()) return result;
 
-  // Split by commas
-  while (std::getline(ss, pair, ',')) {
-    size_t equalPos = pair.find('=');
+  enum class state : char {
+    leading_spaces_key,
+    key,
+    leading_spaces_value,
+    value
+  } internal_state = state::leading_spaces_key;
 
-    if (equalPos == std::string::npos)
-      return Baggage::Error::MALFORMED_BAGGAGE_HEADER;
+  size_t beg = 0;
+  size_t tmp_end = 0;
 
-    // Extract key and value, then trim spaces
-    std::string key = trim(pair.substr(0, equalPos));
-    if (key.empty()) return Baggage::Error::MALFORMED_BAGGAGE_HEADER;
-    if (result.size() == max_capacity)
-      return Baggage::Error::MAXIMUM_CAPACITY_REACHED;
+  StringView key;
+  StringView value;
 
-    std::string value = trim(pair.substr(equalPos + 1));
-    result[key] = value;
+  const size_t end = input.size();
+
+  for (size_t i = 0; i < end; ++i) {
+    switch (internal_state) {
+      case state::leading_spaces_key: {
+        if (!std::isspace(input[i])) {
+          if (result.size() == max_capacity)
+            return Baggage::Error::MAXIMUM_CAPACITY_REACHED;
+
+          beg = i;
+          tmp_end = i;
+          internal_state = state::key;
+        }
+      } break;
+
+      case state::key: {
+        if (input[i] == ',') {
+          return Baggage::Error::MALFORMED_BAGGAGE_HEADER;
+        } else if (input[i] == '=') {
+          key = StringView{input.data() + beg, tmp_end - beg + 1};
+          internal_state = state::leading_spaces_value;
+        } else if (!std::isspace(input[i])) {
+          tmp_end = i;
+        }
+      } break;
+
+      case state::leading_spaces_value: {
+        if (!std::isspace(input[i])) {
+          beg = i;
+          tmp_end = i;
+          internal_state = state::value;
+        }
+      } break;
+
+      case state::value: {
+        if (input[i] == ',') {
+          value = StringView{input.data() + beg, tmp_end - beg + 1};
+          result.emplace(std::string(key), std::string(value));
+          beg = i;
+          tmp_end = i;
+          internal_state = state::leading_spaces_key;
+        } else if (!std::isspace(input[i])) {
+          tmp_end = i;
+        }
+      } break;
+    }
   }
+
+  if (internal_state != state::value) {
+    return Baggage::Error::MALFORMED_BAGGAGE_HEADER;
+  }
+
+  value = StringView{input.data() + beg, tmp_end - beg + 1};
+  result.emplace(std::string(key), std::string(value));
+
   return result;
 }
-
-/*constexpr bool is_space(char c) {*/
-/*  return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c ==
- * '\v';*/
-/*}*/
-
-/*Expected<std::unordered_map<std::string, std::string>, Baggage::Error>*/
-/*parse_baggage(StringView input, size_t max_capacity) {*/
-/*  enum class state : char {*/
-/*    swallow,*/
-/*    key,*/
-/*    value*/
-/*  } internal_state = state::swallow;*/
-/**/
-/*  std::unordered_map<std::string, std::string> result;*/
-/**/
-/*  size_t beg = 0;*/
-/*  size_t tmp_end = 0;*/
-/**/
-/*  StringView key;*/
-/*  StringView value;*/
-/**/
-/*  const size_t end = input.size();*/
-/**/
-/*  for (size_t i = 0; i < end; ++i) {*/
-/*    switch(internal_state) {*/
-/*      case state::swallow: {*/
-/*        if (!is_space(input[i])) {*/
-/*          beg = i;*/
-/*          internal_state = state::key;*/
-/*        }*/
-/*      } break;*/
-/**/
-/*      case state::key: {*/
-/*        if (input[i] == '=') {*/
-/*          if (result.size() == max_capacity) return
- * Baggage::Error::MAXIMUM_CAPACITY_REACHED;*/
-/**/
-/*          key = StringView{input.data() + beg, tmp_end - beg};*/
-/*          beg = i;*/
-/*          tmp_end = i;*/
-/*          internal_state = state::value;*/
-/*        } else if (!is_space(input[i])) {*/
-/*          tmp_end = i;*/
-/*        }*/
-/*      } break;*/
-/**/
-/*      case state::value: {*/
-/*        if (input[i] == ',') {*/
-/*          value = StringView{input.data() + beg, tmp_end - beg};*/
-/*          result.emplace(std::string(key), std::string(value));*/
-/*          beg = i;*/
-/*          tmp_end = i;*/
-/*          internal_state = state::swallow;*/
-/*        } else if (!is_space(input[i])) {*/
-/*          tmp_end = i;*/
-/*        }*/
-/*      } break;*/
-/**/
-/*    }*/
-/*  }*/
-/**/
-/*  if (internal_state != state::value) {*/
-/*    return Baggage::Error::MALFORMED_BAGGAGE_HEADER;*/
-/*  }*/
-/**/
-/*  value = StringView{input.data() + beg, tmp_end - beg};*/
-/*  result.emplace(std::string(key), std::string(value));*/
-/**/
-/*  return result;*/
-/*}*/
 
 }  // namespace
 
