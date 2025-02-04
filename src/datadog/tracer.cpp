@@ -9,6 +9,8 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_signature.h>
 #include <datadog/version.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
@@ -19,7 +21,9 @@
 #include "extraction_util.h"
 #include "hex.h"
 #include "json.hpp"
+#include "msgpack.h"
 #include "platform_util.h"
+#include "random.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tags.h"
@@ -85,6 +89,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       log << "DATADOG TRACER CONFIGURATION - " << configuration;
     });
   }
+
+  store_config();
 }
 
 std::string Tracer::config() const {
@@ -108,6 +114,42 @@ std::string Tracer::config() const {
   }
 
   return config.dump();
+}
+
+void Tracer::store_config() {
+  auto maybe_file =
+      InMemoryFile::make(std::string("datadog-tracer-info-") + short_uuid());
+  if (auto error = maybe_file.if_error()) {
+    if (error->code == Error::Code::NOT_IMPLEMENTED) return;
+
+    logger_->log_error("Failed to open anonymous file");
+    return;
+  }
+
+  metadata_file_ = std::make_unique<InMemoryFile>(std::move(*maybe_file));
+
+  auto defaults = config_manager_->span_defaults();
+
+  std::string buffer;
+  buffer.reserve(1024);
+
+  // clang-format off
+  msgpack::pack_map(
+    buffer, 
+    "schema_version", [&](auto& buffer) { msgpack::pack_integer(buffer, std::uint64_t(1)); return Expected<void>{}; },
+    "runtime_id", [&](auto& buffer) { return msgpack::pack_string(buffer, runtime_id_.string()); },
+    "tracer_version", [&](auto& buffer) { return msgpack::pack_string(buffer, signature_.library_version); },
+    "tracer_language", [&](auto& buffer) { return msgpack::pack_string(buffer, signature_.library_language); },
+    "hostname", [&](auto& buffer) { return msgpack::pack_string(buffer, hostname_.value_or("")); },
+    "service_name", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->service); },
+    "service_env", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->environment); },
+    "service_version", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->version); }
+  );
+  // clang-format on
+
+  if (!metadata_file_->write_then_seal(buffer)) {
+    logger_->log_error("Either failed to write or seal the configuration file");
+  }
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }

@@ -1,5 +1,6 @@
 #include "platform_util.h"
 
+#include <cassert>
 // clang-format off
 #if defined(__x86_64__) || defined(_M_X64)
 #  define DD_SDK_CPU_ARCH "x86_64"
@@ -25,6 +26,10 @@
 #    define DD_SDK_KERNEL "Linux"
 #    include "string_util.h"
 #    include <fstream>
+#    include <sys/types.h>
+#    include <sys/mman.h>
+#    include <fcntl.h>
+#    include <errno.h>
 #  endif
 #elif defined(_MSC_VER)
 #  include <windows.h>
@@ -98,7 +103,7 @@ std::tuple<std::string, std::string> get_windows_info() {
   // application manifest, which is the lowest version supported by the
   // application. Use `RtlGetVersion` to obtain the accurate OS version
   // regardless of the manifest.
-  using RtlGetVersion = auto(*)(LPOSVERSIONINFOEXW)->NTSTATUS;
+  using RtlGetVersion = auto (*)(LPOSVERSIONINFOEXW)->NTSTATUS;
 
   RtlGetVersion func =
       (RtlGetVersion)GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
@@ -223,6 +228,57 @@ int at_fork_in_child(void (*on_fork)()) {
                         /*in child*/ on_fork);
 #endif
 }
+
+InMemoryFile::InMemoryFile(void* handle) : handle_(handle) {}
+
+InMemoryFile::InMemoryFile(InMemoryFile&& rhs) {
+  std::swap(rhs.handle_, handle_);
+};
+InMemoryFile& InMemoryFile::operator=(InMemoryFile&& rhs) {
+  std::swap(handle_, rhs.handle_);
+  return *this;
+}
+
+#if defined(__linux__) || defined(__unix__)
+
+InMemoryFile::~InMemoryFile() {
+  /// NOTE(@dmehala): No need to close the fd since it is automatically handled
+  /// by `MFD_CLOEXEC`.
+  if (handle_ == nullptr) return;
+  int* data = static_cast<int*>(handle_);
+  delete (data);
+}
+
+bool InMemoryFile::write_then_seal(const std::string& data) {
+  int fd = *static_cast<int*>(handle_);
+
+  size_t written = write(fd, data.data(), data.size());
+  if (written != data.size()) return false;
+
+  return fcntl(fd, F_ADD_SEALS,
+               F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) == 0;
+}
+
+Expected<InMemoryFile> InMemoryFile::make(std::string_view name) {
+  int fd = memfd_create(name.data(), MFD_CLOEXEC | MFD_ALLOW_SEALING);
+  if (fd == -1) {
+    std::string err_msg = "failed to create an anonymous file. errno = ";
+    err_msg += std::to_string(errno);
+    return Error{Error::Code::OTHER, std::move(err_msg)};
+  }
+
+  int* handle = new int;
+  *handle = fd;
+  return InMemoryFile(handle);
+}
+
+#else
+InMemoryFile::~InMemoryFile() {}
+bool InMemoryFile::write_then_seal(const std::string&) { return false; }
+Expected<InMemoryFile> InMemoryFile::make(StringView) {
+  return Error{Error::Code::NOT_IMPLEMENTED, "In-memory file not implemented"};
+}
+#endif
 
 }  // namespace tracing
 }  // namespace datadog
