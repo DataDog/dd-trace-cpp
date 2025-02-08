@@ -122,7 +122,15 @@ jobs:
         name: Testing
         command: |
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch << parameters.arch >> 
-          .\build\test\tests.exe 
+          .\build\test\tests.exe -r junit -o report.xml
+    - run:
+        name: Upload test report to Datadog
+        when: always
+        command: |
+          Invoke-WebRequest -Uri "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_win-x64" -OutFile "datadog-ci.exe"
+          Start-Process -FilePath "./datadog-ci.exe" -ArgumentList "upload --service dd-trace-cpp report.xml"
+    - store_test_results:
+        path: report.xml
 
   build-and-test-cmake:
     parameters:
@@ -139,7 +147,20 @@ jobs:
     - checkout
     - run: bin/with-toolchain << parameters.toolchain >> cmake . -B .build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_TESTING=1 
     - run: cmake --build .build -j ${MAKE_JOB_COUNT} -v
-    - run: cd .build && test/tests
+    - run: cd .build && test/tests -r junit -o report.xml
+    - run:
+        name: Upload test report to Datadog
+        when: always
+        command: |
+          if [[ "<< parameters.arch >>" == "amd64" ]]; then
+            curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-x64" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
+          else
+            curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-arm64" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
+          fi
+
+          datadog-ci junit upload --service dd-trace-cpp .build/report.xml
+    - store_test_results:
+        path: .build/report.xml
 
   coverage:
     docker:
