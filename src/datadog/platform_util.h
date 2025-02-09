@@ -3,7 +3,6 @@
 // This component provides platform-dependent miscellanea.
 
 #include <datadog/expected.h>
-#include <datadog/optional.h>
 #include <datadog/string_view.h>
 
 #include <string>

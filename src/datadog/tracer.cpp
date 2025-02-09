@@ -9,8 +9,6 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_signature.h>
 #include <datadog/version.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include <algorithm>
 #include <cassert>

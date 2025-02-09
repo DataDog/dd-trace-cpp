@@ -1,6 +1,5 @@
 #include "platform_util.h"
 
-#include <cassert>
 // clang-format off
 #if defined(__x86_64__) || defined(_M_X64)
 #  define DD_SDK_CPU_ARCH "x86_64"
@@ -103,7 +102,7 @@ std::tuple<std::string, std::string> get_windows_info() {
   // application manifest, which is the lowest version supported by the
   // application. Use `RtlGetVersion` to obtain the accurate OS version
   // regardless of the manifest.
-  using RtlGetVersion = auto(*)(LPOSVERSIONINFOEXW)->NTSTATUS;
+  using RtlGetVersion = auto (*)(LPOSVERSIONINFOEXW)->NTSTATUS;
 
   RtlGetVersion func =
       (RtlGetVersion)GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
