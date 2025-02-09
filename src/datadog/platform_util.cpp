@@ -259,7 +259,7 @@ bool InMemoryFile::write_then_seal(const std::string& data) {
                F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) == 0;
 }
 
-Expected<InMemoryFile> InMemoryFile::make(std::string_view name) {
+Expected<InMemoryFile> InMemoryFile::make(StringView name) {
   int fd = memfd_create(name.data(), MFD_CLOEXEC | MFD_ALLOW_SEALING);
   if (fd == -1) {
     std::string err_msg = "failed to create an anonymous file. errno = ";
