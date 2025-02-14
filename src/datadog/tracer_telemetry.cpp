@@ -355,10 +355,14 @@ std::string TracerTelemetry::app_closing() {
   return message_batch_payload;
 }
 
-std::string TracerTelemetry::configuration_change() {
+Optional<std::string> TracerTelemetry::configuration_change() {
+  if (configuration_snapshot_.empty()) return nullopt;
+
+  std::vector<ConfigMetadata> current_configuration;
+  std::swap(current_configuration, configuration_snapshot_);
+
   auto configuration_json = nlohmann::json::array();
-  for (const auto& config_metadata : configuration_snapshot_) {
-    // if (config_metadata.value.empty()) continue;
+  for (const auto& config_metadata : current_configuration) {
     configuration_json.emplace_back(
         generate_configuration_field(config_metadata));
   }

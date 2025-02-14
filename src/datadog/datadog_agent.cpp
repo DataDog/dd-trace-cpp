@@ -414,8 +414,9 @@ void DatadogAgent::send_heartbeat_and_telemetry() {
 }
 
 void DatadogAgent::send_configuration_change() {
-  send_telemetry("app-client-configuration-change",
-                 tracer_telemetry_->configuration_change());
+  if (auto payload = tracer_telemetry_->configuration_change()) {
+    send_telemetry("app-client-configuration-change", *payload);
+  }
 }
 
 void DatadogAgent::send_app_closing() {

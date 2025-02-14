@@ -150,7 +150,7 @@ class TracerTelemetry {
   // been modified, a `generate-metrics` message.
   std::string app_closing();
   // Construct an `app-client-configuration-change` message.
-  std::string configuration_change();
+  Optional<std::string> configuration_change();
 };
 
 }  // namespace tracing
