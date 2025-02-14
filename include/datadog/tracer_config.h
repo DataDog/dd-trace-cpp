@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include "baggage.h"
 #include "clock.h"
 #include "datadog_agent_config.h"
 #include "expected.h"
@@ -201,8 +202,7 @@ class FinalizedTracerConfig final {
   bool delegate_trace_sampling;
   bool report_traces;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
-  std::size_t baggage_max_items;
-  std::size_t baggage_max_bytes;
+  Baggage::Options baggage_opts;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

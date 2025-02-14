@@ -1347,8 +1347,8 @@ TRACER_CONFIG_TEST("baggage") {
   SECTION("default") {
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    CHECK(finalized->baggage_max_items == 64);
-    CHECK(finalized->baggage_max_bytes == 8192);
+    CHECK(finalized->baggage_opts.max_items == 64);
+    CHECK(finalized->baggage_opts.max_bytes == 8192);
 
     CHECK(contains_baggage_propagation_style(finalized->extraction_styles) ==
           true);
@@ -1385,8 +1385,8 @@ TRACER_CONFIG_TEST("baggage") {
 
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    CHECK(finalized->baggage_max_items == 128);
-    CHECK(finalized->baggage_max_bytes == 1024);
+    CHECK(finalized->baggage_opts.max_items == 128);
+    CHECK(finalized->baggage_opts.max_bytes == 1024);
 
     CHECK(contains_baggage_propagation_style(finalized->extraction_styles) ==
           false);
@@ -1409,8 +1409,8 @@ TRACER_CONFIG_TEST("baggage") {
 
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    CHECK(finalized->baggage_max_items == 10);
-    CHECK(finalized->baggage_max_bytes == 32);
+    CHECK(finalized->baggage_opts.max_items == 10);
+    CHECK(finalized->baggage_opts.max_bytes == 32);
 
     CHECK(contains_baggage_propagation_style(finalized->extraction_styles) ==
           true);

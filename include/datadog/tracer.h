@@ -54,8 +54,7 @@ class Tracer {
   // read to determine if the process is instrumented with a tracer and to
   // retrieve relevant tracing information.
   std::shared_ptr<InMemoryFile> metadata_file_;
-  std::size_t baggage_max_items_;
-  std::size_t baggage_max_bytes_;
+  Baggage::Options baggage_opts_;
   bool baggage_injection_enabled_;
   bool baggage_extraction_enabled_;
 

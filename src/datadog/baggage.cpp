@@ -6,7 +6,7 @@ namespace tracing {
 namespace {
 
 Expected<std::unordered_map<std::string, std::string>, Baggage::Error>
-parse_baggage(StringView input, size_t max_capacity) {
+parse_baggage(StringView input) {
   std::unordered_map<std::string, std::string> result;
   if (input.empty()) return result;
 
@@ -29,9 +29,6 @@ parse_baggage(StringView input, size_t max_capacity) {
     switch (internal_state) {
       case state::leading_spaces_key: {
         if (input[i] != ' ') {
-          if (result.size() == max_capacity)
-            return Baggage::Error::MAXIMUM_CAPACITY_REACHED;
-
           beg = i;
           tmp_end = i;
           internal_state = state::key;
@@ -40,7 +37,7 @@ parse_baggage(StringView input, size_t max_capacity) {
 
       case state::key: {
         if (input[i] == ',') {
-          return Baggage::Error::MALFORMED_BAGGAGE_HEADER;
+          return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
         } else if (input[i] == '=') {
           key = StringView{input.data() + beg, tmp_end - beg + 1};
           internal_state = state::leading_spaces_value;
@@ -72,7 +69,7 @@ parse_baggage(StringView input, size_t max_capacity) {
   }
 
   if (internal_state != state::value) {
-    return Baggage::Error::MALFORMED_BAGGAGE_HEADER;
+    return {Baggage::Error::MALFORMED_BAGGAGE_HEADER};
   }
 
   value = StringView{input.data() + beg, tmp_end - beg + 1};
@@ -84,11 +81,6 @@ parse_baggage(StringView input, size_t max_capacity) {
 }  // namespace
 
 Baggage::Baggage(size_t max_capacity) : max_capacity_(max_capacity) {}
-
-Baggage::Baggage(
-    std::initializer_list<std::pair<const std::string, std::string>> baggage,
-    size_t max_capacity)
-    : max_capacity_(max_capacity), baggage_(baggage) {}
 
 Baggage::Baggage(std::unordered_map<std::string, std::string> baggage,
                  size_t max_capacity)
@@ -127,12 +119,15 @@ void Baggage::visit(std::function<void(StringView, StringView)>&& visitor) {
   }
 }
 
-Expected<void> Baggage::inject(DictWriter& writer, size_t max_bytes) const {
+Expected<void> Baggage::inject(DictWriter& writer, const Options& opts) const {
   if (baggage_.empty()) return {};
+  if (baggage_.size() > opts.max_items)
+    return datadog::tracing::Error{
+        datadog::tracing::Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED, ""};
 
   // TODO(@dmehala): Memory alloc optimization, (re)use fixed size buffer.
   std::string res;
-  res.reserve(max_bytes);
+  res.reserve(opts.max_bytes);
 
   auto it = baggage_.cbegin();
   res += it->first;
@@ -146,7 +141,7 @@ Expected<void> Baggage::inject(DictWriter& writer, size_t max_bytes) const {
     res += it->second;
   }
 
-  if (res.size() >= max_bytes)
+  if (res.size() >= opts.max_bytes)
     return datadog::tracing::Error{
         datadog::tracing::Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED, ""};
 
@@ -156,20 +151,19 @@ Expected<void> Baggage::inject(DictWriter& writer, size_t max_bytes) const {
   return {};
 }
 
-Expected<Baggage, Baggage::Error> Baggage::extract(const DictReader& headers,
-                                                   size_t max_capacity) {
+Expected<Baggage, Baggage::Error> Baggage::extract(const DictReader& headers) {
   auto found = headers.lookup("baggage");
   if (!found) {
-    return Error::MISSING_HEADER;
+    return Baggage::Error{Error::MISSING_HEADER};
   }
 
   // TODO(@dmehala): Avoid allocation
-  auto bv = parse_baggage(*found, max_capacity);
+  auto bv = parse_baggage(*found);
   if (auto error = bv.if_error()) {
     return *error;
   }
 
-  Baggage result(*bv, max_capacity);
+  Baggage result(*bv);
   return result;
 }
 

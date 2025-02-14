@@ -22,7 +22,7 @@ enum class PropagationStyle {
   // propagation is disabled in the relevant direction (extraction or
   // injection).
   NONE,
-  // TBD
+  // Baggage header
   BAGGAGE,
 };
 

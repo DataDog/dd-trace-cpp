@@ -1,10 +1,11 @@
+#pragma once
+
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
 #include <datadog/string_view.h>
 
-#include <initializer_list>
 #include <string>
 #include <unordered_map>
 
@@ -22,31 +23,42 @@ namespace tracing {
 /// interface using the `inject` method.
 class Baggage {
  public:
-  enum class Error : char {
-    /// Baggage propagation is disabled. This may be due to one of the following
-    /// reasons:
-    /// - `baggage` is not set as an extraction or injection propagation style.
-    /// - The maximum number of items is less than 0.
-    /// - The number of bytes is less than 3.
-    DISABLED,
-    MISSING_HEADER,
-    MALFORMED_BAGGAGE_HEADER,
-    MAXIMUM_CAPACITY_REACHED,
-    MAXIMUM_BYTES_REACHED,
+  struct Error final {
+    enum Code : char {
+      /// Baggage propagation is disabled. This may be due to one of the
+      /// following
+      /// reasons:
+      /// - `baggage` is not set as an extraction or injection propagation
+      /// style.
+      /// - The maximum number of items is less than 0.
+      /// - The number of bytes is less than 3.
+      DISABLED,
+      MISSING_HEADER,
+      MALFORMED_BAGGAGE_HEADER,
+      MAXIMUM_CAPACITY_REACHED,
+      MAXIMUM_BYTES_REACHED,
+    };
+    Code code;
+    Optional<size_t> pos;
+
+    Error(Code in_code) : code(in_code), pos(nullopt) {}
+    Error(Code in_code, size_t position) : code(in_code), pos(position) {}
+  };
+
+  struct Options final {
+    size_t max_bytes;
+    size_t max_items;
   };
 
   static constexpr size_t default_max_capacity = 64;
+  static constexpr Options default_options{2048, default_max_capacity};
 
   /// Extracts a Baggage instance from a `DictReader` and creates a Baggage
   /// instance if no errors are encounters .
   ///
   /// @param `reader` The input `DictReader` from which to extract the data.
-  /// @param `max_capacity` The maximum number of Baggage items allowd to
-  /// parse. An error is returned when the number of element parsed exceed this
-  /// value. If not specified, a default capacity is used.
   /// @return A `Baggage` instance or an `Error`.
-  static Expected<Baggage, Error> extract(
-      const DictReader& reader, size_t max_capacity = default_max_capacity);
+  static Expected<Baggage, Error> extract(const DictReader& reader);
 
   /// Initializes an empty Baggage with the default maximum capacity.
   Baggage() = default;
@@ -63,14 +75,6 @@ class Baggage {
   /// Baggage.
   /// @param `max_capacity` The maximum capacity for this Baggage instance.
   Baggage(std::unordered_map<std::string, std::string>,
-          size_t max_capacity = default_max_capacity);
-
-  /// Initializes a Baggage instance using the provided initializer list of
-  /// key-value pairs. The maximum capacity can also be specified.
-  ///
-  /// @param `init_list` An initializer list containing key-value pairs.
-  /// @param `max_capacity` The maximum capacity for this Baggage instance.
-  Baggage(std::initializer_list<std::pair<const std::string, std::string>>,
           size_t max_capacity = default_max_capacity);
 
   /// Checks if the Baggage contains a specified key.
@@ -124,10 +128,11 @@ class Baggage {
   /// limit.
   ///
   /// @param `writer` The DictWriter to inject the data into.
-  /// @param `max_bytes` The maximum number of bytes to write.
+  /// @param `opts` Injection options.
   /// @return An `Expected<void>`, which may either succeed or contain an
   /// error.
-  Expected<void> inject(DictWriter& writer, size_t max_bytes) const;
+  Expected<void> inject(DictWriter& writer,
+                        const Options& opts = default_options) const;
 
   /// Equality operator for comparing two Baggage instances.
   inline bool operator==(const Baggage& rhs) const {

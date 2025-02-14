@@ -60,8 +60,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       extraction_styles_(config.extraction_styles),
       tags_header_max_size_(config.tags_header_size),
       sampling_delegation_enabled_(config.delegate_trace_sampling),
-      baggage_max_items_(config.baggage_max_items),
-      baggage_max_bytes_(config.baggage_max_bytes),
+      baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
       baggage_extraction_enabled_(false) {
   if (config.report_hostname) {
@@ -120,6 +119,10 @@ std::string Tracer::config() const {
     {"extraction_styles", extraction_styles_},
     {"tags_header_size", tags_header_max_size_},
     {"environment_variables", nlohmann::json::parse(environment::to_json())},
+    {"baggage", nlohmann::json{
+      {"max_bytes", baggage_opts_.max_bytes},
+      {"max_items", baggage_opts_.max_items},
+    }},
   });
   // clang-format on
 
@@ -420,15 +423,15 @@ Span Tracer::extract_or_create_span(const DictReader& reader,
   return create_span(config);
 }
 
-Baggage Tracer::create_baggage() { return Baggage(baggage_max_items_); }
+Baggage Tracer::create_baggage() { return Baggage(baggage_opts_.max_items); }
 
 Expected<Baggage, Baggage::Error> Tracer::extract_baggage(
     const DictReader& reader) {
   if (!baggage_extraction_enabled_) {
-    return Baggage::Error::DISABLED;
+    return Baggage::Error{Baggage::Error::DISABLED};
   }
 
-  return Baggage::extract(reader, baggage_max_items_);
+  return Baggage::extract(reader);
 }
 
 Baggage Tracer::extract_or_create_baggage(const DictReader& reader) {
@@ -446,7 +449,7 @@ Expected<void> Tracer::inject(const Baggage& baggage, DictWriter& writer) {
     return Error{Error::Code::OTHER, "Baggage propagation is disabled"};
   }
 
-  return baggage.inject(writer, baggage_max_bytes_);
+  return baggage.inject(writer, baggage_opts_);
 }
 
 }  // namespace tracing

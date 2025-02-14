@@ -380,20 +380,20 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
                tracer_version);
 
   // Baggage
-  std::tie(origin, final_config.baggage_max_items) =
+  std::tie(origin, final_config.baggage_opts.max_items) =
       pick(env_config->baggage_max_items, user_config.baggage_max_items, 64);
   final_config.metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS] =
       ConfigMetadata(ConfigName::TRACE_BAGGAGE_MAX_ITEMS,
-                     to_string(final_config.baggage_max_items), origin);
+                     to_string(final_config.baggage_opts.max_items), origin);
 
-  std::tie(origin, final_config.baggage_max_bytes) =
+  std::tie(origin, final_config.baggage_opts.max_bytes) =
       pick(env_config->baggage_max_bytes, user_config.baggage_max_bytes, 8192);
   final_config.metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES] =
       ConfigMetadata(ConfigName::TRACE_BAGGAGE_MAX_BYTES,
-                     to_string(final_config.baggage_max_bytes), origin);
+                     to_string(final_config.baggage_opts.max_bytes), origin);
 
-  if (final_config.baggage_max_items <= 0 ||
-      final_config.baggage_max_bytes < 3) {
+  if (final_config.baggage_opts.max_items <= 0 ||
+      final_config.baggage_opts.max_bytes < 3) {
     auto it = std::remove(final_config.extraction_styles.begin(),
                           final_config.extraction_styles.end(),
                           PropagationStyle::BAGGAGE);

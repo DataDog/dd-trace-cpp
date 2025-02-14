@@ -14,7 +14,7 @@ struct CinReader : public dd::DictReader {
 
   void visit(
       const std::function<void(dd::StringView key, dd::StringView value)>&
-          visitor) const override{};
+          visitor) const override {};
 };
 
 std::istream& operator>>(std::istream& is, CinReader& reader) {
@@ -24,7 +24,7 @@ std::istream& operator>>(std::istream& is, CinReader& reader) {
 
 std::ostream& operator<<(std::ostream& os, dd::Baggage::Error error) {
   using dd::Baggage;
-  switch (error) {
+  switch (error.code) {
     case Baggage::Error::MISSING_HEADER:
       os << "missing `baggage` header";
       break;
@@ -47,7 +47,14 @@ std::ostream& operator<<(std::ostream& os, dd::Baggage::Error error) {
 int main() {
   dd::TracerConfig cfg;
   cfg.log_on_startup = false;
+  cfg.telemetry.enabled = false;
+  cfg.agent.remote_configuration_enabled = false;
   const auto finalized_cfg = datadog::tracing::finalize_config(cfg);
+  if (auto error = finalized_cfg.if_error()) {
+    std::cerr << "Failed to initialize the tracer: " << error->message
+              << std::endl;
+    return error->code;
+  }
 
   dd::Tracer tracer(*finalized_cfg);
 
