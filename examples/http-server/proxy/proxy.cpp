@@ -8,6 +8,7 @@
 #include <optional>
 #include <string_view>
 
+#include "datadog/cerr_logger.h"
 #include "datadog/dict_reader.h"
 #include "datadog/dict_writer.h"
 #include "datadog/span.h"
@@ -27,6 +28,7 @@ int main() {
   dd::TracerConfig config;
   config.service = "dd-trace-cpp-http-server-example-proxy";
   config.service_type = "proxy";
+  config.logger = std::make_shared<datadog::tracing::CerrLogger>();
 
   // `finalize_config` validates `config` and applies any settings from
   // environment variables, such as `DD_AGENT_HOST`.

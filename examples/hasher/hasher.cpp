@@ -10,6 +10,7 @@
 // canonical format.  Produce a trace whose structure reflects the directory
 // structure.
 
+#include <datadog/cerr_logger.h>
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
@@ -133,6 +134,7 @@ int main() {
   dd::TracerConfig config;
   config.service = "dd-trace-cpp-example";
   config.environment = "dev";
+  config.logger = std::make_shared<datadog::tracing::CerrLogger>();
 
   auto validated = dd::finalize_config(config);
   if (auto *error = validated.if_error()) {

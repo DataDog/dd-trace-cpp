@@ -8,9 +8,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "cerr_logger.h"
 #include "datadog_agent.h"
 #include "json.hpp"
+#include "null_logger.h"
 #include "parse_util.h"
 #include "platform_util.h"
 #include "string_util.h"
@@ -240,7 +240,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
                                                 const Clock &clock) {
   auto logger =
-      user_config.logger ? user_config.logger : std::make_shared<CerrLogger>();
+      user_config.logger ? user_config.logger : std::make_shared<NullLogger>();
 
   Expected<TracerConfig> env_config = load_tracer_env_config(*logger);
   if (auto error = env_config.if_error()) {

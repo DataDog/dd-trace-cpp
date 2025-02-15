@@ -15,6 +15,7 @@
 #include "mocks/dict_readers.h"
 #include "mocks/dict_writers.h"
 #include "mocks/loggers.h"
+#include "null_logger.h"
 #include "test.h"
 
 using namespace datadog::tracing;

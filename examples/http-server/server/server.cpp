@@ -21,6 +21,7 @@
 //
 //         will deliver a response after approximately 23 milliseconds.
 
+#include <datadog/cerr_logger.h>
 #include <datadog/clock.h>
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
@@ -110,6 +111,7 @@ int main() {
   dd::TracerConfig config;
   config.service = "dd-trace-cpp-http-server-example-server";
   config.service_type = "server";
+  config.logger = std::make_shared<datadog::tracing::CerrLogger>();
 
   // `finalize_config` validates `config` and applies any settings from
   // environment variables, such as `DD_AGENT_HOST`.

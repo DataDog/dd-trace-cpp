@@ -11,7 +11,7 @@
 #include <ostream>
 
 #include "mocks/collectors.h"
-#include "mocks/loggers.h"
+#include "null_logger.h"
 #include "test.h"
 
 namespace std {

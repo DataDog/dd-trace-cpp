@@ -3,7 +3,7 @@
 #include "catch.hpp"
 #include "datadog/json.hpp"
 #include "datadog/remote_config/remote_config.h"
-#include "mocks/loggers.h"
+#include "null_logger.h"
 
 namespace rc = datadog::remote_config;
 using namespace datadog::tracing;
