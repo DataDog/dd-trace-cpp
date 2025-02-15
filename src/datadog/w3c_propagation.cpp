@@ -111,7 +111,7 @@ handle_trace_flag:
       parse_uint64(StringView(traceparent.data() + beg, 2), 16);
   if (maybe_trace_flags.if_error()) return "malformed_traceflags";
 
-  result.sampling_priority = *maybe_trace_flags & 0x01;
+  result.sampling_priority = static_cast<int>(*maybe_trace_flags & 0x01);
 
   return nullopt;
 }

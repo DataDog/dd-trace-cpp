@@ -103,8 +103,6 @@ SpanSamplerConfig::Rule by_name_and_tags(
   return rule;
 }
 
-const auto x = nullopt;
-
 }  // namespace
 
 TEST_CASE("span rules matching") {
@@ -121,34 +119,34 @@ TEST_CASE("span rules matching") {
       {"no rules → no span sampling tags", {}, {}, {}, {}, {}},
       {"match by service",
        {by_service("testsvc")},
-       {8, 1.0, x},
-       {8, 1.0, x},
-       {8, 1.0, x},
-       {8, 1.0, x}},
+       {8, 1.0, nullopt},
+       {8, 1.0, nullopt},
+       {8, 1.0, nullopt},
+       {8, 1.0, nullopt}},
       {"match by name",
        {by_name("sibling")},
-       {x, x, x},
-       {x, x, x},
-       {8, 1.0, x},
-       {x, x, x}},
+       {nullopt, nullopt, nullopt},
+       {nullopt, nullopt, nullopt},
+       {8, 1.0, nullopt},
+       {nullopt, nullopt, nullopt}},
       {"match by resource",
        {by_resource("office")},
-       {x, x, x},
-       {8, 1.0, x},
-       {x, x, x},
-       {x, x, x}},
+       {nullopt, nullopt, nullopt},
+       {8, 1.0, nullopt},
+       {nullopt, nullopt, nullopt},
+       {nullopt, nullopt, nullopt}},
       {"match by tag",
        {by_tags({{"generation", "second"}})},
-       {x, x, x},
-       {8, 1.0, x},
-       {8, 1.0, x},
-       {x, x, x}},
+       {nullopt, nullopt, nullopt},
+       {8, 1.0, nullopt},
+       {8, 1.0, nullopt},
+       {nullopt, nullopt, nullopt}},
       {"match by name and tag",
        {by_name_and_tags("child", {{"generation", "second"}})},
-       {x, x, x},
-       {8, 1.0, x},
-       {x, x, x},
-       {x, x, x}},
+       {nullopt, nullopt, nullopt},
+       {8, 1.0, nullopt},
+       {nullopt, nullopt, nullopt},
+       {nullopt, nullopt, nullopt}},
   }));
 
   TracerConfig config;
@@ -221,8 +219,12 @@ TEST_CASE("span rules only on trace drop") {
   };
 
   auto test_case = GENERATE(values<TestCase>({
-      {"trace drop → span sampling tags", TestCase::DROP_TRACE, {8, 1.0, x}},
-      {"trace keep →  no span sampling tags", TestCase::KEEP_TRACE, {x, x, x}},
+      {"trace drop → span sampling tags",
+       TestCase::DROP_TRACE,
+       {8, 1.0, nullopt}},
+      {"trace keep →  no span sampling tags",
+       TestCase::KEEP_TRACE,
+       {nullopt, nullopt, nullopt}},
   }));
 
   CAPTURE(test_case.name);
@@ -256,8 +258,8 @@ TEST_CASE("span rule sample rate") {
   };
 
   auto test_case = GENERATE(values<TestCase>({
-      {"100% → span sampling tags", 1.0, {8, 1.0, x}},
-      {"0% →  no span sampling tags", 0.0, {x, x, x}},
+      {"100% → span sampling tags", 1.0, {8, 1.0, nullopt}},
+      {"0% →  no span sampling tags", 0.0, {nullopt, nullopt, nullopt}},
   }));
 
   CAPTURE(test_case.name);
@@ -297,7 +299,7 @@ TEST_CASE("span rule limiter") {
   };
 
   auto test_case =
-      GENERATE(values<TestCase>({{"default is no limit", 1000, x, 1000},
+      GENERATE(values<TestCase>({{"default is no limit", 1000, nullopt, 1000},
                                  {"limiter limits", 1000, 100, 100}}));
 
   CAPTURE(test_case.name);

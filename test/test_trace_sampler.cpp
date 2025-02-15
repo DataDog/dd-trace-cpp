@@ -66,7 +66,7 @@ TEST_CASE("trace sampling rule sample rate") {
   config.service = "testsvc";
   config.trace_sampler.sample_rate = test_case.sample_rate;
   // Plenty of head room so that the limiter doesn't throttle us.
-  config.trace_sampler.max_per_second = num_iterations * 2;
+  config.trace_sampler.max_per_second = static_cast<double>(num_iterations * 2);
   const auto collector = std::make_shared<PriorityCountingCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
@@ -179,7 +179,7 @@ TEST_CASE("priority sampling") {
   config.service = "testsvc";
   config.environment = "dev";
   // plenty of head room
-  config.trace_sampler.max_per_second = 2 * num_iterations;
+  config.trace_sampler.max_per_second = static_cast<double>(2 * num_iterations);
   const auto collector =
       std::make_shared<PriorityCountingCollectorWithResponse>();
   config.collector = collector;
