@@ -23,7 +23,6 @@ add_executable(tests
     # test cases
     test_base64.cpp
     test_cerr_logger.cpp
-    test_curl.cpp
     test_config_manager.cpp
     test_datadog_agent.cpp
     test_glob.cpp
@@ -43,6 +42,12 @@ add_executable(tests
     remote_config/test_remote_config.cpp
 )
 
+# TODO: Remove dependency on libcurl
+if (DD_TRACE_TRANSPORT STREQUAL "curl")
+  target_sources(tests PRIVATE test_curl.cpp)
+  target_link_libraries(tests PRIVATE CURL::libcurl)
+endif ()
+
 target_include_directories(tests
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -61,9 +66,7 @@ target_compile_definitions(tests
 
 target_link_libraries(tests 
   PRIVATE
-    # TODO: Remove dependency on libcurl
-    CURL::libcurl_static
-    dd_trace_cpp-static
+    dd_trace::static
     dd_trace::specs
 )
 

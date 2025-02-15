@@ -174,6 +174,10 @@ target_link_libraries(dd_trace_cpp-objects
 if (BUILD_SHARED_LIBS)
   add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
   add_library(dd_trace::shared ALIAS dd_trace_cpp-shared)
+  set_target_properties(dd_trace_cpp-shared PROPERTIES OUTPUT_NAME "dd_trace_cpp")
+  set(DD_TRACE_SELECTED_LIB dd_trace_cpp-shared)
+
+  add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects)
 
   if (DD_TRACE_TRANSPORT STREQUAL "curl")
     add_dependencies(dd_trace_cpp-shared CURL::libcurl_shared)
@@ -184,10 +188,7 @@ if (BUILD_SHARED_LIBS)
         src/datadog/default_http_client_curl.cpp
     )
 
-    target_link_libraries(dd_trace_cpp-shared
-      PRIVATE
-        CURL::libcurl_shared
-    )
+    target_link_libraries(dd_trace_cpp-shared PRIVATE CURL::libcurl_shared)
   else()
     target_sources(dd_trace_cpp-shared
       PRIVATE
@@ -195,12 +196,9 @@ if (BUILD_SHARED_LIBS)
     )
   endif ()
 
-  add_dependencies(dd_trace_cpp-shared dd_trace_cpp-objects CURL::libcurl_shared)
-
   target_link_libraries(dd_trace_cpp-shared
     PUBLIC
       dd_trace::obj
-      CURL::libcurl_shared
     PRIVATE
       dd_trace::specs
   )
@@ -217,6 +215,10 @@ endif ()
 if (BUILD_STATIC_LIBS)
   add_library(dd_trace_cpp-static STATIC $<TARGET_OBJECTS:dd_trace_cpp-objects>)
   add_library(dd_trace::static ALIAS dd_trace_cpp-static)
+  set_target_properties(dd_trace_cpp-static PROPERTIES OUTPUT_NAME "dd_trace_cpp")
+  set(DD_TRACE_SELECTED_LIB dd_trace_cpp-static)
+
+  add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
 
   if (DD_TRACE_TRANSPORT STREQUAL "curl")
     add_dependencies(dd_trace_cpp-static CURL::libcurl_static)
@@ -238,7 +240,6 @@ if (BUILD_STATIC_LIBS)
     ) 
   endif ()
 
-  add_dependencies(dd_trace_cpp-static dd_trace_cpp-objects)
 
   target_link_libraries(dd_trace_cpp-static 
     PUBLIC
@@ -255,3 +256,7 @@ if (BUILD_STATIC_LIBS)
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 endif ()
+
+# Alias either for shared or static library.
+add_library(dd_trace::lib ALIAS ${DD_TRACE_SELECTED_LIB})
+unset(DD_TRACE_SELECTED_LIB)

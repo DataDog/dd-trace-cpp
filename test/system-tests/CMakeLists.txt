@@ -15,7 +15,7 @@ target_include_directories(parametric-http-server
 
 target_link_libraries(parametric-http-server 
   PRIVATE
-    dd_trace_cpp-static 
+    dd_trace::static
     dd_trace::specs
     nlohmann_json::nlohmann_json
 )
