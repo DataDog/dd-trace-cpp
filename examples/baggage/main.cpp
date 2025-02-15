@@ -28,9 +28,12 @@ std::ostream& operator<<(std::ostream& os, dd::Baggage::Error error) {
     case Baggage::Error::MISSING_HEADER:
       os << "missing `baggage` header";
       break;
-    case Baggage::Error::MALFORMED_BAGGAGE_HEADER:
+    case Baggage::Error::MALFORMED_BAGGAGE_HEADER: {
       os << "malformed `baggage` header";
-      break;
+      if (error.pos) {
+        os << " at position " << *error.pos;
+      }
+    } break;
     case Baggage::Error::MAXIMUM_CAPACITY_REACHED:
       os << "maximum number of bagge items reached";
       break;

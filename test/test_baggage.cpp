@@ -3,6 +3,7 @@
 #include "catch.hpp"
 #include "mocks/dict_readers.h"
 #include "mocks/dict_writers.h"
+#include "random.h"
 
 #define BAGGAGE_TEST(x) TEST_CASE(x, "[baggage]")
 
@@ -33,7 +34,7 @@ BAGGAGE_TEST("extract") {
             "                  ",
             Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER},
         },
-        /*{
+        {
             "valid",
             "key1=value1,key2=value2",
             Baggage({{"key1", "value1"}, {"key2", "value2"}}),
@@ -84,9 +85,14 @@ BAGGAGE_TEST("extract") {
             Baggage({{"key1", "value1"}, {"key2", "value2"}}),
         },
         {
-            "spaces in key is allowed",
+            "spaces in key is not allowed",
             "key1 foo=value1",
-            Baggage({{"key1 foo", "value1"}}),
+            Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER},
+        },
+        {
+            "spaces in value is not allowed",
+            "key1=value1 value2",
+            Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER},
         },
         {
             "verify separator",
@@ -112,7 +118,17 @@ BAGGAGE_TEST("extract") {
             "malformed baggage 4",
             "key1=value1,=",
             Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER},
-        },*/
+        },
+        {
+            "malformed baggage 5",
+            "key1=value1,key2=",
+            Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER},
+        },
+        {
+            "malformed baggage 6",
+            "key1=",
+            Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER},
+        },
     }));
 
     CAPTURE(test_case.name, test_case.input);
@@ -147,11 +163,14 @@ BAGGAGE_TEST("inject") {
 
   SECTION("default limits are respected") {
     auto default_opts = Baggage::default_options;
-    SECTION("max items") {
+    SECTION("max items reached") {
       Baggage bag;
       for (size_t i = 0; i < default_opts.max_items; ++i) {
-        bag.set("a", "a");
+        bag.set(uuid(), "a");
       }
+      // NOTE(@dmehala): if that fails, the flackiness is comming from UUIDs
+      // collision.
+      REQUIRE(bag.size() == default_opts.max_items);
       bag.set("a", "a");
 
       MockDictWriter writer;

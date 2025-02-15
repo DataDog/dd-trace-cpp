@@ -5,6 +5,41 @@ namespace tracing {
 
 namespace {
 
+/// Whitespace in RFC 7230 section 3.2.3 definition
+/// BDNF:
+///  - OWS  = *(SP / HTAB)
+///  - SP   = SPACE (0x20)
+///  - HTAB = Horizontal tab (0x09)
+constexpr bool is_whitespace(char c) { return c == 0x20 || c == 0x09; }
+
+constexpr bool is_allowed_key_char(char c) {
+  // clang-format off
+  return (c >= 0x30 && c <= 0x39)   ///< [0-9]
+      || (c >= 0x41 && c <= 0x5A)   ///< [a-z]
+      || (c >= 0x61 && c <= 0x7A)   ///< [A-Z]
+      || (c == 0x21)                ///< "!"
+      || (c >= 0x23 && c <= 0x27)   ///< "#" / "$" / "%" / "&" / "'"
+      || (c == 0x2A)                ///< "*"
+      || (c == 0x2B)                ///< "+"
+      || (c == 0x2D)                ///< "-"
+      || (c == 0x2E)                ///< "."
+      || (c == 0x5E)                ///< "^"
+      || (c == 0x5F)                ///< "_"
+      || (c == 0x60)                ///< "`"
+      || (c == 0x7C)                ///< "|"
+      || (c == 0x7E);               ///< "~"
+  // clang-format on
+}
+
+constexpr bool is_allowed_value_char(char c) {
+  // clang-format off
+  return (c == 0x21)                ///< "!"
+      || (c >= 0x23 && c <= 0x2B)   ///< "#" / "$" / "%" / "&" / "'" / "(" / /< ")" / "*" / "+" / "," / "-"
+      || (c >= 0x2D && c <= 0x5B)   ///< "-" / "." / "/" / [0-9] / ";' / "<" / "=" / ">" / "?" / "@" / [A-Z]
+      || (c >= 0x5D && c <= 0x7E);  ///< "]" / "^" / "_" / "`" / [a-z]
+  // clang-format on
+}
+
 Expected<std::unordered_map<std::string, std::string>, Baggage::Error>
 parse_baggage(StringView input) {
   std::unordered_map<std::string, std::string> result;
@@ -13,8 +48,10 @@ parse_baggage(StringView input) {
   enum class state : char {
     leading_spaces_key,
     key,
+    trailing_spaces_key,
     leading_spaces_value,
-    value
+    value,
+    trailing_spaces_value,
   } internal_state = state::leading_spaces_key;
 
   size_t beg = 0;
@@ -26,54 +63,96 @@ parse_baggage(StringView input) {
   const size_t end = input.size();
 
   for (size_t i = 0; i < end; ++i) {
+    auto c = input[i];
+
     switch (internal_state) {
       case state::leading_spaces_key: {
-        if (input[i] != ' ') {
+        if (!is_whitespace(c)) {
           beg = i;
           tmp_end = i;
           internal_state = state::key;
+          goto key;
         }
       } break;
 
       case state::key: {
-        if (input[i] == ',') {
-          return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
-        } else if (input[i] == '=') {
-          key = StringView{input.data() + beg, tmp_end - beg + 1};
-          internal_state = state::leading_spaces_value;
-        } else if (input[i] != ' ') {
+      key:
+        if (c == '=') {
           tmp_end = i;
+          goto consume_key;
+        } else if (is_whitespace(c)) {
+          tmp_end = i;
+          internal_state = state::trailing_spaces_key;
+        } else if (!is_allowed_key_char(c)) {
+          return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
+        }
+      } break;
+
+      case state::trailing_spaces_key: {
+        if (c == '=') {
+        consume_key:
+          size_t count = tmp_end - beg;
+          if (count < 1)
+            return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
+
+          key = StringView{input.data() + beg, count};
+          internal_state = state::leading_spaces_value;
+        } else if (!is_whitespace(c)) {
+          return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
         }
       } break;
 
       case state::leading_spaces_value: {
-        if (input[i] != ' ') {
+        if (!is_whitespace(c)) {
           beg = i;
           tmp_end = i;
           internal_state = state::value;
+          goto value;
         }
       } break;
 
       case state::value: {
-        if (input[i] == ',') {
-          value = StringView{input.data() + beg, tmp_end - beg + 1};
+      value:
+        if (c == ',') {
+          tmp_end = i;
+          goto consume_value;
+        } else if (is_whitespace(c)) {
+          tmp_end = i;
+          internal_state = state::trailing_spaces_value;
+        } else if (!is_allowed_value_char(c)) {
+          return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
+        }
+      } break;
+
+      case state::trailing_spaces_value: {
+        if (c == ',') {
+        consume_value:
+          size_t count = tmp_end - beg;
+          if (count < 1)
+            return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER,
+                                  tmp_end};
+
+          value = StringView{input.data() + beg, count};
           result.emplace(std::string(key), std::string(value));
           beg = i;
           tmp_end = i;
           internal_state = state::leading_spaces_key;
-        } else if (input[i] != ' ') {
-          tmp_end = i;
+        } else if (!is_whitespace(c)) {
+          return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
         }
-      } break;
+      }
     }
   }
 
-  if (internal_state != state::value) {
-    return {Baggage::Error::MALFORMED_BAGGAGE_HEADER};
+  if (internal_state == state::value) {
+    value = StringView{input.data() + beg, end - beg};
+    result.emplace(std::string(key), std::string(value));
+  } else if (internal_state == state::trailing_spaces_value) {
+    value = StringView{input.data() + beg, tmp_end - beg};
+    result.emplace(std::string(key), std::string(value));
+  } else {
+    return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, end};
   }
-
-  value = StringView{input.data() + beg, tmp_end - beg + 1};
-  result.emplace(std::string(key), std::string(value));
 
   return result;
 }
