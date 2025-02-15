@@ -14,7 +14,7 @@ struct CinReader : public dd::DictReader {
 
   void visit(
       const std::function<void(dd::StringView key, dd::StringView value)>&
-          visitor) const override {};
+          visitor) const override{};
 };
 
 std::istream& operator>>(std::istream& is, CinReader& reader) {
