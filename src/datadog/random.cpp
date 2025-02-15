@@ -82,5 +82,11 @@ std::string uuid() {
   return result;
 }
 
+std::string short_uuid() {
+  std::bitset<64> high = random_uint64();
+  std::string hexed = hex_padded(high.to_ullong());
+  return hexed.substr(0, 8);
+}
+
 }  // namespace tracing
 }  // namespace datadog

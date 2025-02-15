@@ -31,6 +31,7 @@ struct SpanConfig;
 class TraceSampler;
 class SpanSampler;
 class IDGenerator;
+class InMemoryFile;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
@@ -47,6 +48,10 @@ class Tracer {
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
   bool sampling_delegation_enabled_;
+  // Store the tracer configuration in an in-memory file, allowing it to be
+  // read to determine if the process is instrumented with a tracer and to
+  // retrieve relevant tracing information.
+  std::shared_ptr<InMemoryFile> metadata_file_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:
@@ -81,6 +86,9 @@ class Tracer {
   // Return a JSON object describing this Tracer's configuration. It is the same
   // JSON object that was logged when this Tracer was created.
   std::string config() const;
+
+ private:
+  void store_config();
 };
 
 }  // namespace tracing

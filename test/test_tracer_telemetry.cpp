@@ -110,16 +110,9 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
       CHECK(cfg_payload[0] == expected_conf);
 
       SECTION("generates a configuration change event") {
-        SECTION("empty configuration generate a valid payload") {
-          auto config_change_message = nlohmann::json::parse(
-              tracer_telemetry.configuration_change(), nullptr, false);
-          REQUIRE(config_change_message.is_discarded() == false);
-          REQUIRE(is_valid_telemetry_payload(app_started) == true);
-
-          CHECK(config_change_message["request_type"] ==
-                "app-client-configuration-change");
-          CHECK(config_change_message["payload"]["configuration"].is_array());
-          CHECK(config_change_message["payload"]["configuration"].empty());
+        SECTION("empty configuration do not generate a valid payload") {
+          auto config_update = tracer_telemetry.configuration_change();
+          CHECK(!config_update);
         }
 
         SECTION("valid configurations update") {
@@ -130,8 +123,10 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
                Error{Error::Code::OTHER, "empty field"}}};
 
           tracer_telemetry.capture_configuration_change(new_config);
-          auto config_change_message = nlohmann::json::parse(
-              tracer_telemetry.configuration_change(), nullptr, false);
+          auto updates = tracer_telemetry.configuration_change();
+          REQUIRE(updates);
+          auto config_change_message =
+              nlohmann::json::parse(*updates, nullptr, false);
           REQUIRE(config_change_message.is_discarded() == false);
           REQUIRE(is_valid_telemetry_payload(config_change_message) == true);
 
@@ -141,18 +136,32 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
           CHECK(config_change_message["payload"]["configuration"].size() == 2);
 
           const std::unordered_map<std::string, nlohmann::json> expected_json{
-              {"service", nlohmann::json{{"name", "service"},
-                                         {"value", "increase seq_id"},
-                                         {"seq_id", 2},
-                                         {"origin", "env_var"}}},
-              {"trace_enabled",
-               nlohmann::json{{"name", "trace_enabled"},
-                              {"value", ""},
-                              {"seq_id", 1},
-                              {"origin", "default"},
-                              {"error",
-                               {{"code", Error::Code::OTHER},
-                                {"message", "empty field"}}}}}};
+              {
+                  "service",
+                  nlohmann::json{
+                      {"name", "service"},
+                      {"value", "increase seq_id"},
+                      {"seq_id", 2},
+                      {"origin", "env_var"},
+                  },
+              },
+              {
+                  "trace_enabled",
+                  nlohmann::json{
+                      {"name", "trace_enabled"},
+                      {"value", ""},
+                      {"seq_id", 1},
+                      {"origin", "default"},
+                      {
+                          "error",
+                          {
+                              {"code", Error::Code::OTHER},
+                              {"message", "empty field"},
+                          },
+                      },
+                  },
+              },
+          };
 
           for (const auto& conf :
                config_change_message["payload"]["configuration"]) {
@@ -160,6 +169,9 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
             REQUIRE(expected_conf != expected_json.cend());
             CHECK(expected_conf->second == conf);
           }
+
+          // No update -> no configuration update
+          CHECK(tracer_telemetry.configuration_change() == nullopt);
         }
       }
     }
