@@ -45,7 +45,7 @@
 namespace datadog {
 namespace tracing {
 
-template <typename Value>
+template <typename Value, typename Error = Error>
 class Expected {
   std::variant<Value, Error> data_;
 
@@ -98,93 +98,93 @@ class Expected {
   const Error* if_error() const&& = delete;
 };
 
-template <typename Value>
-Expected<Value>::Expected(const Value& value) : data_(value) {}
+template <typename Value, typename Error>
+Expected<Value, Error>::Expected(const Value& value) : data_(value) {}
 
-template <typename Value>
-Expected<Value>::Expected(Value&& value) : data_(std::move(value)) {}
+template <typename Value, typename Error>
+Expected<Value, Error>::Expected(Value&& value) : data_(std::move(value)) {}
 
-template <typename Value>
-Expected<Value>::Expected(const Error& error) : data_(error) {}
+template <typename Value, typename Error>
+Expected<Value, Error>::Expected(const Error& error) : data_(error) {}
 
-template <typename Value>
-Expected<Value>::Expected(Error&& error) : data_(std::move(error)) {}
+template <typename Value, typename Error>
+Expected<Value, Error>::Expected(Error&& error) : data_(std::move(error)) {}
 
-template <typename Value>
-bool Expected<Value>::has_value() const noexcept {
+template <typename Value, typename Error>
+bool Expected<Value, Error>::has_value() const noexcept {
   return std::holds_alternative<Value>(data_);
 }
-template <typename Value>
-Expected<Value>::operator bool() const noexcept {
+template <typename Value, typename Error>
+Expected<Value, Error>::operator bool() const noexcept {
   return has_value();
 }
 
-template <typename Value>
-Value& Expected<Value>::value() & {
+template <typename Value, typename Error>
+Value& Expected<Value, Error>::value() & {
   return std::get<0>(data_);
 }
-template <typename Value>
-const Value& Expected<Value>::value() const& {
+template <typename Value, typename Error>
+const Value& Expected<Value, Error>::value() const& {
   return std::get<0>(data_);
 }
-template <typename Value>
-Value&& Expected<Value>::value() && {
+template <typename Value, typename Error>
+Value&& Expected<Value, Error>::value() && {
   return std::move(std::get<0>(data_));
 }
-template <typename Value>
-const Value&& Expected<Value>::value() const&& {
+template <typename Value, typename Error>
+const Value&& Expected<Value, Error>::value() const&& {
   return std::move(std::get<0>(data_));
 }
 
-template <typename Value>
-Value& Expected<Value>::operator*() & {
+template <typename Value, typename Error>
+Value& Expected<Value, Error>::operator*() & {
   return value();
 }
-template <typename Value>
-const Value& Expected<Value>::operator*() const& {
+template <typename Value, typename Error>
+const Value& Expected<Value, Error>::operator*() const& {
   return value();
 }
-template <typename Value>
-Value&& Expected<Value>::operator*() && {
+template <typename Value, typename Error>
+Value&& Expected<Value, Error>::operator*() && {
   return std::move(value());
 }
-template <typename Value>
-const Value&& Expected<Value>::operator*() const&& {
+template <typename Value, typename Error>
+const Value&& Expected<Value, Error>::operator*() const&& {
   return std::move(value());
 }
 
-template <typename Value>
-Value* Expected<Value>::operator->() {
+template <typename Value, typename Error>
+Value* Expected<Value, Error>::operator->() {
   return &value();
 }
-template <typename Value>
-const Value* Expected<Value>::operator->() const {
+template <typename Value, typename Error>
+const Value* Expected<Value, Error>::operator->() const {
   return &value();
 }
 
-template <typename Value>
-Error& Expected<Value>::error() & {
+template <typename Value, typename Error>
+Error& Expected<Value, Error>::error() & {
   return std::get<1>(data_);
 }
-template <typename Value>
-const Error& Expected<Value>::error() const& {
+template <typename Value, typename Error>
+const Error& Expected<Value, Error>::error() const& {
   return std::get<1>(data_);
 }
-template <typename Value>
-Error&& Expected<Value>::error() && {
+template <typename Value, typename Error>
+Error&& Expected<Value, Error>::error() && {
   return std::move(std::get<1>(data_));
 }
-template <typename Value>
-const Error&& Expected<Value>::error() const&& {
+template <typename Value, typename Error>
+const Error&& Expected<Value, Error>::error() const&& {
   return std::move(std::get<1>(data_));
 }
 
-template <typename Value>
-Error* Expected<Value>::if_error() & {
+template <typename Value, typename Error>
+Error* Expected<Value, Error>::if_error() & {
   return std::get_if<1>(&data_);
 }
-template <typename Value>
-const Error* Expected<Value>::if_error() const& {
+template <typename Value, typename Error>
+const Error* Expected<Value, Error>::if_error() const& {
   return std::get_if<1>(&data_);
 }
 

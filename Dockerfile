@@ -36,3 +36,5 @@ run chmod +x /tmp/install-cmake && /tmp/install-cmake && rm /tmp/install-cmake
 copy bin/install-lcov /tmp/install-lcov
 run chmod +x /tmp/install-lcov && /tmp/install-lcov && rm /tmp/install-lcov
 
+run curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/main/install.sh | bash
+

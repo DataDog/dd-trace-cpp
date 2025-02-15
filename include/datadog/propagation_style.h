@@ -22,6 +22,8 @@ enum class PropagationStyle {
   // propagation is disabled in the relevant direction (extraction or
   // injection).
   NONE,
+  // Baggage header
+  BAGGAGE,
 };
 
 StringView to_string_view(PropagationStyle style);

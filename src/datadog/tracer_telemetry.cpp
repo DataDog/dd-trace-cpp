@@ -46,6 +46,10 @@ std::string to_string(datadog::tracing::ConfigName name) {
       return "span_sample_rules";
     case ConfigName::TRACE_SAMPLING_RULES:
       return "trace_sample_rules";
+    case ConfigName::TRACE_BAGGAGE_MAX_BYTES:
+      return "trace_baggage_max_bytes";
+    case ConfigName::TRACE_BAGGAGE_MAX_ITEMS:
+      return "trace_baggage_max_items";
   }
 
   std::abort();
