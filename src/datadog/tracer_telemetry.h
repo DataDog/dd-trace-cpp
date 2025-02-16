@@ -38,6 +38,7 @@
 
 #include "json.hpp"
 #include "platform_util.h"
+#include "telemetry/log.h"
 
 namespace datadog {
 namespace tracing {
@@ -47,7 +48,7 @@ struct SpanDefaults;
 
 class TracerTelemetry {
   bool enabled_ = false;
-  bool debug_ = false;
+  bool debug_ = true;
   Clock clock_;
   std::shared_ptr<Logger> logger_;
   HostInfo host_info_;
@@ -120,6 +121,8 @@ class TracerTelemetry {
 
   std::vector<std::shared_ptr<telemetry::Metric>> user_metrics_;
 
+  std::vector<telemetry::LogMessage> logs_;
+
  public:
   TracerTelemetry(
       bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
@@ -151,6 +154,10 @@ class TracerTelemetry {
   std::string app_closing();
   // Construct an `app-client-configuration-change` message.
   Optional<std::string> configuration_change();
+
+  inline void log(std::string message, telemetry::LogLevel level) {
+    logs_.emplace_back(telemetry::LogMessage{std::move(message), level});
+  }
 };
 
 }  // namespace tracing

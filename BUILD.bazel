@@ -3,6 +3,7 @@ cc_library(
     srcs = [
       "src/datadog/telemetry/configuration.cpp",
       "src/datadog/telemetry/metrics.cpp",
+      "src/datadog/telemetry/log.h",
       "src/datadog/telemetry/telemetry.cpp",
       "src/datadog/base64.cpp",
       "src/datadog/cerr_logger.cpp",

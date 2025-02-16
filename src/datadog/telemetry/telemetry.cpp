@@ -39,5 +39,13 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       std::vector<std::shared_ptr<remote_config::Listener>>{});
 }
 
+void Telemetry::log_error(std::string message) {
+  tracer_telemetry_->log(std::move(message), LogLevel::ERROR);
+}
+
+void Telemetry::log_warning(std::string message) {
+  tracer_telemetry_->log(std::move(message), LogLevel::WARNING);
+}
+
 }  // namespace telemetry
 }  // namespace datadog
