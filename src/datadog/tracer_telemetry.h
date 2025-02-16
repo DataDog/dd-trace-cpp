@@ -31,6 +31,7 @@
 #include <datadog/clock.h>
 #include <datadog/config.h>
 #include <datadog/runtime_id.h>
+#include <datadog/telemetry/log.h>
 #include <datadog/telemetry/metrics.h>
 #include <datadog/tracer_signature.h>
 
@@ -38,7 +39,6 @@
 
 #include "json.hpp"
 #include "platform_util.h"
-#include "telemetry/log.h"
 
 namespace datadog {
 namespace tracing {

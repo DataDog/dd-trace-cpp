@@ -4,6 +4,7 @@
 #include <datadog/telemetry/telemetry.h>
 
 #include "datadog_agent.h"
+#include "json_serializer.h"
 #include "platform_util.h"
 #include "tracer_telemetry.h"
 
@@ -39,12 +40,42 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       std::vector<std::shared_ptr<remote_config::Listener>>{});
 }
 
+Telemetry::Telemetry(FinalizedConfiguration configuration,
+                     tracing::EventScheduler& scheduler,
+                     std::shared_ptr<tracing::HTTPClient> http_client)
+    : config_(std::move(configuration)), http_client_(std::move(http_client)) {
+  // TODO: send app-started
+  scheduler.schedule_recurring_event(config_.metrics_interval,
+                                     [this] { snapshot_metrics(); });
+  task_ = scheduler.schedule_recurring_event(config_.heartbeat_interval,
+                                             [this] { flush(); });
+}
+
+Telemetry::~Telemetry() {
+  task_();
+  events_.add("app-closing");
+  flush();
+}
+
 void Telemetry::log_error(std::string message) {
-  tracer_telemetry_->log(std::move(message), LogLevel::ERROR);
+  logs_.emplace_back(
+      telemetry::LogMessage{std::move(message), LogLevel::ERROR});
 }
 
 void Telemetry::log_warning(std::string message) {
-  tracer_telemetry_->log(std::move(message), LogLevel::WARNING);
+  logs_.emplace_back(
+      telemetry::LogMessage{std::move(message), LogLevel::WARNING});
+}
+
+void Telemetry::snapshot_metrics() {}
+
+void Telemetry::flush() {
+  JSONPayload payload(buffer);
+  payload.add_logs(logs_);
+
+  auto payload = "";
+  auto request_type = "";
+  exporter_.send(request_type, payload);
 }
 
 }  // namespace telemetry

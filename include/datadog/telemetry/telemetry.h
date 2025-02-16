@@ -1,7 +1,11 @@
 #pragma once
 
+#include <datadog/event_scheduler.h>
+#include <datadog/expected.h>
+#include <datadog/http_client.h>
 #include <datadog/logger.h>
 #include <datadog/telemetry/configuration.h>
+#include <datadog/telemetry/log.h>
 #include <datadog/telemetry/metrics.h>
 
 #include <memory>
@@ -29,6 +33,11 @@ class Telemetry final {
   std::shared_ptr<tracing::DatadogAgent> datadog_agent_;
   std::shared_ptr<tracing::TracerTelemetry> tracer_telemetry_;
 
+  tracing::EventScheduler::Cancel task_;
+  std::shared_ptr<tracing::HTTPClient> http_client_;
+
+  std::vector<telemetry::LogMessage> logs_;
+
  public:
   /// Constructor for the Telemetry class
   ///
@@ -39,7 +48,11 @@ class Telemetry final {
             std::shared_ptr<tracing::Logger> logger,
             std::vector<std::shared_ptr<Metric>> metrics);
 
-  ~Telemetry() = default;
+  Telemetry(FinalizedConfiguration configuration,
+            tracing::EventScheduler& scheduler,
+            std::shared_ptr<tracing::HTTPClient> http_client);
+
+  ~Telemetry();
 
   /// Capture and report internal error message to Datadog.
   ///
@@ -50,6 +63,12 @@ class Telemetry final {
   ///
   /// @param message The warning message to log.
   void log_warning(std::string message);
+
+ private:
+  /// Take a snapshot of all the metrics collected.
+  void snapshot_metrics();
+  /// The thing actually running in a thread.
+  void flush();
 };
 
 }  // namespace telemetry
