@@ -16,13 +16,6 @@
 
 using namespace datadog::tracing;
 
-struct NullLogger : public Logger {
-  void log_error(const LogFunc&) override {}
-  void log_startup(const LogFunc&) override {}
-  void log_error(const Error&) override {}
-  void log_error(StringView) override {}
-};
-
 struct MockLogger : public Logger {
   struct Entry {
     enum Kind { DD_ERROR, STARTUP } kind;

@@ -23,6 +23,7 @@
 #include "mocks/collectors.h"
 #include "mocks/event_schedulers.h"
 #include "mocks/loggers.h"
+#include "null_logger.h"
 #include "test.h"
 
 namespace datadog {
