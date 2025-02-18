@@ -116,7 +116,7 @@ jobs:
         name: Building
         command: |
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch << parameters.arch >> 
-          cmake --preset=ci-winwdows -B build -DCMAKE_BUILD_TYPE=Debug .
+          cmake --preset=ci-windows -B build -DCMAKE_BUILD_TYPE=Debug .
           cmake --build build -j $env:MAKE_JOB_COUNT -v
     - run:
         name: Testing
