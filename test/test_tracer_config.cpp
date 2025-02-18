@@ -40,10 +40,6 @@ using namespace datadog::tracing;
 
 namespace {
 
-// For brevity when we're tabulating a lot of test cases with parse
-// `Optional<...>` data members.
-const auto x = nullopt;
-
 // Here's an attempt at a portable secure temporary file.
 // There's no standard solution, and it's generally hard on Windows.
 class SomewhatSecureTemporaryFile : public std::fstream {
@@ -288,7 +284,7 @@ TEST_CASE("TracerConfig::log_on_startup") {
       const Tracer tracer{*finalized};
       (void)tracer;
     }
-    REQUIRE(logger->startup_count() == int(test_case.expect_startup_log));
+    REQUIRE(logger->startup_count() == size_t(test_case.expect_startup_log));
   }
 }
 
@@ -503,23 +499,25 @@ TEST_CASE("TracerConfig::agent") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"override host with default port", "dd-agent", x, x, "http",
-           "dd-agent:8126"},
-          {"override port and host", "dd-agent", "8080", x, "http",
+          {"override host with default port", "dd-agent", nullopt, nullopt,
+           "http", "dd-agent:8126"},
+          {"override port and host", "dd-agent", "8080", nullopt, "http",
            "dd-agent:8080"},
-          {"override port with default host", x, "8080", x, "http",
+          {"override port with default host", nullopt, "8080", nullopt, "http",
            "localhost:8080"},
           // A bogus port number will cause an error in the TCPClient, not
           // during configuration.  For the purposes of configuration, any
           // value is accepted.
-          {"we don't parse port", x, "bogus", x, "http", "localhost:bogus"},
-          {"URL", x, x, "http://dd-agent:8080", "http", "dd-agent:8080"},
-          {"URL overrides scheme", x, x, "https://dd-agent:8080", "https",
+          {"we don't parse port", nullopt, "bogus", nullopt, "http",
+           "localhost:bogus"},
+          {"URL", nullopt, nullopt, "http://dd-agent:8080", "http",
            "dd-agent:8080"},
-          {"URL overrides host", "localhost", x, "http://dd-agent:8080", "http",
-           "dd-agent:8080"},
-          {"URL overrides port", x, "8126", "http://dd-agent:8080", "http",
-           "dd-agent:8080"},
+          {"URL overrides scheme", nullopt, nullopt, "https://dd-agent:8080",
+           "https", "dd-agent:8080"},
+          {"URL overrides host", "localhost", nullopt, "http://dd-agent:8080",
+           "http", "dd-agent:8080"},
+          {"URL overrides port", nullopt, "8126", "http://dd-agent:8080",
+           "http", "dd-agent:8080"},
           {"URL overrides port and host", "localhost", "8126",
            "http://dd-agent:8080", "http", "dd-agent:8080"},
       }));
@@ -569,9 +567,9 @@ TEST_CASE("TracerConfig::trace_sampler") {
       REQUIRE(finalized);
       REQUIRE(finalized->trace_sampler.rules.size() == 1);
       // and the default sample_rate is 100%
-      const auto& rule = finalized->trace_sampler.rules.front();
-      CHECK(rule.rate == 1.0);
-      CHECK(rule.mechanism == SamplingMechanism::RULE);
+      const auto& finalized_rule = finalized->trace_sampler.rules.front();
+      CHECK(finalized_rule.rate == 1.0);
+      CHECK(finalized_rule.mechanism == SamplingMechanism::RULE);
     }
 
     SECTION("has to have a valid sample_rate") {
@@ -878,7 +876,7 @@ TEST_CASE("TracerConfig::span_sampler") {
     REQUIRE(finalized->span_sampler.rules[0].sample_rate == 0.5);
     REQUIRE(!finalized->span_sampler.rules[0].max_per_second);
     REQUIRE(finalized->span_sampler.rules[1].sample_rate == 0.6);
-    REQUIRE(finalized->span_sampler.rules[1].max_per_second == 10);
+    REQUIRE(finalized->span_sampler.rules[1].max_per_second == 10.);
   }
 
   SECTION("DD_SPAN_SAMPLING_RULES") {
@@ -999,7 +997,7 @@ TEST_CASE("TracerConfig::span_sampler") {
             {"max_per_second": 10, "sample_rate": 0.1}
           ])json";
 
-          const EnvGuard guard{"DD_SPAN_SAMPLING_RULES", rules_json};
+          const EnvGuard guard2{"DD_SPAN_SAMPLING_RULES", rules_json};
           auto finalized = finalize_config(config);
           REQUIRE(finalized);
           const auto& rules = finalized->span_sampler.rules;
@@ -1128,6 +1126,7 @@ TEST_CASE("TracerConfig propagation styles") {
         };
 
         // brevity
+        static const auto x = nullopt;
         static const auto datadog = PropagationStyle::DATADOG,
                           b3 = PropagationStyle::B3,
                           none = PropagationStyle::NONE;

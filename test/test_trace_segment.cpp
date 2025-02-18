@@ -327,11 +327,12 @@ TEST_CASE("TraceSegment finalization of spans") {
 
       SECTION(
           "agent catch-all response @100% -> agent psr tag on second trace") {
-        const auto collector = std::make_shared<MockCollectorWithResponse>();
-        collector->response
+        const auto collector_response =
+            std::make_shared<MockCollectorWithResponse>();
+        collector_response->response
             .sample_rate_by_key[CollectorResponse::key_of_default_rate] =
             assert_rate(1.0);
-        config.collector = collector;
+        config.collector = collector_response;
 
         auto finalized = finalize_config(config);
         REQUIRE(finalized);
@@ -341,16 +342,16 @@ TEST_CASE("TraceSegment finalization of spans") {
           auto span = tracer.create_span();
           (void)span;
         }
-        REQUIRE(collector->span_count() == 1);
+        REQUIRE(collector_response->span_count() == 1);
 
-        collector->chunks.clear();
+        collector_response->chunks.clear();
         // Second trace will use the rate from `collector->response`.
         {
           auto span = tracer.create_span();
           (void)span;
         }
-        REQUIRE(collector->span_count() == 1);
-        const auto& span = collector->first_span();
+        REQUIRE(collector_response->span_count() == 1);
+        const auto& span = collector_response->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
       }
 

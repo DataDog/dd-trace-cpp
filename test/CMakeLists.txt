@@ -52,6 +52,13 @@ target_include_directories(tests
     ${CMAKE_SOURCE_DIR}/include/datadog
 )
 
+# Enable Catch2 std stringification 
+# <https://github.com/catchorg/Catch2/blob/devel/docs/configuration.md#enabling-stringification>
+target_compile_definitions(tests
+  PUBLIC
+    CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS
+)
+
 target_link_libraries(tests 
   PRIVATE
     # TODO: Remove dependency on libcurl

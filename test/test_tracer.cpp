@@ -473,12 +473,12 @@ TEST_CASE("span extraction") {
     if (test_case.expected_error != Error::NO_SPAN_TO_EXTRACT) {
       auto method = "extract_or_create_span";
       CAPTURE(method);
-      auto result = tracer.extract_span(reader);
+      auto result2 = tracer.extract_span(reader);
       if (test_case.expected_error) {
-        REQUIRE(!result);
-        REQUIRE(result.error().code == test_case.expected_error);
+        REQUIRE(!result2);
+        REQUIRE(result2.error().code == test_case.expected_error);
       } else {
-        REQUIRE(result);
+        REQUIRE(result2);
       }
     }
   }
@@ -1266,13 +1266,6 @@ TEST_CASE("span extraction") {
     CAPTURE(test_case.dd_parent_id);
     CAPTURE(test_case.dd_tags);
 
-    const auto collector = std::make_shared<MockCollector>();
-    const auto logger = std::make_shared<MockLogger>();
-
-    TracerConfig config;
-    config.collector = collector;
-    config.logger = logger;
-    config.service = "service1";
     config.delegate_trace_sampling = false;
     std::vector<PropagationStyle> extraction_styles{
         PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C};
@@ -1839,7 +1832,7 @@ TEST_CASE("_dd.is_sampling_decider") {
       }
       REQUIRE(span.service != "service1");
       if (span.service == "service2" && span.name == "local_root") {
-        const bool made_the_decision = service3_delegation_enabled ? 0 : 1;
+        const size_t made_the_decision = service3_delegation_enabled ? 0 : 1;
         REQUIRE(span.tags.count(tags::internal::sampling_decider) ==
                 made_the_decision);
         REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) ==
@@ -1856,7 +1849,7 @@ TEST_CASE("_dd.is_sampling_decider") {
       }
       REQUIRE(span.service != "service2");
       if (span.service == "service3" && span.name == "local_root") {
-        const bool made_the_decision = service3_delegation_enabled ? 1 : 0;
+        const size_t made_the_decision = service3_delegation_enabled ? 1 : 0;
         REQUIRE(span.tags.count(tags::internal::sampling_decider) ==
                 made_the_decision);
         REQUIRE(span.numeric_tags.count(tags::internal::sampling_priority) ==
@@ -1980,7 +1973,7 @@ TEST_CASE("sampling delegation is not an override") {
       REQUIRE(span2);
       propagation_writer.items.clear();
       span2->inject(propagation_writer);
-      const bool expected_delegate_header = service1_delegate ? 1 : 0;
+      const size_t expected_delegate_header = service1_delegate ? 1 : 0;
       CHECK(
           propagation_writer.items.count("x-datadog-delegate-trace-sampling") ==
           expected_delegate_header);

@@ -62,9 +62,9 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
     }
 
     SECTION("With an integration") {
-      TracerTelemetry tracer_telemetry{
+      TracerTelemetry tracer_telemetry2{
           true, clock, logger, tracer_signature, "nginx", "1.25.2"};
-      auto app_started_message = tracer_telemetry.app_started({});
+      auto app_started_message = tracer_telemetry2.app_started({});
       auto app_started = nlohmann::json::parse(app_started_message);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
       REQUIRE(app_started["request_type"] == "message-batch");
@@ -165,9 +165,9 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
           for (const auto& conf :
                config_change_message["payload"]["configuration"]) {
-            auto expected_conf = expected_json.find(conf["name"]);
-            REQUIRE(expected_conf != expected_json.cend());
-            CHECK(expected_conf->second == conf);
+            auto it = expected_json.find(conf["name"]);
+            REQUIRE(it != expected_json.cend());
+            CHECK(it->second == conf);
           }
 
           // No update -> no configuration update

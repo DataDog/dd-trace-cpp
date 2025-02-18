@@ -67,11 +67,11 @@ TEST_CASE("set_tag") {
 
   SECTION("tags can be overwritten") {
     {
-      SpanConfig config;
-      config.tags = {{"color", "purple"},
-                     {"turtle.depth", "all the way down"},
-                     {"_dd.tag", "written"}};
-      auto span = tracer.create_span(config);
+      SpanConfig span_config;
+      span_config.tags = {{"color", "purple"},
+                          {"turtle.depth", "all the way down"},
+                          {"_dd.tag", "written"}};
+      auto span = tracer.create_span(span_config);
       span.set_tag("color", "green");
       span.set_tag("bonus", "applied");
       span.set_tag("_dd.tag", "overwritten");
@@ -119,13 +119,13 @@ TEST_CASE("lookup_tag") {
   }
 
   SECTION("lookup after config") {
-    SpanConfig config;
-    config.tags = {
+    SpanConfig span_config;
+    span_config.tags = {
         {"color", "purple"},
         {"turtle.depth", "all the way down"},
         {"_dd.tag", "found"},
     };
-    auto span = tracer.create_span(config);
+    auto span = tracer.create_span(span_config);
 
     REQUIRE(span.lookup_tag("color") == "purple");
     REQUIRE(span.lookup_tag("turtle.depth") == "all the way down");
@@ -150,9 +150,9 @@ TEST_CASE("remove_tag") {
   }
 
   SECTION("after removal, lookup yields null") {
-    SpanConfig config;
-    config.tags = {{"mayfly", "carpe diem"}, {"_dd.mayfly", "carpe diem"}};
-    auto span = tracer.create_span(config);
+    SpanConfig span_config;
+    span_config.tags = {{"mayfly", "carpe diem"}, {"_dd.mayfly", "carpe diem"}};
+    auto span = tracer.create_span(span_config);
     span.set_tag("foo", "bar");
 
     span.remove_tag("mayfly");
@@ -294,9 +294,9 @@ TEST_CASE("span duration") {
 
   SECTION("start time is adjustable") {
     {
-      SpanConfig config;
-      config.start = default_clock() - std::chrono::seconds(3);
-      auto span = tracer.create_span(config);
+      SpanConfig span_config;
+      span_config.start = default_clock() - std::chrono::seconds(3);
+      auto span = tracer.create_span(span_config);
       (void)span;
     }
 
