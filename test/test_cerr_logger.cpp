@@ -29,8 +29,6 @@ class StreambufGuard {
 
 }  // namespace
 
-// `CerrLogger` is the default logger.
-// These test exist just to cover all of its methods.
 TEST_CASE("CerrLogger") {
   std::ostringstream stream;
   const StreambufGuard guard{std::cerr, stream.rdbuf()};
