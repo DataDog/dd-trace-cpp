@@ -121,8 +121,8 @@ struct TracerConfig {
   Optional<std::size_t> max_tags_header_size;
 
   // `logger` specifies how the tracer will issue diagnostic messages.  If
-  // `logger` is null, then it defaults to a logger that inserts into
-  // `std::cerr`.
+  // `logger` is null, then it defaults to no logging (`NullLogger`).  See
+  // `CerrLogger` for an alternative.
   std::shared_ptr<Logger> logger;
 
   // `log_on_startup` indicates whether the tracer will log a banner of

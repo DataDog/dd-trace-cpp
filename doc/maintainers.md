@@ -605,8 +605,11 @@ be to have versions of the `Error`-returning operations that instead accept a
 the present state of things is acceptable and that such a change is not
 warranted.
 
-The default implementation of `Logger` is `CerrLogger`, defined in
-[cerr_logger.h][42]. `CerrLogger` logs to [std::cerr][43] in both `log_error`
+The default implementation of `Logger` is `NullLogger`, defined in
+[null_logger.h][47]. `NullLogger` doesn't log anything.
+
+A client library might wish to install `CerrLogger` instead. `CerrLogger` is
+defined in [cerr_logger.h][42] and logs to [std::cerr][43] in both `log_error`
 and `log_startup`.
 
 The `Logger` used by a `Tracer` is configured via `std::shared_ptr<Logger>
@@ -690,8 +693,9 @@ TODO
 [39]: https://en.cppreference.com/w/cpp/utility/variant/get_if
 [40]: https://en.cppreference.com/w/cpp/language/value_category
 [41]: ../include/datadog/logger.h
-[42]: ../src/datadog/cerr_logger.h
+[42]: ../include/datadog/cerr_logger.h
 [43]: https://en.cppreference.com/w/cpp/io/cerr
 [44]: https://en.cppreference.com/w/cpp/utility/functional/function
 [45]: https://github.com/DataDog/datadog-agent/blob/796ccb9e92326c85b51f519291e86eb5bc950180/pkg/trace/api/endpoints.go#L97
 [46]: https://github.com/DataDog/dd-trace-cpp/tree/david.goffredo/traception
+[47]: ../src/datadog/null_logger.h
