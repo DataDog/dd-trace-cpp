@@ -76,6 +76,18 @@ class TracerTelemetry {
           true};
       telemetry::CounterMetric trace_segments_closed = {
           "trace_segments_closed", "tracers", {}, true};
+      telemetry::CounterMetric baggage_items_exceeded = {
+          "context_header.truncated",
+          "tracers",
+          {{"truncation_reason:baggage_item_count_exceeded"}},
+          true,
+      };
+      telemetry::CounterMetric baggage_bytes_exceeded = {
+          "context_header.truncated",
+          "tracers",
+          {{"truncation_reason:baggage_byte_count_exceeded"}},
+          true,
+      };
     } tracer;
     struct {
       telemetry::CounterMetric requests = {

@@ -52,6 +52,7 @@ parse_baggage(StringView input) {
     leading_spaces_value,
     value,
     trailing_spaces_value,
+    properties,
   } internal_state = state::leading_spaces_key;
 
   size_t beg = 0;
@@ -116,11 +117,20 @@ parse_baggage(StringView input) {
         if (c == ',') {
           tmp_end = i;
           goto consume_value;
+        } else if (c == ';') {
+          tmp_end = i;
+          internal_state = state::properties;
         } else if (is_whitespace(c)) {
           tmp_end = i;
           internal_state = state::trailing_spaces_value;
         } else if (!is_allowed_value_char(c)) {
           return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
+        }
+      } break;
+
+      case state::properties: {
+        if (c == ',') {
+          goto consume_value;
         }
       } break;
 
@@ -137,17 +147,20 @@ parse_baggage(StringView input) {
           beg = i;
           tmp_end = i;
           internal_state = state::leading_spaces_key;
+        } else if (c == ';') {
+          internal_state = state::properties;
         } else if (!is_whitespace(c)) {
           return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
         }
-      }
+      } break;
     }
   }
 
   if (internal_state == state::value) {
     value = StringView{input.data() + beg, end - beg};
     result.emplace(std::string(key), std::string(value));
-  } else if (internal_state == state::trailing_spaces_value) {
+  } else if (internal_state == state::trailing_spaces_value ||
+             internal_state == state::properties) {
     value = StringView{input.data() + beg, tmp_end - beg};
     result.emplace(std::string(key), std::string(value));
   } else {
@@ -159,7 +172,9 @@ parse_baggage(StringView input) {
 
 }  // namespace
 
-Baggage::Baggage(size_t max_capacity) : max_capacity_(max_capacity) {}
+Baggage::Baggage(size_t max_capacity) : max_capacity_(max_capacity) {
+  (void)max_capacity_;
+}
 
 Baggage::Baggage(std::unordered_map<std::string, std::string> baggage,
                  size_t max_capacity)
@@ -173,8 +188,6 @@ Optional<StringView> Baggage::get(StringView key) const {
 }
 
 bool Baggage::set(std::string key, std::string value) {
-  if (baggage_.size() == max_capacity_) return false;
-
   baggage_[key] = value;
   return true;
 }
@@ -199,35 +212,56 @@ void Baggage::visit(std::function<void(StringView, StringView)>&& visitor) {
 }
 
 Expected<void> Baggage::inject(DictWriter& writer, const Options& opts) const {
-  if (baggage_.empty()) return {};
-  if (baggage_.size() > opts.max_items)
-    return datadog::tracing::Error{
-        datadog::tracing::Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED, ""};
+  auto n = baggage_.size();
+  if (n == 0) return {};
 
-  // TODO(@dmehala): Memory alloc optimization, (re)use fixed size buffer.
-  std::string res;
-  res.reserve(opts.max_bytes);
-
-  auto it = baggage_.cbegin();
-  res += it->first;
-  res += "=";
-  res += it->second;
-
-  for (it++; it != baggage_.cend(); ++it) {
-    res += ",";
-    res += it->first;
-    res += "=";
-    res += it->second;
+  Expected<void> res;
+  if (n > opts.max_items) {
+    std::string err_msg = "injected ";
+    err_msg += std::to_string(opts.max_items);
+    err_msg += " out of ";
+    err_msg += std::to_string(baggage_.size());
+    err_msg += " baggage items";
+    res = datadog::tracing::Error{
+        datadog::tracing::Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED, err_msg};
   }
 
-  if (res.size() >= opts.max_bytes)
+  // TODO(@dmehala): Memory alloc optimization, (re)use fixed size buffer.
+  std::string seralized_baggage;
+  seralized_baggage.reserve(opts.max_bytes);
+
+  auto it = baggage_.cbegin();
+  seralized_baggage += it->first;
+  seralized_baggage += "=";
+  seralized_baggage += it->second;
+  if (seralized_baggage.size() > opts.max_bytes) {
     return datadog::tracing::Error{
-        datadog::tracing::Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED, ""};
+        datadog::tracing::Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED,
+        "reached maximum bytes size limit"};
+  }
+
+  size_t items = 1;
+  for (it++; it != baggage_.cend() && ++items < opts.max_items; ++it) {
+    std::string buffer;
+    buffer += ",";
+    buffer += it->first;
+    buffer += "=";
+    buffer += it->second;
+
+    if (buffer.size() + seralized_baggage.size() > opts.max_bytes) {
+      res = datadog::tracing::Error{
+          datadog::tracing::Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED,
+          "reached maximum bytes size limit"};
+      break;
+    }
+
+    seralized_baggage += buffer;
+  }
 
   /// NOTE(@dmehala): It is the writer's responsibility to write the header,
   /// including percent-encoding.
-  writer.set("baggage", res);
-  return {};
+  writer.set("baggage", seralized_baggage);
+  return res;
 }
 
 Expected<Baggage, Baggage::Error> Baggage::extract(const DictReader& headers) {

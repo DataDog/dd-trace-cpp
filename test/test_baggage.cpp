@@ -95,9 +95,24 @@ BAGGAGE_TEST("extract") {
             Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER},
         },
         {
-            "verify separator",
+            "ignore properties",
             "key1=value1;a=b,key2=value2",
-            Baggage({{"key1", "value1;a=b"}, {"key2", "value2"}}),
+            Baggage({{"key1", "value1"}, {"key2", "value2"}}),
+        },
+        {
+            "ignore properties 2",
+            "key1=value1     ;foo=bar,key2=value2",
+            Baggage({{"key1", "value1"}, {"key2", "value2"}}),
+        },
+        {
+            "ignore properties 3",
+            "key1=value1, key2 = value2;property1;property2, key3=value3; "
+            "propertyKey=propertyValue",
+            Baggage({
+                {"key1", "value1"},
+                {"key2", "value2"},
+                {"key3", "value3"},
+            }),
         },
         {
             "malformed baggage",
@@ -151,33 +166,68 @@ BAGGAGE_TEST("extract") {
 }
 
 BAGGAGE_TEST("inject") {
-  SECTION("limit is respected") {
+  SECTION("custom items limit is respected") {
     Baggage bag({{"violets", "blue"}, {"roses", "red"}});
 
+    const Baggage::Options opts_items_limit{
+        /*.max_bytes = */ 2048,
+        /*.max_items =*/1,
+    };
+
     MockDictWriter writer;
-    auto injected =
-        bag.inject(writer, {/*.max_bytes = */ 5, /*.max_items =*/16});
+    auto injected = bag.inject(writer, opts_items_limit);
+
     REQUIRE(!injected);
-    CHECK(injected.error().code == Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED);
+    REQUIRE(writer.items.count("baggage") == 1);
+    CHECK((writer.items["baggage"] == "violets=blue" ||
+           writer.items["baggage"] == "roses=red"));
+  }
+
+  SECTION("custom bytes limit is respected") {
+    Baggage bag({{"foo", "bar"}, {"a", "b"}, {"hello", "world"}});
+
+    const std::string expected_baggage{"foo=bar,a=b"};
+    const Baggage::Options opts_bytes_limit{
+        /*.max_bytes = */ expected_baggage.size(),
+        /*.max_items =*/1000,
+    };
+
+    MockDictWriter writer;
+    auto injected = bag.inject(writer, opts_bytes_limit);
+
+    REQUIRE(!injected);
+    REQUIRE(writer.items.count("baggage") == 1);
+    REQUIRE(writer.items["baggage"].size() <= opts_bytes_limit.max_bytes);
+    CHECK((writer.items["baggage"] == expected_baggage ||
+           writer.items["baggage"] == "hello=world"));
   }
 
   SECTION("default limits are respected") {
     auto default_opts = Baggage::default_options;
     SECTION("max items reached") {
+      std::size_t max_bytes_needed = 0;
+
       Baggage bag;
       for (size_t i = 0; i < default_opts.max_items; ++i) {
-        bag.set(uuid(), "a");
+        auto uuid_value = uuid();
+        bag.set(uuid_value, "a");
+        max_bytes_needed +=
+            uuid_value.size() + 1 + 2;  // +2 are for the separators
       }
       // NOTE(@dmehala): if that fails, the flackiness is comming from UUIDs
       // collision.
       REQUIRE(bag.size() == default_opts.max_items);
       bag.set("a", "a");
+      max_bytes_needed += 4;
+
+      Baggage::Options opts = Baggage::default_options;
+      opts.max_bytes = max_bytes_needed;
 
       MockDictWriter writer;
-      auto injected = bag.inject(writer);
+      auto injected = bag.inject(writer, opts);
       CHECK(!injected);
       CHECK(injected.error().code ==
-            Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED);
+            Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED);
     }
 
     SECTION("max bytes reached") {

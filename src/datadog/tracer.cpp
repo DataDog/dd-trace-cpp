@@ -449,7 +449,19 @@ Expected<void> Tracer::inject(const Baggage& baggage, DictWriter& writer) {
     return Error{Error::Code::OTHER, "Baggage propagation is disabled"};
   }
 
-  return baggage.inject(writer, baggage_opts_);
+  auto res = baggage.inject(writer, baggage_opts_);
+  if (auto err = res.if_error()) {
+    logger_->log_error(
+        err->with_prefix("failed to serialize all baggage items: "));
+
+    if (err->code == Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED) {
+      tracer_telemetry_->metrics().tracer.baggage_bytes_exceeded.inc();
+    } else if (err->code == Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED) {
+      tracer_telemetry_->metrics().tracer.baggage_items_exceeded.inc();
+    }
+  }
+
+  return {};
 }
 
 }  // namespace tracing
