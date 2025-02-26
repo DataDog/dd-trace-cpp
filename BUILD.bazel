@@ -3,6 +3,7 @@ cc_library(
     srcs = [
       "src/datadog/telemetry/configuration.cpp",
       "src/datadog/telemetry/metrics.cpp",
+      "src/datadog/telemetry/log.h",
       "src/datadog/telemetry/telemetry.cpp",
       "src/datadog/baggage.cpp",
       "src/datadog/base64.cpp",
@@ -49,7 +50,6 @@ cc_library(
       "src/datadog/version.cpp",
       "src/datadog/w3c_propagation.cpp",
       "src/datadog/base64.h",
-      "src/datadog/cerr_logger.h",
       "src/datadog/config_manager.h",
       "src/datadog/collector_response.h",
       "src/datadog/datadog_agent.h",
@@ -62,6 +62,7 @@ cc_library(
       "src/datadog/json_serializer.h",
       "src/datadog/limiter.h",
       "src/datadog/msgpack.h",
+      "src/datadog/null_logger.h",
       "src/datadog/parse_util.h",
       "src/datadog/platform_util.h",
       "src/datadog/random.h",
@@ -79,6 +80,7 @@ cc_library(
     ],
     hdrs = [
       "include/datadog/baggage.h",
+      "include/datadog/cerr_logger.h",
       "include/datadog/clock.h",
       "include/datadog/collector.h",
       "include/datadog/config.h",

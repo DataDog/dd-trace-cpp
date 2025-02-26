@@ -61,7 +61,7 @@ struct MockCollectorWithResponse : public MockCollector {
 };
 
 struct PriorityCountingCollector : public Collector {
-  std::map<int, std::size_t> sampling_priority_count;
+  std::map<double, std::size_t> sampling_priority_count;
 
   Expected<void> send(std::vector<std::unique_ptr<SpanData>>&& spans,
                       const std::shared_ptr<TraceSampler>&) override {

@@ -31,14 +31,14 @@ std::string join(const Sequence& elements, StringView separator,
 
 void to_lower(std::string& text) {
   std::transform(text.begin(), text.end(), text.begin(),
-                 [](unsigned char ch) { return std::tolower(ch); });
+                 [](auto c) { return (char)std::tolower(c); });
 }
 
 std::string to_lower(StringView sv) {
   std::string s;
   s.reserve(sv.size());
   std::transform(sv.begin(), sv.end(), std::back_inserter(s),
-                 [](char c) { return std::tolower(c); });
+                 [](auto c) { return (char)std::tolower(c); });
 
   return s;
 }
@@ -47,7 +47,7 @@ std::string to_upper(StringView sv) {
   std::string s;
   s.reserve(sv.size());
   std::transform(sv.begin(), sv.end(), std::back_inserter(s),
-                 [](char c) { return std::toupper(c); });
+                 [](auto c) { return (char)std::toupper(c); });
 
   return s;
 }

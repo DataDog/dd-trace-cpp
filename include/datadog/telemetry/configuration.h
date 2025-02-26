@@ -33,12 +33,18 @@ struct Configuration {
   // library.
   // Example: "1.2.3", "6c44da20", "2020.02.13"
   tracing::Optional<std::string> integration_version;
+  // Enable or disable telemetry logs collection.
+  // Default: enabled.
+  // Can be overriden by the `DD_TELEMETRY_LOG_COLLECTION_ENABLED` environment
+  // variable.
+  tracing::Optional<bool> report_logs;
 };
 
 struct FinalizedConfiguration {
   bool debug;
   bool enabled;
   bool report_metrics;
+  bool report_logs;
   std::chrono::steady_clock::duration metrics_interval;
   std::chrono::steady_clock::duration heartbeat_interval;
   std::string integration_name;

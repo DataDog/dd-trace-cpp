@@ -12,7 +12,7 @@ namespace dd = datadog::tracing;
 
 inline std::string tolower(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
+                 [](auto c) { return (char)std::tolower(c); });
   return s;
 }
 

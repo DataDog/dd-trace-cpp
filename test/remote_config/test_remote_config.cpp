@@ -3,7 +3,7 @@
 #include "catch.hpp"
 #include "datadog/json.hpp"
 #include "datadog/remote_config/remote_config.h"
-#include "mocks/loggers.h"
+#include "null_logger.h"
 
 namespace rc = datadog::remote_config;
 using namespace datadog::tracing;
@@ -357,14 +357,14 @@ REMOTE_CONFIG_TEST("response processing") {
           ]
       })";
 
-      const auto response_json =
+      const auto new_response_json =
           nlohmann::json::parse(/* input = */ new_rc_response,
                                 /* parser_callback = */ nullptr,
                                 /* allow_exceptions = */ false);
 
-      REQUIRE(!response_json.is_discarded());
+      REQUIRE(!new_response_json.is_discarded());
 
-      rc.process_response(response_json);
+      rc.process_response(new_response_json);
 
       CHECK(tracing_listener->count_on_update == 2);
       CHECK(tracing_listener->count_on_revert == 0);
@@ -398,14 +398,14 @@ REMOTE_CONFIG_TEST("response processing") {
             ]
         })";
 
-        const auto response_json =
+        const auto new_response_json =
             nlohmann::json::parse(/* input = */ rc_partial_revert_response,
                                   /* parser_callback = */ nullptr,
                                   /* allow_exceptions = */ false);
 
-        REQUIRE(!response_json.is_discarded());
+        REQUIRE(!new_response_json.is_discarded());
 
-        rc.process_response(response_json);
+        rc.process_response(new_response_json);
 
         CHECK(tracing_listener->count_on_update == 1);
         CHECK(tracing_listener->count_on_revert == 1);
@@ -422,14 +422,14 @@ REMOTE_CONFIG_TEST("response processing") {
           "target_files": [{}]
         })";
 
-        const auto response_json =
+        const auto new_response_json =
             nlohmann::json::parse(/* input = */ rc_revert_response,
                                   /* parser_callback = */ nullptr,
                                   /* allow_exceptions = */ false);
 
-        REQUIRE(!response_json.is_discarded());
+        REQUIRE(!new_response_json.is_discarded());
 
-        rc.process_response(response_json);
+        rc.process_response(new_response_json);
 
         CHECK(tracing_listener->count_on_update == 1);
         CHECK(tracing_listener->count_on_revert == 1);

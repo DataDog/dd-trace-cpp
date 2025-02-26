@@ -16,13 +16,6 @@
 
 using namespace datadog::tracing;
 
-struct NullLogger : public Logger {
-  void log_error(const LogFunc&) override {}
-  void log_startup(const LogFunc&) override {}
-  void log_error(const Error&) override {}
-  void log_error(StringView) override {}
-};
-
 struct MockLogger : public Logger {
   struct Entry {
     enum Kind { DD_ERROR, STARTUP } kind;
@@ -78,11 +71,11 @@ struct MockLogger : public Logger {
     entries.push_back(Entry{Entry::DD_ERROR, std::string(message)});
   }
 
-  int error_count() const { return count(Entry::DD_ERROR); }
+  auto error_count() const { return count(Entry::DD_ERROR); }
 
-  int startup_count() const { return count(Entry::STARTUP); }
+  auto startup_count() const { return count(Entry::STARTUP); }
 
-  int count(Entry::Kind kind) const {
+  size_t count(Entry::Kind kind) const {
     std::lock_guard<std::mutex> lock{mutex};
     return std::count_if(
         entries.begin(), entries.end(),
