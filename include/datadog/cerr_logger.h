@@ -3,9 +3,6 @@
 // This component provides a class, `CerrLogger`, that implements the `Logger`
 // interface from `logger.h`.  `CerrLogger` prints to `std::cerr`, which is
 // typically an unbuffered stream to the standard error file.
-//
-// `CerrLogger` is the default logger used by `Tracer` unless otherwise
-// configured in `TracerConfig`.
 
 #include <datadog/logger.h>
 
