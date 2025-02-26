@@ -55,6 +55,8 @@ namespace environment {
   MACRO(DD_TELEMETRY_METRICS_ENABLED)                \
   MACRO(DD_TELEMETRY_METRICS_INTERVAL_SECONDS)       \
   MACRO(DD_TELEMETRY_DEBUG)                          \
+  MACRO(DD_TRACE_BAGGAGE_MAX_ITEMS)                  \
+  MACRO(DD_TRACE_BAGGAGE_MAX_BYTES)                  \
   MACRO(DD_TELEMETRY_LOG_COLLECTION_ENABLED)
 
 #define WITH_COMMA(ARG) ARG,

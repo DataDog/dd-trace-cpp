@@ -435,7 +435,6 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
                               additional_w3c_tracestate_));
         break;
       default:
-        assert(style == PropagationStyle::NONE);
         break;
     }
   }

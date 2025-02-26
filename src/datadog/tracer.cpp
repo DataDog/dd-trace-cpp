@@ -59,7 +59,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       tags_header_max_size_(config.tags_header_size),
-      sampling_delegation_enabled_(config.delegate_trace_sampling) {
+      sampling_delegation_enabled_(config.delegate_trace_sampling),
+      baggage_opts_(config.baggage_opts),
+      baggage_injection_enabled_(false),
+      baggage_extraction_enabled_(false) {
   if (config.report_hostname) {
     hostname_ = get_hostname();
   }
@@ -79,6 +82,20 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 
     if (tracer_telemetry_->enabled()) {
       agent->send_app_started(config.metadata);
+    }
+  }
+
+  for (const auto style : extraction_styles_) {
+    if (style == PropagationStyle::BAGGAGE) {
+      baggage_extraction_enabled_ = true;
+      break;
+    }
+  }
+
+  for (const auto style : injection_styles_) {
+    if (style == PropagationStyle::BAGGAGE) {
+      baggage_injection_enabled_ = true;
+      break;
     }
   }
 
@@ -102,6 +119,10 @@ std::string Tracer::config() const {
     {"extraction_styles", extraction_styles_},
     {"tags_header_size", tags_header_max_size_},
     {"environment_variables", nlohmann::json::parse(environment::to_json())},
+    {"baggage", nlohmann::json{
+      {"max_bytes", baggage_opts_.max_bytes},
+      {"max_items", baggage_opts_.max_items},
+    }},
   });
   // clang-format on
 
@@ -212,7 +233,6 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         extract = &extract_w3c;
         break;
       default:
-        assert(style == PropagationStyle::NONE);
         extract = &extract_none;
     }
     audited_reader.entries_found.clear();
@@ -401,6 +421,47 @@ Span Tracer::extract_or_create_span(const DictReader& reader,
     return std::move(*maybe_span);
   }
   return create_span(config);
+}
+
+Baggage Tracer::create_baggage() { return Baggage(baggage_opts_.max_items); }
+
+Expected<Baggage, Baggage::Error> Tracer::extract_baggage(
+    const DictReader& reader) {
+  if (!baggage_extraction_enabled_) {
+    return Baggage::Error{Baggage::Error::DISABLED};
+  }
+
+  return Baggage::extract(reader);
+}
+
+Baggage Tracer::extract_or_create_baggage(const DictReader& reader) {
+  auto maybe_baggage = extract_baggage(reader);
+  if (maybe_baggage) {
+    return std::move(*maybe_baggage);
+  }
+
+  return create_baggage();
+}
+
+Expected<void> Tracer::inject(const Baggage& baggage, DictWriter& writer) {
+  if (!baggage_injection_enabled_) {
+    // TODO(@dmehala): update `Expected` to support `<void, Error>`
+    return Error{Error::Code::OTHER, "Baggage propagation is disabled"};
+  }
+
+  auto res = baggage.inject(writer, baggage_opts_);
+  if (auto err = res.if_error()) {
+    logger_->log_error(
+        err->with_prefix("failed to serialize all baggage items: "));
+
+    if (err->code == Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED) {
+      tracer_telemetry_->metrics().tracer.baggage_bytes_exceeded.inc();
+    } else if (err->code == Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED) {
+      tracer_telemetry_->metrics().tracer.baggage_items_exceeded.inc();
+    }
+  }
+
+  return {};
 }
 
 }  // namespace tracing

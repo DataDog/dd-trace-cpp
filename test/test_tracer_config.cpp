@@ -95,7 +95,9 @@ class SomewhatSecureTemporaryFile : public std::fstream {
 
 }  // namespace
 
-TEST_CASE("TracerConfig::defaults") {
+#define TRACER_CONFIG_TEST(x) TEST_CASE(x, "[tracer.config]")
+
+TRACER_CONFIG_TEST("TracerConfig::defaults") {
   TracerConfig config;
 
   SECTION("service is not required") {
@@ -228,7 +230,7 @@ TEST_CASE("TracerConfig::defaults") {
   }
 }
 
-TEST_CASE("TracerConfig::log_on_startup") {
+TRACER_CONFIG_TEST("TracerConfig::log_on_startup") {
   TracerConfig config;
   config.service = "testsvc";
   const auto logger = std::make_shared<MockLogger>();
@@ -289,7 +291,7 @@ TEST_CASE("TracerConfig::log_on_startup") {
   }
 }
 
-TEST_CASE("TracerConfig::report_traces") {
+TRACER_CONFIG_TEST("TracerConfig::report_traces") {
   TracerConfig config;
   config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
@@ -358,7 +360,7 @@ TEST_CASE("TracerConfig::report_traces") {
   }
 }
 
-TEST_CASE("TracerConfig::agent") {
+TRACER_CONFIG_TEST("TracerConfig::agent") {
   TracerConfig config;
   config.service = "testsvc";
 
@@ -548,7 +550,7 @@ TEST_CASE("TracerConfig::agent") {
   }
 }
 
-TEST_CASE("TracerConfig::trace_sampler") {
+TRACER_CONFIG_TEST("TracerConfig::trace_sampler") {
   TracerConfig config;
   config.service = "testsvc";
 
@@ -817,7 +819,7 @@ TEST_CASE("TracerConfig::trace_sampler") {
   }
 }
 
-TEST_CASE("TracerConfig::span_sampler") {
+TRACER_CONFIG_TEST("TracerConfig::span_sampler") {
   TracerConfig config;
   config.service = "testsvc";
 
@@ -1051,16 +1053,17 @@ TEST_CASE("TracerConfig::span_sampler") {
   }
 }
 
-TEST_CASE("TracerConfig propagation styles") {
+TRACER_CONFIG_TEST("TracerConfig propagation styles") {
   TracerConfig config;
   config.service = "testsvc";
 
-  SECTION("default style is [Datadog, W3C]") {
+  SECTION("default style is [Datadog, W3C, Baggage]") {
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
     const std::vector<PropagationStyle> expected_styles = {
-        PropagationStyle::DATADOG, PropagationStyle::W3C};
+        PropagationStyle::DATADOG, PropagationStyle::W3C,
+        PropagationStyle::BAGGAGE};
 
     REQUIRE(finalized->injection_styles == expected_styles);
     REQUIRE(finalized->extraction_styles == expected_styles);
@@ -1130,7 +1133,9 @@ TEST_CASE("TracerConfig propagation styles") {
         static const auto x = nullopt;
         static const auto datadog = PropagationStyle::DATADOG,
                           b3 = PropagationStyle::B3,
-                          none = PropagationStyle::NONE;
+                          none = PropagationStyle::NONE,
+                          baggage = PropagationStyle::BAGGAGE;
+
         // clang-format off
         auto test_case = GENERATE(values<TestCase>({
           {__LINE__, "Datadog", x, {datadog}},
@@ -1151,6 +1156,7 @@ TEST_CASE("TracerConfig propagation styles") {
           {__LINE__, "b3,datadog,w3c", Error::UNKNOWN_PROPAGATION_STYLE},
           {__LINE__, "b3,datadog,datadog", Error::DUPLICATE_PROPAGATION_STYLE},
           {__LINE__, "  b3 b3 b3, b3 , b3, b3, b3   , b3 b3 b3  ", Error::DUPLICATE_PROPAGATION_STYLE},
+          {__LINE__, "baggage", x, {baggage}},
         }));
         // clang-format on
 
@@ -1274,7 +1280,7 @@ TEST_CASE("TracerConfig propagation styles") {
   }
 }
 
-TEST_CASE("configure 128-bit trace IDs") {
+TRACER_CONFIG_TEST("configure 128-bit trace IDs") {
   TracerConfig config;
   config.service = "testsvc";
 
@@ -1326,5 +1332,121 @@ TEST_CASE("configure 128-bit trace IDs") {
     finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->generate_128bit_trace_ids == test_case.expected_value);
+  }
+}
+
+TRACER_CONFIG_TEST("baggage") {
+  TracerConfig config;
+
+  auto contains_baggage_propagation_style =
+      [](const std::vector<PropagationStyle>& style) {
+        return std::find(style.cbegin(), style.cend(),
+                         PropagationStyle::BAGGAGE) != style.cend();
+      };
+
+  SECTION("default") {
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->baggage_opts.max_items == 64);
+    CHECK(finalized->baggage_opts.max_bytes == 8192);
+
+    CHECK(contains_baggage_propagation_style(finalized->extraction_styles) ==
+          true);
+    CHECK(contains_baggage_propagation_style(finalized->injection_styles) ==
+          true);
+
+    REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_ITEMS) ==
+            1);
+    REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_BYTES) ==
+            1);
+    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS].origin ==
+          ConfigMetadata::Origin::DEFAULT);
+    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES].origin ==
+          ConfigMetadata::Origin::DEFAULT);
+  }
+
+  SECTION("value overriden by environment variables") {
+    SECTION("invalid BAGGAGE_MAX_ITEMS is reported") {
+      EnvGuard guard{"DD_TRACE_BAGGAGE_MAX_ITEMS", "ten"};
+      auto finalized = finalize_config(config);
+      CHECK(!finalized);
+    }
+
+    SECTION("invalid BAGGAGE_MAX_BYTES is reported") {
+      EnvGuard guard{"DD_TRACE_BAGGAGE_MAX_BYTES", "2kib"};
+      auto finalized = finalize_config(config);
+      CHECK(!finalized);
+    }
+
+    EnvGuard guard{"DD_TRACE_BAGGAGE_MAX_ITEMS", "128"};
+    EnvGuard guard2{"DD_TRACE_BAGGAGE_MAX_BYTES", "1024"};
+    EnvGuard guard3{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "datadog"};
+    EnvGuard guard4{"DD_TRACE_PROPAGATION_STYLE_INJECT", "datadog"};
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->baggage_opts.max_items == 128);
+    CHECK(finalized->baggage_opts.max_bytes == 1024);
+
+    CHECK(contains_baggage_propagation_style(finalized->extraction_styles) ==
+          false);
+    CHECK(contains_baggage_propagation_style(finalized->injection_styles) ==
+          false);
+
+    REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_ITEMS) ==
+            1);
+    REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_BYTES) ==
+            1);
+    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS].origin ==
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES].origin ==
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+  }
+
+  SECTION("value overriden by code") {
+    config.baggage_max_items = 10;
+    config.baggage_max_bytes = 32;
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->baggage_opts.max_items == 10);
+    CHECK(finalized->baggage_opts.max_bytes == 32);
+
+    CHECK(contains_baggage_propagation_style(finalized->extraction_styles) ==
+          true);
+    CHECK(contains_baggage_propagation_style(finalized->injection_styles) ==
+          true);
+
+    REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_ITEMS) ==
+            1);
+    REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_BYTES) ==
+            1);
+    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS].origin ==
+          ConfigMetadata::Origin::CODE);
+    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES].origin ==
+          ConfigMetadata::Origin::CODE);
+  }
+
+  SECTION("disabled when `max_bytes` <= 3") {
+    config.baggage_max_bytes = 2;
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    CHECK(contains_baggage_propagation_style(finalized->extraction_styles) ==
+          false);
+    CHECK(contains_baggage_propagation_style(finalized->injection_styles) ==
+          false);
+  }
+
+  SECTION("disabled when `max_items` <= 0") {
+    config.baggage_max_items = 0;
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    CHECK(contains_baggage_propagation_style(finalized->extraction_styles) ==
+          false);
+    CHECK(contains_baggage_propagation_style(finalized->injection_styles) ==
+          false);
   }
 }

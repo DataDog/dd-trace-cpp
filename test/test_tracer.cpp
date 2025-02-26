@@ -1434,6 +1434,47 @@ TEST_CASE("span extraction") {
   }
 }
 
+TEST_CASE("baggage usage") {
+  TracerConfig config;
+  config.logger = std::make_shared<NullLogger>();
+  config.collector = std::make_shared<NullCollector>();
+
+  SECTION("disabling baggage propagation yield an error") {
+    config.extraction_styles = {PropagationStyle::DATADOG};
+    config.injection_styles = {PropagationStyle::DATADOG};
+
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+
+    Tracer tracer(*finalized_config);
+
+    MockDictReader reader;
+    auto maybe_baggage = tracer.extract_baggage(reader);
+    CHECK(!maybe_baggage);
+
+    auto baggage = tracer.create_baggage();
+    MockDictWriter writer;
+    CHECK(!tracer.inject(baggage, writer));
+  }
+
+  SECTION("feature is enabled") {
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+
+    Tracer tracer(*finalized_config);
+
+    MockDictReader reader;
+    auto baggage = tracer.extract_or_create_baggage(reader);
+
+    baggage.set("data", "dog");
+    MockDictWriter writer;
+    tracer.inject(baggage, writer);
+
+    REQUIRE(writer.items.count("baggage") == 1);
+    CHECK(writer.items["baggage"] == "data=dog");
+  }
+}
+
 TEST_CASE("report hostname") {
   TracerConfig config;
   config.service = "testsvc";
