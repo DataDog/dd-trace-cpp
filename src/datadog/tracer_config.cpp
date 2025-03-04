@@ -122,10 +122,6 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
     env_cfg.report_traces = !falsy(*enabled_env);
   }
-  if (auto trace_delegate_sampling_env =
-          lookup(environment::DD_TRACE_DELEGATE_SAMPLING)) {
-    env_cfg.delegate_trace_sampling = !falsy(*trace_delegate_sampling_env);
-  }
   if (auto enabled_env =
           lookup(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)) {
     env_cfg.generate_128bit_trace_ids = !falsy(*enabled_env);
@@ -352,14 +348,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.report_hostname =
       value_or(env_config->report_hostname, user_config.report_hostname, false);
 
-  // Delegate Sampling
-  std::tie(origin, final_config.delegate_trace_sampling) =
-      pick(env_config->delegate_trace_sampling,
-           user_config.delegate_trace_sampling, false);
-  final_config.metadata[ConfigName::DELEGATE_SAMPLING] =
-      ConfigMetadata(ConfigName::DELEGATE_SAMPLING,
-                     to_string(final_config.delegate_trace_sampling), origin);
-
   // Tags Header Size
   final_config.tags_header_size = value_or(
       env_config->max_tags_header_size, user_config.max_tags_header_size, 512);
@@ -370,7 +358,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
            user_config.generate_128bit_trace_ids, true);
   final_config.metadata[ConfigName::GENEREATE_128BIT_TRACE_IDS] =
       ConfigMetadata(ConfigName::GENEREATE_128BIT_TRACE_IDS,
-                     to_string(final_config.delegate_trace_sampling), origin);
+                     to_string(final_config.generate_128bit_trace_ids), origin);
 
   // Integration name & version
   final_config.integration_name = value_or(

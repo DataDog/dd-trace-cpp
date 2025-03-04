@@ -20,7 +20,6 @@ struct ExtractedData {
   Optional<std::uint64_t> parent_id;
   Optional<std::string> origin;
   std::vector<std::pair<std::string, std::string>> trace_tags;
-  bool delegate_sampling_decision = false;
   Optional<int> sampling_priority;
   // If this `ExtractedData` was created on account of `PropagationStyle::W3C`,
   // then `datadog_w3c_parent_id` contains the parts of the "tracestate"

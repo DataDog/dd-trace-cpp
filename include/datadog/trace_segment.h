@@ -79,25 +79,6 @@ class TraceSegment {
 
   std::shared_ptr<ConfigManager> config_manager_;
 
-  // See `doc/sampling-delegation.md` for more information about
-  // `struct SamplingDelegation`.
-  struct SamplingDelegation {
-    // This segment is configured to delegate its sampling decision.
-    bool enabled;
-    // The trace context from which the local root span was extracted delegated
-    // the sampling decision to this segment.
-    bool decision_was_delegated_to_me;
-    // This segment included a request for sampling delegation in outbound
-    // injected trace context (see `inject`).
-    bool sent_request_header;
-    // This segment received a (presumably delegated) sampling decision. See
-    // `read_sampling_delegation_response`.
-    bool received_matching_response_header;
-    // This segment conveyed a sampling decision back to a parent service that
-    // had previously requested a delegated sampling decision.
-    bool sent_response_header;
-  } sampling_delegation_ = {};
-
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
                const std::shared_ptr<Collector>& collector,
@@ -106,8 +87,7 @@ class TraceSegment {
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
                const std::shared_ptr<ConfigManager>& config_manager,
-               const RuntimeID& runtime_id, bool sampling_delegation_enabled,
-               bool sampling_decision_was_delegated_to_me,
+               const RuntimeID& runtime_id,
                const std::vector<PropagationStyle>& injection_styles,
                const Optional<std::string>& hostname,
                Optional<std::string> origin, std::size_t tags_header_max_size,
@@ -130,14 +110,6 @@ class TraceSegment {
   bool inject(DictWriter& writer, const SpanData& span);
   bool inject(DictWriter& writer, const SpanData& span,
               const InjectionOptions& options);
-
-  // Inject this segment's trace sampling decision into the specified `writer`,
-  // if appropriate.
-  void write_sampling_delegation_response(DictWriter& writer);
-
-  // Extract a trace sampling decision from the specified `reader` if it has
-  // one, and use the resulting decision, if appropriate.
-  Expected<void> read_sampling_delegation_response(const DictReader& reader);
 
   // Take ownership of the specified `span`.
   void register_span(std::unique_ptr<SpanData> span);

@@ -20,8 +20,7 @@ Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
     : trace_segment_(trace_segment),
       data_(data),
       generate_span_id_(generate_span_id),
-      clock_(clock),
-      expecting_delegated_sampling_decision_(false) {
+      clock_(clock) {
   assert(trace_segment_);
   assert(data_);
   assert(generate_span_id_);
@@ -59,21 +58,11 @@ Span Span::create_child(const SpanConfig& config) const {
 Span Span::create_child() const { return create_child(SpanConfig{}); }
 
 void Span::inject(DictWriter& writer) const {
-  expecting_delegated_sampling_decision_ =
-      trace_segment_->inject(writer, *data_);
+  trace_segment_->inject(writer, *data_);
 }
 
 void Span::inject(DictWriter& writer, const InjectionOptions& options) const {
-  expecting_delegated_sampling_decision_ =
-      trace_segment_->inject(writer, *data_, options);
-}
-
-Expected<void> Span::read_sampling_delegation_response(
-    const DictReader& reader) {
-  if (!expecting_delegated_sampling_decision_) return {};
-
-  expecting_delegated_sampling_decision_ = false;
-  return trace_segment_->read_sampling_delegation_response(reader);
+  trace_segment_->inject(writer, *data_, options);
 }
 
 std::uint64_t Span::id() const { return data_->span_id; }

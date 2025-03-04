@@ -74,12 +74,6 @@ int main() {
       span.set_error_message(httplib::to_string(er));
       std::cerr << "Error occurred while proxying request: " << req.target
                 << "\n";
-    } else {
-      tracingutil::HeaderReader reader(res.headers);
-      auto status = span.read_sampling_delegation_response(reader);
-      if (auto error = status.if_error()) {
-        std::cerr << error << "\n";
-      }
     }
 
     span.set_tag("http.status_code", std::to_string(res.status));

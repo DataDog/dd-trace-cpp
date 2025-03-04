@@ -49,7 +49,6 @@ class Tracer {
   std::vector<PropagationStyle> extraction_styles_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
-  bool sampling_delegation_enabled_;
   // Store the tracer configuration in an in-memory file, allowing it to be
   // read to determine if the process is instrumented with a tracer and to
   // retrieve relevant tracing information.
