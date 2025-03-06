@@ -59,7 +59,6 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       tags_header_max_size_(config.tags_header_size),
-      sampling_delegation_enabled_(config.delegate_trace_sampling),
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
       baggage_extraction_enabled_(false) {
@@ -191,9 +190,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   tracer_telemetry_->metrics().tracer.trace_segments_created_new.inc();
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_, config_manager_->trace_sampler(),
-      span_sampler_, defaults, config_manager_, runtime_id_,
-      sampling_delegation_enabled_,
-      false /* sampling_decision_was_delegated_to_me */, injection_styles_,
+      span_sampler_, defaults, config_manager_, runtime_id_, injection_styles_,
       hostname_, nullopt /* origin */, tags_header_max_size_,
       std::move(trace_tags), nullopt /* sampling_decision */,
       nullopt /* additional_w3c_tracestate */,
@@ -378,11 +375,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         *merged_context.datadog_w3c_parent_id;
   }
 
-  const bool delegate_sampling_decision =
-      sampling_delegation_enabled_ && merged_context.delegate_sampling_decision;
-
   Optional<SamplingDecision> sampling_decision;
-  if (!delegate_sampling_decision && merged_context.sampling_priority) {
+  if (merged_context.sampling_priority) {
     SamplingDecision decision;
     decision.priority = *merged_context.sampling_priority;
     // `decision.mechanism` is null.  We might be able to infer it once we
@@ -397,10 +391,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, tracer_telemetry_, config_manager_->trace_sampler(),
       span_sampler_, config_manager_->span_defaults(), config_manager_,
-      runtime_id_, sampling_delegation_enabled_, delegate_sampling_decision,
-      injection_styles_, hostname_, std::move(merged_context.origin),
-      tags_header_max_size_, std::move(merged_context.trace_tags),
-      std::move(sampling_decision),
+      runtime_id_, injection_styles_, hostname_,
+      std::move(merged_context.origin), tags_header_max_size_,
+      std::move(merged_context.trace_tags), std::move(sampling_decision),
       std::move(merged_context.additional_w3c_tracestate),
       std::move(merged_context.additional_datadog_w3c_tracestate),
       std::move(span_data));

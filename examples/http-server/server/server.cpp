@@ -159,10 +159,6 @@ int main() {
   // created. We finish it by popping it off of the span stack.
   server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
     auto* context = static_cast<RequestTracingContext*>(request.user_data.get());
-
-    tracingutil::HeaderWriter writer(response.headers);
-    context->spans.top().trace_segment().write_sampling_delegation_response(writer);
-
     context->spans.pop();
     return httplib::Server::HandlerResponse::Unhandled;
   });

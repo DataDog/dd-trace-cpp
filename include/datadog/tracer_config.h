@@ -80,11 +80,6 @@ struct TracerConfig {
   // `telemetry/configuration.h` By default, the telemetry module is enabled.
   telemetry::Configuration telemetry;
 
-  // `delegate_trace_sampling` indicates whether the tracer will consult a child
-  // service for a trace sampling decision, and prefer the resulting decision
-  // over its own, if appropriate.
-  Optional<bool> delegate_trace_sampling;
-
   // `trace_sampler` configures trace sampling.  Trace sampling determines which
   // traces are sent to Datadog.  See `trace_sampler_config.h`.
   TraceSamplerConfig trace_sampler;
@@ -199,7 +194,6 @@ class FinalizedTracerConfig final {
   Clock clock;
   std::string integration_name;
   std::string integration_version;
-  bool delegate_trace_sampling;
   bool report_traces;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
   Baggage::Options baggage_opts;

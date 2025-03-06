@@ -143,11 +143,6 @@ Expected<ExtractedData> extract_datadog(
     result.sampling_priority = *sampling_priority;
   }
 
-  if (auto sampling_delegation_header =
-          headers.lookup("x-datadog-delegate-trace-sampling")) {
-    result.delegate_sampling_decision = true;
-  }
-
   auto origin = headers.lookup("x-datadog-origin");
   if (origin) {
     result.origin = std::string(*origin);
