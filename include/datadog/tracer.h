@@ -10,6 +10,8 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
+#include <threads.h>
+
 #include <cstddef>
 #include <memory>
 
@@ -22,6 +24,9 @@
 #include "span_config.h"
 #include "tracer_config.h"
 #include "tracer_signature.h"
+
+extern const void* elastic_apm_profiling_correlation_process_storage_v1;
+extern thread_local void* elastic_apm_profiling_correlation_tls_v1;
 
 namespace datadog {
 namespace tracing {
@@ -107,6 +112,7 @@ class Tracer {
   std::string config() const;
 
  private:
+  void correlate(const Span& span);
   void store_config();
 };
 

@@ -19,7 +19,10 @@
 //    polling the Datadog Agent. See
 //    `RemoteConfigurationManager::process_response` in `remote_config.h`.
 
+#include <cstring>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "runtime_id.h"
 #include "string_view.h"
@@ -30,6 +33,15 @@
 
 namespace datadog {
 namespace tracing {
+
+namespace {
+void write_utf8_string(std::vector<uint8_t>& buffer, const std::string& str) {
+  uint32_t length = str.length();
+  buffer.insert(buffer.end(), reinterpret_cast<uint8_t*>(&length),
+                reinterpret_cast<uint8_t*>(&length) + sizeof(length));
+  buffer.insert(buffer.end(), str.begin(), str.end());
+}
+}  // namespace
 
 struct TracerSignature {
   RuntimeID runtime_id;
@@ -47,6 +59,27 @@ struct TracerSignature {
         library_version(tracer_version),
         library_language("cpp"),
         library_language_version(DD_TRACE_STRINGIFY(__cplusplus), 6) {}
+
+  const std::unique_ptr<uint8_t*> generate_process_correlation_storage() {
+    std::vector<uint8_t> buffer;
+
+    // Currently, layout minor version is 2 to differ from Elastic's
+    // version which includes a socket path.
+    // Layout:
+    // https://github.com/elastic/apm/blob/149cd3e39a77a58002344270ed2ad35357bdd02d/specs/agents/universal-profiling-integration.md#process-storage-layout
+    uint16_t layout_minor_version = 2;
+    buffer.insert(buffer.end(),
+                  reinterpret_cast<uint8_t*>(&layout_minor_version),
+                  reinterpret_cast<uint8_t*>(&layout_minor_version) +
+                      sizeof(layout_minor_version));
+
+    write_utf8_string(buffer, default_service);
+    write_utf8_string(buffer, default_environment);
+
+    uint8_t* res = new uint8_t[buffer.size()];
+    memcpy(res, buffer.data(), buffer.size());
+    return std::make_unique<uint8_t*>(res);
+  }
 };
 
 }  // namespace tracing

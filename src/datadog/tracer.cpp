@@ -29,6 +29,9 @@
 #include "tracer_telemetry.h"
 #include "w3c_propagation.h"
 
+const void* elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
+thread_local void* elastic_apm_profiling_correlation_tls_v1 = nullptr;
+
 namespace datadog {
 namespace tracing {
 
@@ -98,6 +101,11 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     }
   }
 
+  // TODO: change the way this is done to handle programs that fork.
+  // TODO: add a flag to disable this by default.
+  elastic_apm_profiling_correlation_process_storage_v1 =
+      *signature_.generate_process_correlation_storage();
+
   if (config.log_on_startup) {
     logger_->log_startup([configuration = this->config()](std::ostream& log) {
       log << "DATADOG TRACER CONFIGURATION - " << configuration;
@@ -105,6 +113,13 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 
   store_config();
+}
+
+void Tracer::correlate(const Span&) {
+  // TODO: update this variablle with data
+  // See Layout:
+  // https://github.com/elastic/apm/blob/149cd3e39a77a58002344270ed2ad35357bdd02d/specs/agents/universal-profiling-integration.md#thread-local-storage-layout
+  elastic_apm_profiling_correlation_tls_v1 = (char*)"randomdata\n";
 }
 
 std::string Tracer::config() const {
@@ -198,6 +213,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
+  correlate(span);
   return span;
 }
 
@@ -400,6 +416,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
+  correlate(span);
   return span;
 }
 
