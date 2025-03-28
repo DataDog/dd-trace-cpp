@@ -39,12 +39,16 @@ struct MockHTTPClient : public HTTPClient {
   std::mutex mutex_;
   ResponseHandler on_response_;
   ErrorHandler on_error_;
+  std::string request_body;
+
+  void clear() { request_body = ""; }
 
   Expected<void> post(
-      const URL&, HeadersSetter set_headers, std::string /*body*/,
+      const URL&, HeadersSetter set_headers, std::string body,
       ResponseHandler on_response, ErrorHandler on_error,
       std::chrono::steady_clock::time_point /*deadline*/) override {
     std::lock_guard<std::mutex> lock{mutex_};
+    request_body = body;
     if (!post_error) {
       on_response_ = on_response;
       on_error_ = on_error;

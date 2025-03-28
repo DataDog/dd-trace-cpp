@@ -10,7 +10,6 @@
 #include <cassert>
 #include <chrono>
 #include <string>
-#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -19,13 +18,13 @@
 #include "msgpack.h"
 #include "span_data.h"
 #include "trace_sampler.h"
+#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
 
 constexpr StringView traces_api_path = "/v0.4/traces";
-constexpr StringView telemetry_v2_path = "/telemetry/proxy/api/v2/apmtelemetry";
 constexpr StringView remote_configuration_path = "/v0.7/config";
 
 void set_content_type_json(DictWriter& headers) {
@@ -36,12 +35,6 @@ HTTPClient::URL traces_endpoint(const HTTPClient::URL& agent_url) {
   auto traces_url = agent_url;
   append(traces_url.path, traces_api_path);
   return traces_url;
-}
-
-HTTPClient::URL telemetry_endpoint(const HTTPClient::URL& agent_url) {
-  auto telemetry_v2_url = agent_url;
-  append(telemetry_v2_url.path, telemetry_v2_path);
-  return telemetry_v2_url;
 }
 
 HTTPClient::URL remote_configuration_endpoint(
@@ -150,15 +143,14 @@ namespace rc = datadog::remote_config;
 
 DatadogAgent::DatadogAgent(
     const FinalizedDatadogAgentConfig& config,
-    const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
+    const std::shared_ptr<telemetry::Telemetry>& telemetry,
     const std::shared_ptr<Logger>& logger,
     const TracerSignature& tracer_signature,
     const std::vector<std::shared_ptr<rc::Listener>>& rc_listeners)
-    : tracer_telemetry_(tracer_telemetry),
+    : telemetry_(telemetry),
       clock_(config.clock),
       logger_(logger),
       traces_endpoint_(traces_endpoint(config.url)),
-      telemetry_endpoint_(telemetry_endpoint(config.url)),
       remote_configuration_endpoint_(remote_configuration_endpoint(config.url)),
       http_client_(config.http_client),
       event_scheduler_(config.event_scheduler),
@@ -168,46 +160,10 @@ DatadogAgent::DatadogAgent(
       remote_config_(tracer_signature, rc_listeners, logger),
       tracer_signature_(tracer_signature) {
   assert(logger_);
-  assert(tracer_telemetry_);
+  assert(telemetry_);
 
   tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
       config.flush_interval, [this]() { flush(); }));
-
-  if (tracer_telemetry_->enabled()) {
-    // Callback for successful telemetry HTTP requests, to examine HTTP
-    // status.
-    telemetry_on_response_ = [logger = logger_](
-                                 int response_status,
-                                 const DictReader& /*response_headers*/,
-                                 std::string response_body) {
-      if (response_status < 200 || response_status >= 300) {
-        logger->log_error([&](auto& stream) {
-          stream << "Unexpected telemetry response status " << response_status
-                 << " with body (if any, starts on next line):\n"
-                 << response_body;
-        });
-      }
-    };
-
-    // Callback for unsuccessful telemetry HTTP requests.
-    telemetry_on_error_ = [logger = logger_](Error error) {
-      logger->log_error(error.with_prefix(
-          "Error occurred during HTTP request for telemetry: "));
-    };
-
-    // Only schedule this if telemetry is enabled.
-    // Every 10 seconds, have the tracer telemetry capture the metrics
-    // values. Every 60 seconds, also report those values to the datadog
-    // agent.
-    tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
-        std::chrono::seconds(10), [this, n = 0]() mutable {
-          n++;
-          tracer_telemetry_->capture_metrics();
-          if (n % 6 == 0) {
-            send_heartbeat_and_telemetry();
-          }
-        }));
-  }
 
   if (config.remote_configuration_enabled) {
     tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
@@ -224,13 +180,6 @@ DatadogAgent::~DatadogAgent() {
   }
 
   flush();
-
-  if (tracer_telemetry_->enabled()) {
-    tracer_telemetry_->capture_metrics();
-    // The app-closing message is bundled with a message containing the
-    // final metric values.
-    send_app_closing();
-  }
 
   http_client_->drain(deadline);
 }
@@ -249,7 +198,6 @@ std::string DatadogAgent::config() const {
     {"type", "datadog::tracing::DatadogAgent"},
     {"config", nlohmann::json::object({
       {"traces_url", (traces_endpoint_.scheme + "://" + traces_endpoint_.authority + traces_endpoint_.path)},
-      {"telemetry_url", (telemetry_endpoint_.scheme + "://" + telemetry_endpoint_.authority + telemetry_endpoint_.path)},
       {"remote_configuration_url", (remote_configuration_endpoint_.scheme + "://" + remote_configuration_endpoint_.authority + remote_configuration_endpoint_.path)},
       {"flush_interval_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(flush_interval_).count() },
       {"request_timeout_milliseconds", std::chrono::duration_cast<std::chrono::milliseconds>(request_timeout_).count() },
@@ -302,7 +250,7 @@ void DatadogAgent::flush() {
 
   // This is the callback for the HTTP response.  It's invoked
   // asynchronously.
-  auto on_response = [telemetry = tracer_telemetry_,
+  auto on_response = [telemetry = telemetry_,
                       samplers = std::move(response_handlers),
                       logger = logger_](int response_status,
                                         const DictReader& /*response_headers*/,
@@ -353,14 +301,13 @@ void DatadogAgent::flush() {
   // This is the callback for if something goes wrong sending the
   // request or retrieving the response.  It's invoked
   // asynchronously.
-  auto on_error = [telemetry = tracer_telemetry_,
-                   logger = logger_](Error error) {
+  auto on_error = [telemetry = telemetry_, logger = logger_](Error error) {
     telemetry->metrics().trace_api.errors_network.inc();
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for submitting traces: "));
   };
 
-  tracer_telemetry_->metrics().trace_api.requests.inc();
+  telemetry_->metrics().trace_api.requests.inc();
   auto post_result =
       http_client_->post(traces_endpoint_, std::move(set_request_headers),
                          std::move(body), std::move(on_response),
@@ -369,58 +316,6 @@ void DatadogAgent::flush() {
     logger_->log_error(
         error->with_prefix("Unexpected error submitting traces: "));
   }
-}
-
-void DatadogAgent::send_telemetry(StringView request_type,
-                                  std::string payload) {
-  auto set_telemetry_headers = [request_type, payload_size = payload.size(),
-                                debug_enabled = tracer_telemetry_->debug(),
-                                tracer_signature =
-                                    &tracer_signature_](DictWriter& headers) {
-    /*
-      TODO:
-        Datadog-Container-ID
-    */
-    headers.set("Content-Type", "application/json");
-    headers.set("Content-Length", std::to_string(payload_size));
-    headers.set("DD-Telemetry-API-Version", "v2");
-    headers.set("DD-Client-Library-Language", "cpp");
-    headers.set("DD-Client-Library-Version", tracer_signature->library_version);
-    headers.set("DD-Telemetry-Request-Type", request_type);
-
-    if (debug_enabled) {
-      headers.set("DD-Telemetry-Debug-Enabled", "true");
-    }
-  };
-
-  auto post_result =
-      http_client_->post(telemetry_endpoint_, set_telemetry_headers,
-                         std::move(payload), telemetry_on_response_,
-                         telemetry_on_error_, clock_().tick + request_timeout_);
-  if (auto* error = post_result.if_error()) {
-    logger_->log_error(
-        error->with_prefix("Unexpected error submitting telemetry event: "));
-  }
-}
-
-void DatadogAgent::send_app_started(
-    const std::unordered_map<ConfigName, ConfigMetadata>& config_metadata) {
-  send_telemetry("app-started",
-                 tracer_telemetry_->app_started(config_metadata));
-}
-
-void DatadogAgent::send_heartbeat_and_telemetry() {
-  send_telemetry("app-heartbeat", tracer_telemetry_->heartbeat_and_telemetry());
-}
-
-void DatadogAgent::send_configuration_change() {
-  if (auto payload = tracer_telemetry_->configuration_change()) {
-    send_telemetry("app-client-configuration-change", *payload);
-  }
-}
-
-void DatadogAgent::send_app_closing() {
-  send_telemetry("app-closing", tracer_telemetry_->app_closing());
 }
 
 void DatadogAgent::get_and_apply_remote_configuration_updates() {
@@ -466,7 +361,7 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
           // and not the agent pulling from telemetry. That way telemetry will
           // be more flexible and could support env var to customize how often
           // it captures metrics.
-          send_configuration_change();
+          telemetry_->send_configuration_change();
         }
       };
 

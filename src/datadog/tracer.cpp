@@ -46,11 +46,11 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
                                     : RuntimeID::generate()),
       signature_{runtime_id_, config.defaults.service,
                  config.defaults.environment},
-      tracer_telemetry_(std::make_shared<TracerTelemetry>(
-          config.telemetry.enabled, config.clock, logger_, signature_,
-          config.integration_name, config.integration_version)),
-      config_manager_(
-          std::make_shared<ConfigManager>(config, tracer_telemetry_)),
+      telemetry_{std::make_shared<telemetry::Telemetry>(
+          config.telemetry, logger_, config.http_client,
+          std::vector<std::shared_ptr<telemetry::Metric>>{},
+          *config.event_scheduler, config.agent_url)},
+      config_manager_(std::make_shared<ConfigManager>(config, telemetry_)),
       collector_(/* see constructor body */),
       span_sampler_(
           std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
@@ -74,14 +74,11 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 
     auto rc_listeners = agent_config.remote_configuration_listeners;
     rc_listeners.emplace_back(config_manager_);
-    auto agent =
-        std::make_shared<DatadogAgent>(agent_config, tracer_telemetry_,
-                                       config.logger, signature_, rc_listeners);
+    auto agent = std::make_shared<DatadogAgent>(
+        agent_config, telemetry_, config.logger, signature_, rc_listeners);
     collector_ = agent;
 
-    if (tracer_telemetry_->enabled()) {
-      agent->send_app_started(config.metadata);
-    }
+    telemetry_->send_app_started(config.metadata);
   }
 
   for (const auto style : extraction_styles_) {
@@ -187,9 +184,9 @@ Span Tracer::create_span(const SpanConfig& config) {
   }
 
   const auto span_data_ptr = span_data.get();
-  tracer_telemetry_->metrics().tracer.trace_segments_created_new.inc();
+  telemetry_->metrics().tracer.trace_segments_created_new.inc();
   const auto segment = std::make_shared<TraceSegment>(
-      logger_, collector_, tracer_telemetry_, config_manager_->trace_sampler(),
+      logger_, collector_, telemetry_, config_manager_->trace_sampler(),
       span_sampler_, defaults, config_manager_, runtime_id_, injection_styles_,
       hostname_, nullopt /* origin */, tags_header_max_size_,
       std::move(trace_tags), nullopt /* sampling_decision */,
@@ -387,9 +384,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   const auto span_data_ptr = span_data.get();
-  tracer_telemetry_->metrics().tracer.trace_segments_created_continued.inc();
+  telemetry_->metrics().tracer.trace_segments_created_continued.inc();
   const auto segment = std::make_shared<TraceSegment>(
-      logger_, collector_, tracer_telemetry_, config_manager_->trace_sampler(),
+      logger_, collector_, telemetry_, config_manager_->trace_sampler(),
       span_sampler_, config_manager_->span_defaults(), config_manager_,
       runtime_id_, injection_styles_, hostname_,
       std::move(merged_context.origin), tags_header_max_size_,
@@ -448,9 +445,9 @@ Expected<void> Tracer::inject(const Baggage& baggage, DictWriter& writer) {
         err->with_prefix("failed to serialize all baggage items: "));
 
     if (err->code == Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED) {
-      tracer_telemetry_->metrics().tracer.baggage_bytes_exceeded.inc();
+      telemetry_->metrics().tracer.baggage_bytes_exceeded.inc();
     } else if (err->code == Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED) {
-      tracer_telemetry_->metrics().tracer.baggage_items_exceeded.inc();
+      telemetry_->metrics().tracer.baggage_items_exceeded.inc();
     }
   }
 

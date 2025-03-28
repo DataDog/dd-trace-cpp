@@ -19,6 +19,7 @@ add_executable(tests
     # telemetry test cases
     telemetry/test_configuration.cpp
     telemetry/test_metrics.cpp
+    telemetry/test_telemetry.cpp
 
     # test cases
     test_baggage.cpp
@@ -37,7 +38,6 @@ add_executable(tests
     test_trace_id.cpp
     test_trace_segment.cpp
     test_tracer_config.cpp
-    test_tracer_telemetry.cpp
     test_tracer.cpp
     test_trace_sampler.cpp
 

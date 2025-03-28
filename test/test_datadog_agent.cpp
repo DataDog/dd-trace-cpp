@@ -1,4 +1,5 @@
 #include <datadog/collector_response.h>
+#include <datadog/config_manager.h>
 #include <datadog/datadog_agent.h>
 #include <datadog/datadog_agent_config.h>
 #include <datadog/tracer.h>
@@ -12,6 +13,7 @@
 #include "mocks/loggers.h"
 #include "test.h"
 
+using namespace datadog;
 using namespace datadog::tracing;
 using namespace std::chrono_literals;
 
@@ -196,9 +198,10 @@ TEST_CASE("Remote Configuration", "[datadog_agent]") {
 
   const TracerSignature signature(RuntimeID::generate(), "testsvc", "test");
 
-  auto telemetry = std::make_shared<TracerTelemetry>(
-      finalized->telemetry.enabled, finalized->clock, finalized->logger,
-      signature, "", "");
+  auto telemetry = std::make_shared<telemetry::Telemetry>(
+      *telemetry::finalize_config(), finalized->logger, http_client,
+      std::vector<std::shared_ptr<telemetry::Metric>>{},
+      *finalized->event_scheduler, finalized->agent_url);
 
   auto config_manager = std::make_shared<ConfigManager>(*finalized, telemetry);
 

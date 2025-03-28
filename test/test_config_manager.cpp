@@ -1,9 +1,13 @@
 #include "catch.hpp"
 #include "datadog/config_manager.h"
 #include "datadog/remote_config/listener.h"
+#include "datadog/telemetry/telemetry.h"
 #include "datadog/trace_sampler.h"
+#include "mocks/http_clients.h"
 
 namespace rc = datadog::remote_config;
+
+using namespace datadog;
 using namespace datadog::tracing;
 
 #define CONFIG_MANAGER_TEST(x) TEST_CASE(x, "[config_manager]")
@@ -26,10 +30,15 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
   config.service = "testsvc";
   config.environment = "test";
 
-  auto tracer_telemetry = std::make_shared<TracerTelemetry>(
-      false, default_clock, nullptr, tracer_signature, "", "");
+  auto final_cfg = *finalize_config(config);
 
-  ConfigManager config_manager(*finalize_config(config), tracer_telemetry);
+  auto http_client = std::make_shared<MockHTTPClient>();
+  auto tracer_telemetry = std::make_shared<telemetry::Telemetry>(
+      *telemetry::finalize_config(), final_cfg.logger, http_client,
+      std::vector<std::shared_ptr<telemetry::Metric>>{},
+      *final_cfg.event_scheduler, final_cfg.agent_url);
+
+  ConfigManager config_manager(final_cfg, tracer_telemetry);
 
   rc::Listener::Configuration config_update{/* id = */ "id",
                                             /* path = */ "",

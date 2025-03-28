@@ -66,8 +66,6 @@ struct DatadogAgentConfig {
   // How often, in seconds, to query the Datadog Agent for remote configuration
   // updates.
   Optional<double> remote_configuration_poll_interval_seconds;
-
-  static Expected<HTTPClient::URL> parse(StringView);
 };
 
 class FinalizedDatadogAgentConfig {
