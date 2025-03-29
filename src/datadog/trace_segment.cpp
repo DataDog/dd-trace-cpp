@@ -27,7 +27,6 @@
 #include "tag_propagation.h"
 #include "tags.h"
 #include "trace_sampler.h"
-#include "tracer_telemetry.h"
 #include "w3c_propagation.h"
 
 namespace datadog {
@@ -86,7 +85,6 @@ void inject_trace_tags(
 TraceSegment::TraceSegment(
     const std::shared_ptr<Logger>& logger,
     const std::shared_ptr<Collector>& collector,
-    const std::shared_ptr<telemetry::Telemetry>& tracer_telemetry,
     const std::shared_ptr<TraceSampler>& trace_sampler,
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
@@ -102,7 +100,6 @@ TraceSegment::TraceSegment(
     std::unique_ptr<SpanData> local_root)
     : logger_(logger),
       collector_(collector),
-      telemetry_(tracer_telemetry),
       trace_sampler_(trace_sampler),
       span_sampler_(span_sampler),
       defaults_(defaults),
@@ -120,7 +117,6 @@ TraceSegment::TraceSegment(
       config_manager_(config_manager) {
   assert(logger_);
   assert(collector_);
-  assert(telemetry_);
   assert(trace_sampler_);
   assert(span_sampler_);
   assert(defaults_);
@@ -146,7 +142,7 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
-  telemetry_->metrics().tracer.spans_created.inc();
+  telemetry::metrics().tracer.spans_created.inc();
 
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
@@ -155,7 +151,7 @@ void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
 
 void TraceSegment::span_finished() {
   {
-    telemetry_->metrics().tracer.spans_finished.inc();
+    // telemetry_->metrics().tracer.spans_finished.inc();
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
     assert(num_finished_spans_ <= spans_.size());
@@ -246,7 +242,7 @@ void TraceSegment::span_finished() {
     }
   }
 
-  telemetry_->metrics().tracer.trace_segments_closed.inc();
+  // telemetry_->metrics().tracer.trace_segments_closed.inc();
 }
 
 void TraceSegment::override_sampling_priority(SamplingPriority priority) {

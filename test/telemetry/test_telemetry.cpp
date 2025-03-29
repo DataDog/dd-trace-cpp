@@ -4,12 +4,12 @@
 
 #include <datadog/clock.h>
 #include <datadog/span_defaults.h>
-#include <datadog/telemetry/telemetry.h>
-
+// #include <datadog/telemetry/telemetry.h>
 #include <datadog/json.hpp>
 #include <unordered_set>
 
 #include "datadog/runtime_id.h"
+#include "datadog/telemetry/telemetry_impl.h"
 #include "mocks/event_schedulers.h"
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
@@ -69,7 +69,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
                       logger,
                       client,
                       std::vector<std::shared_ptr<Metric>>{},
-                      *scheduler,
+                      scheduler,
                       *url,
                       clock};
 
@@ -98,7 +98,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
                            logger,
                            client,
                            std::vector<std::shared_ptr<Metric>>{},
-                           *scheduler,
+                           scheduler,
                            *url};
 
       client->clear();

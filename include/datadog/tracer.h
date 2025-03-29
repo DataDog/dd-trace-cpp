@@ -10,8 +10,6 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
-#include <datadog/telemetry/telemetry.h>
-
 #include <cstddef>
 #include <memory>
 
@@ -28,7 +26,6 @@
 namespace datadog {
 namespace tracing {
 
-class TracerTelemetry;
 class ConfigManager;
 class DictReader;
 struct SpanConfig;
@@ -41,7 +38,6 @@ class Tracer {
   std::shared_ptr<Logger> logger_;
   RuntimeID runtime_id_;
   TracerSignature signature_;
-  std::shared_ptr<telemetry::Telemetry> telemetry_;
   std::shared_ptr<ConfigManager> config_manager_;
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<SpanSampler> span_sampler_;

@@ -5,6 +5,7 @@
 #include <datadog/http_client.h>
 #include <datadog/logger.h>
 #include <datadog/string_view.h>
+#include <datadog/telemetry/telemetry.h>
 #include <datadog/tracer.h>
 
 #include <cassert>
@@ -18,7 +19,6 @@
 #include "msgpack.h"
 #include "span_data.h"
 #include "trace_sampler.h"
-#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
@@ -143,12 +143,10 @@ namespace rc = datadog::remote_config;
 
 DatadogAgent::DatadogAgent(
     const FinalizedDatadogAgentConfig& config,
-    const std::shared_ptr<telemetry::Telemetry>& telemetry,
     const std::shared_ptr<Logger>& logger,
     const TracerSignature& tracer_signature,
     const std::vector<std::shared_ptr<rc::Listener>>& rc_listeners)
-    : telemetry_(telemetry),
-      clock_(config.clock),
+    : clock_(config.clock),
       logger_(logger),
       traces_endpoint_(traces_endpoint(config.url)),
       remote_configuration_endpoint_(remote_configuration_endpoint(config.url)),
@@ -160,7 +158,6 @@ DatadogAgent::DatadogAgent(
       remote_config_(tracer_signature, rc_listeners, logger),
       tracer_signature_(tracer_signature) {
   assert(logger_);
-  assert(telemetry_);
 
   tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
       config.flush_interval, [this]() { flush(); }));
@@ -250,21 +247,20 @@ void DatadogAgent::flush() {
 
   // This is the callback for the HTTP response.  It's invoked
   // asynchronously.
-  auto on_response = [telemetry = telemetry_,
-                      samplers = std::move(response_handlers),
+  auto on_response = [samplers = std::move(response_handlers),
                       logger = logger_](int response_status,
                                         const DictReader& /*response_headers*/,
                                         std::string response_body) {
     if (response_status >= 500) {
-      telemetry->metrics().trace_api.responses_5xx.inc();
+      telemetry::metrics().trace_api.responses_5xx.inc();
     } else if (response_status >= 400) {
-      telemetry->metrics().trace_api.responses_4xx.inc();
+      telemetry::metrics().trace_api.responses_4xx.inc();
     } else if (response_status >= 300) {
-      telemetry->metrics().trace_api.responses_3xx.inc();
+      telemetry::metrics().trace_api.responses_3xx.inc();
     } else if (response_status >= 200) {
-      telemetry->metrics().trace_api.responses_2xx.inc();
+      telemetry::metrics().trace_api.responses_2xx.inc();
     } else if (response_status >= 100) {
-      telemetry->metrics().trace_api.responses_1xx.inc();
+      telemetry::metrics().trace_api.responses_1xx.inc();
     }
     if (response_status != 200) {
       logger->log_error([&](auto& stream) {
@@ -301,13 +297,13 @@ void DatadogAgent::flush() {
   // This is the callback for if something goes wrong sending the
   // request or retrieving the response.  It's invoked
   // asynchronously.
-  auto on_error = [telemetry = telemetry_, logger = logger_](Error error) {
-    telemetry->metrics().trace_api.errors_network.inc();
+  auto on_error = [logger = logger_](Error error) {
+    telemetry::metrics().trace_api.errors_network.inc();
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for submitting traces: "));
   };
 
-  telemetry_->metrics().trace_api.requests.inc();
+  telemetry::metrics().trace_api.requests.inc();
   auto post_result =
       http_client_->post(traces_endpoint_, std::move(set_request_headers),
                          std::move(body), std::move(on_response),
@@ -361,7 +357,7 @@ void DatadogAgent::get_and_apply_remote_configuration_updates() {
           // and not the agent pulling from telemetry. That way telemetry will
           // be more flexible and could support env var to customize how often
           // it captures metrics.
-          telemetry_->send_configuration_change();
+          telemetry::send_configuration_change();
         }
       };
 

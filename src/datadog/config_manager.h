@@ -9,7 +9,6 @@
 #include <datadog/optional.h>
 #include <datadog/remote_config/listener.h>
 #include <datadog/span_defaults.h>
-#include <datadog/telemetry/telemetry.h>
 #include <datadog/tracer_config.h>
 
 #include <mutex>
@@ -76,16 +75,13 @@ class ConfigManager : public remote_config::Listener {
   DynamicConfig<std::shared_ptr<const SpanDefaults>> span_defaults_;
   DynamicConfig<bool> report_traces_;
 
-  std::shared_ptr<telemetry::Telemetry> telemetry_;
-
  private:
   template <typename T>
   void reset_config(ConfigName name, T& conf,
                     std::vector<ConfigMetadata>& metadata);
 
  public:
-  ConfigManager(const FinalizedTracerConfig& config,
-                const std::shared_ptr<telemetry::Telemetry>& telemetry);
+  ConfigManager(const FinalizedTracerConfig& config);
   ~ConfigManager() override{};
 
   remote_config::Products get_products() override;

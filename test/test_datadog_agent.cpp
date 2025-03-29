@@ -2,6 +2,7 @@
 #include <datadog/config_manager.h>
 #include <datadog/datadog_agent.h>
 #include <datadog/datadog_agent_config.h>
+#include <datadog/telemetry/telemetry.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -198,16 +199,12 @@ TEST_CASE("Remote Configuration", "[datadog_agent]") {
 
   const TracerSignature signature(RuntimeID::generate(), "testsvc", "test");
 
-  auto telemetry = std::make_shared<telemetry::Telemetry>(
-      *telemetry::finalize_config(), finalized->logger, http_client,
-      std::vector<std::shared_ptr<telemetry::Metric>>{},
-      *finalized->event_scheduler, finalized->agent_url);
-
-  auto config_manager = std::make_shared<ConfigManager>(*finalized, telemetry);
+  // TODO: set telemetry mock
+  auto config_manager = std::make_shared<ConfigManager>(*finalized);
 
   const auto& agent_config =
       std::get<FinalizedDatadogAgentConfig>(finalized->collector);
-  DatadogAgent agent(agent_config, telemetry, config.logger, signature, {});
+  DatadogAgent agent(agent_config, config.logger, signature, {});
 
   SECTION("404 do not log an error") {
     http_client->response_status = 404;

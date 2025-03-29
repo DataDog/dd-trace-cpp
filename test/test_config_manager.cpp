@@ -1,7 +1,6 @@
 #include "catch.hpp"
 #include "datadog/config_manager.h"
 #include "datadog/remote_config/listener.h"
-#include "datadog/telemetry/telemetry.h"
 #include "datadog/trace_sampler.h"
 #include "mocks/http_clients.h"
 
@@ -21,11 +20,6 @@ nlohmann::json load_json(std::string_view sv) {
 }
 
 CONFIG_MANAGER_TEST("remote configuration handling") {
-  const TracerSignature tracer_signature{
-      /* runtime_id = */ RuntimeID::generate(),
-      /* service = */ "testsvc",
-      /* environment = */ "test"};
-
   TracerConfig config;
   config.service = "testsvc";
   config.environment = "test";
@@ -33,12 +27,9 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
   auto final_cfg = *finalize_config(config);
 
   auto http_client = std::make_shared<MockHTTPClient>();
-  auto tracer_telemetry = std::make_shared<telemetry::Telemetry>(
-      *telemetry::finalize_config(), final_cfg.logger, http_client,
-      std::vector<std::shared_ptr<telemetry::Metric>>{},
-      *final_cfg.event_scheduler, final_cfg.agent_url);
 
-  ConfigManager config_manager(final_cfg, tracer_telemetry);
+  // TODO: set mock telemetry
+  ConfigManager config_manager(final_cfg);
 
   rc::Listener::Configuration config_update{/* id = */ "id",
                                             /* path = */ "",
