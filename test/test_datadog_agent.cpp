@@ -209,8 +209,7 @@ TEST_CASE("RequestHeaders", "[datadog_agent]") {
       auto span = tracer.create_span();
       (void)span;
     }
-    REQUIRE(
-      http_client->request_headers.items["Datadog-Entity-ID"] ==
+    REQUIRE(http_client->request_headers.items["Datadog-Entity-ID"] ==
       "extenv2");
   }
 
@@ -220,8 +219,7 @@ TEST_CASE("RequestHeaders", "[datadog_agent]") {
       auto span = tracer.create_span();
       (void)span;
     }
-    REQUIRE(
-      http_client->request_headers.items["Datadog-Container-Id"] ==
+    REQUIRE(http_client->request_headers.items["Datadog-Container-Id"] ==
       "container1");
   }
   SECTION("DD_CONTAINER_ID") {
@@ -232,8 +230,7 @@ TEST_CASE("RequestHeaders", "[datadog_agent]") {
       auto span = tracer.create_span();
       (void)span;
     }
-    REQUIRE(
-      http_client->request_headers.items["Datadog-Container-Id"] ==
+    REQUIRE(http_client->request_headers.items["Datadog-Container-Id"] ==
       "container2");
   }
 }
