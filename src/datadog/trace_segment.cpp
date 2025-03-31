@@ -142,6 +142,8 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
   return sampling_decision_;
 }
 
+uint64_t TraceSegment::local_root_id() const { return spans_.front()->span_id; }
+
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {

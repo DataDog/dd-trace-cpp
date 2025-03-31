@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <memory>
 
 #include "config_manager.h"
 #include "datadog_agent.h"
@@ -30,7 +31,8 @@
 #include "w3c_propagation.h"
 
 const void* elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
-thread_local void* elastic_apm_profiling_correlation_tls_v1 = nullptr;
+thread_local struct datadog::tracing::TLSStorage*
+    elastic_apm_profiling_correlation_tls_v1 = nullptr;
 
 namespace datadog {
 namespace tracing {
@@ -115,11 +117,25 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   store_config();
 }
 
-void Tracer::correlate(const Span&) {
+void Tracer::correlate(const Span& span) {
   // TODO: update this variablle with data
   // See Layout:
   // https://github.com/elastic/apm/blob/149cd3e39a77a58002344270ed2ad35357bdd02d/specs/agents/universal-profiling-integration.md#thread-local-storage-layout
-  elastic_apm_profiling_correlation_tls_v1 = (char*)"randomdata\n";
+  auto tls_storage_ptr = std::make_unique<struct TLSStorage>();
+  elastic_apm_profiling_correlation_tls_v1 = tls_storage_ptr.get();
+  struct TLSStorage* tls_data = elastic_apm_profiling_correlation_tls_v1;
+  tls_data->valid = 0;
+
+  tls_data->layout_minor_version = 1;
+  tls_data->trace_present = 1;  // We are in a span so no errors
+  tls_data->trace_flags = 0;    // IDK
+  auto trace_id = span.trace_id();
+  tls_data->trace_id_low = trace_id.low;
+  tls_data->trace_id_high = trace_id.high;
+  tls_data->span_id = span.id();
+  tls_data->transaction_id = span.trace_segment().local_root_id();
+
+  tls_data->valid = 1;
 }
 
 std::string Tracer::config() const {

@@ -10,6 +10,7 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
+#include <datadog/tls_storage.h>
 #include <threads.h>
 
 #include <cstddef>
@@ -26,7 +27,8 @@
 #include "tracer_signature.h"
 
 extern const void* elastic_apm_profiling_correlation_process_storage_v1;
-extern thread_local void* elastic_apm_profiling_correlation_tls_v1;
+extern thread_local struct datadog::tracing::TLSStorage*
+    elastic_apm_profiling_correlation_tls_v1;
 
 namespace datadog {
 namespace tracing {
