@@ -4,6 +4,7 @@
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
+#include <datadog/tags.h>
 
 #include <chrono>
 #include <cmath>
@@ -208,6 +209,14 @@ TRACER_CONFIG_TEST("TracerConfig::defaults") {
       REQUIRE(finalized);
       REQUIRE(finalized->defaults.tags == test_case.expected_tags);
     }
+  }
+  
+  SECTION("DD_ENTITY_ID") {
+    const EnvGuard guard{"DD_ENTITY_ID", "entity1"};
+    config.entity_id = "entity2";
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->defaults.tags[tags::entity_id] == "entity1");
   }
 }
 

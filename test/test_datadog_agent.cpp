@@ -7,12 +7,14 @@
 #include <chrono>
 #include <iostream>
 
+#include "common/environment.h"
 #include "mocks/event_schedulers.h"
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
 using namespace datadog::tracing;
+using namespace datadog::test;
 using namespace std::chrono_literals;
 
 TEST_CASE("CollectorResponse", "[datadog_agent]") {
@@ -168,6 +170,63 @@ TEST_CASE("CollectorResponse", "[datadog_agent]") {
     REQUIRE(logger->error_count() == 1);
     REQUIRE(logger->first_error().code == error.code);
   }
+}
+
+TEST_CASE("RequestHeaders", "[datadog_agent]") {
+  TracerConfig config;
+  config.service = "testsvc";
+  const auto logger =
+      std::make_shared<MockLogger>(std::cerr, MockLogger::ERRORS_ONLY);
+  const auto event_scheduler = std::make_shared<MockEventScheduler>();
+  const auto http_client = std::make_shared<MockHTTPClient>();
+  config.logger = logger;
+  config.agent.event_scheduler = event_scheduler;
+  config.agent.http_client = http_client;
+  // Tests currently only cover sending traces to the agent.
+  // Submiting telemetry performs essentially the same steps, but may be added
+  // in the future.
+  config.telemetry.enabled = false;
+  config.agent.external_env = "extenv1";
+  config.agent.container_id = "container1";
+  auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+
+  SECTION("external_env") {
+    {
+      Tracer tracer{*finalized};
+      auto span = tracer.create_span();
+      (void)span;
+    }
+    REQUIRE(http_client->request_headers.items["Datadog-Entity-ID"] == "extenv1");
+  }
+  SECTION("DD_EXTERNAL_ENV") {
+    {
+      const EnvGuard guard{"DD_EXTERNAL_ENV", "extenv2"};
+      auto finalized2 = finalize_config(config);
+      Tracer tracer{*finalized2};
+      auto span = tracer.create_span();
+      (void)span;
+    }
+    REQUIRE(http_client->request_headers.items["Datadog-Entity-ID"] == "extenv2");
+  }
+
+  SECTION("container_id") {
+    {
+      Tracer tracer{*finalized};
+      auto span = tracer.create_span();
+      (void)span;
+    }
+    REQUIRE(http_client->request_headers.items["Datadog-Container-Id"] == "container1");
+  }
+  SECTION("DD_CONTAINER_ID") {
+    {
+      const EnvGuard guard{"DD_CONTAINER_ID", "container2"};
+      auto finalized2 = finalize_config(config);
+      Tracer tracer{*finalized2};
+      auto span = tracer.create_span();
+      (void)span;
+    }
+    REQUIRE(http_client->request_headers.items["Datadog-Container-Id"] == "container2");  }
 }
 
 // NOTE: `report_telemetry` is too vague for now.
