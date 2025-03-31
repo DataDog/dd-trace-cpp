@@ -210,7 +210,7 @@ TRACER_CONFIG_TEST("TracerConfig::defaults") {
       REQUIRE(finalized->defaults.tags == test_case.expected_tags);
     }
   }
-  
+
   SECTION("DD_ENTITY_ID") {
     const EnvGuard guard{"DD_ENTITY_ID", "entity1"};
     config.entity_id = "entity2";

@@ -161,8 +161,8 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
 
   const auto [container_id_origin, container_id] =
       pick(env_config->container_id, user_config.container_id, std::string{});
-  result.metadata[ConfigName::CONTAINER_ID] =
-      ConfigMetadata(ConfigName::CONTAINER_ID, container_id, container_id_origin);
+  result.metadata[ConfigName::CONTAINER_ID] = ConfigMetadata(
+      ConfigName::CONTAINER_ID, container_id, container_id_origin);
   if (!container_id.empty()) {
     result.extra_headers["Datadog-Container-Id"] = container_id;
   }
