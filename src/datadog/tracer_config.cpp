@@ -317,7 +317,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       ConfigName::ENTITY_ID, entity_id, origin);
   if (!entity_id.empty()) {
     final_config.defaults.tags.insert_or_assign(
-        tags::entity_id, *env_config->entity_id);
+        tags::entity_id, entity_id);
   }
 
   // Extraction Styles
