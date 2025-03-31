@@ -11,7 +11,6 @@
 // `tracer_config.h`.
 
 #include <datadog/tls_storage.h>
-#include <threads.h>
 
 #include <cstddef>
 #include <memory>

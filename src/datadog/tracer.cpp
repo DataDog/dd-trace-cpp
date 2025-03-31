@@ -33,6 +33,8 @@
 const void* elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
 thread_local struct datadog::tracing::TLSStorage*
     elastic_apm_profiling_correlation_tls_v1 = nullptr;
+thread_local std::unique_ptr<datadog::tracing::TLSStorage> tls_info_holder =
+    nullptr;
 
 namespace datadog {
 namespace tracing {
@@ -118,11 +120,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 }
 
 void Tracer::correlate(const Span& span) {
-  // TODO: update this variablle with data
-  // See Layout:
-  // https://github.com/elastic/apm/blob/149cd3e39a77a58002344270ed2ad35357bdd02d/specs/agents/universal-profiling-integration.md#thread-local-storage-layout
-  auto tls_storage_ptr = std::make_unique<struct TLSStorage>();
-  elastic_apm_profiling_correlation_tls_v1 = tls_storage_ptr.get();
+  tls_info_holder = std::make_unique<datadog::tracing::TLSStorage>();
+  elastic_apm_profiling_correlation_tls_v1 = tls_info_holder.get();
+
   struct TLSStorage* tls_data = elastic_apm_profiling_correlation_tls_v1;
   tls_data->valid = 0;
 

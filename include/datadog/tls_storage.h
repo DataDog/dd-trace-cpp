@@ -5,6 +5,9 @@
 #include <array>
 #include <cstdint>
 
+// Global struct used to exposed thread-specific information.
+// https://github.com/elastic/apm/blob/149cd3e39a77a58002344270ed2ad35357bdd02d/specs/agents/universal-profiling-integration.md#thread-local-storage-layout
+
 namespace datadog {
 namespace tracing {
 struct __attribute__((packed)) TLSStorage {
@@ -17,5 +20,6 @@ struct __attribute__((packed)) TLSStorage {
   uint64_t span_id;
   uint64_t transaction_id;
 };
+
 }  // namespace tracing
 }  // namespace datadog
