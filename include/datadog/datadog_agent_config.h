@@ -66,6 +66,18 @@ struct DatadogAgentConfig {
   // How often, in seconds, to query the Datadog Agent for remote configuration
   // updates.
   Optional<double> remote_configuration_poll_interval_seconds;
+  // External environment, used to populate headers. Overriden by the
+  // DD_EXTERNAL_ENV variable, usually supplied by the Datadog Admission
+  // Controller.
+  Optional<std::string> external_env;
+  // Container ID, used to populate trace headers. Overriden by the
+  // `DD_CONTAINER_ID` environment variable.  This is used to populate a
+  // header to help the datadog agent identify the container, from an
+  // external origin discovery script.
+  // Typcially "ci-<container_id>" where container_id is the GUID container
+  // id of the container, or "in-<inode>" where inode is the inode of the
+  // containers's cgroup.
+  Optional<std::string> container_id;
 
   static Expected<HTTPClient::URL> parse(StringView);
 };
@@ -89,6 +101,7 @@ class FinalizedDatadogAgentConfig {
   std::chrono::steady_clock::duration shutdown_timeout;
   std::chrono::steady_clock::duration remote_configuration_poll_interval;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::unordered_map<std::string, std::string> extra_headers;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(

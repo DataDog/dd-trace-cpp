@@ -14,6 +14,7 @@
 #include "parse_util.h"
 #include "platform_util.h"
 #include "string_util.h"
+#include "tags.h"
 
 namespace datadog {
 namespace tracing {
@@ -146,6 +147,10 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     }
 
     env_cfg.baggage_max_bytes = std::move(*maybe_value);
+  }
+
+  if (auto entity_id = lookup(environment::DD_ENTITY_ID)) {
+    env_cfg.entity_id = std::string{*entity_id};
   }
 
   // PropagationStyle
@@ -303,6 +308,17 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
            std::unordered_map<std::string, std::string>{});
   final_config.metadata[ConfigName::TAGS] = ConfigMetadata(
       ConfigName::TAGS, join_tags(final_config.defaults.tags), origin);
+
+  // DD_ENTITY_ID
+  std::string entity_id;
+  std::tie(origin, entity_id) =
+      pick(env_config->entity_id, user_config.entity_id, "");
+  final_config.metadata[ConfigName::ENTITY_ID] = ConfigMetadata(
+      ConfigName::ENTITY_ID, entity_id, origin);
+  if (!entity_id.empty()) {
+    final_config.defaults.tags.insert_or_assign(
+        tags::entity_id, *env_config->entity_id);
+  }
 
   // Extraction Styles
   const std::vector<PropagationStyle> default_propagation_styles{

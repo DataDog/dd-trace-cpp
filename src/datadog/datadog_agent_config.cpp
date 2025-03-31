@@ -44,6 +44,13 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
     env_config.url = std::move(configured_url);
   }
 
+  if (auto external_env = lookup(environment::DD_EXTERNAL_ENV)) {
+    env_config.external_env = std::string{*external_env};
+  }
+  if (auto container_id = lookup(environment::DD_CONTAINER_ID)) {
+    env_config.container_id = std::string{*container_id};
+  }
+
   return env_config;
 }
 
@@ -143,6 +150,22 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.url = *parsed_url;
   result.metadata[ConfigName::AGENT_URL] =
       ConfigMetadata(ConfigName::AGENT_URL, url, origin);
+
+  const auto [env_origin, env] =
+      pick(env_config->external_env, user_config.external_env, std::string{});
+  result.metadata[ConfigName::EXTERNAL_ENV] =
+      ConfigMetadata(ConfigName::EXTERNAL_ENV, env, env_origin);
+  if (!env.empty()) {
+    result.extra_headers["Datadog-External-Env"] = env;
+  }
+
+  const auto [container_id_origin, container_id] =
+      pick(env_config->container_id, user_config.container_id, std::string{});
+  result.metadata[ConfigName::CONTAINER_ID] =
+      ConfigMetadata(ConfigName::CONTAINER_ID, container_id, container_id_origin);
+  if (!container_id.empty()) {
+    result.extra_headers["Datadog-Container-Id"] = container_id;
+  }
 
   return result;
 }

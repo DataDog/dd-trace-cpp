@@ -25,7 +25,10 @@ namespace environment {
 // preprocessor is used so that the DD_* symbols are listed exactly once.
 #define LIST_ENVIRONMENT_VARIABLES(MACRO)            \
   MACRO(DD_AGENT_HOST)                               \
+  MACRO(DD_CONTAINER_ID)                             \
   MACRO(DD_ENV)                                      \
+  MACRO(DD_ENTITY_ID)                                \
+  MACRO(DD_EXTERNAL_ENV)                             \
   MACRO(DD_INSTRUMENTATION_TELEMETRY_ENABLED)        \
   MACRO(DD_PROPAGATION_STYLE_EXTRACT)                \
   MACRO(DD_PROPAGATION_STYLE_INJECT)                 \

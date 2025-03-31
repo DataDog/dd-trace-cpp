@@ -214,6 +214,8 @@ DatadogAgent::DatadogAgent(
         config.remote_configuration_poll_interval,
         [this] { get_and_apply_remote_configuration_updates(); }));
   }
+
+  extra_headers = config.extra_headers;
 }
 
 DatadogAgent::~DatadogAgent() {
@@ -298,6 +300,9 @@ void DatadogAgent::flush() {
     headers.set("Datadog-Meta-Tracer-Version",
                 tracer_signature_.library_version);
     headers.set("X-Datadog-Trace-Count", std::to_string(trace_chunks.size()));
+    for (const auto& [key, value] : extra_headers) {
+      headers.set(key, value);
+    }
   };
 
   // This is the callback for the HTTP response.  It's invoked
