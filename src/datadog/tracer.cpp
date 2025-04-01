@@ -31,10 +31,10 @@
 #include "w3c_propagation.h"
 
 const void* elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
-thread_local struct datadog::tracing::TLSStorage*
-    elastic_apm_profiling_correlation_tls_v1 = nullptr;
 thread_local std::unique_ptr<datadog::tracing::TLSStorage> tls_info_holder =
-    nullptr;
+    std::make_unique<datadog::tracing::TLSStorage>();
+thread_local struct datadog::tracing::TLSStorage*
+    elastic_apm_profiling_correlation_tls_v1 = tls_info_holder.get();
 
 namespace datadog {
 namespace tracing {
@@ -120,9 +120,6 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 }
 
 void Tracer::correlate(const Span& span) {
-  tls_info_holder = std::make_unique<datadog::tracing::TLSStorage>();
-  elastic_apm_profiling_correlation_tls_v1 = tls_info_holder.get();
-
   struct TLSStorage* tls_data = elastic_apm_profiling_correlation_tls_v1;
   tls_data->valid = 0;
 
