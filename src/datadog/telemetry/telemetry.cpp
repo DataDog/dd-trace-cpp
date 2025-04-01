@@ -116,4 +116,14 @@ void report_error_log(std::string message) {
              instance());
 }
 
+void report_error_log(std::string message, std::string stacktrace) {
+  std::visit(details::Overload{
+                 [&](Telemetry& telemetry) {
+                   telemetry.log_error(message, stacktrace);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
+}
+
 }  // namespace datadog::telemetry

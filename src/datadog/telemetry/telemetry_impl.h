@@ -58,6 +58,7 @@ class Telemetry final {
   ///
   /// @param message The error message.
   void log_error(std::string message);
+  void log_error(std::string message, std::string stacktrace);
 
   /// capture and report internal warning message to Datadog.
   ///

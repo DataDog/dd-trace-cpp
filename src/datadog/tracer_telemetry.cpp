@@ -55,6 +55,18 @@ std::string to_string(datadog::tracing::ConfigName name) {
   std::abort();
 }
 
+nlohmann::json encode_log(const telemetry::LogMessage& log) {
+  auto encoded = nlohmann::json{
+      {"message", log.message},
+      {"level", to_string(log.level)},
+      {"tracer_time", log.timestamp},
+  };
+  if (log.stacktrace) {
+    encoded.emplace("stack_trace", *log.stacktrace);
+  }
+  return encoded;
+}
+
 }  // namespace
 
 TracerTelemetry::TracerTelemetry(
@@ -275,8 +287,7 @@ std::string TracerTelemetry::heartbeat_and_telemetry() {
   if (!logs_.empty()) {
     auto encoded_logs = nlohmann::json::array();
     for (const auto& log : logs_) {
-      auto encoded =
-          nlohmann::json{{"message", log.message}, {"level", log.level}};
+      auto encoded = encode_log(log);
       encoded_logs.emplace_back(std::move(encoded));
     }
 
@@ -352,8 +363,7 @@ std::string TracerTelemetry::app_closing() {
   if (!logs_.empty()) {
     auto encoded_logs = nlohmann::json::array();
     for (const auto& log : logs_) {
-      auto encoded =
-          nlohmann::json{{"message", log.message}, {"level", log.level}};
+      auto encoded = encode_log(log);
       encoded_logs.emplace_back(std::move(encoded));
     }
 

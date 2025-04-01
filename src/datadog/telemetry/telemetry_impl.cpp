@@ -201,6 +201,10 @@ void Telemetry::log_error(std::string message) {
   tracer_telemetry_->log(std::move(message), LogLevel::ERROR);
 }
 
+void Telemetry::log_error(std::string message, std::string stacktrace) {
+  tracer_telemetry_->log(std::move(message), LogLevel::ERROR, stacktrace);
+}
+
 void Telemetry::log_warning(std::string message) {
   tracer_telemetry_->log(std::move(message), LogLevel::WARNING);
 }
