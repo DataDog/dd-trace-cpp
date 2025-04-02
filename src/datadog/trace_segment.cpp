@@ -151,7 +151,7 @@ void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
 
 void TraceSegment::span_finished() {
   {
-    // telemetry_->metrics().tracer.spans_finished.inc();
+    telemetry::metrics().tracer.spans_finished.inc();
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
     assert(num_finished_spans_ <= spans_.size());
@@ -242,7 +242,7 @@ void TraceSegment::span_finished() {
     }
   }
 
-  // telemetry_->metrics().tracer.trace_segments_closed.inc();
+  telemetry::metrics().tracer.trace_segments_closed.inc();
 }
 
 void TraceSegment::override_sampling_priority(SamplingPriority priority) {

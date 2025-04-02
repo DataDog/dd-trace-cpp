@@ -4,7 +4,6 @@
 
 #include <datadog/clock.h>
 #include <datadog/span_defaults.h>
-// #include <datadog/telemetry/telemetry.h>
 #include <datadog/json.hpp>
 #include <unordered_set>
 
