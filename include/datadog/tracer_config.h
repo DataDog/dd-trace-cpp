@@ -161,6 +161,10 @@ struct TracerConfig {
   /// The maximum amount of bytes allowed to be written during tracing context
   /// injection.
   Optional<std::size_t> baggage_max_bytes;
+  // Entity ID to add as internal tag. Overridden by the `DD_ENTITY_ID`,
+  // usually supplied by Datadog's Admission Controller to help identify traces
+  // coming from kubernetes pods.
+  Optional<std::string> entity_id;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from

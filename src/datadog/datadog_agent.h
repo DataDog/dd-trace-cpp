@@ -55,6 +55,7 @@ class DatadogAgent : public Collector {
   HTTPClient::ErrorHandler telemetry_on_error_;
   std::chrono::steady_clock::duration request_timeout_;
   std::chrono::steady_clock::duration shutdown_timeout_;
+  std::unordered_map<std::string, std::string> extra_headers;
 
   remote_config::Manager remote_config_;
   TracerSignature tracer_signature_;
