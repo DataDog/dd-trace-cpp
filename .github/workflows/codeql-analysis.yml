@@ -29,10 +29,11 @@ jobs:
       with:
         languages: ${{ matrix.language }}
 
+    - name: Install dependencies
+      run: bin/install-cmake
+
     - name: Build dd-trace-cpp
-      run: |
-        bin/install-cmake
-        bin/cmake-build
+      run: bin/cmake-build --preset=ci-codeql
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@b56ba49b26e50535fa1e7f7db0f4f7b4bf65d80d # v3.28.10
