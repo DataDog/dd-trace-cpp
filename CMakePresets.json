@@ -12,6 +12,13 @@
         "DD_TRACE_STATIC_CRT": "1",
         "DD_TRACE_BUILD_TESTING": "1"
       }
+    },
+    {
+      "name": "ci-codeql",
+      "displayName": "CI CodeQL",
+      "cacheVariables": {
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+      }
     }
   ]
 }
