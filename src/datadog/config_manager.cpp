@@ -1,5 +1,7 @@
 #include "config_manager.h"
 
+#include <datadog/telemetry/telemetry.h>
+
 #include "json_serializer.h"
 #include "parse_util.h"
 #include "string_util.h"
@@ -123,17 +125,14 @@ ConfigManager::Update parse_dynamic_config(const nlohmann::json& j) {
 
 namespace rc = datadog::remote_config;
 
-ConfigManager::ConfigManager(
-    const FinalizedTracerConfig& config,
-    const std::shared_ptr<telemetry::Telemetry>& telemetry)
+ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
     : clock_(config.clock),
       default_metadata_(config.metadata),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock_)),
       rules_(config.trace_sampler.rules),
       span_defaults_(std::make_shared<SpanDefaults>(config.defaults)),
-      report_traces_(config.report_traces),
-      telemetry_(telemetry) {}
+      report_traces_(config.report_traces) {}
 
 rc::Products ConfigManager::get_products() { return rc::product::APM_TRACING; }
 
@@ -153,7 +152,7 @@ Optional<std::string> ConfigManager::on_update(const Configuration& config) {
   auto config_update = parse_dynamic_config(config_json.at("lib_config"));
 
   auto config_metadata = apply_update(config_update);
-  telemetry_->capture_configuration_change(config_metadata);
+  telemetry::capture_configuration_change(config_metadata);
 
   // TODO:
   return nullopt;
@@ -161,7 +160,7 @@ Optional<std::string> ConfigManager::on_update(const Configuration& config) {
 
 void ConfigManager::on_revert(const Configuration&) {
   auto config_metadata = apply_update({});
-  telemetry_->capture_configuration_change(config_metadata);
+  telemetry::capture_configuration_change(config_metadata);
 }
 
 std::shared_ptr<TraceSampler> ConfigManager::trace_sampler() {

@@ -34,6 +34,25 @@ class Metric {
   Metric(std::string name, std::string type, std::string scope,
          std::vector<std::string> tags, bool common);
 
+  Metric(Metric&& rhs)
+      : name_(std::move(rhs.name_)),
+        type_(std::move(rhs.type_)),
+        scope_(std::move(rhs.scope_)),
+        tags_(std::move(rhs.tags_)) {
+    rhs.value_.store(value_.exchange(rhs.value_));
+  }
+
+  Metric& operator=(Metric&& rhs) {
+    if (&rhs != this) {
+      std::swap(name_, rhs.name_);
+      std::swap(type_, rhs.type_);
+      std::swap(scope_, rhs.scope_);
+      std::swap(tags_, rhs.tags_);
+      rhs.value_.store(value_.exchange(rhs.value_));
+    }
+    return *this;
+  }
+
  public:
   // Accessors for name, type, tags, common and capture_and_reset_value are used
   // when producing the JSON message for reporting metrics.
@@ -68,6 +87,59 @@ class GaugeMetric : public Metric {
   void add(uint64_t amount);
   void dec();
   void sub(uint64_t amount);
+};
+
+// This structure contains all the metrics that are exposed by tracer
+// telemetry.
+struct DefaultMetrics {
+  struct {
+    telemetry::CounterMetric spans_created = {
+        "spans_created", "tracers", {}, true};
+    telemetry::CounterMetric spans_finished = {
+        "spans_finished", "tracers", {}, true};
+
+    telemetry::CounterMetric trace_segments_created_new = {
+        "trace_segments_created", "tracers", {"new_continued:new"}, true};
+    telemetry::CounterMetric trace_segments_created_continued = {
+        "trace_segments_created", "tracers", {"new_continued:continued"}, true};
+    telemetry::CounterMetric trace_segments_closed = {
+        "trace_segments_closed", "tracers", {}, true};
+    telemetry::CounterMetric baggage_items_exceeded = {
+        "context_header.truncated",
+        "tracers",
+        {{"truncation_reason:baggage_item_count_exceeded"}},
+        true,
+    };
+    telemetry::CounterMetric baggage_bytes_exceeded = {
+        "context_header.truncated",
+        "tracers",
+        {{"truncation_reason:baggage_byte_count_exceeded"}},
+        true,
+    };
+  } tracer;
+  struct {
+    telemetry::CounterMetric requests = {
+        "trace_api.requests", "tracers", {}, true};
+
+    telemetry::CounterMetric responses_1xx = {
+        "trace_api.responses", "tracers", {"status_code:1xx"}, true};
+    telemetry::CounterMetric responses_2xx = {
+        "trace_api.responses", "tracers", {"status_code:2xx"}, true};
+    telemetry::CounterMetric responses_3xx = {
+        "trace_api.responses", "tracers", {"status_code:3xx"}, true};
+    telemetry::CounterMetric responses_4xx = {
+        "trace_api.responses", "tracers", {"status_code:4xx"}, true};
+    telemetry::CounterMetric responses_5xx = {
+        "trace_api.responses", "tracers", {"status_code:5xx"}, true};
+
+    telemetry::CounterMetric errors_timeout = {
+        "trace_api.errors", "tracers", {"type:timeout"}, true};
+    telemetry::CounterMetric errors_network = {
+        "trace_api.errors", "tracers", {"type:network"}, true};
+    telemetry::CounterMetric errors_status_code = {
+        "trace_api.errors", "tracers", {"type:status_code"}, true};
+
+  } trace_api;
 };
 
 }  // namespace telemetry
