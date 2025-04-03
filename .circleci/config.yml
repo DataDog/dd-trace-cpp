@@ -110,7 +110,7 @@ jobs:
     - run:
         name: Install dependencies
         command: |
-          choco install -y cmake --version=3.31.6 --installargs 'ADD_CMAKE_TO_PATH=System'
+          choco install -y cmake --version=3.31.6 --accept-license --installargs 'ADD_CMAKE_TO_PATH=System'
           choco install -y ninja
     - run: 
         name: Building
