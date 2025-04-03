@@ -70,7 +70,8 @@ TracerTelemetry::TracerTelemetry(
       host_info_(get_host_info()),
       tracer_signature_(tracer_signature),
       integration_name_(integration_name),
-      integration_version_(integration_version) {
+      integration_version_(integration_version),
+      user_metrics_(user_metrics) {
   if (enabled_) {
     // Register all the metrics that we're tracking by adding them to the
     // metrics_snapshots_ container. This allows for simpler iteration logic
@@ -78,7 +79,7 @@ TracerTelemetry::TracerTelemetry(
     for (auto& m : internal_metrics) {
       metrics_snapshots_.emplace_back(m, MetricSnapshot{});
     }
-    for (auto& m : user_metrics) {
+    for (auto& m : user_metrics_) {
       metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
     }
   }
