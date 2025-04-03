@@ -18,10 +18,10 @@ Overload(Ts...) -> Overload<Ts...>;
 
 }  // namespace details
 
-/// TODO
 using NoopTelemetry = std::monostate;
 
-/// TODO
+/// `TelemetryProxy` holds either the real implementation or a no-op
+/// implementation.
 using TelemetryProxy = std::variant<NoopTelemetry, Telemetry>;
 
 // NOTE(@dmehala): until metrics handling is improved.
@@ -75,7 +75,7 @@ void send_configuration_change() {
   std::visit(
       details::Overload{
           [&](Telemetry& telemetry) { telemetry.send_configuration_change(); },
-          [](auto&&) {},
+          [](NoopTelemetry) {},
       },
       instance());
 }
@@ -86,7 +86,7 @@ void capture_configuration_change(
                  [&](Telemetry& telemetry) {
                    telemetry.capture_configuration_change(new_configuration);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -103,7 +103,7 @@ DefaultMetrics& metrics() {
 void report_warning_log(std::string message) {
   std::visit(details::Overload{
                  [&](Telemetry& telemetry) { telemetry.log_warning(message); },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -111,7 +111,7 @@ void report_warning_log(std::string message) {
 void report_error_log(std::string message) {
   std::visit(details::Overload{
                  [&](Telemetry& telemetry) { telemetry.log_error(message); },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
