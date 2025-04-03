@@ -59,61 +59,6 @@ class TracerTelemetry {
   uint64_t seq_id_ = 0;
   // Track sequence id per configuration field
   std::unordered_map<ConfigName, std::size_t> config_seq_ids;
-  // This structure contains all the metrics that are exposed by tracer
-  // telemetry.
-  struct {
-    struct {
-      telemetry::CounterMetric spans_created = {
-          "spans_created", "tracers", {}, true};
-      telemetry::CounterMetric spans_finished = {
-          "spans_finished", "tracers", {}, true};
-
-      telemetry::CounterMetric trace_segments_created_new = {
-          "trace_segments_created", "tracers", {"new_continued:new"}, true};
-      telemetry::CounterMetric trace_segments_created_continued = {
-          "trace_segments_created",
-          "tracers",
-          {"new_continued:continued"},
-          true};
-      telemetry::CounterMetric trace_segments_closed = {
-          "trace_segments_closed", "tracers", {}, true};
-      telemetry::CounterMetric baggage_items_exceeded = {
-          "context_header.truncated",
-          "tracers",
-          {{"truncation_reason:baggage_item_count_exceeded"}},
-          true,
-      };
-      telemetry::CounterMetric baggage_bytes_exceeded = {
-          "context_header.truncated",
-          "tracers",
-          {{"truncation_reason:baggage_byte_count_exceeded"}},
-          true,
-      };
-    } tracer;
-    struct {
-      telemetry::CounterMetric requests = {
-          "trace_api.requests", "tracers", {}, true};
-
-      telemetry::CounterMetric responses_1xx = {
-          "trace_api.responses", "tracers", {"status_code:1xx"}, true};
-      telemetry::CounterMetric responses_2xx = {
-          "trace_api.responses", "tracers", {"status_code:2xx"}, true};
-      telemetry::CounterMetric responses_3xx = {
-          "trace_api.responses", "tracers", {"status_code:3xx"}, true};
-      telemetry::CounterMetric responses_4xx = {
-          "trace_api.responses", "tracers", {"status_code:4xx"}, true};
-      telemetry::CounterMetric responses_5xx = {
-          "trace_api.responses", "tracers", {"status_code:5xx"}, true};
-
-      telemetry::CounterMetric errors_timeout = {
-          "trace_api.errors", "tracers", {"type:timeout"}, true};
-      telemetry::CounterMetric errors_network = {
-          "trace_api.errors", "tracers", {"type:network"}, true};
-      telemetry::CounterMetric errors_status_code = {
-          "trace_api.errors", "tracers", {"type:status_code"}, true};
-
-    } trace_api;
-  } metrics_;
   // Each metric has an associated MetricSnapshot that contains the data points,
   // represented as a timestamp and the value of that metric.
   using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
@@ -141,13 +86,12 @@ class TracerTelemetry {
       const TracerSignature& tracer_signature,
       const std::string& integration_name,
       const std::string& integration_version,
+      const std::vector<std::reference_wrapper<telemetry::Metric>>&
+          internal_metrics,
       const std::vector<std::shared_ptr<telemetry::Metric>>& user_metrics =
           std::vector<std::shared_ptr<telemetry::Metric>>{});
   inline bool enabled() { return enabled_; }
   inline bool debug() { return debug_; }
-  // Provides access to the telemetry metrics for updating the values.
-  // This value should not be stored.
-  auto& metrics() { return metrics_; }
   // Constructs an `app-started` message using information provided when
   // constructed and the tracer_config value passed in.
   std::string app_started(

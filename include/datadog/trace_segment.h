@@ -40,6 +40,9 @@
 #include "sampling_priority.h"
 
 namespace datadog {
+namespace telemetry {
+class Telemetry;
+}
 namespace tracing {
 
 class Collector;
@@ -52,14 +55,13 @@ struct SpanDefaults;
 class SpanSampler;
 class TraceSampler;
 class ConfigManager;
-class TracerTelemetry;
 
 class TraceSegment {
   mutable std::mutex mutex_;
 
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
-  std::shared_ptr<TracerTelemetry> tracer_telemetry_;
+  std::shared_ptr<telemetry::Telemetry> telemetry_;
   std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
 
@@ -82,7 +84,7 @@ class TraceSegment {
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
                const std::shared_ptr<Collector>& collector,
-               const std::shared_ptr<TracerTelemetry>& tracer_telemetry,
+               const std::shared_ptr<telemetry::Telemetry>& telemetry,
                const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,

@@ -14,6 +14,7 @@
 #include "parse_util.h"
 #include "platform_util.h"
 #include "string_util.h"
+#include "threaded_event_scheduler.h"
 
 namespace datadog {
 namespace tracing {
@@ -397,14 +398,14 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     final_config.runtime_id = user_config.runtime_id;
   }
 
+  auto agent_finalized =
+      finalize_config(user_config.agent, final_config.logger, clock);
+  if (auto *error = agent_finalized.if_error()) {
+    return std::move(*error);
+  }
   if (!user_config.collector) {
-    auto finalized =
-        finalize_config(user_config.agent, final_config.logger, clock);
-    if (auto *error = finalized.if_error()) {
-      return std::move(*error);
-    }
-    final_config.collector = *finalized;
-    final_config.metadata.merge(finalized->metadata);
+    final_config.collector = *agent_finalized;
+    final_config.metadata.merge(agent_finalized->metadata);
   } else {
     final_config.collector = user_config.collector;
   }
@@ -430,6 +431,17 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   } else {
     return std::move(telemetry_final_config.error());
   }
+
+  // agent url
+  final_config.agent_url = agent_finalized->url;
+
+  if (user_config.event_scheduler == nullptr) {
+    final_config.event_scheduler = std::make_shared<ThreadedEventScheduler>();
+  } else {
+    final_config.event_scheduler = user_config.event_scheduler;
+  }
+
+  final_config.http_client = agent_finalized->http_client;
 
   return final_config;
 }

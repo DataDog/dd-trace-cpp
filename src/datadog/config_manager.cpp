@@ -123,8 +123,9 @@ ConfigManager::Update parse_dynamic_config(const nlohmann::json& j) {
 
 namespace rc = datadog::remote_config;
 
-ConfigManager::ConfigManager(const FinalizedTracerConfig& config,
-                             const std::shared_ptr<TracerTelemetry>& telemetry)
+ConfigManager::ConfigManager(
+    const FinalizedTracerConfig& config,
+    const std::shared_ptr<telemetry::Telemetry>& telemetry)
     : clock_(config.clock),
       default_metadata_(config.metadata),
       trace_sampler_(

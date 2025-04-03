@@ -156,11 +156,18 @@ struct TracerConfig {
   // programmatic value in Datadog's Active Configuration, whereas it is
   // actually the default value for the integration.
   Optional<bool> report_service_as_default;
+
   /// The maximum number of baggage items that can be stored or propagated.
   Optional<std::size_t> baggage_max_items;
+
   /// The maximum amount of bytes allowed to be written during tracing context
   /// injection.
   Optional<std::size_t> baggage_max_bytes;
+
+  /// The event scheduler used for scheduling recurring tasks.
+  /// By default, it uses `ThreadedEventScheduler`, which runs tasks on a
+  /// separate thread.
+  std::shared_ptr<EventScheduler> event_scheduler;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -197,6 +204,9 @@ class FinalizedTracerConfig final {
   bool report_traces;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
   Baggage::Options baggage_opts;
+  HTTPClient::URL agent_url;
+  std::shared_ptr<EventScheduler> event_scheduler;
+  std::shared_ptr<HTTPClient> http_client;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

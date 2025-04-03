@@ -61,6 +61,8 @@ TracerTelemetry::TracerTelemetry(
     bool enabled, const Clock& clock, const std::shared_ptr<Logger>& logger,
     const TracerSignature& tracer_signature,
     const std::string& integration_name, const std::string& integration_version,
+    const std::vector<std::reference_wrapper<telemetry::Metric>>&
+        internal_metrics,
     const std::vector<std::shared_ptr<telemetry::Metric>>& user_metrics)
     : enabled_(enabled),
       clock_(clock),
@@ -74,35 +76,9 @@ TracerTelemetry::TracerTelemetry(
     // Register all the metrics that we're tracking by adding them to the
     // metrics_snapshots_ container. This allows for simpler iteration logic
     // when using the values in `generate-metrics` messages.
-    metrics_snapshots_.emplace_back(metrics_.tracer.spans_created,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.tracer.spans_finished,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_created_new,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(
-        metrics_.tracer.trace_segments_created_continued, MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_closed,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.requests,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_1xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_2xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_3xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_4xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_5xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_timeout,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_network,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
-                                    MetricSnapshot{});
-
+    for (auto& m : internal_metrics) {
+      metrics_snapshots_.emplace_back(m, MetricSnapshot{});
+    }
     for (auto& m : user_metrics_) {
       metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
     }

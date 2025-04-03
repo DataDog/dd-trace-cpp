@@ -9,12 +9,12 @@
 #include <datadog/optional.h>
 #include <datadog/remote_config/listener.h>
 #include <datadog/span_defaults.h>
+#include <datadog/telemetry/telemetry.h>
 #include <datadog/tracer_config.h>
 
 #include <mutex>
 
 #include "json.hpp"
-#include "tracer_telemetry.h"
 
 namespace datadog {
 namespace tracing {
@@ -76,7 +76,7 @@ class ConfigManager : public remote_config::Listener {
   DynamicConfig<std::shared_ptr<const SpanDefaults>> span_defaults_;
   DynamicConfig<bool> report_traces_;
 
-  std::shared_ptr<TracerTelemetry> telemetry_;
+  std::shared_ptr<telemetry::Telemetry> telemetry_;
 
  private:
   template <typename T>
@@ -85,7 +85,7 @@ class ConfigManager : public remote_config::Listener {
 
  public:
   ConfigManager(const FinalizedTracerConfig& config,
-                const std::shared_ptr<TracerTelemetry>& telemetry);
+                const std::shared_ptr<telemetry::Telemetry>& telemetry);
   ~ConfigManager() override{};
 
   remote_config::Products get_products() override;

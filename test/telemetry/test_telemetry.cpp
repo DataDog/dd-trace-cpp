@@ -2,17 +2,21 @@
 // activity in other parts of the tracer implementation, and construct messages
 // that are sent to the datadog agent.
 
+#include <datadog/clock.h>
 #include <datadog/span_defaults.h>
-#include <datadog/tracer_telemetry.h>
+#include <datadog/telemetry/telemetry.h>
 
 #include <datadog/json.hpp>
 #include <unordered_set>
 
 #include "datadog/runtime_id.h"
+#include "mocks/event_schedulers.h"
+#include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
 using namespace datadog::tracing;
+using namespace datadog::telemetry;
 
 namespace {
 bool is_valid_telemetry_payload(const nlohmann::json& json) {
@@ -31,12 +35,27 @@ bool is_valid_telemetry_payload(const nlohmann::json& json) {
 
 TEST_CASE("Tracer telemetry", "[telemetry]") {
   const std::time_t mock_time = 1672484400;
-  const Clock clock = [mock_time]() {
+  const Clock clock = [&mock_time]() {
     TimePoint result;
     result.wall = std::chrono::system_clock::from_time_t(mock_time);
     return result;
   };
+
   auto logger = std::make_shared<MockLogger>();
+  auto client = std::make_shared<MockHTTPClient>();
+  auto scheduler = std::make_shared<MockEventScheduler>();
+
+  auto trigger_heartbeat = [&]() {
+    // White box testing. The current implementation send a heartbeat every 60s
+    // and the task is executed every 10s.
+    // TODO(@dmehala): should depends on the config
+    scheduler->event_callback();
+    scheduler->event_callback();
+    scheduler->event_callback();
+    scheduler->event_callback();
+    scheduler->event_callback();
+    scheduler->event_callback();
+  };
 
   const TracerSignature tracer_signature{
       /* runtime_id = */ RuntimeID::generate(),
@@ -45,16 +64,26 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
   const std::string ignore{""};
 
-  TracerTelemetry tracer_telemetry{true,   clock, logger, tracer_signature,
-                                   ignore, ignore};
+  auto url = HTTPClient::URL::parse("http://localhost:8000");
+  Telemetry telemetry{*finalize_config(),
+                      logger,
+                      client,
+                      std::vector<std::shared_ptr<Metric>>{},
+                      *scheduler,
+                      *url,
+                      clock};
 
   SECTION("generates app-started message") {
     SECTION("Without a defined integration") {
-      auto app_started_message = tracer_telemetry.app_started({});
-      auto app_started = nlohmann::json::parse(app_started_message);
+      /// By default the integration is `datadog` with the tracer version.
+      /// TODO: remove the default because these datadog are already part of the
+      /// request header.
+      telemetry.send_app_started({});
+
+      auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
       REQUIRE(app_started["request_type"] == "message-batch");
-      REQUIRE(app_started["payload"].size() == 1);
+      REQUIRE(app_started["payload"].size() == 2);
 
       auto& app_started_payload = app_started["payload"][0];
       CHECK(app_started_payload["request_type"] == "app-started");
@@ -62,10 +91,20 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
     }
 
     SECTION("With an integration") {
-      TracerTelemetry tracer_telemetry2{
-          true, clock, logger, tracer_signature, "nginx", "1.25.2"};
-      auto app_started_message = tracer_telemetry2.app_started({});
-      auto app_started = nlohmann::json::parse(app_started_message);
+      Configuration cfg;
+      cfg.integration_name = "nginx";
+      cfg.integration_version = "1.25.2";
+      Telemetry telemetry2{*finalize_config(cfg),
+                           logger,
+                           client,
+                           std::vector<std::shared_ptr<Metric>>{},
+                           *scheduler,
+                           *url};
+
+      client->clear();
+      telemetry2.send_app_started({});
+
+      auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
       REQUIRE(app_started["request_type"] == "message-batch");
       REQUIRE(app_started["payload"].size() == 2);
@@ -84,12 +123,14 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
            ConfigMetadata(ConfigName::SERVICE_NAME, "foo",
                           ConfigMetadata::Origin::CODE)}};
 
-      auto app_started_message = tracer_telemetry.app_started(configuration);
-      auto app_started = nlohmann::json::parse(app_started_message);
+      client->clear();
+      telemetry.send_app_started(configuration);
+
+      auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
       REQUIRE(app_started["request_type"] == "message-batch");
       REQUIRE(app_started["payload"].is_array());
-      REQUIRE(app_started["payload"].size() == 1);
+      REQUIRE(app_started["payload"].size() == 2);
 
       auto& app_started_payload = app_started["payload"][0];
       CHECK(app_started_payload["request_type"] == "app-started");
@@ -111,8 +152,10 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
       SECTION("generates a configuration change event") {
         SECTION("empty configuration do not generate a valid payload") {
-          auto config_update = tracer_telemetry.configuration_change();
-          CHECK(!config_update);
+          client->clear();
+          telemetry.send_configuration_change();
+
+          CHECK(client->request_body.empty());
         }
 
         SECTION("valid configurations update") {
@@ -122,11 +165,14 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
               {ConfigName::REPORT_TRACES, "", ConfigMetadata::Origin::DEFAULT,
                Error{Error::Code::OTHER, "empty field"}}};
 
-          tracer_telemetry.capture_configuration_change(new_config);
-          auto updates = tracer_telemetry.configuration_change();
-          REQUIRE(updates);
+          client->clear();
+          telemetry.capture_configuration_change(new_config);
+          telemetry.send_configuration_change();
+
+          auto updates = client->request_body;
+          REQUIRE(!updates.empty());
           auto config_change_message =
-              nlohmann::json::parse(*updates, nullptr, false);
+              nlohmann::json::parse(updates, nullptr, false);
           REQUIRE(config_change_message.is_discarded() == false);
           REQUIRE(is_valid_telemetry_payload(config_change_message) == true);
 
@@ -171,14 +217,19 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
           }
 
           // No update -> no configuration update
-          CHECK(tracer_telemetry.configuration_change() == nullopt);
+          client->clear();
+          telemetry.send_configuration_change();
+          CHECK(client->request_body.empty());
         }
       }
     }
   }
 
   SECTION("generates a heartbeat message") {
-    auto heartbeat_message = tracer_telemetry.heartbeat_and_telemetry();
+    client->clear();
+    trigger_heartbeat();
+
+    auto heartbeat_message = client->request_body;
     auto message_batch = nlohmann::json::parse(heartbeat_message);
     REQUIRE(is_valid_telemetry_payload(message_batch) == true);
     REQUIRE(message_batch["payload"].size() == 1);
@@ -187,16 +238,13 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
   }
 
   SECTION("captures metrics and sends generate-metrics payload") {
-    tracer_telemetry.metrics().tracer.trace_segments_created_new.inc();
-    REQUIRE(
-        tracer_telemetry.metrics().tracer.trace_segments_created_new.value() ==
-        1);
-    tracer_telemetry.capture_metrics();
-    REQUIRE(
-        tracer_telemetry.metrics().tracer.trace_segments_created_new.value() ==
-        0);
-    auto heartbeat_and_telemetry_message =
-        tracer_telemetry.heartbeat_and_telemetry();
+    telemetry.metrics().tracer.trace_segments_created_new.inc();
+    REQUIRE(telemetry.metrics().tracer.trace_segments_created_new.value() == 1);
+    trigger_heartbeat();
+
+    REQUIRE(telemetry.metrics().tracer.trace_segments_created_new.value() == 0);
+
+    auto heartbeat_and_telemetry_message = client->request_body;
     auto message_batch = nlohmann::json::parse(heartbeat_and_telemetry_message);
     REQUIRE(is_valid_telemetry_payload(message_batch) == true);
     REQUIRE(message_batch["payload"].size() == 2);
@@ -217,8 +265,10 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
   }
 
   SECTION("generates an app-closing event") {
-    auto app_closing_message = tracer_telemetry.app_closing();
-    auto message_batch = nlohmann::json::parse(app_closing_message);
+    client->clear();
+    telemetry.send_app_closing();
+
+    auto message_batch = nlohmann::json::parse(client->request_body);
     REQUIRE(is_valid_telemetry_payload(message_batch) == true);
     REQUIRE(message_batch["payload"].size() == 1);
     auto heartbeat = message_batch["payload"][0];
