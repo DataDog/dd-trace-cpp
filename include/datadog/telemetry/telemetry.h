@@ -87,4 +87,10 @@ void report_warning_log(std::string message);
 /// @param message The error message.
 void report_error_log(std::string message);
 
+/// Report internal error message to Datadog.
+///
+/// @param message The error message.
+/// @param stacktrace Stacktrace leading to the error.
+void report_error_log(std::string message, std::string stacktrace);
+
 }  // namespace datadog::telemetry

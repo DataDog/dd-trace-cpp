@@ -111,8 +111,13 @@ class TracerTelemetry {
   // Construct an `app-client-configuration-change` message.
   Optional<std::string> configuration_change();
 
-  inline void log(std::string message, telemetry::LogLevel level) {
-    logs_.emplace_back(telemetry::LogMessage{std::move(message), level});
+  inline void log(std::string message, telemetry::LogLevel level,
+                  Optional<std::string> stacktrace = nullopt) {
+    auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+                         clock_().wall.time_since_epoch())
+                         .count();
+    logs_.emplace_back(telemetry::LogMessage{std::move(message), level,
+                                             stacktrace, timestamp});
   }
 };
 
