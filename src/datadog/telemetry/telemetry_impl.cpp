@@ -114,7 +114,7 @@ Telemetry::~Telemetry() {
     tracer_telemetry_->capture_metrics();
     // The app-closing message is bundled with a message containing the
     // final metric values.
-    /*send_app_closing();*/
+    send_app_closing();
     http_client_->drain(clock_().tick + 1s);
   }
 }
@@ -234,7 +234,7 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
   auto post_result = http_client_->post(
       telemetry_endpoint_, set_telemetry_headers, std::move(payload),
       telemetry_on_response_, telemetry_on_error_,
-      tracing::default_clock().tick + 5s);
+      tracing::default_clock().tick + 1s);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(
         error->with_prefix("Unexpected error submitting telemetry event: "));
