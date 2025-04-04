@@ -111,10 +111,10 @@ void Telemetry::schedule_tasks() {
 Telemetry::~Telemetry() {
   if (!tasks_.empty()) {
     cancel_tasks(tasks_);
-    /*tracer_telemetry_->capture_metrics();*/
+    tracer_telemetry_->capture_metrics();
     // The app-closing message is bundled with a message containing the
     // final metric values.
-    send_app_closing();
+    /*send_app_closing();*/
     http_client_->drain(clock_().tick + 1s);
   }
 }
