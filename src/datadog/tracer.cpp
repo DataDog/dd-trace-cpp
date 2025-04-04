@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <memory>
 
 #include "config_manager.h"
 #include "datadog_agent.h"
@@ -28,6 +29,12 @@
 #include "tags.h"
 #include "trace_sampler.h"
 #include "w3c_propagation.h"
+
+const void* elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
+thread_local std::unique_ptr<datadog::tracing::TLSStorage> tls_info_holder =
+    std::make_unique<datadog::tracing::TLSStorage>();
+thread_local struct datadog::tracing::TLSStorage*
+    elastic_apm_profiling_correlation_tls_v1 = tls_info_holder.get();
 
 namespace datadog {
 namespace tracing {
@@ -94,6 +101,11 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     }
   }
 
+  // TODO: change the way this is done to handle programs that fork.
+  // TODO: add a flag to disable this by default.
+  elastic_apm_profiling_correlation_process_storage_v1 =
+      *signature_.generate_process_correlation_storage();
+
   if (config.log_on_startup) {
     logger_->log_startup([configuration = this->config()](std::ostream& log) {
       log << "DATADOG TRACER CONFIGURATION - " << configuration;
@@ -101,6 +113,22 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   }
 
   store_config();
+}
+
+void Tracer::correlate(const Span& span) {
+  struct TLSStorage* tls_data = elastic_apm_profiling_correlation_tls_v1;
+  tls_data->valid = 0;
+
+  tls_data->layout_minor_version = 1;
+  tls_data->trace_present = 1;  // We are in a span so no errors
+  tls_data->trace_flags = 0;    // IDK
+  auto trace_id = span.trace_id();
+  tls_data->trace_id_low = trace_id.low;
+  tls_data->trace_id_high = trace_id.high;
+  tls_data->span_id = span.id();
+  tls_data->transaction_id = span.trace_segment().local_root_id();
+
+  tls_data->valid = 1;
 }
 
 std::string Tracer::config() const {
@@ -193,6 +221,7 @@ Span Tracer::create_span(const SpanConfig& config) {
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
+  correlate(span);
   return span;
 }
 
@@ -395,6 +424,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
+  correlate(span);
   return span;
 }
 
