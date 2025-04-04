@@ -114,8 +114,8 @@ Telemetry::~Telemetry() {
     /*tracer_telemetry_->capture_metrics();*/
     // The app-closing message is bundled with a message containing the
     // final metric values.
-    /*send_app_closing();*/
-    /*http_client_->drain(clock_().tick + 1s);*/
+    send_app_closing();
+    http_client_->drain(clock_().tick + 1s);
   }
 }
 
