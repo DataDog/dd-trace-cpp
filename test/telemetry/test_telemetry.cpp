@@ -10,13 +10,13 @@
 
 #include "datadog/runtime_id.h"
 #include "datadog/telemetry/telemetry_impl.h"
-#include "mocks/event_schedulers.h"
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
 using namespace datadog::tracing;
 using namespace datadog::telemetry;
+using namespace std::chrono_literals;
 
 namespace {
 bool is_valid_telemetry_payload(const nlohmann::json& json) {
@@ -31,6 +31,43 @@ bool is_valid_telemetry_payload(const nlohmann::json& json) {
          json.contains("/host"_json_pointer);
 }
 
+struct FakeEventScehduler : public EventScheduler {
+  size_t count_tasks = 0;
+  std::function<void()> heartbeat_callback = nullptr;
+  std::function<void()> metrics_callback = nullptr;
+  Optional<std::chrono::steady_clock::duration> heartbeat_interval;
+  Optional<std::chrono::steady_clock::duration> metrics_interval;
+  bool cancelled = false;
+
+  // NOTE: White box testing. This is a limitation of the event scheduler API.
+  Cancel schedule_recurring_event(std::chrono::steady_clock::duration interval,
+                                  std::function<void()> callback) override {
+    if (count_tasks == 0) {
+      heartbeat_callback = callback;
+      heartbeat_interval = interval;
+    } else if (count_tasks == 1) {
+      metrics_callback = callback;
+      metrics_interval = interval;
+    }
+    count_tasks++;
+    return [this]() { cancelled = true; };
+  }
+
+  void trigger_heartbeat() {
+    assert(heartbeat_callback != nullptr);
+    heartbeat_callback();
+  }
+
+  void trigger_metrics_capture() {
+    assert(metrics_callback != nullptr);
+    metrics_callback();
+  }
+
+  std::string config() const override {
+    return nlohmann::json::object({{"type", "FakeEventScheduler"}}).dump();
+  }
+};
+
 }  // namespace
 
 TEST_CASE("Tracer telemetry", "[telemetry]") {
@@ -43,26 +80,12 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
   auto logger = std::make_shared<MockLogger>();
   auto client = std::make_shared<MockHTTPClient>();
-  auto scheduler = std::make_shared<MockEventScheduler>();
-
-  auto trigger_heartbeat = [&]() {
-    // White box testing. The current implementation send a heartbeat every 60s
-    // and the task is executed every 10s.
-    // TODO(@dmehala): should depends on the config
-    scheduler->event_callback();
-    scheduler->event_callback();
-    scheduler->event_callback();
-    scheduler->event_callback();
-    scheduler->event_callback();
-    scheduler->event_callback();
-  };
+  auto scheduler = std::make_shared<FakeEventScehduler>();
 
   const TracerSignature tracer_signature{
       /* runtime_id = */ RuntimeID::generate(),
       /* service = */ "testsvc",
       /* environment = */ "test"};
-
-  const std::string ignore{""};
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
   Telemetry telemetry{*finalize_config(),
@@ -227,7 +250,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
   SECTION("generates a heartbeat message") {
     client->clear();
-    trigger_heartbeat();
+    scheduler->trigger_heartbeat();
 
     auto heartbeat_message = client->request_body;
     auto message_batch = nlohmann::json::parse(heartbeat_message);
@@ -240,7 +263,8 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
   SECTION("captures metrics and sends generate-metrics payload") {
     telemetry.metrics().tracer.trace_segments_created_new.inc();
     REQUIRE(telemetry.metrics().tracer.trace_segments_created_new.value() == 1);
-    trigger_heartbeat();
+    scheduler->trigger_metrics_capture();
+    scheduler->trigger_heartbeat();
 
     REQUIRE(telemetry.metrics().tracer.trace_segments_created_new.value() == 0);
 
@@ -322,7 +346,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
       client->clear();
       test_case.apply(telemetry, test_case.input, test_case.stacktrace);
-      trigger_heartbeat();
+      scheduler->trigger_heartbeat();
 
       auto message_batch = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch));
@@ -343,5 +367,74 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
         CHECK(logs_payload[0].contains("stack_trace") == false);
       }
     }
+  }
+}
+
+TEST_CASE("Tracer telemetry configuration", "[telemetry]") {
+  // Cases:
+  //  - when `report_metrics` is set to false. No metrics are reported.
+  //  - when `report_logs` is set to false. No logs are reported.
+  //  - respects interval defined.
+  //  - telemetry disabled doesn't send anything.
+
+  auto logger = std::make_shared<MockLogger>();
+  auto client = std::make_shared<MockHTTPClient>();
+  auto scheduler = std::make_shared<FakeEventScehduler>();
+  std::vector<std::shared_ptr<Metric>> metrics;
+
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
+
+  auto url = HTTPClient::URL::parse("http://localhost:8000");
+
+  SECTION("disabling metrics reporting do not collect metrics") {
+    Configuration cfg;
+    cfg.report_metrics = false;
+
+    auto final_cfg = finalize_config(cfg);
+    REQUIRE(final_cfg);
+
+    Telemetry telemetry(*final_cfg, logger, client, metrics, scheduler, *url);
+    CHECK(scheduler->metrics_callback == nullptr);
+    CHECK(scheduler->metrics_interval == nullopt);
+  }
+
+  SECTION("intervals are respected") {
+    Configuration cfg;
+    cfg.metrics_interval_seconds = .5;
+    cfg.heartbeat_interval_seconds = 30;
+
+    auto final_cfg = finalize_config(cfg);
+    REQUIRE(final_cfg);
+
+    Telemetry telemetry(*final_cfg, logger, client, metrics, scheduler, *url);
+    CHECK(scheduler->metrics_callback != nullptr);
+    CHECK(scheduler->metrics_interval == 500ms);
+
+    CHECK(scheduler->heartbeat_callback != nullptr);
+    CHECK(scheduler->metrics_interval != 30s);
+  }
+
+  SECTION("disabling logs reporting do not collect logs") {
+    client->clear();
+
+    Configuration cfg;
+    cfg.report_logs = false;
+
+    auto final_cfg = finalize_config(cfg);
+    REQUIRE(final_cfg);
+
+    Telemetry telemetry(*final_cfg, logger, client, metrics, scheduler, *url);
+    telemetry.log_error("error");
+
+    // NOTE(@dmehala): logs are sent with an heartbeat.
+    scheduler->trigger_heartbeat();
+
+    auto message_batch = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(message_batch));
+    REQUIRE(message_batch["payload"].size() == 1);
+    CHECK(message_batch["payload"][0]["request_type"] == "app-heartbeat");
   }
 }
