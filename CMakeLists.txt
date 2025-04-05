@@ -145,7 +145,6 @@ target_sources(dd_trace_cpp-objects
     src/datadog/tag_propagation.cpp
     src/datadog/threaded_event_scheduler.cpp
     src/datadog/tracer_config.cpp
-    src/datadog/tracer_telemetry.cpp
     src/datadog/tracer.cpp
     src/datadog/trace_id.cpp
     src/datadog/trace_sampler_config.cpp
