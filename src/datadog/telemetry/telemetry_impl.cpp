@@ -163,13 +163,15 @@ Telemetry::Telemetry(FinalizedConfiguration config,
         "Error occurred during HTTP request for telemetry: "));
   };
 
+  send_telemetry("app-started", app_started());
   schedule_tasks();
 }
 
 void Telemetry::schedule_tasks() {
   tasks_.emplace_back(scheduler_->schedule_recurring_event(
-      config_.heartbeat_interval,
-      [this]() { send_heartbeat_and_telemetry(); }));
+      config_.heartbeat_interval, [this]() {
+        send_telemetry("app-heartbeat", heartbeat_and_telemetry());
+      }));
 
   if (config_.report_metrics) {
     tasks_.emplace_back(scheduler_->schedule_recurring_event(
@@ -183,7 +185,7 @@ Telemetry::~Telemetry() {
     capture_metrics();
     // The app-closing message is bundled with a message containing the
     // final metric values.
-    send_app_closing();
+    send_telemetry("app-closing", app_closing());
     http_client_->drain(clock_().tick + 1s);
   }
 }
@@ -239,7 +241,7 @@ Telemetry::Telemetry(Telemetry&& rhs)
     metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
   }
 
-  cancel_tasks(rhs.tasks_);
+  cancel_tasks(tasks_);
   schedule_tasks();
 }
 
@@ -302,8 +304,6 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
   return *this;
 }
 
-// TODO(@dmehala): Move `report_logs` check in the serialization once
-// `TracerTelemetry` will be removed.
 void Telemetry::log_error(std::string message) {
   if (!config_.report_logs) return;
   log(std::move(message), LogLevel::ERROR);
@@ -340,7 +340,6 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
     }
   };
 
-  // TODO(@dmehala): make `clock::instance()` a singleton
   auto post_result = http_client_->post(
       telemetry_endpoint_, set_telemetry_headers, std::move(payload),
       telemetry_on_response_, telemetry_on_error_,
@@ -351,24 +350,24 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
   }
 }
 
-void Telemetry::send_app_started(
-    const std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>&
-        config_metadata) {
-  send_telemetry("app-started", app_started(config_metadata));
-}
-
-void Telemetry::send_app_closing() {
-  send_telemetry("app-closing", app_closing());
-}
-
-void Telemetry::send_heartbeat_and_telemetry() {
-  send_telemetry("app-heartbeat", heartbeat_and_telemetry());
-}
-
 void Telemetry::send_configuration_change() {
-  if (auto payload = configuration_change()) {
-    send_telemetry("app-client-configuration-change", *payload);
+  if (configuration_snapshot_.empty()) return;
+
+  std::vector<ConfigMetadata> current_configuration;
+  std::swap(current_configuration, configuration_snapshot_);
+
+  auto configuration_json = nlohmann::json::array();
+  for (const auto& config_metadata : current_configuration) {
+    configuration_json.emplace_back(
+        generate_configuration_field(config_metadata));
   }
+
+  auto telemetry_body =
+      generate_telemetry_body("app-client-configuration-change");
+  telemetry_body["payload"] =
+      nlohmann::json{{"configuration", configuration_json}};
+
+  send_telemetry("app-client-configuration-change", telemetry_body.dump());
 }
 
 std::string Telemetry::heartbeat_and_telemetry() {
@@ -523,70 +522,100 @@ std::string Telemetry::app_closing() {
   return message_batch_payload;
 }
 
-std::string Telemetry::app_started(
-    const std::unordered_map<ConfigName, ConfigMetadata>& configurations) {
+std::string Telemetry::app_started() {
   auto configuration_json = nlohmann::json::array();
-  for (const auto& [_, config_metadata] : configurations) {
-    // if (config_metadata.value.empty()) continue;
+  auto product_json = nlohmann::json::object();
 
-    configuration_json.emplace_back(
-        generate_configuration_field(config_metadata));
+  for (const auto& product : config_.products) {
+    auto& configurations = product.configurations;
+    for (const auto& [_, config_metadata] : configurations) {
+      // if (config_metadata.value.empty()) continue;
+
+      configuration_json.emplace_back(
+          generate_configuration_field(config_metadata));
+    }
+
+    /// NOTE(@dmehala): Telemetry API is tightly related to APM tracing and
+    /// assumes telemetry event can only be generated from a tracer. The
+    /// assumption is that the tracing product is always enabled and there
+    /// is no need to declare it.
+    if (product.name == Product::Name::tracing) continue;
+
+    auto p = nlohmann::json{
+        {to_string(product.name),
+         nlohmann::json{
+             {"version", product.version},
+             {"enabled", product.enabled},
+         }},
+    };
+
+    if (product.error_code || product.error_message) {
+      auto p_error = nlohmann::json{};
+      if (product.error_code) {
+        p_error.emplace("code", *product.error_code);
+      }
+      if (product.error_message) {
+        p_error.emplace("message", *product.error_message);
+      }
+
+      p.emplace("error", std::move(p_error));
+    }
+
+    product_json.emplace(std::move(p));
   }
 
-  // clang-format off
   auto app_started_msg = nlohmann::json{
-    {"request_type", "app-started"},
-    {"payload", nlohmann::json{
-      {"configuration", configuration_json}
-    }}
+      {"request_type", "app-started"},
+      {
+          "payload",
+          nlohmann::json{
+              {"configuration", configuration_json},
+              {"products", product_json},
+          },
+      },
   };
 
+  if (config_.install_id || config_.install_time || config_.install_type) {
+    auto install_signature = nlohmann::json{};
+    if (config_.install_id) {
+      install_signature.emplace("install_id", *config_.install_id);
+    }
+    if (config_.install_type) {
+      install_signature.emplace("install_type", *config_.install_type);
+    }
+    if (config_.install_time) {
+      install_signature.emplace("install_time", *config_.install_time);
+    }
+
+    app_started_msg["payload"].emplace("install_signature",
+                                       std::move(install_signature));
+  }
+
   auto batch = generate_telemetry_body("message-batch");
-  batch["payload"] = nlohmann::json::array({
-    std::move(app_started_msg)
-  });
-  // clang-format on
+  batch["payload"] = nlohmann::json::array({std::move(app_started_msg)});
 
   if (!config_.integration_name.empty()) {
-    // clang-format off
     auto integration_msg = nlohmann::json{
-      {"request_type", "app-integrations-change"},
-      {"payload", nlohmann::json{
-        {"integrations", nlohmann::json::array({
-          nlohmann::json{
-            {"name", config_.integration_name},
-            {"version", config_.integration_version},
-            {"enabled", true}
-          }
-        })}
-      }}
+        {"request_type", "app-integrations-change"},
+        {
+            "payload",
+            nlohmann::json{
+                {
+                    "integrations",
+                    nlohmann::json::array({
+                        nlohmann::json{{"name", config_.integration_name},
+                                       {"version", config_.integration_version},
+                                       {"enabled", true}},
+                    }),
+                },
+            },
+        },
     };
-    // clang-format on
 
     batch["payload"].emplace_back(std::move(integration_msg));
   }
 
   return batch.dump();
-}
-
-Optional<std::string> Telemetry::configuration_change() {
-  if (configuration_snapshot_.empty()) return nullopt;
-
-  std::vector<ConfigMetadata> current_configuration;
-  std::swap(current_configuration, configuration_snapshot_);
-
-  auto configuration_json = nlohmann::json::array();
-  for (const auto& config_metadata : current_configuration) {
-    configuration_json.emplace_back(
-        generate_configuration_field(config_metadata));
-  }
-
-  auto telemetry_body =
-      generate_telemetry_body("app-client-configuration-change");
-  telemetry_body["payload"] =
-      nlohmann::json{{"configuration", configuration_json}};
-
-  return telemetry_body.dump();
 }
 
 nlohmann::json Telemetry::generate_telemetry_body(std::string request_type) {

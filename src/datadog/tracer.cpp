@@ -76,8 +76,6 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     auto agent = std::make_shared<DatadogAgent>(agent_config, config.logger,
                                                 signature_, rc_listeners);
     collector_ = agent;
-
-    telemetry::send_app_started(config.metadata);
   }
 
   for (const auto style : extraction_styles_) {
