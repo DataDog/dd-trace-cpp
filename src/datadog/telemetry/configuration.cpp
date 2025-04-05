@@ -122,6 +122,21 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
       pick(env_config->integration_version, user_config.integration_version,
            tracing::tracer_version);
 
+  // products
+  result.products = user_config.products;
+
+  if (auto install_id = lookup(environment::DD_INSTRUMENTATION_INSTALL_ID)) {
+    result.install_id = std::string(*install_id);
+  }
+  if (auto install_type =
+          lookup(environment::DD_INSTRUMENTATION_INSTALL_TYPE)) {
+    result.install_type = std::string(*install_type);
+  }
+  if (auto install_time =
+          lookup(environment::DD_INSTRUMENTATION_INSTALL_TIME)) {
+    result.install_time = std::string(*install_time);
+  }
+
   return result;
 }
 

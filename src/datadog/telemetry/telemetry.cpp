@@ -61,16 +61,6 @@ void init(FinalizedConfiguration configuration,
                       agent_url, clock});
 }
 
-void send_app_started(const std::unordered_map<tracing::ConfigName,
-                                               tracing::ConfigMetadata>& conf) {
-  std::visit(
-      details::Overload{
-          [&](Telemetry& telemetry) { telemetry.send_app_started(conf); },
-          [](NoopTelemetry) {},
-      },
-      instance());
-}
-
 void send_configuration_change() {
   std::visit(
       details::Overload{

@@ -6,7 +6,10 @@
 
 using namespace datadog::telemetry;
 
-TEST_CASE("Counter metrics", "[telemetry.metrics]") {
+#define TELEMETRY_METRICS_TEST(x) \
+  TEST_CASE(x, "[telemetry],[telemetry.metrics]")
+
+TELEMETRY_METRICS_TEST("Counter metrics") {
   CounterMetric metric = {
       "test.counter.metric", "test_scope", {"testing-testing:123"}, true};
 
@@ -18,7 +21,7 @@ TEST_CASE("Counter metrics", "[telemetry.metrics]") {
   REQUIRE(metric.value() == 0);
 }
 
-TEST_CASE("Gauge metrics", "[telemetry.metrics]") {
+TELEMETRY_METRICS_TEST("Gauge metrics") {
   GaugeMetric metric = {
       "test.gauge.metric", "test_scope", {"testing-testing:123"}, true};
   metric.set(40);
