@@ -90,21 +90,14 @@ class Telemetry final {
   /// @param message The warning message to log.
   void log_warning(std::string message);
 
-  void send_app_started(
-      const std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>&
-          config_metadata);
-
   void send_configuration_change();
 
   void capture_configuration_change(
       const std::vector<tracing::ConfigMetadata>& new_configuration);
 
-  void send_app_closing();
-
  private:
   void send_telemetry(tracing::StringView request_type, std::string payload);
 
-  void send_heartbeat_and_telemetry();
   void schedule_tasks();
 
   void capture_metrics();
@@ -120,9 +113,7 @@ class Telemetry final {
 
   // Constructs an `app-started` message using information provided when
   // constructed and the tracer_config value passed in.
-  std::string app_started(
-      const std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>&
-          configurations);
+  std::string app_started();
   // Constructs a messsage-batch containing `app-heartbeat`, and if metrics
   // have been modified, a `generate-metrics` message.
   std::string heartbeat_and_telemetry();

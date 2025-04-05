@@ -4,13 +4,13 @@
 #include "../common/environment.h"
 #include "../test.h"
 
-#define TELEMETRY_CONFIGURATION_TEST(x) \
-  TEST_CASE(x, "[telemetry.configuration]")
-
 namespace ddtest = datadog::test;
 
 using namespace datadog;
 using namespace std::literals;
+
+#define TELEMETRY_CONFIGURATION_TEST(x) \
+  TEST_CASE(x, "[telemetry],[telemetry.configuration]")
 
 TELEMETRY_CONFIGURATION_TEST("defaults") {
   const auto cfg = telemetry::finalize_config();
@@ -21,6 +21,9 @@ TELEMETRY_CONFIGURATION_TEST("defaults") {
   CHECK(cfg->report_metrics == true);
   CHECK(cfg->metrics_interval == 60s);
   CHECK(cfg->heartbeat_interval == 10s);
+  CHECK(cfg->install_id.has_value() == false);
+  CHECK(cfg->install_type.has_value() == false);
+  CHECK(cfg->install_time.has_value() == false);
 }
 
 TELEMETRY_CONFIGURATION_TEST("code override") {
@@ -144,4 +147,22 @@ TELEMETRY_CONFIGURATION_TEST("validation") {
       REQUIRE(!final_cfg);
     }
   }
+}
+
+TELEMETRY_CONFIGURATION_TEST("installation infos are used when available") {
+  ddtest::EnvGuard install_id_env("DD_INSTRUMENTATION_INSTALL_ID", "1-2-3-4");
+  ddtest::EnvGuard install_type_env("DD_INSTRUMENTATION_INSTALL_TYPE", "ssi");
+  ddtest::EnvGuard install_time_env("DD_INSTRUMENTATION_INSTALL_TIME", "now");
+
+  const auto final_cfg = telemetry::finalize_config();
+  REQUIRE(final_cfg);
+
+  REQUIRE(final_cfg->install_id.has_value());
+  CHECK(final_cfg->install_id.value() == "1-2-3-4");
+
+  REQUIRE(final_cfg->install_type.has_value());
+  CHECK(final_cfg->install_type.value() == "ssi");
+
+  REQUIRE(final_cfg->install_time.has_value());
+  CHECK(final_cfg->install_time.value() == "now");
 }

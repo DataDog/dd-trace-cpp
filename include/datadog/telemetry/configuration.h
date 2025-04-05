@@ -1,5 +1,6 @@
 #pragma once
 
+#include <datadog/config.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
 
@@ -7,6 +8,24 @@
 #include <string>
 
 namespace datadog::telemetry {
+
+struct Product final {
+  enum class Name : char {
+    tracing,
+    appsec,
+    profiler,
+    mlobs,
+    live_debugger,
+  };
+
+  Name name;
+  bool enabled;
+  std::string version;
+  tracing::Optional<int> error_code;
+  tracing::Optional<std::string> error_message;
+  std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>
+      configurations;
+};
 
 struct Configuration {
   // Enable or disable the telemetry module.
@@ -38,6 +57,8 @@ struct Configuration {
   // Can be overriden by the `DD_TELEMETRY_LOG_COLLECTION_ENABLED` environment
   // variable.
   tracing::Optional<bool> report_logs;
+  // TODO
+  std::vector<Product> products;
 };
 
 struct FinalizedConfiguration {
@@ -49,6 +70,12 @@ struct FinalizedConfiguration {
   std::chrono::steady_clock::duration heartbeat_interval;
   std::string integration_name;
   std::string integration_version;
+  std::vector<Product> products;
+
+  // From `DD_INSTRUMENTATION_INSTALL_*`
+  tracing::Optional<std::string> install_id;
+  tracing::Optional<std::string> install_type;
+  tracing::Optional<std::string> install_time;
 
   friend tracing::Expected<FinalizedConfiguration> finalize_config(
       const Configuration&);

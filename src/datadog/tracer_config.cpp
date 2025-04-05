@@ -425,13 +425,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     return std::move(span_sampler_config.error());
   }
 
-  if (auto telemetry_final_config =
-          telemetry::finalize_config(user_config.telemetry)) {
-    final_config.telemetry = std::move(*telemetry_final_config);
-  } else {
-    return std::move(telemetry_final_config.error());
-  }
-
   // agent url
   final_config.agent_url = agent_finalized->url;
 
@@ -442,6 +435,17 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   }
 
   final_config.http_client = agent_finalized->http_client;
+
+  // telemetry
+  if (auto telemetry_final_config =
+          telemetry::finalize_config(user_config.telemetry)) {
+    final_config.telemetry = std::move(*telemetry_final_config);
+    final_config.telemetry.products.emplace_back(telemetry::Product{
+        telemetry::Product::Name::tracing, true, tracer_version, nullopt,
+        nullopt, final_config.metadata});
+  } else {
+    return std::move(telemetry_final_config.error());
+  }
 
   return final_config;
 }
