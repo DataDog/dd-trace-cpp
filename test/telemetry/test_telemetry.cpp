@@ -89,12 +89,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
 
   SECTION("ctor send app-started message") {
     SECTION("Without a defined integration") {
-      Telemetry telemetry{*finalize_config(),
-                          logger,
-                          client,
-                          std::vector<std::shared_ptr<Metric>>{},
-                          scheduler,
-                          *url};
+      Telemetry telemetry{*finalize_config(), logger, client, scheduler, *url};
       /// By default the integration is `datadog` with the tracer version.
       /// TODO: remove the default because these datadog are already part of the
       /// request header.
@@ -114,11 +109,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
       Configuration cfg;
       cfg.integration_name = "nginx";
       cfg.integration_version = "1.25.2";
-      Telemetry telemetry2{*finalize_config(cfg),
-                           logger,
-                           client,
-                           std::vector<std::shared_ptr<Metric>>{},
-                           scheduler,
+      Telemetry telemetry2{*finalize_config(cfg), logger, client, scheduler,
                            *url};
 
       auto app_started = nlohmann::json::parse(client->request_body);
@@ -144,12 +135,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
       ddtest::EnvGuard install_time_env("DD_INSTRUMENTATION_INSTALL_TIME",
                                         "1703188212");
 
-      Telemetry telemetry4{*finalize_config(),
-                           logger,
-                           client,
-                           std::vector<std::shared_ptr<Metric>>{},
-                           scheduler,
-                           *url};
+      Telemetry telemetry4{*finalize_config(), logger, client, scheduler, *url};
 
       auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
@@ -191,11 +177,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
       Configuration cfg;
       cfg.products.emplace_back(std::move(product));
 
-      Telemetry telemetry3{*finalize_config(cfg),
-                           logger,
-                           client,
-                           std::vector<std::shared_ptr<Metric>>{},
-                           scheduler,
+      Telemetry telemetry3{*finalize_config(cfg), logger, client, scheduler,
                            *url};
 
       auto app_started = nlohmann::json::parse(client->request_body);
@@ -299,12 +281,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
 
   SECTION("dtor send app-closing message") {
     {
-      Telemetry telemetry{*finalize_config(),
-                          logger,
-                          client,
-                          std::vector<std::shared_ptr<Metric>>{},
-                          scheduler,
-                          *url};
+      Telemetry telemetry{*finalize_config(), logger, client, scheduler, *url};
       client->clear();
     }
 
@@ -335,13 +312,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
-  Telemetry telemetry{*finalize_config(),
-                      logger,
-                      client,
-                      std::vector<std::shared_ptr<Metric>>{},
-                      scheduler,
-                      *url,
-                      clock};
+  Telemetry telemetry{*finalize_config(), logger, client,
+                      scheduler,          *url,   clock};
 
   SECTION("generates a heartbeat message") {
     client->clear();
@@ -355,100 +327,305 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     REQUIRE(heartbeat["request_type"] == "app-heartbeat");
   }
 
-  SECTION("captures metrics and sends generate-metrics payload") {
-    telemetry.metrics().tracer.trace_segments_created_new.inc();
-    REQUIRE(telemetry.metrics().tracer.trace_segments_created_new.value() == 1);
-    scheduler->trigger_metrics_capture();
-    scheduler->trigger_heartbeat();
-
-    REQUIRE(telemetry.metrics().tracer.trace_segments_created_new.value() == 0);
-
-    auto heartbeat_and_telemetry_message = client->request_body;
-    auto message_batch = nlohmann::json::parse(heartbeat_and_telemetry_message);
-    REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-    REQUIRE(message_batch["payload"].size() == 2);
-    auto generate_metrics = message_batch["payload"][1];
-    REQUIRE(generate_metrics["request_type"] == "generate-metrics");
-    auto payload = generate_metrics["payload"];
-    auto series = payload["series"];
-    REQUIRE(series.size() == 1);
-    auto metric = series[0];
-    REQUIRE(metric["metric"] == "trace_segments_created");
-    auto tags = metric["tags"];
-    REQUIRE(tags.size() == 1);
-    REQUIRE(tags[0] == "new_continued:new");
-    auto points = metric["points"];
-    REQUIRE(points.size() == 1);
-    REQUIRE(points[0][0] == mock_time);
-    REQUIRE(points[0][1] == 1);
-  }
-
-  SECTION("logs serialization") {
-    SECTION("log level is correct") {
-      struct TestCase {
-        std::string_view name;
-        std::string input;
-        Optional<std::string> stacktrace;
-        std::function<void(Telemetry&, const std::string&,
-                           const Optional<std::string>& stacktrace)>
-            apply;
-        std::string expected_log_level;
-      };
-
-      auto test_case = GENERATE(values<TestCase>({
-          {
-              "warning log",
-              "This is a warning log!",
-              nullopt,
-              [](Telemetry& telemetry, const std::string& input,
-                 const Optional<std::string>&) {
-                telemetry.log_warning(input);
-              },
-              "WARNING",
-          },
-          {
-              "error log",
-              "This is an error log!",
-              nullopt,
-              [](Telemetry& telemetry, const std::string& input,
-                 const Optional<std::string>&) { telemetry.log_error(input); },
-              "ERROR",
-          },
-          {
-              "error log with stacktrace",
-              "This is an error log with a fake stacktrace!",
-              "error here\nthen here\nfinally here\n",
-              [](Telemetry& telemetry, const std::string& input,
-                 Optional<std::string> stacktrace) {
-                telemetry.log_error(input, *stacktrace);
-              },
-              "ERROR",
-          },
-      }));
-
-      CAPTURE(test_case.name);
-
+  SECTION("metrics reporting") {
+    SECTION("counters are correctly serialized in generate-metrics payload") {
       client->clear();
-      test_case.apply(telemetry, test_case.input, test_case.stacktrace);
+      /// test cases for counters:
+      /// - can't decrement below zero. -> is that a telemetry requirements?
+      /// - rates or counter reset to zero after capture.
+      const Counter my_counter{"my_counter", "counter-test", true};
+      telemetry.increment_counter(my_counter);  // = 1
+      telemetry.increment_counter(my_counter);  // = 2
+      telemetry.increment_counter(my_counter);  // = 3
+      telemetry.decrement_counter(my_counter);  // = 2
+      scheduler->trigger_metrics_capture();
+
+      telemetry.increment_counter(my_counter);  // = 1
+      scheduler->trigger_metrics_capture();
+
+      telemetry.set_counter(my_counter, 42);
+      telemetry.set_counter(my_counter, {"event:test"}, 100);
+      telemetry.decrement_counter(my_counter, {"event:test"});
+      scheduler->trigger_metrics_capture();
+
+      // Expect 2 series:
+      //   - `my_counter` without tags: 3 datapoint (2, 1, 42) with the same
+      //   timestamp.
+      //   - `my_counter` with `event:test` tags: 1 datapoint (99).
       scheduler->trigger_heartbeat();
 
       auto message_batch = nlohmann::json::parse(client->request_body);
-      REQUIRE(is_valid_telemetry_payload(message_batch));
+      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
+      REQUIRE(message_batch["payload"].size() == 2);
+      auto generate_metrics = message_batch["payload"][1];
+      REQUIRE(generate_metrics["request_type"] == "generate-metrics");
+      auto payload = generate_metrics["payload"];
+
+      auto series = payload["series"];
+      REQUIRE(series.size() == 2);
+
+      for (const auto& s : series) {
+        CHECK(s["metric"] == "my_counter");
+        CHECK(s["type"] == "count");
+        CHECK(s["common"] == true);
+        CHECK(s["namespace"] == "counter-test");
+        if (s.contains("tags")) {
+          REQUIRE(s["tags"].size() == 1);
+          CHECK(s["tags"][0] == "event:test");
+
+          auto points = s["points"];
+          REQUIRE(points.size() == 1);
+
+          CHECK(points[0][0] == mock_time);
+          CHECK(points[0][1] == 99);
+        } else {
+          auto points = s["points"];
+          REQUIRE(points.size() == 3);
+
+          CHECK(points[0][0] == mock_time);
+          CHECK(points[0][1] == 2);
+
+          CHECK(points[1][0] == mock_time);
+          CHECK(points[1][1] == 1);
+
+          CHECK(points[2][0] == mock_time);
+          CHECK(points[2][1] == 42);
+        }
+      }
+
+      // Make sure the next heartbeat doesn't contains counters if no
+      // datapoint has been incremented, decremented or set.
+      client->clear();
+      scheduler->trigger_heartbeat();
+
+      auto message_batch2 = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
+      REQUIRE(message_batch2["payload"].size() == 1);
+
+      auto payload2 = message_batch["payload"][0];
+      CHECK(payload2["request_type"] == "app-heartbeat");
+    }
+
+    SECTION("rate") {
+      client->clear();
+
+      Rate rps{"request", "rate-test", true};
+      telemetry.set_rate(rps, 1000);
+
+      scheduler->trigger_metrics_capture();
+
+      telemetry.set_rate(rps, 2000);
+      telemetry.set_rate(rps, 5000);
+      telemetry.set_rate(rps, {"status:2xx"}, 5000);
+
+      scheduler->trigger_metrics_capture();
+
+      // Expect 2 series:
+      //  - `request` without tags: 2 datapoint (1000, 5000)
+      //  - `request` with tags: 1 datapoint (5000)
+      scheduler->trigger_heartbeat();
+
+      auto message_batch = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
+      REQUIRE(message_batch["payload"].size() == 2);
+      auto generate_metrics = message_batch["payload"][1];
+      REQUIRE(generate_metrics["request_type"] == "generate-metrics");
+      auto payload = generate_metrics["payload"];
+
+      auto series = payload["series"];
+      REQUIRE(series.size() == 2);
+
+      for (const auto& s : series) {
+        CHECK(s["metric"] == "request");
+        CHECK(s["type"] == "rate");
+        CHECK(s["common"] == true);
+        CHECK(s["namespace"] == "rate-test");
+        if (s.contains("tags")) {
+          REQUIRE(s["tags"].size() == 1);
+          CHECK(s["tags"][0] == "status:2xx");
+
+          auto points = s["points"];
+          REQUIRE(points.size() == 1);
+
+          CHECK(points[0][0] == mock_time);
+          CHECK(points[0][1] == 5000);
+        } else {
+          auto points = s["points"];
+          REQUIRE(points.size() == 2);
+
+          CHECK(points[0][0] == mock_time);
+          CHECK(points[0][1] == 1000);
+
+          CHECK(points[1][0] == mock_time);
+          CHECK(points[1][1] == 5000);
+        }
+      }
+
+      // Make sure the next heartbeat doesn't contains distributions if no
+      // datapoint has been added to a distribution.
+      client->clear();
+      scheduler->trigger_heartbeat();
+
+      auto message_batch2 = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
+      REQUIRE(message_batch2["payload"].size() == 1);
+
+      auto payload2 = message_batch["payload"][0];
+      CHECK(payload2["request_type"] == "app-heartbeat");
+    }
+
+    SECTION("distribution") {
+      client->clear();
+
+      Distribution response_time{"response_time", "dist-test", false};
+      telemetry.add_datapoint(response_time, 128);
+      telemetry.add_datapoint(response_time, 42);
+      telemetry.add_datapoint(response_time, 3000);
+
+      // Add a tag, this will add a new serie to the distribution payload.
+      telemetry.add_datapoint(response_time, {"status:200", "method:GET"},
+                              6530);
+
+      Distribution request_size{"request_size", "dist-test-2", true};
+      telemetry.add_datapoint(request_size, 1843);
+      telemetry.add_datapoint(request_size, 4135);
+
+      // Expect 3 series:
+      //  - `response_time` without tags: 3 datapoint (128, 42, 3000).
+      //  - `response_time` with 2 tags: 1 datapoint (6530).
+      //  - `request_size`: 2 datapoint (1843, 4135).
+      scheduler->trigger_heartbeat();
+
+      auto message_batch = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
       REQUIRE(message_batch["payload"].size() == 2);
 
-      auto logs_message = message_batch["payload"][1];
-      REQUIRE(logs_message["request_type"] == "logs");
+      auto distribution_message = message_batch["payload"][1];
+      REQUIRE(distribution_message["request_type"] == "distributions");
 
-      auto logs_payload = logs_message["payload"]["logs"];
-      REQUIRE(logs_payload.size() == 1);
-      CHECK(logs_payload[0]["level"] == test_case.expected_log_level);
-      CHECK(logs_payload[0]["message"] == test_case.input);
-      CHECK(logs_payload[0].contains("tracer_time"));
+      auto distribution_series = distribution_message["payload"]["series"];
+      REQUIRE(distribution_series.size() == 3);
 
-      if (test_case.stacktrace) {
-        CHECK(logs_payload[0]["stack_trace"] == test_case.stacktrace);
-      } else {
-        CHECK(logs_payload[0].contains("stack_trace") == false);
+      for (auto& dist : distribution_series) {
+        if (dist["metric"] == "response_time") {
+          CHECK(dist["common"] == false);
+          CHECK(dist["namespace"] == "dist-test");
+          if (dist.contains("tags")) {
+            const std::vector<std::string> expected_tags{"status:200",
+                                                         "method:GET"};
+            CHECK(dist["tags"] == expected_tags);
+
+            auto datapoint = dist["points"];
+            REQUIRE(datapoint.size() == 1);
+
+            const std::vector<uint64_t> expected_points{6530};
+            CHECK(expected_points == datapoint);
+          } else {
+            auto datapoint = dist["points"];
+            REQUIRE(datapoint.size() == 3);
+
+            const std::vector<uint64_t> expected_points{128, 42, 3000};
+            CHECK(expected_points == datapoint);
+          }
+        } else if (dist["metric"] == "request_size") {
+          CHECK(dist["common"] == true);
+          CHECK(dist["namespace"] == "dist-test-2");
+
+          auto datapoint = dist["points"];
+          REQUIRE(datapoint.size() == 2);
+
+          const std::vector<uint64_t> expected_points{1843, 4135};
+          CHECK(expected_points == datapoint);
+        } else {
+          FAIL(
+              "expected distribution name {response_time, request_size} but "
+              "got "
+              << dist["metric"]);
+        }
+      }
+
+      // Make sure the next heartbeat doesn't contains distributions if no
+      // datapoint has been added to a distribution.
+      client->clear();
+      scheduler->trigger_heartbeat();
+
+      auto message_batch2 = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
+      REQUIRE(message_batch2["payload"].size() == 1);
+
+      auto payload = message_batch["payload"][0];
+      CHECK(payload["request_type"] == "app-heartbeat");
+    }
+
+    SECTION("logs serialization") {
+      SECTION("log level is correct") {
+        struct TestCase {
+          std::string_view name;
+          std::string input;
+          Optional<std::string> stacktrace;
+          std::function<void(Telemetry&, const std::string&,
+                             const Optional<std::string>& stacktrace)>
+              apply;
+          std::string expected_log_level;
+        };
+
+        auto test_case = GENERATE(values<TestCase>({
+            {
+                "warning log",
+                "This is a warning log!",
+                nullopt,
+                [](Telemetry& telemetry, const std::string& input,
+                   const Optional<std::string>&) {
+                  telemetry.log_warning(input);
+                },
+                "WARNING",
+            },
+            {
+                "error log",
+                "This is an error log!",
+                nullopt,
+                [](Telemetry& telemetry, const std::string& input,
+                   const Optional<std::string>&) {
+                  telemetry.log_error(input);
+                },
+                "ERROR",
+            },
+            {
+                "error log with stacktrace",
+                "This is an error log with a fake stacktrace!",
+                "error here\nthen here\nfinally here\n",
+                [](Telemetry& telemetry, const std::string& input,
+                   Optional<std::string> stacktrace) {
+                  telemetry.log_error(input, *stacktrace);
+                },
+                "ERROR",
+            },
+        }));
+
+        CAPTURE(test_case.name);
+
+        client->clear();
+        test_case.apply(telemetry, test_case.input, test_case.stacktrace);
+        scheduler->trigger_heartbeat();
+
+        auto message_batch = nlohmann::json::parse(client->request_body);
+        REQUIRE(is_valid_telemetry_payload(message_batch));
+        REQUIRE(message_batch["payload"].size() == 2);
+
+        auto logs_message = message_batch["payload"][1];
+        REQUIRE(logs_message["request_type"] == "logs");
+
+        auto logs_payload = logs_message["payload"]["logs"];
+        REQUIRE(logs_payload.size() == 1);
+        CHECK(logs_payload[0]["level"] == test_case.expected_log_level);
+        CHECK(logs_payload[0]["message"] == test_case.input);
+        CHECK(logs_payload[0].contains("tracer_time"));
+
+        if (test_case.stacktrace) {
+          CHECK(logs_payload[0]["stack_trace"] == test_case.stacktrace);
+        } else {
+          CHECK(logs_payload[0].contains("stack_trace") == false);
+        }
       }
     }
   }
@@ -464,7 +641,6 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
   auto logger = std::make_shared<MockLogger>();
   auto client = std::make_shared<MockHTTPClient>();
   auto scheduler = std::make_shared<FakeEventScheduler>();
-  std::vector<std::shared_ptr<Metric>> metrics;
 
   const TracerSignature tracer_signature{
       /* runtime_id = */ RuntimeID::generate(),
@@ -480,7 +656,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
     auto final_cfg = finalize_config(cfg);
     REQUIRE(final_cfg);
 
-    Telemetry telemetry(*final_cfg, logger, client, metrics, scheduler, *url);
+    Telemetry telemetry(*final_cfg, logger, client, scheduler, *url);
     CHECK(scheduler->metrics_callback == nullptr);
     CHECK(scheduler->metrics_interval == nullopt);
   }
@@ -493,7 +669,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
     auto final_cfg = finalize_config(cfg);
     REQUIRE(final_cfg);
 
-    Telemetry telemetry(*final_cfg, logger, client, metrics, scheduler, *url);
+    Telemetry telemetry(*final_cfg, logger, client, scheduler, *url);
     CHECK(scheduler->metrics_callback != nullptr);
     CHECK(scheduler->metrics_interval == 500ms);
 
@@ -510,7 +686,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
     auto final_cfg = finalize_config(cfg);
     REQUIRE(final_cfg);
 
-    Telemetry telemetry(*final_cfg, logger, client, metrics, scheduler, *url);
+    Telemetry telemetry(*final_cfg, logger, client, scheduler, *url);
     telemetry.log_error("error");
 
     // NOTE(@dmehala): logs are sent with an heartbeat.

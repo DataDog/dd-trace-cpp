@@ -18,7 +18,6 @@ add_executable(tests
 
     # telemetry test cases
     telemetry/test_configuration.cpp
-    telemetry/test_metrics.cpp
     telemetry/test_telemetry.cpp
 
     # test cases

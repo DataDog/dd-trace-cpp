@@ -24,15 +24,11 @@ using NoopTelemetry = std::monostate;
 /// implementation.
 using TelemetryProxy = std::variant<NoopTelemetry, Telemetry>;
 
-// NOTE(@dmehala): until metrics handling is improved.
-static DefaultMetrics noop_metrics;
-
 /// NOTE(@dmehala): Here to facilitate Meyer's singleton construction.
 struct Ctor_param final {
   FinalizedConfiguration configuration;
   std::shared_ptr<tracing::Logger> logger;
   std::shared_ptr<tracing::HTTPClient> client;
-  std::vector<std::shared_ptr<Metric>> metrics;
   std::shared_ptr<tracing::EventScheduler> scheduler;
   tracing::HTTPClient::URL agent_url;
   tracing::Clock clock = tracing::default_clock;
@@ -41,8 +37,7 @@ struct Ctor_param final {
 TelemetryProxy make_telemetry(const Ctor_param& init) {
   if (!init.configuration.enabled) return NoopTelemetry{};
   return Telemetry{init.configuration, init.logger,    init.client,
-                   init.metrics,       init.scheduler, init.agent_url,
-                   init.clock};
+                   init.scheduler,     init.agent_url, init.clock};
 }
 
 TelemetryProxy& instance(
@@ -54,11 +49,10 @@ TelemetryProxy& instance(
 void init(FinalizedConfiguration configuration,
           std::shared_ptr<tracing::Logger> logger,
           std::shared_ptr<tracing::HTTPClient> client,
-          std::vector<std::shared_ptr<Metric>> metrics,
           std::shared_ptr<tracing::EventScheduler> event_scheduler,
           tracing::HTTPClient::URL agent_url, tracing::Clock clock) {
-  instance(Ctor_param{configuration, logger, client, metrics, event_scheduler,
-                      agent_url, clock});
+  instance(Ctor_param{configuration, logger, client, event_scheduler, agent_url,
+                      clock});
 }
 
 void send_configuration_change() {
@@ -79,15 +73,6 @@ void capture_configuration_change(
                  [](NoopTelemetry) {},
              },
              instance());
-}
-
-DefaultMetrics& metrics() {
-  auto& proxy = instance();
-  if (std::holds_alternative<NoopTelemetry>(proxy)) {
-    return noop_metrics;
-  } else {
-    return std::get<Telemetry>(proxy).metrics();
-  }
 }
 
 void report_warning_log(std::string message) {
@@ -115,5 +100,111 @@ void report_error_log(std::string message, std::string stacktrace) {
              },
              instance());
 }
+
+namespace counter {
+void increment(const Counter& counter) {
+  std::visit(
+      details::Overload{
+          [&](Telemetry& telemetry) { telemetry.increment_counter(counter); },
+          [](auto&&) {},
+      },
+      instance());
+}
+
+void increment(const Counter& counter, const std::vector<std::string>& tags) {
+  std::visit(details::Overload{
+                 [&](Telemetry& telemetry) {
+                   telemetry.increment_counter(counter, tags);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
+}
+
+void decrement(const Counter& counter) {
+  std::visit(
+      details::Overload{
+          [&](Telemetry& telemetry) { telemetry.decrement_counter(counter); },
+          [](auto&&) {},
+      },
+      instance());
+}
+
+void decrement(const Counter& counter, const std::vector<std::string>& tags) {
+  std::visit(details::Overload{
+                 [&](Telemetry& telemetry) {
+                   telemetry.decrement_counter(counter, tags);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
+}
+
+void set(const Counter& counter, uint64_t value) {
+  std::visit(
+      details::Overload{
+          [&](Telemetry& telemetry) { telemetry.set_counter(counter, value); },
+          [](auto&&) {},
+      },
+      instance());
+}
+
+void set(const Counter& counter, const std::vector<std::string>& tags,
+         uint64_t value) {
+  std::visit(details::Overload{
+                 [&](Telemetry& telemetry) {
+                   telemetry.set_counter(counter, tags, value);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
+}
+
+}  // namespace counter
+
+namespace rate {
+void set(const Rate& rate, uint64_t value) {
+  std::visit(details::Overload{
+                 [&](Telemetry& telemetry) { telemetry.set_rate(rate, value); },
+                 [](auto&&) {},
+             },
+             instance());
+}
+
+void set(const Rate& rate, const std::vector<std::string>& tags,
+         uint64_t value) {
+  std::visit(
+      details::Overload{
+          [&](Telemetry& telemetry) { telemetry.set_rate(rate, tags, value); },
+          [](auto&&) {},
+      },
+      instance());
+}
+}  // namespace rate
+
+namespace distribution {
+
+void add(const Distribution& distribution, uint64_t value) {
+  std::visit(details::Overload{
+                 [&](Telemetry& telemetry) {
+                   telemetry.add_datapoint(distribution, value);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
+}
+
+void add(const Distribution& distribution, const std::vector<std::string>& tags,
+         uint64_t value) {
+  std::visit(details::Overload{
+                 [&](Telemetry& telemetry) {
+                   telemetry.add_datapoint(distribution, tags, value);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
+}
+
+}  // namespace distribution
 
 }  // namespace datadog::telemetry
