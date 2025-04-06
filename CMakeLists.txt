@@ -107,7 +107,6 @@ target_sources(dd_trace_cpp-objects
     FILES ${public_header_files}
   PRIVATE
     src/datadog/telemetry/configuration.cpp
-    src/datadog/telemetry/metrics.cpp
     src/datadog/telemetry/telemetry.cpp
     src/datadog/telemetry/telemetry_impl.cpp
     src/datadog/baggage.cpp
@@ -150,6 +149,7 @@ target_sources(dd_trace_cpp-objects
     src/datadog/trace_sampler_config.cpp
     src/datadog/trace_sampler.cpp
     src/datadog/trace_segment.cpp
+    src/datadog/telemetry_metrics.cpp
     src/datadog/version.cpp
     src/datadog/w3c_propagation.cpp
 )
