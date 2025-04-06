@@ -385,7 +385,7 @@ void Telemetry::send_configuration_change() {
   telemetry_body["payload"] =
       nlohmann::json{{"configuration", configuration_json}};
 
-  send_telemetry("app-client-configuration-change", telemetry_body);
+  send_telemetry("app-client-configuration-change", telemetry_body.dump());
 }
 
 std::string Telemetry::heartbeat_and_telemetry() {
