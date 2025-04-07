@@ -103,7 +103,8 @@ Telemetry::Telemetry(FinalizedConfiguration config,
                         tracing::get_process_name(), ""),
       http_client_(client),
       clock_(std::move(clock)),
-      scheduler_(event_scheduler) {
+      scheduler_(event_scheduler),
+      host_info_(get_host_info()) {
   // Register all the metrics that we're tracking by adding them to the
   // metrics_snapshots_ container. This allows for simpler iteration logic
   // when using the values in `generate-metrics` messages.
