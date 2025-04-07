@@ -94,18 +94,15 @@ Telemetry::Telemetry(FinalizedConfiguration config,
 }
 
 void Telemetry::schedule_tasks() {
-  // Only schedule this if telemetry is enabled.
-  // Every 10 seconds, have the tracer telemetry capture the metrics
-  // values. Every 60 seconds, also report those values to the datadog
-  // agent.
   tasks_.emplace_back(scheduler_->schedule_recurring_event(
-      std::chrono::seconds(10), [this, n = 0]() mutable {
-        n++;
-        tracer_telemetry_->capture_metrics();
-        if (n % 6 == 0) {
-          send_heartbeat_and_telemetry();
-        }
-      }));
+      config_.heartbeat_interval,
+      [this]() { send_heartbeat_and_telemetry(); }));
+
+  if (config_.report_metrics) {
+    tasks_.emplace_back(scheduler_->schedule_recurring_event(
+        config_.metrics_interval,
+        [this]() mutable { tracer_telemetry_->capture_metrics(); }));
+  }
 }
 
 Telemetry::~Telemetry() {
@@ -198,14 +195,17 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
 }
 
 void Telemetry::log_error(std::string message) {
+  if (!config_.report_logs) return;
   tracer_telemetry_->log(std::move(message), LogLevel::ERROR);
 }
 
 void Telemetry::log_error(std::string message, std::string stacktrace) {
+  if (!config_.report_logs) return;
   tracer_telemetry_->log(std::move(message), LogLevel::ERROR, stacktrace);
 }
 
 void Telemetry::log_warning(std::string message) {
+  if (!config_.report_logs) return;
   tracer_telemetry_->log(std::move(message), LogLevel::WARNING);
 }
 
