@@ -194,8 +194,6 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
   return *this;
 }
 
-// TODO(@dmehala): Move `report_logs` check in the serialization once
-// `TracerTelemetry` will be removed.
 void Telemetry::log_error(std::string message) {
   if (!config_.report_logs) return;
   tracer_telemetry_->log(std::move(message), LogLevel::ERROR);
