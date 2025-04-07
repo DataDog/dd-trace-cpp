@@ -31,7 +31,7 @@ bool is_valid_telemetry_payload(const nlohmann::json& json) {
          json.contains("/host"_json_pointer);
 }
 
-struct FakeEventScehduler : public EventScheduler {
+struct FakeEventScheduler : public EventScheduler {
   size_t count_tasks = 0;
   std::function<void()> heartbeat_callback = nullptr;
   std::function<void()> metrics_callback = nullptr;
@@ -80,7 +80,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
   auto logger = std::make_shared<MockLogger>();
   auto client = std::make_shared<MockHTTPClient>();
-  auto scheduler = std::make_shared<FakeEventScehduler>();
+  auto scheduler = std::make_shared<FakeEventScheduler>();
 
   const TracerSignature tracer_signature{
       /* runtime_id = */ RuntimeID::generate(),
