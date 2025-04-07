@@ -379,7 +379,7 @@ TEST_CASE("Tracer telemetry configuration", "[telemetry]") {
 
   auto logger = std::make_shared<MockLogger>();
   auto client = std::make_shared<MockHTTPClient>();
-  auto scheduler = std::make_shared<FakeEventScehduler>();
+  auto scheduler = std::make_shared<FakeEventScheduler>();
   std::vector<std::shared_ptr<Metric>> metrics;
 
   const TracerSignature tracer_signature{
