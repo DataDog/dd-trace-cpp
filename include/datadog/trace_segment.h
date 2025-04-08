@@ -102,6 +102,8 @@ class TraceSegment {
   const Optional<std::string>& origin() const;
   Optional<SamplingDecision> sampling_decision() const;
 
+  uint64_t local_root_id() const;
+
   Logger& logger() const;
 
   // Inject trace context for the specified `span` into the specified `writer`.

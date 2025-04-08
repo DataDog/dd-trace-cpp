@@ -35,6 +35,10 @@
 
 #ifdef __linux__
 const void* elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
+thread_local struct datadog::tracing::TLSStorage*
+    elastic_apm_profiling_correlation_tls_v1 = nullptr;
+thread_local std::unique_ptr<datadog::tracing::TLSStorage> tls_info_holder =
+    nullptr;
 #endif
 
 namespace datadog {
@@ -114,6 +118,33 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 
   store_config();
 }
+
+#ifdef __linux__
+void Tracer::correlate(const Span& span) {
+  // See Layout:
+  // https://github.com/elastic/apm/blob/149cd3e39a77a58002344270ed2ad35357bdd02d/specs/agents/universal-profiling-integration.md#thread-local-storage-layout
+  tls_info_holder = std::make_unique<datadog::tracing::TLSStorage>();
+  elastic_apm_profiling_correlation_tls_v1 = tls_info_holder.get();
+
+  struct TLSStorage* tls_data = elastic_apm_profiling_correlation_tls_v1;
+  tls_data->valid = 0;
+
+  tls_data->layout_minor_version = 1;
+  tls_data->trace_present = 1;  // We are in a span so no errors
+  tls_data->trace_flags =
+      span.trace_segment().sampling_decision().has_value() &&
+              (span.trace_segment().sampling_decision().value().priority > 0)
+          ? 1
+          : 0;
+  auto trace_id = span.trace_id();
+  tls_data->trace_id_low = trace_id.low;
+  tls_data->trace_id_high = trace_id.high;
+  tls_data->span_id = span.id();
+  tls_data->transaction_id = span.trace_segment().local_root_id();
+
+  tls_data->valid = 1;
+}
+#endif
 
 std::string Tracer::config() const {
   // clang-format off
@@ -206,6 +237,11 @@ Span Tracer::create_span(const SpanConfig& config) {
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
+
+#ifdef __linux__
+  correlate(span);
+#endif
+
   return span;
 }
 
@@ -417,6 +453,11 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
+
+#ifdef __linux__
+  correlate(span);
+#endif
+
   return span;
 }
 

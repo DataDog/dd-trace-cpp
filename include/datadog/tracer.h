@@ -10,6 +10,10 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
+#ifdef __linux__
+#include <datadog/tls_storage.h>
+#endif
+
 #include <cstddef>
 #include <memory>
 
@@ -25,6 +29,8 @@
 
 #ifdef __linux__
 extern const void* elastic_apm_profiling_correlation_process_storage_v1;
+extern thread_local struct datadog::tracing::TLSStorage*
+    elastic_apm_profiling_correlation_tls_v1;
 #endif
 
 namespace datadog {
@@ -109,6 +115,9 @@ class Tracer {
   std::string config() const;
 
  private:
+#ifdef __linux__
+  void correlate(const Span& span);
+#endif
   void store_config();
 };
 
