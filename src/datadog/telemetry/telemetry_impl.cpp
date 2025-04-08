@@ -343,31 +343,13 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
     }
   };
 
-  auto telemetry_on_response = [logger = logger_](
-                                   int response_status,
-                                   const DictReader& /*response_headers*/,
-                                   std::string response_body) {
-    if (response_status < 200 || response_status >= 300) {
-      logger->log_error([&](auto& stream) {
-        stream << "Unexpected telemetry response status " << response_status
-               << " with body (if any, starts on next line):\n"
-               << response_body;
-      });
-    }
-  };
-
-  auto telemetry_on_error = [logger = logger_](Error error) {
-    logger->log_error(error.with_prefix(
-        "Error occurred during HTTP request for telemetry: "));
-  };
-
-  auto post_result = http_client_->post(
-      telemetry_endpoint_, set_telemetry_headers, std::move(payload),
-      telemetry_on_response, telemetry_on_error, clock_().tick + 1s);
-  if (auto* error = post_result.if_error()) {
-    logger_->log_error(
-        error->with_prefix("Unexpected error submitting telemetry event: "));
-  }
+  // auto post_result = http_client_->post(
+  //     telemetry_endpoint_, set_telemetry_headers, std::move(payload),
+  //     telemetry_on_response_, telemetry_on_error_, clock_().tick + 1s);
+  // if (auto* error = post_result.if_error()) {
+  //   logger_->log_error(
+  //       error->with_prefix("Unexpected error submitting telemetry event: "));
+  // }
 }
 
 void Telemetry::send_configuration_change() {
