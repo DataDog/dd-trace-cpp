@@ -113,6 +113,7 @@ cc_library(
       "include/datadog/span_matcher.h",
       "include/datadog/span_sampler_config.h",
       "include/datadog/string_view.h",
+      "include/datadog/tls_storage.h",
       "include/datadog/tracer.h",
       "include/datadog/tracer_config.h",
       "include/datadog/tracer_signature.h",
