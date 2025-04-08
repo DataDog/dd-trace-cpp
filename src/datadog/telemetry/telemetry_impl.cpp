@@ -186,9 +186,8 @@ Telemetry::~Telemetry() {
     // The app-closing message is bundled with a message containing the
     // final metric values.
     auto payload = app_closing();
-    (void)payload;
-    // send_telemetry("app-closing", app_closing());
-    http_client_->drain(clock_().tick + 1s);
+    send_telemetry("app-closing", payload);
+    // http_client_->drain(clock_().tick + 1s);
   }
 }
 
