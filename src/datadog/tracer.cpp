@@ -13,6 +13,9 @@
 
 #include <algorithm>
 #include <cassert>
+#ifdef __linux__
+#include <memory>
+#endif
 
 #include "config_manager.h"
 #include "datadog_agent.h"
@@ -28,6 +31,10 @@
 #include "tags.h"
 #include "trace_sampler.h"
 #include "w3c_propagation.h"
+
+#ifdef __linux__
+const void* elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
+#endif
 
 namespace datadog {
 namespace tracing {
@@ -93,6 +100,13 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       break;
     }
   }
+
+#ifdef __linux__
+  // TODO: change the way this is done to handle programs that fork.
+  // TODO: add a flag to disable this by default.
+  elastic_apm_profiling_correlation_process_storage_v1 =
+      *signature_.generate_process_correlation_storage();
+#endif
 
   if (config.log_on_startup) {
     logger_->log_startup([configuration = this->config()](std::ostream& log) {

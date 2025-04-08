@@ -23,6 +23,10 @@
 #include "tracer_config.h"
 #include "tracer_signature.h"
 
+#ifdef __linux__
+extern const void* elastic_apm_profiling_correlation_process_storage_v1;
+#endif
+
 namespace datadog {
 namespace tracing {
 
