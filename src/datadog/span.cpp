@@ -4,6 +4,7 @@
 #include <datadog/span_config.h>
 #include <datadog/string_view.h>
 #include <datadog/trace_segment.h>
+#include <datadog/tracer.h>
 
 #include <cassert>
 #include <string>
@@ -39,6 +40,16 @@ Span::~Span() {
     const auto now = clock_();
     data_->duration = now - data_->start;
   }
+
+#ifdef __linux__
+  // When a span is finished, we must update the span_id to its parent's.
+  if (elastic_apm_profiling_correlation_process_storage_v1 != nullptr &&
+      parent_id().has_value()) {
+    elastic_apm_profiling_correlation_tls_v1->valid = 0;
+    elastic_apm_profiling_correlation_tls_v1->span_id = parent_id().value();
+    elastic_apm_profiling_correlation_tls_v1->valid = 1;
+  }
+#endif
 
   trace_segment_->span_finished();
 }

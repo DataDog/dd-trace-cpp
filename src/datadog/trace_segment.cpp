@@ -9,6 +9,7 @@
 #include <datadog/telemetry/metrics.h>
 #include <datadog/telemetry/telemetry.h>
 #include <datadog/trace_segment.h>
+#include <datadog/tracer.h>
 
 #include <cassert>
 #include <string>
@@ -139,6 +140,8 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
   return sampling_decision_;
 }
 
+uint64_t TraceSegment::local_root_id() const { return spans_.front()->span_id; }
+
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
@@ -241,6 +244,11 @@ void TraceSegment::span_finished() {
           error->with_prefix("Error sending spans to collector: "));
     }
   }
+
+#ifdef __linux__
+  // When all spans are finished, so is the current trace.
+  elastic_apm_profiling_correlation_tls_v1->trace_present = 0;
+#endif
 
   telemetry::metrics().tracer.trace_segments_closed.inc();
 }
