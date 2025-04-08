@@ -199,7 +199,7 @@ Telemetry::Telemetry(Telemetry&& rhs)
       telemetry_on_error_(std::move(rhs.telemetry_on_error_)),
       telemetry_endpoint_(std::move(rhs.telemetry_endpoint_)),
       tracer_signature_(std::move(rhs.tracer_signature_)),
-      http_client_(rhs.http_client_),
+      http_client_(std::move(rhs.http_client_)),
       clock_(std::move(rhs.clock_)),
       scheduler_(std::move(rhs.scheduler_)),
       user_metrics_(std::move(rhs.user_metrics_)),
@@ -259,7 +259,6 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
     std::swap(telemetry_endpoint_, rhs.telemetry_endpoint_);
     std::swap(http_client_, rhs.http_client_);
     std::swap(tracer_signature_, rhs.tracer_signature_);
-    std::swap(http_client_, rhs.http_client_);
     std::swap(clock_, rhs.clock_);
     std::swap(user_metrics_, rhs.user_metrics_);
     std::swap(seq_id_, rhs.seq_id_);
@@ -343,13 +342,13 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
     }
   };
 
-  // auto post_result = http_client_->post(
-  //     telemetry_endpoint_, set_telemetry_headers, std::move(payload),
-  //     telemetry_on_response_, telemetry_on_error_, clock_().tick + 1s);
-  // if (auto* error = post_result.if_error()) {
-  //   logger_->log_error(
-  //       error->with_prefix("Unexpected error submitting telemetry event: "));
-  // }
+  auto post_result = http_client_->post(
+      telemetry_endpoint_, set_telemetry_headers, std::move(payload),
+      telemetry_on_response_, telemetry_on_error_, clock_().tick + 1s);
+  if (auto* error = post_result.if_error()) {
+    logger_->log_error(
+        error->with_prefix("Unexpected error submitting telemetry event: "));
+  }
 }
 
 void Telemetry::send_configuration_change() {
