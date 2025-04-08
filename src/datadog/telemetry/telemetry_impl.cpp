@@ -187,7 +187,7 @@ Telemetry::~Telemetry() {
     // final metric values.
     auto payload = app_closing();
     send_telemetry("app-closing", payload);
-    // http_client_->drain(clock_().tick + 1s);
+    http_client_->drain(clock_().tick + 2s);
   }
 }
 
@@ -326,7 +326,7 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
   auto set_telemetry_headers = [request_type, payload_size = payload.size(),
                                 debug_enabled = config_.debug,
                                 tracer_signature =
-                                    &tracer_signature_](DictWriter& headers) {
+                                    tracer_signature_](DictWriter& headers) {
     /*
       TODO:
         Datadog-Container-ID
@@ -335,7 +335,7 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
     headers.set("Content-Length", std::to_string(payload_size));
     headers.set("DD-Telemetry-API-Version", "v2");
     headers.set("DD-Client-Library-Language", "cpp");
-    headers.set("DD-Client-Library-Version", tracer_signature->library_version);
+    headers.set("DD-Client-Library-Version", tracer_signature.library_version);
     headers.set("DD-Telemetry-Request-Type", request_type);
 
     if (debug_enabled) {
@@ -345,7 +345,7 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
 
   auto post_result = http_client_->post(
       telemetry_endpoint_, set_telemetry_headers, std::move(payload),
-      telemetry_on_response_, telemetry_on_error_, clock_().tick + 5s);
+      telemetry_on_response_, telemetry_on_error_, clock_().tick + 1s);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(
         error->with_prefix("Unexpected error submitting telemetry event: "));
