@@ -205,6 +205,8 @@ Telemetry::Telemetry(Telemetry&& rhs)
       seq_id_(rhs.seq_id_),
       config_seq_ids_(rhs.config_seq_ids_),
       host_info_(rhs.host_info_) {
+  cancel_tasks(rhs.tasks_);
+
   // Register all the metrics that we're tracking by adding them to the
   // metrics_snapshots_ container. This allows for simpler iteration logic
   // when using the values in `generate-metrics` messages.
@@ -241,12 +243,13 @@ Telemetry::Telemetry(Telemetry&& rhs)
     metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
   }
 
-  cancel_tasks(tasks_);
   schedule_tasks();
 }
 
 Telemetry& Telemetry::operator=(Telemetry&& rhs) {
   if (&rhs != this) {
+    cancel_tasks(rhs.tasks_);
+
     std::swap(metrics_, rhs.metrics_);
     std::swap(config_, rhs.config_);
     std::swap(logger_, rhs.logger_);
@@ -298,7 +301,6 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
       metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
     }
 
-    cancel_tasks(rhs.tasks_);
     schedule_tasks();
   }
   return *this;
@@ -342,8 +344,7 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
 
   auto post_result = http_client_->post(
       telemetry_endpoint_, set_telemetry_headers, std::move(payload),
-      telemetry_on_response_, telemetry_on_error_,
-      tracing::default_clock().tick + 5s);
+      telemetry_on_response_, telemetry_on_error_, clock_().tick + 5s);
   if (auto* error = post_result.if_error()) {
     logger_->log_error(
         error->with_prefix("Unexpected error submitting telemetry event: "));
@@ -517,8 +518,8 @@ std::string Telemetry::app_closing() {
 
   auto telemetry_body = generate_telemetry_body("message-batch");
   telemetry_body["payload"] = batch_payloads;
-  auto message_batch_payload = telemetry_body.dump();
 
+  auto message_batch_payload = telemetry_body.dump();
   return message_batch_payload;
 }
 

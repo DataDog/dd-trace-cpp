@@ -9,7 +9,6 @@
 #include <datadog/telemetry/metrics.h>
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 /// Telemetry functions are responsibles for handling internal telemetry data to
