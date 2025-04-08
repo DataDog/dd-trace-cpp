@@ -1,11 +1,17 @@
 #pragma once
 
+#include <datadog/clock.h>
+#include <datadog/config.h>
 #include <datadog/event_scheduler.h>
 #include <datadog/http_client.h>
 #include <datadog/logger.h>
 #include <datadog/telemetry/configuration.h>
+#include <datadog/telemetry/metrics.h>
+#include <datadog/tracer_signature.h>
 
-#include "tracer_telemetry.h"
+#include "json.hpp"
+#include "log.h"
+#include "platform_util.h"
 
 namespace datadog::telemetry {
 
@@ -17,7 +23,6 @@ class Telemetry final {
   FinalizedConfiguration config_;
   /// Shared pointer to the user logger instance.
   std::shared_ptr<tracing::Logger> logger_;
-  std::shared_ptr<tracing::TracerTelemetry> tracer_telemetry_;
   std::vector<tracing::EventScheduler::Cancel> tasks_;
   tracing::HTTPClient::ResponseHandler telemetry_on_response_;
   tracing::HTTPClient::ErrorHandler telemetry_on_error_;
@@ -26,6 +31,26 @@ class Telemetry final {
   std::shared_ptr<tracing::HTTPClient> http_client_;
   tracing::Clock clock_;
   std::shared_ptr<tracing::EventScheduler> scheduler_;
+
+  // This uses a reference_wrapper so references to internal metric values can
+  // be captured, and be iterated trivially when the values need to be
+  // snapshotted and published in telemetry messages.
+  using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
+  std::vector<
+      std::pair<std::reference_wrapper<telemetry::Metric>, MetricSnapshot>>
+      metrics_snapshots_;
+  std::vector<std::shared_ptr<telemetry::Metric>> user_metrics_;
+
+  std::vector<tracing::ConfigMetadata> configuration_snapshot_;
+
+  std::vector<telemetry::LogMessage> logs_;
+
+  // Track sequence id per payload generated
+  uint64_t seq_id_ = 0;
+  // Track sequence id per configuration field
+  std::unordered_map<tracing::ConfigName, std::size_t> config_seq_ids_;
+
+  tracing::HostInfo host_info_;
 
  public:
   /// Constructor for the Telemetry class
@@ -36,7 +61,7 @@ class Telemetry final {
   Telemetry(FinalizedConfiguration configuration,
             std::shared_ptr<tracing::Logger> logger,
             std::shared_ptr<tracing::HTTPClient> client,
-            std::vector<std::shared_ptr<Metric>> metrics,
+            std::vector<std::shared_ptr<Metric>> user_metrics,
             std::shared_ptr<tracing::EventScheduler> event_scheduler,
             tracing::HTTPClient::URL agent_url,
             tracing::Clock clock = tracing::default_clock);
@@ -81,6 +106,29 @@ class Telemetry final {
 
   void send_heartbeat_and_telemetry();
   void schedule_tasks();
+
+  void capture_metrics();
+
+  void log(std::string message, telemetry::LogLevel level,
+           tracing::Optional<std::string> stacktrace = tracing::nullopt);
+
+  tracing::Optional<std::string> configuration_change();
+
+  nlohmann::json generate_telemetry_body(std::string request_type);
+  nlohmann::json generate_configuration_field(
+      const tracing::ConfigMetadata& config_metadata);
+
+  // Constructs an `app-started` message using information provided when
+  // constructed and the tracer_config value passed in.
+  std::string app_started(
+      const std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>&
+          configurations);
+  // Constructs a messsage-batch containing `app-heartbeat`, and if metrics
+  // have been modified, a `generate-metrics` message.
+  std::string heartbeat_and_telemetry();
+  // Constructs a message-batch containing `app-closing`, and if metrics have
+  // been modified, a `generate-metrics` message.
+  std::string app_closing();
 };
 
 }  // namespace datadog::telemetry
