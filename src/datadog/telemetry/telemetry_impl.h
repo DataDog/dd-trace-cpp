@@ -61,7 +61,7 @@ class Telemetry final {
   Telemetry(FinalizedConfiguration configuration,
             std::shared_ptr<tracing::Logger> logger,
             std::shared_ptr<tracing::HTTPClient> client,
-            std::vector<std::shared_ptr<Metric>> metrics,
+            std::vector<std::shared_ptr<Metric>> user_metrics,
             std::shared_ptr<tracing::EventScheduler> event_scheduler,
             tracing::HTTPClient::URL agent_url,
             tracing::Clock clock = tracing::default_clock);

@@ -93,7 +93,7 @@ nlohmann::json encode_log(const telemetry::LogMessage& log) {
 Telemetry::Telemetry(FinalizedConfiguration config,
                      std::shared_ptr<tracing::Logger> logger,
                      std::shared_ptr<tracing::HTTPClient> client,
-                     std::vector<std::shared_ptr<Metric>> user_metrics_,
+                     std::vector<std::shared_ptr<Metric>> user_metrics,
                      std::shared_ptr<tracing::EventScheduler> event_scheduler,
                      HTTPClient::URL agent_url, Clock clock)
     : config_(std::move(config)),
@@ -104,6 +104,7 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       http_client_(client),
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
+      user_metrics_(std::move(user_metrics)),
       host_info_(get_host_info()) {
   // Register all the metrics that we're tracking by adding them to the
   // metrics_snapshots_ container. This allows for simpler iteration logic
