@@ -68,7 +68,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       tags_header_max_size_(config.tags_header_size),
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
-      baggage_extraction_enabled_(false) {
+      baggage_extraction_enabled_(false),
+      correlate_full_host_profiles_(config.correlate_full_host_profiles) {
   telemetry::init(config.telemetry, logger_, config.http_client,
                   std::vector<std::shared_ptr<telemetry::Metric>>{},
                   config.event_scheduler, config.agent_url);
@@ -107,9 +108,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 
 #ifdef __linux__
   // TODO: change the way this is done to handle programs that fork.
-  // TODO: add a flag to disable this by default.
-  elastic_apm_profiling_correlation_process_storage_v1 =
-      *signature_.generate_process_correlation_storage();
+  if (correlate_full_host_profiles_)
+    elastic_apm_profiling_correlation_process_storage_v1 =
+        *signature_.generate_process_correlation_storage();
 #endif
 
   if (config.log_on_startup) {
@@ -240,7 +241,7 @@ Span Tracer::create_span(const SpanConfig& config) {
             clock_};
 
 #ifdef __linux__
-  correlate(span);
+  if (correlate_full_host_profiles_) correlate(span);
 #endif
 
   return span;
@@ -447,7 +448,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
             clock_};
 
 #ifdef __linux__
-  correlate(span);
+  if (correlate_full_host_profiles_) correlate(span);
 #endif
 
   return span;
