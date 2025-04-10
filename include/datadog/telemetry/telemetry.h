@@ -18,7 +18,7 @@
 namespace datadog::telemetry {
 
 /// Initialize the telemetry module
-/// Once initialized, sends a notification indicating the the application has
+/// Once initialized, sends a notification indicating that the application has
 /// started. The telemetry module is running for the entire lifecycle of the
 /// application.
 ///
