@@ -261,7 +261,8 @@ void TraceSegment::span_finished() {
 
 #ifdef __linux__
   // When all spans are finished, so is the current trace.
-  elastic_apm_profiling_correlation_tls_v1->trace_present = 0;
+  if (elastic_apm_profiling_correlation_process_storage_v1 != nullptr)
+    elastic_apm_profiling_correlation_tls_v1->trace_present = 0;
 #endif
 }
 
