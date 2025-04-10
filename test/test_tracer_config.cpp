@@ -1316,6 +1316,87 @@ TRACER_CONFIG_TEST("configure 128-bit trace IDs") {
   }
 }
 
+#ifdef __linux__
+TRACER_CONFIG_TEST("TracerConfig::correlate_full_host_profiles") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.logger = std::make_shared<NullLogger>();
+
+  SECTION("default is false") {
+    {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      Tracer tracer{*finalized};
+      auto span = tracer.create_span();
+    }
+    REQUIRE(elastic_apm_profiling_correlation_process_storage_v1 == nullptr);
+    REQUIRE(elastic_apm_profiling_correlation_tls_v1 == nullptr);
+  }
+
+  SECTION("true enables correlation") {
+    {
+      config.correlate_full_host_profiles = true;
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      Tracer tracer{*finalized};
+      auto span = tracer.create_span();
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1 != nullptr);
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1->trace_present == 1);
+    }
+    REQUIRE(elastic_apm_profiling_correlation_process_storage_v1 != nullptr);
+    REQUIRE(elastic_apm_profiling_correlation_tls_v1 != nullptr);
+    REQUIRE(elastic_apm_profiling_correlation_tls_v1->trace_present == 0);
+    // reset for next tests
+    elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
+    elastic_apm_profiling_correlation_tls_v1 = nullptr;
+  }
+
+  SECTION("overridden by DD_TRACE_CORRELATE_FULL_HOST_PROFILES") {
+    struct TestCase {
+      std::string name;
+      std::string dd_trace_correlate_full_host_profiles;
+      bool original_value;
+      bool correlate;
+    };
+
+    auto test_case = GENERATE(values<TestCase>({
+        {"falsy override ('false')", "false", true, false},
+        {"falsy override ('0')", "0", true, false},
+        {"falsy consistent ('false')", "false", false, false},
+        {"falsy consistent ('0')", "0", false, false},
+        {"truthy override ('true')", "true", false, true},
+        {"truthy override ('1')", "1", false, true},
+        {"truthy consistent ('true')", "true", true, true},
+        {"truthy consistent ('1')", "1", true, true},
+    }));
+
+    CAPTURE(test_case.name);
+    const EnvGuard guard{"DD_TRACE_CORRELATE_FULL_HOST_PROFILES",
+                         test_case.dd_trace_correlate_full_host_profiles};
+    config.report_traces = test_case.original_value;
+    {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      Tracer tracer{*finalized};
+      auto span = tracer.create_span();
+      if (test_case.correlate) {
+        REQUIRE(elastic_apm_profiling_correlation_process_storage_v1 !=
+                nullptr);
+        REQUIRE(elastic_apm_profiling_correlation_tls_v1 != nullptr);
+        REQUIRE(elastic_apm_profiling_correlation_tls_v1->trace_present == 1);
+        // reset for next tests
+        elastic_apm_profiling_correlation_process_storage_v1 = nullptr;
+        elastic_apm_profiling_correlation_tls_v1 = nullptr;
+      } else {
+        REQUIRE(elastic_apm_profiling_correlation_process_storage_v1 ==
+                nullptr);
+        REQUIRE(elastic_apm_profiling_correlation_tls_v1 == nullptr);
+      }
+    }
+  }
+}
+#endif
+
 TRACER_CONFIG_TEST("baggage") {
   TracerConfig config;
 
