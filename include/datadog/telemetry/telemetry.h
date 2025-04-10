@@ -9,7 +9,6 @@
 #include <datadog/telemetry/metrics.h>
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 /// Telemetry functions are responsibles for handling internal telemetry data to
@@ -19,8 +18,9 @@
 namespace datadog::telemetry {
 
 /// Initialize the telemetry module
-/// Once initialized, the telemetry module is running for the entier lifecycle
-/// of the application.
+/// Once initialized, sends a notification indicating that the application has
+/// started. The telemetry module is running for the entire lifecycle of the
+/// application.
 ///
 /// @param configuration The finalized configuration settings.
 /// @param logger User logger instance.
@@ -35,21 +35,6 @@ void init(FinalizedConfiguration configuration,
           std::shared_ptr<tracing::EventScheduler> event_scheduler,
           tracing::HTTPClient::URL agent_url,
           tracing::Clock clock = tracing::default_clock);
-
-/// Sends a notification indicating that the application has started.
-///
-/// This function is responsible for reporting the application has successfully
-/// started. It takes a configuration map as a parameter, which contains various
-/// configuration settings helping to understand how our product are used.
-///
-/// @param conf A map containing configuration names and their corresponding
-/// metadata.
-///
-/// @note This function should be called after the application has completed its
-/// initialization process to ensure that all components are aware of the
-/// application's startup status.
-void send_app_started(const std::unordered_map<tracing::ConfigName,
-                                               tracing::ConfigMetadata>& conf);
 
 /// Sends configuration changes.
 ///

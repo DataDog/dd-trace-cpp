@@ -8,12 +8,14 @@
 #include <datadog/json.hpp>
 #include <unordered_set>
 
+#include "../common/environment.h"
 #include "datadog/runtime_id.h"
 #include "datadog/telemetry/telemetry_impl.h"
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
 
+namespace ddtest = datadog::test;
 using namespace datadog::tracing;
 using namespace datadog::telemetry;
 using namespace std::chrono_literals;
@@ -70,14 +72,10 @@ struct FakeEventScheduler : public EventScheduler {
 
 }  // namespace
 
-TEST_CASE("Tracer telemetry", "[telemetry]") {
-  const std::time_t mock_time = 1672484400;
-  const Clock clock = [&mock_time]() {
-    TimePoint result;
-    result.wall = std::chrono::system_clock::from_time_t(mock_time);
-    return result;
-  };
+#define TELEMETRY_IMPLEMENTATION_TEST(x) \
+  TEST_CASE(x, "[telemetry],[telemetry.impl]")
 
+TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
   auto logger = std::make_shared<MockLogger>();
   auto client = std::make_shared<MockHTTPClient>();
   auto scheduler = std::make_shared<FakeEventScheduler>();
@@ -88,21 +86,18 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
       /* environment = */ "test"};
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
-  Telemetry telemetry{*finalize_config(),
-                      logger,
-                      client,
-                      std::vector<std::shared_ptr<Metric>>{},
-                      scheduler,
-                      *url,
-                      clock};
 
-  SECTION("generates app-started message") {
+  SECTION("ctor send app-started message") {
     SECTION("Without a defined integration") {
+      Telemetry telemetry{*finalize_config(),
+                          logger,
+                          client,
+                          std::vector<std::shared_ptr<Metric>>{},
+                          scheduler,
+                          *url};
       /// By default the integration is `datadog` with the tracer version.
       /// TODO: remove the default because these datadog are already part of the
       /// request header.
-      telemetry.send_app_started({});
-
       auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
       REQUIRE(app_started["request_type"] == "message-batch");
@@ -114,6 +109,8 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
     }
 
     SECTION("With an integration") {
+      client->clear();
+
       Configuration cfg;
       cfg.integration_name = "nginx";
       cfg.integration_version = "1.25.2";
@@ -123,9 +120,6 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
                            std::vector<std::shared_ptr<Metric>>{},
                            scheduler,
                            *url};
-
-      client->clear();
-      telemetry2.send_app_started({});
 
       auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
@@ -140,14 +134,69 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
       }
     }
 
+    SECTION("With installation signature") {
+      client->clear();
+
+      ddtest::EnvGuard install_id_env("DD_INSTRUMENTATION_INSTALL_ID",
+                                      "68e75c48-57ca-4a12-adfc-575c4b05fcbe");
+      ddtest::EnvGuard install_type_env("DD_INSTRUMENTATION_INSTALL_TYPE",
+                                        "k8s_single_step");
+      ddtest::EnvGuard install_time_env("DD_INSTRUMENTATION_INSTALL_TIME",
+                                        "1703188212");
+
+      Telemetry telemetry4{*finalize_config(),
+                           logger,
+                           client,
+                           std::vector<std::shared_ptr<Metric>>{},
+                           scheduler,
+                           *url};
+
+      auto app_started = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(app_started) == true);
+      REQUIRE(app_started["request_type"] == "message-batch");
+      REQUIRE(app_started["payload"].is_array());
+      REQUIRE(app_started["payload"].size() == 2);
+
+      auto& app_started_payload = app_started["payload"][0];
+      CHECK(app_started_payload["request_type"] == "app-started");
+
+      auto install_payload =
+          app_started_payload["payload"]["install_signature"];
+      REQUIRE(install_payload.is_object());
+
+      REQUIRE(install_payload.contains("install_id") == true);
+      CHECK(install_payload["install_id"] ==
+            "68e75c48-57ca-4a12-adfc-575c4b05fcbe");
+
+      REQUIRE(install_payload.contains("install_id") == true);
+      CHECK(install_payload["install_type"] == "k8s_single_step");
+
+      REQUIRE(install_payload.contains("install_id") == true);
+      CHECK(install_payload["install_time"] == "1703188212");
+    }
+
     SECTION("With configuration") {
-      std::unordered_map<ConfigName, ConfigMetadata> configuration{
+      client->clear();
+
+      Product product;
+      product.name = Product::Name::tracing;
+      product.enabled = true;
+      product.version = tracer_version;
+      product.configurations = std::unordered_map<ConfigName, ConfigMetadata>{
           {ConfigName::SERVICE_NAME,
            ConfigMetadata(ConfigName::SERVICE_NAME, "foo",
-                          ConfigMetadata::Origin::CODE)}};
+                          ConfigMetadata::Origin::CODE)},
+      };
 
-      client->clear();
-      telemetry.send_app_started(configuration);
+      Configuration cfg;
+      cfg.products.emplace_back(std::move(product));
+
+      Telemetry telemetry3{*finalize_config(cfg),
+                           logger,
+                           client,
+                           std::vector<std::shared_ptr<Metric>>{},
+                           scheduler,
+                           *url};
 
       auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
@@ -176,7 +225,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
       SECTION("generates a configuration change event") {
         SECTION("empty configuration do not generate a valid payload") {
           client->clear();
-          telemetry.send_configuration_change();
+          telemetry3.send_configuration_change();
 
           CHECK(client->request_body.empty());
         }
@@ -189,8 +238,8 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
                Error{Error::Code::OTHER, "empty field"}}};
 
           client->clear();
-          telemetry.capture_configuration_change(new_config);
-          telemetry.send_configuration_change();
+          telemetry3.capture_configuration_change(new_config);
+          telemetry3.send_configuration_change();
 
           auto updates = client->request_body;
           REQUIRE(!updates.empty());
@@ -241,12 +290,58 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
 
           // No update -> no configuration update
           client->clear();
-          telemetry.send_configuration_change();
+          telemetry3.send_configuration_change();
           CHECK(client->request_body.empty());
         }
       }
     }
   }
+
+  SECTION("dtor send app-closing message") {
+    {
+      Telemetry telemetry{*finalize_config(),
+                          logger,
+                          client,
+                          std::vector<std::shared_ptr<Metric>>{},
+                          scheduler,
+                          *url};
+      client->clear();
+    }
+
+    auto message_batch = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(message_batch) == true);
+    REQUIRE(message_batch["payload"].size() == 1);
+    auto heartbeat = message_batch["payload"][0];
+    REQUIRE(heartbeat["request_type"] == "app-closing");
+  }
+}
+
+TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
+  const std::time_t mock_time = 1672484400;
+  const Clock clock = [&mock_time]() {
+    TimePoint result;
+    result.wall = std::chrono::system_clock::from_time_t(mock_time);
+    return result;
+  };
+
+  auto logger = std::make_shared<MockLogger>();
+  auto client = std::make_shared<MockHTTPClient>();
+  auto scheduler = std::make_shared<FakeEventScheduler>();
+
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
+
+  auto url = HTTPClient::URL::parse("http://localhost:8000");
+
+  Telemetry telemetry{*finalize_config(),
+                      logger,
+                      client,
+                      std::vector<std::shared_ptr<Metric>>{},
+                      scheduler,
+                      *url,
+                      clock};
 
   SECTION("generates a heartbeat message") {
     client->clear();
@@ -286,17 +381,6 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
     REQUIRE(points.size() == 1);
     REQUIRE(points[0][0] == mock_time);
     REQUIRE(points[0][1] == 1);
-  }
-
-  SECTION("generates an app-closing event") {
-    client->clear();
-    telemetry.send_app_closing();
-
-    auto message_batch = nlohmann::json::parse(client->request_body);
-    REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-    REQUIRE(message_batch["payload"].size() == 1);
-    auto heartbeat = message_batch["payload"][0];
-    REQUIRE(heartbeat["request_type"] == "app-closing");
   }
 
   SECTION("logs serialization") {
@@ -370,7 +454,7 @@ TEST_CASE("Tracer telemetry", "[telemetry]") {
   }
 }
 
-TEST_CASE("Tracer telemetry configuration", "[telemetry]") {
+TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
   // Cases:
   //  - when `report_metrics` is set to false. No metrics are reported.
   //  - when `report_logs` is set to false. No logs are reported.
