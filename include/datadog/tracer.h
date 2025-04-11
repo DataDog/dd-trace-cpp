@@ -10,6 +10,10 @@
 // obtained from a `TracerConfig` via the `finalize_config` function.  See
 // `tracer_config.h`.
 
+#ifdef __linux__
+#include <datadog/tls_storage.h>
+#endif
+
 #include <cstddef>
 #include <memory>
 
@@ -22,6 +26,12 @@
 #include "span_config.h"
 #include "tracer_config.h"
 #include "tracer_signature.h"
+
+#ifdef __linux__
+extern const void* elastic_apm_profiling_correlation_process_storage_v1;
+extern thread_local struct datadog::tracing::TLSStorage*
+    elastic_apm_profiling_correlation_tls_v1;
+#endif
 
 namespace datadog {
 namespace tracing {
@@ -54,6 +64,7 @@ class Tracer {
   Baggage::Options baggage_opts_;
   bool baggage_injection_enabled_;
   bool baggage_extraction_enabled_;
+  bool correlate_full_host_profiles_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:
@@ -105,6 +116,9 @@ class Tracer {
   std::string config() const;
 
  private:
+#ifdef __linux__
+  void correlate(const Span& span);
+#endif
   void store_config();
 };
 

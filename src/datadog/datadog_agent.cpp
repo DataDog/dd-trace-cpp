@@ -184,8 +184,11 @@ DatadogAgent::~DatadogAgent() {
 Expected<void> DatadogAgent::send(
     std::vector<std::unique_ptr<SpanData>>&& spans,
     const std::shared_ptr<TraceSampler>& response_handler) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  trace_chunks_.push_back(TraceChunk{std::move(spans), response_handler});
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    trace_chunks_.push_back(TraceChunk{std::move(spans), response_handler});
+  }
+  flush();
   return nullopt;
 }
 
