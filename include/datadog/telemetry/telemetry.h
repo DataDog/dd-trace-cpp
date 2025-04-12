@@ -57,21 +57,24 @@ void send_configuration_change();
 void capture_configuration_change(
     const std::vector<tracing::ConfigMetadata>& new_configuration);
 
+/// The `log` namespace provides functions for reporting logs.
+namespace log {
 /// Report internal warning message to Datadog.
 ///
 /// @param message The warning message to log.
-void report_warning_log(std::string message);
+void warning(std::string message);
 
 /// Report internal error message to Datadog.
 ///
 /// @param message The error message.
-void report_error_log(std::string message);
+void error(std::string message);
 
 /// Report internal error message to Datadog.
 ///
 /// @param message The error message.
 /// @param stacktrace Stacktrace leading to the error.
-void report_error_log(std::string message, std::string stacktrace);
+void error(std::string message, std::string stacktrace);
+}  // namespace log
 
 /// The `counter` namespace provides functions to track values.
 /// Counters can be useful for tracking the total number of an event occurring

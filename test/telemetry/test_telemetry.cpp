@@ -672,77 +672,109 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
         }
       }
     }
+  }
 
-    SECTION("logs serialization") {
-      SECTION("log level is correct") {
-        struct TestCase {
-          std::string_view name;
-          std::string input;
-          Optional<std::string> stacktrace;
-          std::function<void(Telemetry&, const std::string&,
-                             const Optional<std::string>& stacktrace)>
-              apply;
-          std::string expected_log_level;
-        };
+  SECTION("logs reporting") {
+    SECTION("log level is correct") {
+      struct TestCase {
+        std::string_view name;
+        std::string input;
+        Optional<std::string> stacktrace;
+        std::function<void(Telemetry&, const std::string&,
+                           const Optional<std::string>& stacktrace)>
+            apply;
+        std::string expected_log_level;
+      };
 
-        auto test_case = GENERATE(values<TestCase>({
-            {
-                "warning log",
-                "This is a warning log!",
-                nullopt,
-                [](Telemetry& telemetry, const std::string& input,
-                   const Optional<std::string>&) {
-                  telemetry.log_warning(input);
-                },
-                "WARNING",
-            },
-            {
-                "error log",
-                "This is an error log!",
-                nullopt,
-                [](Telemetry& telemetry, const std::string& input,
-                   const Optional<std::string>&) {
-                  telemetry.log_error(input);
-                },
-                "ERROR",
-            },
-            {
-                "error log with stacktrace",
-                "This is an error log with a fake stacktrace!",
-                "error here\nthen here\nfinally here\n",
-                [](Telemetry& telemetry, const std::string& input,
-                   Optional<std::string> stacktrace) {
-                  telemetry.log_error(input, *stacktrace);
-                },
-                "ERROR",
-            },
-        }));
+      auto test_case = GENERATE(values<TestCase>({
+          {
+              "warning log",
+              "This is a warning log!",
+              nullopt,
+              [](Telemetry& telemetry, const std::string& input,
+                 const Optional<std::string>&) {
+                telemetry.log_warning(input);
+              },
+              "WARNING",
+          },
+          {
+              "error log",
+              "This is an error log!",
+              nullopt,
+              [](Telemetry& telemetry, const std::string& input,
+                 const Optional<std::string>&) { telemetry.log_error(input); },
+              "ERROR",
+          },
+          {
+              "error log with stacktrace",
+              "This is an error log with a fake stacktrace!",
+              "error here\nthen here\nfinally here\n",
+              [](Telemetry& telemetry, const std::string& input,
+                 Optional<std::string> stacktrace) {
+                telemetry.log_error(input, *stacktrace);
+              },
+              "ERROR",
+          },
+      }));
 
-        CAPTURE(test_case.name);
+      CAPTURE(test_case.name);
 
-        client->clear();
-        test_case.apply(telemetry, test_case.input, test_case.stacktrace);
-        scheduler->trigger_heartbeat();
+      client->clear();
+      test_case.apply(telemetry, test_case.input, test_case.stacktrace);
+      scheduler->trigger_heartbeat();
 
-        auto message_batch = nlohmann::json::parse(client->request_body);
-        REQUIRE(is_valid_telemetry_payload(message_batch));
-        REQUIRE(message_batch["payload"].size() == 2);
+      auto message_batch = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch));
+      REQUIRE(message_batch["payload"].size() == 2);
 
-        auto logs_message = message_batch["payload"][1];
-        REQUIRE(logs_message["request_type"] == "logs");
+      auto logs_message = message_batch["payload"][1];
+      REQUIRE(logs_message["request_type"] == "logs");
 
-        auto logs_payload = logs_message["payload"]["logs"];
-        REQUIRE(logs_payload.size() == 1);
-        CHECK(logs_payload[0]["level"] == test_case.expected_log_level);
-        CHECK(logs_payload[0]["message"] == test_case.input);
-        CHECK(logs_payload[0].contains("tracer_time"));
+      auto logs_payload = logs_message["payload"]["logs"];
+      REQUIRE(logs_payload.size() == 1);
+      CHECK(logs_payload[0]["level"] == test_case.expected_log_level);
+      CHECK(logs_payload[0]["message"] == test_case.input);
+      CHECK(logs_payload[0]["tracer_time"] == 1672484400);
 
-        if (test_case.stacktrace) {
-          CHECK(logs_payload[0]["stack_trace"] == test_case.stacktrace);
-        } else {
-          CHECK(logs_payload[0].contains("stack_trace") == false);
-        }
+      if (test_case.stacktrace) {
+        CHECK(logs_payload[0]["stack_trace"] == test_case.stacktrace);
+      } else {
+        CHECK(logs_payload[0].contains("stack_trace") == false);
       }
+
+      // Make sure the next heartbeat doesn't contains counters if no
+      // datapoint has been incremented, decremented or set.
+      client->clear();
+      scheduler->trigger_heartbeat();
+
+      auto message_batch2 = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
+      REQUIRE(message_batch2["payload"].size() == 1);
+
+      auto payload2 = message_batch["payload"][0];
+      CHECK(payload2["request_type"] == "app-heartbeat");
+    }
+
+    SECTION("dtor sends logs in `app-closing` message") {
+      {
+        Telemetry tmp_telemetry{*finalize_config(), logger, client,
+                                scheduler,          *url,   clock};
+        tmp_telemetry.log_warning("Be careful!");
+        client->clear();
+      }
+
+      auto message_batch = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch));
+      REQUIRE(message_batch["payload"].size() == 2);
+
+      auto logs_message = message_batch["payload"][1];
+      REQUIRE(logs_message["request_type"] == "logs");
+
+      auto logs_payload = logs_message["payload"]["logs"];
+      REQUIRE(logs_payload.size() == 1);
+      CHECK(logs_payload[0]["level"] == "WARNING");
+      CHECK(logs_payload[0]["message"] == "Be careful!");
+      CHECK(logs_payload[0]["tracer_time"] == 1672484400);
     }
   }
 }
