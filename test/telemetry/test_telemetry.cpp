@@ -294,10 +294,9 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
 }
 
 TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
-  const std::time_t mock_time = 1672484400;
-  const Clock clock = [&mock_time]() {
+  const Clock clock = [] {
     TimePoint result;
-    result.wall = std::chrono::system_clock::from_time_t(mock_time);
+    result.wall = std::chrono::system_clock::from_time_t(1672484400);
     return result;
   };
 
@@ -606,11 +605,6 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
     SECTION("dtor sends metrics and distributions") {
       // metrics captured before the aggregation task
-      const Clock clock = [] {
-        TimePoint result;
-        result.wall = std::chrono::system_clock::from_time_t(1744706125);
-        return result;
-      };
       const Distribution response_time{"response_time", "dist-test", false};
       const Rate rps{"request", "rate-test", true};
       const Counter my_counter{"my_counter", "counter-test", true};
@@ -642,7 +636,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
                   "metric":"my_counter",
                   "namespace":"counter-test",
                   "type": "count",
-                  "points": [[1744706125, 1]]
+                  "points": [[1672484400, 1]]
                 }
               )");
               CHECK(s == expected_counter);
@@ -653,7 +647,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
                   "metric":"request",
                   "namespace":"rate-test",
                   "type": "rate",
-                  "points": [[1744706125, 1000]]
+                  "points": [[1672484400, 1000]]
                 }
               )");
               CHECK(s == expected_rate);
