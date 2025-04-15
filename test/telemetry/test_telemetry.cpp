@@ -609,11 +609,11 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       const Rate rps{"request", "rate-test", true};
       const Counter my_counter{"my_counter", "counter-test", true};
       {
-        Telemetry telemetry{*finalize_config(), logger, client,
-                            scheduler,          *url,   clock};
-        telemetry.increment_counter(my_counter);  // = 1
-        telemetry.add_datapoint(response_time, 128);
-        telemetry.set_rate(rps, 1000);
+        Telemetry tmp_telemetry{*finalize_config(), logger, client,
+                                scheduler,          *url,   clock};
+        tmp_telemetry.increment_counter(my_counter);  // = 1
+        tmp_telemetry.add_datapoint(response_time, 128);
+        tmp_telemetry.set_rate(rps, 1000);
         client->clear();
       }
 
