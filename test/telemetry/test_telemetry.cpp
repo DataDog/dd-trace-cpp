@@ -445,7 +445,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
           }
         ]
       )");
-      CHECK(is_same_json(series, expected_metrics));
+      CHECK(series == expected_metrics);
     }
 
     SECTION("rate") {
@@ -501,7 +501,14 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
           }
         ]
       )");
-      CHECK(is_same_json(series, expected_metrics));
+
+      for (const auto& s : series) {
+        if (s.contains("tags")) {
+          CHECK(s == expected_metrics[0]);
+        } else {
+          CHECK(s == expected_metrics[1]);
+        }
+      }
 
       // Make sure the next heartbeat doesn't contains distributions if no
       // datapoint has been added to a distribution.
