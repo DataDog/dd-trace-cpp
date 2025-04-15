@@ -404,6 +404,43 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       CHECK(payload2["request_type"] == "app-heartbeat");
     }
 
+    SECTION("counters can't go below zero") {
+      client->clear();
+      const Counter positive_counter{"positive_counter", "counter-test2", true};
+      telemetry.decrement_counter(positive_counter);  // = 0
+      telemetry.decrement_counter(positive_counter);  // = 0
+      telemetry.decrement_counter(positive_counter);  // = 0
+
+      scheduler->trigger_metrics_capture();
+      scheduler->trigger_heartbeat();
+
+      auto message_batch = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
+      REQUIRE(message_batch["payload"].size() == 2);
+
+      auto generate_metrics = message_batch["payload"][1];
+      REQUIRE(generate_metrics["request_type"] == "generate-metrics");
+      auto payload = generate_metrics["payload"];
+
+      auto series = payload["series"];
+      REQUIRE(series.size() == 1);
+
+      const auto expected_metrics = nlohmann::json::parse(R"(
+        [
+          {
+            "common": true,
+            "metric": "positive_counter",
+            "namespace": "counter-test2",
+            "points": [
+              [ 1672484400, 0 ]
+            ],
+            "type": "count"
+          }
+        ]
+      )");
+      CHECK(series == expected_metrics);
+    }
+
     SECTION("rate") {
       client->clear();
 
