@@ -74,7 +74,7 @@ void report_error_log(std::string message);
 void report_error_log(std::string message, std::string stacktrace);
 
 /// The `counter` namespace provides functions to track values.
-/// Counters can be useful for tracking the total number of an event occuring in
+/// Counters can be useful for tracking the total number of an event occurring in
 /// one time interval. For example, the amount of requests, errors or jobs
 /// processed every 10 seconds.
 namespace counter {
@@ -118,7 +118,7 @@ void set(const Counter& counter, const std::vector<std::string>& tags,
 }  // namespace counter
 
 /// The `rate` namespace provides support for rate metrics-values.
-/// Rates can be useful for tracking the total number of an event occurences  in
+/// Rates can be useful for tracking the total number of an event occurrences  in
 /// one time interval. For example, the number of requests per second.
 namespace rate {
 
