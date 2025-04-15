@@ -364,34 +364,32 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       auto series = payload["series"];
       REQUIRE(series.size() == 2);
 
-      for (const auto& s : series) {
-        CHECK(s["metric"] == "my_counter");
-        CHECK(s["type"] == "count");
-        CHECK(s["common"] == true);
-        CHECK(s["namespace"] == "counter-test");
-        if (s.contains("tags")) {
-          REQUIRE(s["tags"].size() == 1);
-          CHECK(s["tags"][0] == "event:test");
-
-          auto points = s["points"];
-          REQUIRE(points.size() == 1);
-
-          CHECK(points[0][0] == mock_time);
-          CHECK(points[0][1] == 99);
-        } else {
-          auto points = s["points"];
-          REQUIRE(points.size() == 3);
-
-          CHECK(points[0][0] == mock_time);
-          CHECK(points[0][1] == 2);
-
-          CHECK(points[1][0] == mock_time);
-          CHECK(points[1][1] == 1);
-
-          CHECK(points[2][0] == mock_time);
-          CHECK(points[2][1] == 42);
-        }
-      }
+      const auto expected_metrics = nlohmann::json::parse(R"(
+        [
+          {
+            "common": true,
+            "metric": "my_counter",
+            "namespace": "counter-test",
+            "points": [
+              [ 1672484400, 99 ]
+            ],
+            "tags": [ "event:test" ],
+            "type": "count"
+          },
+          {
+            "common": true,
+            "metric": "my_counter",
+            "namespace": "counter-test",
+            "points": [
+              [ 1672484400, 2 ],
+              [ 1672484400, 1 ],
+              [ 1672484400, 42 ]
+            ],
+            "type": "count"
+          }
+        ]
+      )");
+      CHECK(series == expected_metrics);
 
       // Make sure the next heartbeat doesn't contains counters if no
       // datapoint has been incremented, decremented or set.
@@ -435,31 +433,31 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       auto series = payload["series"];
       REQUIRE(series.size() == 2);
 
-      for (const auto& s : series) {
-        CHECK(s["metric"] == "request");
-        CHECK(s["type"] == "rate");
-        CHECK(s["common"] == true);
-        CHECK(s["namespace"] == "rate-test");
-        if (s.contains("tags")) {
-          REQUIRE(s["tags"].size() == 1);
-          CHECK(s["tags"][0] == "status:2xx");
-
-          auto points = s["points"];
-          REQUIRE(points.size() == 1);
-
-          CHECK(points[0][0] == mock_time);
-          CHECK(points[0][1] == 5000);
-        } else {
-          auto points = s["points"];
-          REQUIRE(points.size() == 2);
-
-          CHECK(points[0][0] == mock_time);
-          CHECK(points[0][1] == 1000);
-
-          CHECK(points[1][0] == mock_time);
-          CHECK(points[1][1] == 5000);
-        }
-      }
+      const auto expected_metrics = nlohmann::json::parse(R"(
+        [
+          {
+            "common": true,
+            "metric": "request",
+            "namespace": "rate-test",
+            "points": [
+              [ 1672484400, 5000 ]
+            ],
+            "tags": [ "status:2xx" ],
+            "type": "rate"
+          },
+          {
+            "common": true,
+            "metric": "request",
+            "namespace": "rate-test",
+            "points": [
+              [ 1672484400, 1000 ],
+              [ 1672484400, 5000 ]
+            ],
+            "type": "rate"
+          }
+        ]
+      )");
+      CHECK(series == expected_metrics);
 
       // Make sure the next heartbeat doesn't contains distributions if no
       // datapoint has been added to a distribution.
@@ -506,43 +504,29 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       auto distribution_series = distribution_message["payload"]["series"];
       REQUIRE(distribution_series.size() == 3);
 
-      for (auto& dist : distribution_series) {
-        if (dist["metric"] == "response_time") {
-          CHECK(dist["common"] == false);
-          CHECK(dist["namespace"] == "dist-test");
-          if (dist.contains("tags")) {
-            const std::vector<std::string> expected_tags{"status:200",
-                                                         "method:GET"};
-            CHECK(dist["tags"] == expected_tags);
-
-            auto datapoint = dist["points"];
-            REQUIRE(datapoint.size() == 1);
-
-            const std::vector<uint64_t> expected_points{6530};
-            CHECK(expected_points == datapoint);
-          } else {
-            auto datapoint = dist["points"];
-            REQUIRE(datapoint.size() == 3);
-
-            const std::vector<uint64_t> expected_points{128, 42, 3000};
-            CHECK(expected_points == datapoint);
-          }
-        } else if (dist["metric"] == "request_size") {
-          CHECK(dist["common"] == true);
-          CHECK(dist["namespace"] == "dist-test-2");
-
-          auto datapoint = dist["points"];
-          REQUIRE(datapoint.size() == 2);
-
-          const std::vector<uint64_t> expected_points{1843, 4135};
-          CHECK(expected_points == datapoint);
-        } else {
-          FAIL(
-              "expected distribution name {response_time, request_size} but "
-              "got "
-              << dist["metric"]);
+      const auto expected_series = nlohmann::json::parse(R"([
+        {
+           "common":false,
+           "metric":"response_time",
+           "namespace":"dist-test",
+           "points": [6530],
+           "tags":["status:200","method:GET"]
+        },
+        {
+           "common":true,
+           "metric": "request_size",
+           "namespace":"dist-test-2",
+           "points":[1843,4135]
+        },
+        {
+           "common": false,
+           "metric":"response_time",
+           "namespace":"dist-test",
+           "points":[128,42,3000]
         }
-      }
+      ])");
+
+      CHECK(distribution_series == expected_series);
 
       // Make sure the next heartbeat doesn't contains distributions if no
       // datapoint has been added to a distribution.
@@ -555,6 +539,81 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto payload = message_batch["payload"][0];
       CHECK(payload["request_type"] == "app-heartbeat");
+    }
+
+    SECTION("dtor sends metrics and distributions") {
+      // metrics captured before the aggregation task
+      const Clock clock = [] {
+        TimePoint result;
+        result.wall = std::chrono::system_clock::from_time_t(1744706125);
+        return result;
+      };
+      const Distribution response_time{"response_time", "dist-test", false};
+      const Rate rps{"request", "rate-test", true};
+      const Counter my_counter{"my_counter", "counter-test", true};
+      {
+        Telemetry telemetry{*finalize_config(), logger, client,
+                            scheduler,          *url,   clock};
+        telemetry.increment_counter(my_counter);  // = 1
+        telemetry.add_datapoint(response_time, 128);
+        telemetry.set_rate(rps, 1000);
+        client->clear();
+      }
+
+      // Expect 2 metrics with 1 datapoint each and 1 ditribution
+      auto message_batch = nlohmann::json::parse(client->request_body);
+      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
+      REQUIRE(message_batch["payload"].size() == 3);
+
+      for (const auto& payload : message_batch["payload"]) {
+        const auto& req_type = payload["request_type"];
+        if (req_type == "generate-metrics") {
+          const auto& metrics_series = payload["payload"]["series"];
+          REQUIRE(metrics_series.size() == 2);
+
+          for (const auto& s : metrics_series) {
+            if (s["metric"] == "my_counter") {
+              const auto expected_counter = nlohmann::json::parse(R"(
+                {
+                  "common":true,
+                  "metric":"my_counter",
+                  "namespace":"counter-test",
+                  "type": "count",
+                  "points": [[1744706125, 1]]
+                }
+              )");
+              CHECK(s == expected_counter);
+            } else if (s["metric"] == "request") {
+              const auto expected_rate = nlohmann::json::parse(R"(
+                {
+                  "common":true,
+                  "metric":"request",
+                  "namespace":"rate-test",
+                  "type": "rate",
+                  "points": [[1744706125, 1000]]
+                }
+              )");
+              CHECK(s == expected_rate);
+            } else {
+              FAIL("unexpected metrics name, got " << s["metric"]);
+            }
+          }
+        } else if (req_type == "distributions") {
+          const auto& distribution_series = payload["payload"]["series"];
+          REQUIRE(distribution_series.size() == 1);
+
+          const auto& d0 = distribution_series[0];
+          const auto expected_d0 = nlohmann::json::parse(R"(
+            {
+              "common":false,
+              "metric":"response_time",
+              "namespace":"dist-test",
+              "points": [128]
+            }
+          )");
+          CHECK(d0 == expected_d0);
+        }
+      }
     }
 
     SECTION("logs serialization") {

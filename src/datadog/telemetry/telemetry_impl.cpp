@@ -406,8 +406,9 @@ std::string Telemetry::app_closing() {
   });
   batch_payloads.emplace_back(std::move(app_closing));
 
-  auto metrics = nlohmann::json::array();
-
+  nlohmann::json::array_t metrics = nlohmann::json::array();
+  encode_metrics(metrics, counters_snapshot_);
+  encode_metrics(metrics, rates_snapshot_);
   if (!metrics.empty()) {
     auto generate_metrics = nlohmann::json::object({
         {"request_type", "generate-metrics"},
@@ -416,6 +417,20 @@ std::string Telemetry::app_closing() {
                     })},
     });
     batch_payloads.emplace_back(std::move(generate_metrics));
+  }
+
+  if (auto distributions_series = encode_distributions(distributions_);
+      !distributions_.empty()) {
+    auto distributions_json = nlohmann::json{
+        {"request_type", "distributions"},
+        {
+            "payload",
+            nlohmann::json{
+                {"series", distributions_series},
+            },
+        },
+    };
+    batch_payloads.emplace_back(std::move(distributions_json));
   }
 
   if (!logs_.empty()) {
