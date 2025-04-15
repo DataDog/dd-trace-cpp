@@ -16,16 +16,14 @@
 #include <utility>
 #include <vector>
 
-#include "collector_response.h"
 #include "config_manager.h"
 #include "hex.h"
-#include "json.hpp"
 #include "platform_util.h"
-#include "random.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
 #include "tags.h"
+#include "telemetry_metrics.h"
 #include "trace_sampler.h"
 #include "w3c_propagation.h"
 
@@ -142,7 +140,7 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
-  telemetry::metrics().tracer.spans_created.inc();
+  telemetry::counter::increment(metrics::tracer::spans_created);
 
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
@@ -151,7 +149,7 @@ void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
 
 void TraceSegment::span_finished() {
   {
-    telemetry::metrics().tracer.spans_finished.inc();
+    telemetry::counter::increment(metrics::tracer::spans_finished);
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
     assert(num_finished_spans_ <= spans_.size());
@@ -242,7 +240,7 @@ void TraceSegment::span_finished() {
     }
   }
 
-  telemetry::metrics().tracer.trace_segments_closed.inc();
+  telemetry::counter::increment(metrics::tracer::trace_segments_closed);
 }
 
 void TraceSegment::override_sampling_priority(SamplingPriority priority) {
