@@ -76,16 +76,21 @@ std::string to_string(datadog::tracing::ConfigName name) {
   std::abort();
 }
 
-nlohmann::json encode_log(const telemetry::LogMessage& log) {
-  auto encoded = nlohmann::json{
-      {"message", log.message},
-      {"level", to_string(log.level)},
-      {"tracer_time", log.timestamp},
-  };
-  if (log.stacktrace) {
-    encoded.emplace("stack_trace", *log.stacktrace);
+nlohmann::json encode_logs(const std::vector<telemetry::LogMessage>& logs) {
+  auto encoded_logs = nlohmann::json::array();
+  for (auto& log : logs) {
+    auto encoded = nlohmann::json{
+        {"message", log.message},
+        {"level", to_string(log.level)},
+        {"tracer_time", log.timestamp},
+    };
+    if (log.stacktrace) {
+      encoded.emplace("stack_trace", *log.stacktrace);
+    }
+
+    encoded_logs.emplace_back(std::move(encoded));
   }
-  return encoded;
+  return encoded_logs;
 }
 
 std::string_view to_string(details::MetricType type) {
@@ -371,13 +376,14 @@ std::string Telemetry::heartbeat_and_telemetry() {
     batch_payloads.emplace_back(std::move(distributions_json));
   }
 
-  if (!logs_.empty()) {
-    auto encoded_logs = nlohmann::json::array();
-    for (const auto& log : logs_) {
-      auto encoded = encode_log(log);
-      encoded_logs.emplace_back(std::move(encoded));
-    }
+  std::vector<telemetry::LogMessage> old_logs;
+  {
+    std::lock_guard l{log_mutex_};
+    std::swap(old_logs, logs_);
+  }
 
+  if (!old_logs.empty()) {
+    auto encoded_logs = encode_logs(old_logs);
     assert(!encoded_logs.empty());
 
     auto logs_payload = nlohmann::json::object({
@@ -434,12 +440,7 @@ std::string Telemetry::app_closing() {
   }
 
   if (!logs_.empty()) {
-    auto encoded_logs = nlohmann::json::array();
-    for (const auto& log : logs_) {
-      auto encoded = encode_log(log);
-      encoded_logs.emplace_back(std::move(encoded));
-    }
-
+    auto encoded_logs = encode_logs(logs_);
     assert(!encoded_logs.empty());
 
     auto logs_payload = nlohmann::json::object({
@@ -667,6 +668,7 @@ void Telemetry::log(std::string message, telemetry::LogLevel level,
   auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
                        clock_().wall.time_since_epoch())
                        .count();
+  std::lock_guard l{log_mutex_};
   logs_.emplace_back(
       telemetry::LogMessage{std::move(message), level, stacktrace, timestamp});
 }
