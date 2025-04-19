@@ -26,6 +26,12 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
   WriteCallback on_write_ = nullptr;
   CURL *added_handle_ = nullptr;
   CURLMsg message_;
+  enum class state {
+    unknown,
+    added,
+    performed,
+    finished
+  } state_ = state::unknown;
   // Since `SingleRequestMockCurlLibrary` supports at most one request,
   // `created_handles_` and `destroyed_handles_` will have size zero or one.
   std::unordered_multiset<CURL *> created_handles_;
@@ -76,6 +82,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
 
   CURLMcode multi_add_handle(CURLM *, CURL *easy_handle) override {
     added_handle_ = easy_handle;
+    state_ = state::added;
     return CURLM_OK;
   }
   CURLMsg *multi_info_read(CURLM *, int *msgs_in_queue) override {
@@ -85,7 +92,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
     }
 
     *msgs_in_queue = added_handle_ != nullptr;
-    if (*msgs_in_queue == 0) {
+    if (*msgs_in_queue == 0 || state_ != state::performed) {
       return nullptr;
     }
     message_.msg = CURLMSG_DONE;
@@ -127,6 +134,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
     REQUIRE(on_write_(body.data() + body.size() / 2, 1, remaining,
                       user_data_on_write_) == remaining);
 
+    state_ = state::performed;
     return CURLM_OK;
   }
   CURLMcode multi_remove_handle(CURLM *, CURL *easy_handle) override {
