@@ -382,7 +382,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   const auto span_data_ptr = span_data.get();
   telemetry::counter::increment(metrics::tracer::trace_segments_created,
-                                {"new_continued:new"});
+                                {"new_continued:continued"});
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
       config_manager_->span_defaults(), config_manager_, runtime_id_,
@@ -445,11 +445,11 @@ Expected<void> Tracer::inject(const Baggage& baggage, DictWriter& writer) {
     if (err->code == Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED) {
       telemetry::counter::increment(
           metrics::tracer::context_header_truncated,
-          {"truncation_reason:baggage_item_count_exceeded"});
+          {"truncation_reason:baggage_byte_count_exceeded"});
     } else if (err->code == Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED) {
       telemetry::counter::increment(
           metrics::tracer::context_header_truncated,
-          {"truncation_reason:baggage_byte_count_exceeded"});
+          {"truncation_reason:baggage_item_count_exceeded"});
     }
   }
 

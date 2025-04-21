@@ -18,9 +18,6 @@
 
 namespace datadog::telemetry {
 
-// This uses a reference_wrapper so references to internal metric values can
-// be captured, and be iterated trivially when the values need to be
-// snapshotted and published in telemetry messages.
 using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
 
 /// The telemetry class is responsible for handling internal telemetry data to
