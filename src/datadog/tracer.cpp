@@ -26,6 +26,7 @@
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tags.h"
+#include "telemetry_metrics.h"
 #include "trace_sampler.h"
 #include "w3c_propagation.h"
 
@@ -59,7 +60,6 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       baggage_injection_enabled_(false),
       baggage_extraction_enabled_(false) {
   telemetry::init(config.telemetry, logger_, config.http_client,
-                  std::vector<std::shared_ptr<telemetry::Metric>>{},
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {
     hostname_ = get_hostname();
@@ -181,7 +181,8 @@ Span Tracer::create_span(const SpanConfig& config) {
   }
 
   const auto span_data_ptr = span_data.get();
-  telemetry::metrics().tracer.trace_segments_created_new.inc();
+  telemetry::counter::increment(metrics::tracer::trace_segments_created,
+                                {"new_continued:new"});
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
       defaults, config_manager_, runtime_id_, injection_styles_, hostname_,
@@ -380,7 +381,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   const auto span_data_ptr = span_data.get();
-  telemetry::metrics().tracer.trace_segments_created_continued.inc();
+  telemetry::counter::increment(metrics::tracer::trace_segments_created,
+                                {"new_continued:continued"});
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
       config_manager_->span_defaults(), config_manager_, runtime_id_,
@@ -441,9 +443,13 @@ Expected<void> Tracer::inject(const Baggage& baggage, DictWriter& writer) {
         err->with_prefix("failed to serialize all baggage items: "));
 
     if (err->code == Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED) {
-      telemetry::metrics().tracer.baggage_bytes_exceeded.inc();
+      telemetry::counter::increment(
+          metrics::tracer::context_header_truncated,
+          {"truncation_reason:baggage_byte_count_exceeded"});
     } else if (err->code == Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED) {
-      telemetry::metrics().tracer.baggage_items_exceeded.inc();
+      telemetry::counter::increment(
+          metrics::tracer::context_header_truncated,
+          {"truncation_reason:baggage_item_count_exceeded"});
     }
   }
 

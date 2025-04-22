@@ -88,12 +88,74 @@ nlohmann::json encode_log(const telemetry::LogMessage& log) {
   return encoded;
 }
 
+std::string_view to_string(details::MetricType type) {
+  using namespace datadog::telemetry::details;
+  switch (type) {
+    case MetricType::counter:
+      return "count";
+    case MetricType::rate:
+      return "rate";
+    case MetricType::distribution:
+      return "distribution";
+  }
+
+  return "";
+}
+
+// TODO: do `enable_if`
+template <typename T>
+void encode_metrics(
+    nlohmann::json::array_t& metrics,
+    const std::unordered_map<MetricContext<T>, telemetry::MetricSnapshot>&
+        counters_snapshots) {
+  for (const auto& [metric_ctx, snapshots] : counters_snapshots) {
+    auto encoded = nlohmann::json{
+        {"metric", metric_ctx.id.name},
+        {"type", to_string(metric_ctx.id.type)},
+        {"common", metric_ctx.id.common},
+        {"namespace", metric_ctx.id.scope},
+    };
+
+    if (!metric_ctx.tags.empty()) {
+      encoded.emplace("tags", metric_ctx.tags);
+    }
+
+    auto points = nlohmann::json::array();
+    for (const auto& [timestamp, value] : snapshots) {
+      points.emplace_back(nlohmann::json::array({timestamp, value}));
+    }
+
+    encoded.emplace("points", points);
+    metrics.emplace_back(std::move(encoded));
+  }
+}
+
+nlohmann::json encode_distributions(
+    const std::unordered_map<MetricContext<Distribution>,
+                             std::vector<uint64_t>>& distributions) {
+  auto j = nlohmann::json::array();
+
+  for (const auto& [metric_ctx, values] : distributions) {
+    auto series = nlohmann::json{
+        {"metric", metric_ctx.id.name},
+        {"common", metric_ctx.id.common},
+        {"namespace", metric_ctx.id.scope},
+        {"points", values},
+    };
+    if (!metric_ctx.tags.empty()) {
+      series.emplace("tags", metric_ctx.tags);
+    }
+    j.emplace_back(series);
+  }
+
+  return j;
+}
+
 }  // namespace
 
 Telemetry::Telemetry(FinalizedConfiguration config,
                      std::shared_ptr<tracing::Logger> logger,
                      std::shared_ptr<tracing::HTTPClient> client,
-                     std::vector<std::shared_ptr<Metric>> user_metrics,
                      std::shared_ptr<tracing::EventScheduler> event_scheduler,
                      HTTPClient::URL agent_url, Clock clock)
     : config_(std::move(config)),
@@ -104,44 +166,7 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       http_client_(client),
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
-      user_metrics_(std::move(user_metrics)),
       host_info_(get_host_info()) {
-  // Register all the metrics that we're tracking by adding them to the
-  // metrics_snapshots_ container. This allows for simpler iteration logic
-  // when using the values in `generate-metrics` messages.
-  metrics_snapshots_.emplace_back(metrics_.tracer.spans_created,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.spans_finished,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_created_new,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(
-      metrics_.tracer.trace_segments_created_continued, MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_closed,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.requests,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_1xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_2xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_3xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_4xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_5xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_timeout,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_network,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
-                                  MetricSnapshot{});
-
-  for (auto& m : user_metrics_) {
-    metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
-  }
-
   // Callback for successful telemetry HTTP requests, to examine HTTP
   // status.
   telemetry_on_response_ = [logger = logger_](
@@ -191,8 +216,7 @@ Telemetry::~Telemetry() {
 }
 
 Telemetry::Telemetry(Telemetry&& rhs)
-    : metrics_(std::move(rhs.metrics_)),
-      config_(std::move(rhs.config_)),
+    : config_(std::move(rhs.config_)),
       logger_(std::move(rhs.logger_)),
       telemetry_on_response_(std::move(rhs.telemetry_on_response_)),
       telemetry_on_error_(std::move(rhs.telemetry_on_error_)),
@@ -201,56 +225,16 @@ Telemetry::Telemetry(Telemetry&& rhs)
       http_client_(rhs.http_client_),
       clock_(std::move(rhs.clock_)),
       scheduler_(std::move(rhs.scheduler_)),
-      user_metrics_(std::move(rhs.user_metrics_)),
       seq_id_(rhs.seq_id_),
       config_seq_ids_(rhs.config_seq_ids_),
       host_info_(rhs.host_info_) {
   cancel_tasks(rhs.tasks_);
-
-  // Register all the metrics that we're tracking by adding them to the
-  // metrics_snapshots_ container. This allows for simpler iteration logic
-  // when using the values in `generate-metrics` messages.
-  metrics_snapshots_.emplace_back(metrics_.tracer.spans_created,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.spans_finished,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_created_new,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(
-      metrics_.tracer.trace_segments_created_continued, MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_closed,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.requests,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_1xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_2xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_3xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_4xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.responses_5xx,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_timeout,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_network,
-                                  MetricSnapshot{});
-  metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
-                                  MetricSnapshot{});
-
-  for (auto& m : user_metrics_) {
-    metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
-  }
-
   schedule_tasks();
 }
 
 Telemetry& Telemetry::operator=(Telemetry&& rhs) {
   if (&rhs != this) {
     cancel_tasks(rhs.tasks_);
-
-    std::swap(metrics_, rhs.metrics_);
     std::swap(config_, rhs.config_);
     std::swap(logger_, rhs.logger_);
     std::swap(telemetry_on_response_, rhs.telemetry_on_response_);
@@ -260,47 +244,9 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
     std::swap(tracer_signature_, rhs.tracer_signature_);
     std::swap(http_client_, rhs.http_client_);
     std::swap(clock_, rhs.clock_);
-    std::swap(user_metrics_, rhs.user_metrics_);
     std::swap(seq_id_, rhs.seq_id_);
     std::swap(config_seq_ids_, rhs.config_seq_ids_);
     std::swap(host_info_, rhs.host_info_);
-
-    // Register all the metrics that we're tracking by adding them to the
-    // metrics_snapshots_ container. This allows for simpler iteration logic
-    // when using the values in `generate-metrics` messages.
-    metrics_snapshots_.emplace_back(metrics_.tracer.spans_created,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.tracer.spans_finished,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_created_new,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(
-        metrics_.tracer.trace_segments_created_continued, MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.tracer.trace_segments_closed,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.requests,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_1xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_2xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_3xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_4xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.responses_5xx,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_timeout,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_network,
-                                    MetricSnapshot{});
-    metrics_snapshots_.emplace_back(metrics_.trace_api.errors_status_code,
-                                    MetricSnapshot{});
-
-    for (auto& m : user_metrics_) {
-      metrics_snapshots_.emplace_back(*m, MetricSnapshot{});
-    }
-
     schedule_tasks();
   }
   return *this;
@@ -379,37 +325,28 @@ std::string Telemetry::heartbeat_and_telemetry() {
   });
   batch_payloads.emplace_back(std::move(heartbeat));
 
-  auto metrics = nlohmann::json::array();
-  for (auto& m : metrics_snapshots_) {
-    auto& metric = m.first.get();
-    auto& points = m.second;
-    if (!points.empty()) {
-      auto type = metric.type();
-      if (type == "count") {
-        metrics.emplace_back(nlohmann::json::object({
-            {"metric", metric.name()},
-            {"tags", metric.tags()},
-            {"type", metric.type()},
-            {"points", points},
-            {"namespace", metric.scope()},
-            {"common", metric.common()},
-        }));
-      } else if (type == "gauge") {
-        // gauge metrics have a interval
-        metrics.emplace_back(nlohmann::json::object({
-            {"metric", metric.name()},
-            {"tags", metric.tags()},
-            {"type", metric.type()},
-            {"namespace", metric.scope()},
-            {"interval", 10},
-            {"points", points},
-            {"common", metric.common()},
-        }));
-      }
-    }
-    points.clear();
+  std::unordered_map<MetricContext<Distribution>, std::vector<uint64_t>>
+      distributions;
+  {
+    std::lock_guard l{distributions_mutex_};
+    std::swap(distributions_, distributions);
   }
 
+  std::unordered_map<MetricContext<Counter>, MetricSnapshot> counters_snapshot;
+  {
+    std::lock_guard l{counter_mutex_};
+    std::swap(counters_snapshot_, counters_snapshot);
+  }
+
+  std::unordered_map<MetricContext<Rate>, MetricSnapshot> rates_snapshot;
+  {
+    std::lock_guard l{rate_mutex_};
+    std::swap(rates_snapshot_, rates_snapshot);
+  }
+
+  nlohmann::json::array_t metrics = nlohmann::json::array();
+  encode_metrics(metrics, counters_snapshot);
+  encode_metrics(metrics, rates_snapshot);
   if (!metrics.empty()) {
     auto generate_metrics = nlohmann::json::object({
         {"request_type", "generate-metrics"},
@@ -418,6 +355,20 @@ std::string Telemetry::heartbeat_and_telemetry() {
                     })},
     });
     batch_payloads.emplace_back(std::move(generate_metrics));
+  }
+
+  if (auto distributions_series = encode_distributions(distributions);
+      !distributions.empty()) {
+    auto distributions_json = nlohmann::json{
+        {"request_type", "distributions"},
+        {
+            "payload",
+            nlohmann::json{
+                {"series", distributions_series},
+            },
+        },
+    };
+    batch_payloads.emplace_back(std::move(distributions_json));
   }
 
   if (!logs_.empty()) {
@@ -455,37 +406,9 @@ std::string Telemetry::app_closing() {
   });
   batch_payloads.emplace_back(std::move(app_closing));
 
-  auto metrics = nlohmann::json::array();
-  for (auto& m : metrics_snapshots_) {
-    auto& metric = m.first.get();
-    auto& points = m.second;
-    if (!points.empty()) {
-      auto type = metric.type();
-      if (type == "count") {
-        metrics.emplace_back(nlohmann::json::object({
-            {"metric", metric.name()},
-            {"tags", metric.tags()},
-            {"type", metric.type()},
-            {"points", points},
-            {"common", metric.common()},
-            {"namespace", metric.scope()},
-        }));
-      } else if (type == "gauge") {
-        // gauge metrics have a interval
-        metrics.emplace_back(nlohmann::json::object({
-            {"metric", metric.name()},
-            {"tags", metric.tags()},
-            {"type", metric.type()},
-            {"interval", 10},
-            {"points", points},
-            {"common", metric.common()},
-            {"namespace", metric.scope()},
-        }));
-      }
-    }
-    points.clear();
-  }
-
+  nlohmann::json::array_t metrics = nlohmann::json::array();
+  encode_metrics(metrics, counters_snapshot_);
+  encode_metrics(metrics, rates_snapshot_);
   if (!metrics.empty()) {
     auto generate_metrics = nlohmann::json::object({
         {"request_type", "generate-metrics"},
@@ -494,6 +417,20 @@ std::string Telemetry::app_closing() {
                     })},
     });
     batch_payloads.emplace_back(std::move(generate_metrics));
+  }
+
+  if (auto distributions_series = encode_distributions(distributions_);
+      !distributions_.empty()) {
+    auto distributions_json = nlohmann::json{
+        {"request_type", "distributions"},
+        {
+            "payload",
+            nlohmann::json{
+                {"series", distributions_series},
+            },
+        },
+    };
+    batch_payloads.emplace_back(std::move(distributions_json));
   }
 
   if (!logs_.empty()) {
@@ -701,12 +638,27 @@ void Telemetry::capture_metrics() {
   std::time_t timepoint = std::chrono::duration_cast<std::chrono::seconds>(
                               clock_().wall.time_since_epoch())
                               .count();
-  for (auto& m : metrics_snapshots_) {
-    auto value = m.first.get().capture_and_reset_value();
-    if (value == 0) {
-      continue;
-    }
-    m.second.emplace_back(timepoint, value);
+
+  std::unordered_map<MetricContext<Counter>, uint64_t> counter_snapshot;
+  {
+    std::lock_guard l{counter_mutex_};
+    std::swap(counter_snapshot, counters_);
+  }
+
+  for (auto& [counter, value] : counter_snapshot) {
+    auto& counter_snapshots = counters_snapshot_[counter];
+    counter_snapshots.emplace_back(std::make_pair(timepoint, value));
+  }
+
+  std::unordered_map<MetricContext<Rate>, uint64_t> rate_snapshot;
+  {
+    std::lock_guard l{rate_mutex_};
+    std::swap(rate_snapshot, rates_);
+  }
+
+  for (auto& [rate, value] : rate_snapshot) {
+    auto& rates_snapshots = rates_snapshot_[rate];
+    rates_snapshots.emplace_back(std::make_pair(timepoint, value));
   }
 }
 
@@ -717,6 +669,59 @@ void Telemetry::log(std::string message, telemetry::LogLevel level,
                        .count();
   logs_.emplace_back(
       telemetry::LogMessage{std::move(message), level, stacktrace, timestamp});
+}
+
+void Telemetry::increment_counter(const Counter& id) {
+  increment_counter(id, {});
+}
+
+void Telemetry::increment_counter(const Counter& id,
+                                  const std::vector<std::string>& tags) {
+  std::lock_guard l{counter_mutex_};
+  counters_[{id, tags}] += 1;
+}
+
+void Telemetry::decrement_counter(const Counter& id) {
+  decrement_counter(id, {});
+}
+
+void Telemetry::decrement_counter(const Counter& id,
+                                  const std::vector<std::string>& tags) {
+  std::lock_guard l{counter_mutex_};
+  auto& v = counters_[{id, tags}];
+  if (v > 0) v -= 1;
+}
+
+void Telemetry::set_counter(const Counter& id, uint64_t value) {
+  set_counter(id, {}, value);
+}
+
+void Telemetry::set_counter(const Counter& id,
+                            const std::vector<std::string>& tags,
+                            uint64_t value) {
+  std::lock_guard l{counter_mutex_};
+  counters_[{id, tags}] = value;
+}
+
+void Telemetry::set_rate(const Rate& id, uint64_t value) {
+  set_rate(id, {}, value);
+}
+
+void Telemetry::set_rate(const Rate& id, const std::vector<std::string>& tags,
+                         uint64_t value) {
+  std::lock_guard l{rate_mutex_};
+  rates_[{id, tags}] = value;
+}
+
+void Telemetry::add_datapoint(const Distribution& id, uint64_t value) {
+  add_datapoint(id, {}, value);
+}
+
+void Telemetry::add_datapoint(const Distribution& id,
+                              const std::vector<std::string>& tags,
+                              uint64_t value) {
+  std::lock_guard l{distributions_mutex_};
+  distributions_[{id, tags}].emplace_back(value);
 }
 
 }  // namespace datadog::telemetry

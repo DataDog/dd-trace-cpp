@@ -9,16 +9,26 @@
 #include <datadog/telemetry/metrics.h>
 #include <datadog/tracer_signature.h>
 
+#include <mutex>
+
 #include "json.hpp"
 #include "log.h"
+#include "metric_context.h"
 #include "platform_util.h"
 
 namespace datadog::telemetry {
 
+using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
+
 /// The telemetry class is responsible for handling internal telemetry data to
 /// track Datadog product usage. It _can_ collect and report logs and metrics.
+///
+/// NOTE(@dmehala): The current implementation can lead a significant amount
+/// of overhead if the mutext is highly disputed. Unless this is proven to be
+/// indeed a bottleneck, I'll embrace KISS principle. However, in a future
+/// iteration we could use multiple producer single consumer queue or
+/// lock-free queue.
 class Telemetry final {
-  DefaultMetrics metrics_;
   /// Configuration object containing the validated settings for telemetry
   FinalizedConfiguration config_;
   /// Shared pointer to the user logger instance.
@@ -32,15 +42,23 @@ class Telemetry final {
   tracing::Clock clock_;
   std::shared_ptr<tracing::EventScheduler> scheduler_;
 
-  // This uses a reference_wrapper so references to internal metric values can
-  // be captured, and be iterated trivially when the values need to be
-  // snapshotted and published in telemetry messages.
-  using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
-  std::vector<
-      std::pair<std::reference_wrapper<telemetry::Metric>, MetricSnapshot>>
-      metrics_snapshots_;
-  std::vector<std::shared_ptr<telemetry::Metric>> user_metrics_;
+  /// Counter
+  std::mutex counter_mutex_;
+  std::unordered_map<MetricContext<Counter>, uint64_t> counters_;
+  std::unordered_map<MetricContext<Counter>, MetricSnapshot> counters_snapshot_;
 
+  /// Rate
+  std::mutex rate_mutex_;
+  std::unordered_map<MetricContext<Rate>, uint64_t> rates_;
+  std::unordered_map<MetricContext<Rate>, MetricSnapshot> rates_snapshot_;
+
+  /// Distribution
+  /// TODO: split distribution in array of N element?
+  std::mutex distributions_mutex_;
+  std::unordered_map<MetricContext<Distribution>, std::vector<uint64_t>>
+      distributions_;
+
+  /// Configuration
   std::vector<tracing::ConfigMetadata> configuration_snapshot_;
 
   std::vector<telemetry::LogMessage> logs_;
@@ -61,7 +79,6 @@ class Telemetry final {
   Telemetry(FinalizedConfiguration configuration,
             std::shared_ptr<tracing::Logger> logger,
             std::shared_ptr<tracing::HTTPClient> client,
-            std::vector<std::shared_ptr<Metric>> user_metrics,
             std::shared_ptr<tracing::EventScheduler> event_scheduler,
             tracing::HTTPClient::URL agent_url,
             tracing::Clock clock = tracing::default_clock);
@@ -74,10 +91,6 @@ class Telemetry final {
   /// Move semantics.
   Telemetry(Telemetry&& rhs);
   Telemetry& operator=(Telemetry&&);
-
-  // Provides access to the telemetry metrics for updating the values.
-  // This value should not be stored.
-  inline auto& metrics() { return metrics_; }
 
   /// Capture and report internal error message to Datadog.
   ///
@@ -94,6 +107,27 @@ class Telemetry final {
 
   void capture_configuration_change(
       const std::vector<tracing::ConfigMetadata>& new_configuration);
+
+  /// Counter
+  void increment_counter(const Counter& counter);
+  void increment_counter(const Counter& counter,
+                         const std::vector<std::string>& tags);
+  void decrement_counter(const Counter& counter);
+  void decrement_counter(const Counter& counter,
+                         const std::vector<std::string>& tags);
+  void set_counter(const Counter& counter, uint64_t value);
+  void set_counter(const Counter& counter, const std::vector<std::string>& tags,
+                   uint64_t value);
+
+  /// Rate
+  void set_rate(const Rate& rate, uint64_t value);
+  void set_rate(const Rate& rate, const std::vector<std::string>& tags,
+                uint64_t value);
+
+  /// Distribution
+  void add_datapoint(const Distribution& distribution, uint64_t value);
+  void add_datapoint(const Distribution& distribution,
+                     const std::vector<std::string>& tags, uint64_t value);
 
  private:
   void send_telemetry(tracing::StringView request_type, std::string payload);

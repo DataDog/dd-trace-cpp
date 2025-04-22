@@ -18,6 +18,7 @@
 #include "json.hpp"
 #include "msgpack.h"
 #include "span_data.h"
+#include "telemetry_metrics.h"
 #include "trace_sampler.h"
 
 namespace datadog {
@@ -252,15 +253,20 @@ void DatadogAgent::flush() {
                                         const DictReader& /*response_headers*/,
                                         std::string response_body) {
     if (response_status >= 500) {
-      telemetry::metrics().trace_api.responses_5xx.inc();
+      telemetry::counter::increment(metrics::tracer::api::responses,
+                                    {"status_code:5xx"});
     } else if (response_status >= 400) {
-      telemetry::metrics().trace_api.responses_4xx.inc();
+      telemetry::counter::increment(metrics::tracer::api::responses,
+                                    {"status_code:4xx"});
     } else if (response_status >= 300) {
-      telemetry::metrics().trace_api.responses_3xx.inc();
+      telemetry::counter::increment(metrics::tracer::api::responses,
+                                    {"status_code:3xx"});
     } else if (response_status >= 200) {
-      telemetry::metrics().trace_api.responses_2xx.inc();
+      telemetry::counter::increment(metrics::tracer::api::responses,
+                                    {"status_code:2xx"});
     } else if (response_status >= 100) {
-      telemetry::metrics().trace_api.responses_1xx.inc();
+      telemetry::counter::increment(metrics::tracer::api::responses,
+                                    {"status_code:1xx"});
     }
     if (response_status != 200) {
       logger->log_error([&](auto& stream) {
@@ -298,12 +304,13 @@ void DatadogAgent::flush() {
   // request or retrieving the response.  It's invoked
   // asynchronously.
   auto on_error = [logger = logger_](Error error) {
-    telemetry::metrics().trace_api.errors_network.inc();
+    telemetry::counter::increment(metrics::tracer::api::errors,
+                                  {"type:network"});
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for submitting traces: "));
   };
 
-  telemetry::metrics().trace_api.requests.inc();
+  telemetry::counter::increment(metrics::tracer::api::requests);
   auto post_result =
       http_client_->post(traces_endpoint_, std::move(set_request_headers),
                          std::move(body), std::move(on_response),
