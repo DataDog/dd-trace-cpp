@@ -75,7 +75,8 @@ void capture_configuration_change(
              instance());
 }
 
-void report_warning_log(std::string message) {
+namespace log {
+void warning(std::string message) {
   std::visit(details::Overload{
                  [&](Telemetry& telemetry) { telemetry.log_warning(message); },
                  [](NoopTelemetry) {},
@@ -83,7 +84,7 @@ void report_warning_log(std::string message) {
              instance());
 }
 
-void report_error_log(std::string message) {
+void error(std::string message) {
   std::visit(details::Overload{
                  [&](Telemetry& telemetry) { telemetry.log_error(message); },
                  [](NoopTelemetry) {},
@@ -91,7 +92,7 @@ void report_error_log(std::string message) {
              instance());
 }
 
-void report_error_log(std::string message, std::string stacktrace) {
+void error(std::string message, std::string stacktrace) {
   std::visit(details::Overload{
                  [&](Telemetry& telemetry) {
                    telemetry.log_error(message, stacktrace);
@@ -100,6 +101,7 @@ void report_error_log(std::string message, std::string stacktrace) {
              },
              instance());
 }
+}  // namespace log
 
 namespace counter {
 void increment(const Counter& counter) {

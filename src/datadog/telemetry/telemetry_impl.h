@@ -61,6 +61,7 @@ class Telemetry final {
   /// Configuration
   std::vector<tracing::ConfigMetadata> configuration_snapshot_;
 
+  std::mutex log_mutex_;
   std::vector<telemetry::LogMessage> logs_;
 
   // Track sequence id per payload generated
