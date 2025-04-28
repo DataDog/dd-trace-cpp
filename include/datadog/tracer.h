@@ -54,6 +54,7 @@ class Tracer {
   Baggage::Options baggage_opts_;
   bool baggage_injection_enabled_;
   bool baggage_extraction_enabled_;
+  bool correlate_full_host_profiles_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:

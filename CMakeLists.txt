@@ -203,6 +203,7 @@ if (BUILD_SHARED_LIBS)
     PUBLIC
       dd_trace::obj
       CURL::libcurl_shared
+      customlabels
     PRIVATE
       dd_trace::specs
   )
