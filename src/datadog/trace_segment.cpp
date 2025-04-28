@@ -1,3 +1,9 @@
+#ifdef __linux__
+extern "C" {
+#include <customlabels/customlabels.h>
+}
+#endif
+
 #include <datadog/collector.h>
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
@@ -253,6 +259,15 @@ void TraceSegment::span_finished() {
           error->with_prefix("Error sending spans to collector: "));
     }
   }
+
+#ifdef __linux__
+  // When all spans are finished, so is the current trace.
+  if (process_storage != nullptr) {
+    auto saved_set = custom_labels_current_set;
+    custom_labels_current_set = nullptr;
+    custom_labels_labelset_free(saved_set);
+  }
+#endif
 
   telemetry::counter::increment(metrics::tracer::trace_segments_closed);
 }

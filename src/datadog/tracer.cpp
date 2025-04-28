@@ -21,6 +21,7 @@
 #include "hex.h"
 #include "json.hpp"
 #include "msgpack.h"
+#include "otel_identifiers.h"
 #include "platform_util.h"
 #include "random.h"
 #include "span_data.h"
@@ -107,6 +108,27 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
 
   store_config();
 }
+
+#ifdef __linux__
+void Tracer::correlate(const Span& span) {
+  custom_labels_current_set = custom_labels_labelset_new(2);
+  auto trace_id = span.trace_id().hex_padded();
+  custom_labels_labelset_set(
+      custom_labels_current_set,
+      {sizeof(OTEL_TRACE_ID_IDENTIFIER),
+       reinterpret_cast<const unsigned char*>(OTEL_TRACE_ID_IDENTIFIER)},
+      {trace_id.size(),
+       reinterpret_cast<const unsigned char*>(trace_id.c_str())});
+
+  auto span_id = std::to_string(span.id());
+  custom_labels_labelset_set(
+      custom_labels_current_set,
+      {sizeof(OTEL_SPAN_ID_IDENTIFIER),
+       reinterpret_cast<const unsigned char*>(OTEL_SPAN_ID_IDENTIFIER)},
+      {span_id.size(),
+       reinterpret_cast<const unsigned char*>(span_id.c_str())});
+}
+#endif
 
 std::string Tracer::config() const {
   // clang-format off
@@ -199,6 +221,11 @@ Span Tracer::create_span(const SpanConfig& config) {
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
+
+#ifdef __linux__
+  if (correlate_full_host_profiles_) correlate(span);
+#endif
+
   return span;
 }
 
@@ -410,6 +437,11 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
+
+#ifdef __linux__
+  if (correlate_full_host_profiles_) correlate(span);
+#endif
+
   return span;
 }
 

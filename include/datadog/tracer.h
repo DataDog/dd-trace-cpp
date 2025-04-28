@@ -106,6 +106,9 @@ class Tracer {
   std::string config() const;
 
  private:
+#ifdef __linux__
+  void correlate(const Span& span);
+#endif
   void store_config();
 };
 
