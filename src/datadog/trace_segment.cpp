@@ -1,6 +1,6 @@
 #ifdef __linux__
 extern "C" {
-#include <customlabels/customlabels.h>
+#include <customlabels.h>
 }
 #endif
 
