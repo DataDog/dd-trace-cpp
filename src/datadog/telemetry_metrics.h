@@ -27,10 +27,10 @@ extern const telemetry::Counter spans_finished;
 extern const telemetry::Distribution trace_chunk_size;
 
 /// The size in bytes of the serialized trace chunk.
-extern const telemetry::Distribution trace_chunk_size_bytes;
+extern const telemetry::Distribution trace_chunk_serialized_bytes;
 
 /// The time it takes to serialize a trace chunk.
-extern const telemetry::Distribution trace_chunk_size_ms;
+extern const telemetry::Distribution trace_chunk_serialization_duration;
 
 /// The number of times a trace chunk is enqueued for sampling/serialization. In
 /// partial-flush scenarios, multiple trace chunks may be enqueued per trace
