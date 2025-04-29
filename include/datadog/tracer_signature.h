@@ -23,7 +23,7 @@
 #include <cstring>
 #include <vector>
 extern "C" {
-#include <customlabels/customlabels.h>
+#include <customlabels.h>
 }
 #endif
 
