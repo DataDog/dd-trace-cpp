@@ -16,10 +16,10 @@ const telemetry::Counter trace_segments_closed = {"trace_segments_closed",
 const telemetry::Distribution trace_chunk_size = {"trace_chunk_size", "tracers",
                                                   true};
 
-const telemetry::Distribution trace_chunk_size_bytes = {
+const telemetry::Distribution trace_chunk_serialized_bytes = {
     "trace_chunk_serialization.bytes", "tracers", true};
 
-const telemetry::Distribution trace_chunk_size_ms = {
+const telemetry::Distribution trace_chunk_serialization_duration = {
     "trace_chunk_serialization.ms", "tracers", true};
 
 const telemetry::Counter trace_chunks_enqueued = {"trace_chunks_enqueued",
