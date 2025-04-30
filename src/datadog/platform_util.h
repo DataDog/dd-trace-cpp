@@ -72,5 +72,36 @@ std::string get_process_name();
 
 int at_fork_in_child(void (*on_fork)());
 
+namespace container {
+
+/// Represents the cgroup version of the current process.
+enum class Cgroup : char { v1, v2 };
+
+struct ContainerMetadata final {
+  /// Cgroup version.
+  Cgroup cgroup;
+  /// Unique Identifier (uid) of the container. It depends on the cgroup
+  /// version:
+  ///  - For cgroup v1, it contains the container ID.
+  ///  - For cgroup v2, it contains the "container" inode.
+  std::string uid;
+};
+
+/// Find the docker container ID from a given source.
+/// This function is exposed mainly for testing purposes.
+///
+/// @param source The input from which to read the Docker container ID.
+/// @return An Optional containing the Docker container ID if found, otherwise
+/// nothing.
+Optional<std::string> find_docker_container_id(std::istream& source);
+
+/// Function to retrieve the container metadata.
+///
+/// @return A `ContainerMetadata` object containing metadata of the container in
+/// which the current process is running.
+Optional<ContainerMetadata> get_metadata();
+
+}  // namespace container
+
 }  // namespace tracing
 }  // namespace datadog

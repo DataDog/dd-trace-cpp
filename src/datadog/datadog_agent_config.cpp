@@ -7,6 +7,7 @@
 
 #include "default_http_client.h"
 #include "parse_util.h"
+#include "platform_util.h"
 #include "threaded_event_scheduler.h"
 
 namespace datadog {
@@ -143,6 +144,12 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.url = *parsed_url;
   result.metadata[ConfigName::AGENT_URL] =
       ConfigMetadata(ConfigName::AGENT_URL, url, origin);
+
+  /// Starting Agent X, the admission controller inject a unique identifier
+  /// through `DD_EXTERNAL_ENV`. This uid is used for origin detection.
+  if (auto external_env = lookup(environment::DD_EXTERNAL_ENV)) {
+    result.admission_controller_uid = std::string(*external_env);
+  }
 
   return result;
 }

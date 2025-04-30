@@ -16,6 +16,7 @@
 #include <mutex>
 #include <vector>
 
+#include "platform_util.h"
 #include "remote_config/remote_config.h"
 
 namespace datadog {
@@ -50,6 +51,9 @@ class DatadogAgent : public Collector {
 
   remote_config::Manager remote_config_;
   TracerSignature tracer_signature_;
+
+  // Origin detection
+  HTTPClient::HeadersSetter set_origin_detection_headers_;
 
   void flush();
 

@@ -157,8 +157,34 @@ DatadogAgent::DatadogAgent(
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
       remote_config_(tracer_signature, rc_listeners, logger),
-      tracer_signature_(tracer_signature) {
+      tracer_signature_(tracer_signature),
+      set_origin_detection_headers_([](DictWriter&) {}) {
   assert(logger_);
+
+  /// Origin Detection headers are not necessary when Unix Domain Socket (UDS)
+  /// is used to communicate with the Datadog Agent.
+  if (contains(config.url.scheme, "unix")) {
+    if (auto container = container::get_metadata()) {
+      if (container->cgroup == container::Cgroup::v1) {
+        set_origin_detection_headers_ =
+            [container_id = container->uid, entity_id = "ci-" + container->uid,
+             admission_ctl_id = config.admission_controller_uid.value_or("")](
+                DictWriter& writer) {
+              writer.set("Datadog-Entity-Id", entity_id);
+              writer.set("Datadog-Container-ID", container_id);
+              writer.set("Datadog-External-Env", admission_ctl_id);
+            };
+      } else if (container->cgroup == container::Cgroup::v2) {
+        set_origin_detection_headers_ =
+            [entity_id = "in-" + container->uid,
+             admission_ctl_id = config.admission_controller_uid.value_or("")](
+                DictWriter& writer) {
+              writer.set("Datadog-Entity-Id", entity_id);
+              writer.set("Datadog-External-Env", admission_ctl_id);
+            };
+      }
+    }
+  }
 
   tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
       config.flush_interval, [this]() { flush(); }));
@@ -244,6 +270,7 @@ void DatadogAgent::flush() {
     headers.set("Datadog-Meta-Tracer-Version",
                 tracer_signature_.library_version);
     headers.set("X-Datadog-Trace-Count", std::to_string(trace_chunks.size()));
+    set_origin_detection_headers_(headers);
   };
 
   // This is the callback for the HTTP response.  It's invoked
