@@ -213,18 +213,23 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   for (const auto style : extraction_styles_) {
     using Extractor = decltype(&extract_datadog);  // function pointer
     Extractor extract;
+    std::string extracted_tag;  ///< for telemetry
     switch (style) {
       case PropagationStyle::DATADOG:
         extract = &extract_datadog;
+        extracted_tag = "header_style:datadog";
         break;
       case PropagationStyle::B3:
         extract = &extract_b3;
+        extracted_tag = "header_style:b3multi";
         break;
       case PropagationStyle::W3C:
         extract = &extract_w3c;
+        extracted_tag = "header_style:tracecontext";
         break;
       default:
         extract = &extract_none;
+        extracted_tag = "header_style:none";
     }
     audited_reader.entries_found.clear();
     auto data = extract(audited_reader, span_data->tags, *logger_);
@@ -232,6 +237,9 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       return error->with_prefix(
           extraction_error_prefix(style, audited_reader.entries_found));
     }
+
+    telemetry::counter::increment(metrics::tracer::trace_context::extracted,
+                                  {extracted_tag});
 
     if (!first_style_with_trace_id && data->trace_id.has_value()) {
       first_style_with_trace_id = style;
@@ -419,7 +427,12 @@ Expected<Baggage, Baggage::Error> Tracer::extract_baggage(
     return Baggage::Error{Baggage::Error::DISABLED};
   }
 
-  return Baggage::extract(reader);
+  auto maybe_baggage = Baggage::extract(reader);
+  if (maybe_baggage) {
+    telemetry::counter::increment(metrics::tracer::trace_context::extracted,
+                                  {"header_style:baggage"});
+  }
+  return maybe_baggage;
 }
 
 Baggage Tracer::extract_or_create_baggage(const DictReader& reader) {
@@ -444,12 +457,15 @@ Expected<void> Tracer::inject(const Baggage& baggage, DictWriter& writer) {
 
     if (err->code == Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED) {
       telemetry::counter::increment(
-          metrics::tracer::context_header_truncated,
+          metrics::tracer::trace_context::truncated,
           {"truncation_reason:baggage_byte_count_exceeded"});
     } else if (err->code == Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED) {
       telemetry::counter::increment(
-          metrics::tracer::context_header_truncated,
+          metrics::tracer::trace_context::truncated,
           {"truncation_reason:baggage_item_count_exceeded"});
+    } else {
+      telemetry::counter::increment(metrics::tracer::trace_context::injected,
+                                    {"header_style:baggage"});
     }
   }
 

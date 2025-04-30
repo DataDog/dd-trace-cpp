@@ -140,7 +140,8 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
-  telemetry::counter::increment(metrics::tracer::spans_created);
+  telemetry::counter::increment(metrics::tracer::spans_created,
+                                {"integration_name:datadog"});
 
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
@@ -149,7 +150,8 @@ void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
 
 void TraceSegment::span_finished() {
   {
-    telemetry::counter::increment(metrics::tracer::spans_finished);
+    telemetry::counter::increment(metrics::tracer::spans_finished,
+                                  {"integration_name:datadog"});
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
     assert(num_finished_spans_ <= spans_.size());
@@ -157,15 +159,20 @@ void TraceSegment::span_finished() {
       return;
     }
   }
+
+  telemetry::counter::increment(metrics::tracer::trace_chunks_enqueued);
+
   // We don't need the lock anymore.  There's nobody left to call our methods.
   // On the other hand, there's nobody left to contend for the mutex, so it
   // doesn't make any difference.
   make_sampling_decision_if_null();
   assert(sampling_decision_);
 
-  // All of our spans are finished.  Run the span sampler, finalize the spans,
+  // All of our spans are finished. Run the span sampler, finalize the spans,
   // and then send the spans to the collector.
   if (sampling_decision_->priority <= 0) {
+    telemetry::counter::increment(metrics::tracer::trace_chunks_dropped,
+                                  {"reason:p0_drop"});
     // Span sampling happens when the trace is dropped.
     for (const auto& span_ptr : spans_) {
       SpanData& span = *span_ptr;
@@ -175,8 +182,11 @@ void TraceSegment::span_finished() {
       }
       const SamplingDecision decision = rule->decide(span);
       if (decision.priority <= 0) {
+        telemetry::counter::increment(metrics::tracer::spans_dropped,
+                                      {"reason:p0_drop"});
         continue;
       }
+
       span.numeric_tags[tags::internal::span_sampling_mechanism] =
           *decision.mechanism;
       span.numeric_tags[tags::internal::span_sampling_rule_rate] =
@@ -233,6 +243,10 @@ void TraceSegment::span_finished() {
   }
 
   if (config_manager_->report_traces()) {
+    telemetry::distribution::add(metrics::tracer::trace_chunk_size,
+                                 spans_.size());
+
+    telemetry::counter::increment(metrics::tracer::trace_chunks_sent);
     const auto result = collector_->send(std::move(spans_), trace_sampler_);
     if (auto* error = result.if_error()) {
       logger_->log_error(
@@ -336,6 +350,9 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
                           spans_.front()->tags, *logger_);
+
+        telemetry::counter::increment(metrics::tracer::trace_context::injected,
+                                      {"header_style:datadog"});
         break;
       case PropagationStyle::B3:
         if (span.trace_id.high) {
@@ -350,6 +367,8 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
                           spans_.front()->tags, *logger_);
+        telemetry::counter::increment(metrics::tracer::trace_context::injected,
+                                      {"header_style:b3multi"});
         break;
       case PropagationStyle::W3C:
         writer.set(
@@ -360,6 +379,8 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
             encode_tracestate(span.span_id, sampling_priority, origin_,
                               trace_tags, additional_datadog_w3c_tracestate_,
                               additional_w3c_tracestate_));
+        telemetry::counter::increment(metrics::tracer::trace_context::injected,
+                                      {"header_style:tracecontext"});
         break;
       default:
         break;

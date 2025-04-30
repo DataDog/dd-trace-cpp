@@ -17,6 +17,40 @@ using namespace datadog::tracing;
 using namespace std::chrono_literals;
 
 namespace datadog::telemetry {
+namespace internal_metrics {
+
+/// The number of logs created with a given log level. Useful for calculating
+/// impact for other features (automatic sending of logs). Levels should be one
+/// of `debug`, `info`, `warn`, `error`, `critical`.
+const telemetry::Counter logs_created{"logs_created", "general", true};
+
+/// The number of requests sent to the api endpoint in the agent that errored,
+/// tagged by the error type (e.g. `type:timeout`, `type:network`,
+/// `type:status_code`) and Endpoint (`endpoint:agent`, `endpoint:agentless`).
+const telemetry::Counter errors{"telemetry_api.errors", "telemetry", true};
+
+/// The number of requests sent to a telemetry endpoint, regardless of success,
+/// tagged by the endpoint (`endpoint:agent`, `endpoint:agentless`).
+const telemetry::Counter requests{"telemetry_api.requests", "telemetry", true};
+
+/// The number of responses received from the endpoint, tagged with status code
+/// (`status_code:200`, `status_code:404`) and endpoint (`endpoint:agent`,
+/// `endpoint:agentless`).
+const telemetry::Counter responses{"telemetry_api.responses", "telemetry",
+                                   true};
+
+/// The size of the payload sent to the stats endpoint in bytes, tagged by the
+/// endpoint (`endpoint:agent`, `endpoint:agentless`).
+const telemetry::Distribution bytes_sent{"telemetry_api.bytes", "telemetry",
+                                         true};
+
+/// The time it takes to send the payload sent to the endpoint in ms, tagged by
+/// the endpoint (`endpoint:agent`, `endpoint:agentless`).
+const telemetry::Distribution request_duration{"telemetry_api.ms", "telemetry",
+                                               true};
+
+}  // namespace internal_metrics
+
 namespace {
 
 HTTPClient::URL make_telemetry_endpoint(HTTPClient::URL url) {
@@ -174,26 +208,8 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       host_info_(get_host_info()) {
   // Callback for successful telemetry HTTP requests, to examine HTTP
   // status.
-  telemetry_on_response_ = [logger = logger_](
-                               int response_status,
-                               const DictReader& /*response_headers*/,
-                               std::string response_body) {
-    if (response_status < 200 || response_status >= 300) {
-      logger->log_error([&](auto& stream) {
-        stream << "Unexpected telemetry response status " << response_status
-               << " with body (if any, starts on next line):\n"
-               << response_body;
-      });
-    }
-  };
-
-  // Callback for unsuccessful telemetry HTTP requests.
-  telemetry_on_error_ = [logger = logger_](Error error) {
-    logger->log_error(error.with_prefix(
-        "Error occurred during HTTP request for telemetry: "));
-  };
-
   send_telemetry("app-started", app_started());
+  http_client_->drain(clock_().tick + 2s);
   schedule_tasks();
 }
 
@@ -216,20 +232,23 @@ Telemetry::~Telemetry() {
     // The app-closing message is bundled with a message containing the
     // final metric values.
     send_telemetry("app-closing", app_closing());
-    http_client_->drain(clock_().tick + 1s);
+    http_client_->drain(clock_().tick + 2s);
   }
 }
 
 Telemetry::Telemetry(Telemetry&& rhs)
     : config_(std::move(rhs.config_)),
       logger_(std::move(rhs.logger_)),
-      telemetry_on_response_(std::move(rhs.telemetry_on_response_)),
-      telemetry_on_error_(std::move(rhs.telemetry_on_error_)),
       telemetry_endpoint_(std::move(rhs.telemetry_endpoint_)),
       tracer_signature_(std::move(rhs.tracer_signature_)),
       http_client_(rhs.http_client_),
       clock_(std::move(rhs.clock_)),
       scheduler_(std::move(rhs.scheduler_)),
+      counters_(std::move(rhs.counters_)),
+      counters_snapshot_(std::move(rhs.counters_snapshot_)),
+      rates_(std::move(rhs.rates_)),
+      rates_snapshot_(std::move(rhs.rates_snapshot_)),
+      distributions_(std::move(rhs.distributions_)),
       seq_id_(rhs.seq_id_),
       config_seq_ids_(rhs.config_seq_ids_),
       host_info_(rhs.host_info_) {
@@ -242,13 +261,17 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
     cancel_tasks(rhs.tasks_);
     std::swap(config_, rhs.config_);
     std::swap(logger_, rhs.logger_);
-    std::swap(telemetry_on_response_, rhs.telemetry_on_response_);
-    std::swap(telemetry_on_error_, rhs.telemetry_on_error_);
     std::swap(telemetry_endpoint_, rhs.telemetry_endpoint_);
     std::swap(http_client_, rhs.http_client_);
     std::swap(tracer_signature_, rhs.tracer_signature_);
     std::swap(http_client_, rhs.http_client_);
     std::swap(clock_, rhs.clock_);
+    std::swap(scheduler_, rhs.scheduler_);
+    std::swap(counters_, rhs.counters_);
+    std::swap(counters_snapshot_, rhs.counters_snapshot_);
+    std::swap(rates_, rhs.rates_);
+    std::swap(rates_snapshot_, rhs.rates_snapshot_);
+    std::swap(distributions_, rhs.distributions_);
     std::swap(seq_id_, rhs.seq_id_);
     std::swap(config_seq_ids_, rhs.config_seq_ids_);
     std::swap(host_info_, rhs.host_info_);
@@ -259,16 +282,19 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
 
 void Telemetry::log_error(std::string message) {
   if (!config_.report_logs) return;
+  increment_counter(internal_metrics::logs_created, {"level:error"});
   log(std::move(message), LogLevel::ERROR);
 }
 
 void Telemetry::log_error(std::string message, std::string stacktrace) {
   if (!config_.report_logs) return;
+  increment_counter(internal_metrics::logs_created, {"level:error"});
   log(std::move(message), LogLevel::ERROR, stacktrace);
 }
 
 void Telemetry::log_warning(std::string message) {
   if (!config_.report_logs) return;
+  increment_counter(internal_metrics::logs_created, {"level:warning"});
   log(std::move(message), LogLevel::WARNING);
 }
 
@@ -293,10 +319,55 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
     }
   };
 
-  auto post_result = http_client_->post(
-      telemetry_endpoint_, set_telemetry_headers, std::move(payload),
-      telemetry_on_response_, telemetry_on_error_, clock_().tick + 5s);
+  auto telemetry_on_response = [this, logger = logger_](
+                                   int response_status,
+                                   const DictReader& /*response_headers*/,
+                                   std::string response_body) {
+    if (response_status >= 500) {
+      increment_counter(internal_metrics::responses,
+                        {"status_code:5xx", "endpoint:agent"});
+    } else if (response_status >= 400) {
+      increment_counter(internal_metrics::responses,
+                        {"status_code:4xx", "endpoint:agent"});
+    } else if (response_status >= 300) {
+      increment_counter(internal_metrics::responses,
+                        {"status_code:3xx", "endpoint:agent"});
+    } else if (response_status >= 200) {
+      increment_counter(internal_metrics::responses,
+                        {"status_code:2xx", "endpoint:agent"});
+    } else if (response_status >= 100) {
+      increment_counter(internal_metrics::responses,
+                        {"status_code:1xx", "endpoint:agent"});
+    }
+
+    if (response_status < 200 || response_status >= 300) {
+      logger->log_error([&](auto& stream) {
+        stream << "Unexpected telemetry response status " << response_status
+               << " with body (if any, starts on next line):\n"
+               << response_body;
+      });
+    }
+  };
+
+  // Callback for unsuccessful telemetry HTTP requests.
+  auto telemetry_on_error = [this, logger = logger_](Error error) {
+    increment_counter(internal_metrics::errors,
+                      {"type:network", "endpoint:agent"});
+    logger->log_error(error.with_prefix(
+        "Error occurred during HTTP request for telemetry: "));
+  };
+
+  increment_counter(internal_metrics::requests, {"endpoint:agent"});
+  add_datapoint(internal_metrics::bytes_sent, {"endpoint:agent"},
+                payload.size());
+
+  auto post_result =
+      http_client_->post(telemetry_endpoint_, set_telemetry_headers,
+                         std::move(payload), std::move(telemetry_on_response),
+                         std::move(telemetry_on_error), clock_().tick + 5s);
   if (auto* error = post_result.if_error()) {
+    increment_counter(internal_metrics::errors,
+                      {"type:network", "endpoint:agent"});
     logger_->log_error(
         error->with_prefix("Unexpected error submitting telemetry event: "));
   }
