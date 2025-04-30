@@ -19,6 +19,16 @@
       "cacheVariables": {
         "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
       }
+    },
+    {
+      "name": "dev",
+      "displayName": "Development",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "DD_TRACE_ENABLE_SANITIZE": "ON",
+        "DD_TRACE_BUILD_TESTING": "ON",
+        "DD_TRACE_BUILD_EXAMPLES": "ON"
+      }
     }
   ]
 }

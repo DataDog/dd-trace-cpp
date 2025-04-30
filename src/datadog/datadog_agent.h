@@ -49,7 +49,8 @@ class DatadogAgent : public Collector {
   std::chrono::steady_clock::duration shutdown_timeout_;
 
   remote_config::Manager remote_config_;
-  TracerSignature tracer_signature_;
+
+  std::unordered_map<std::string, std::string> headers_;
 
   void flush();
 

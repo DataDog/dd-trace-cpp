@@ -87,6 +87,9 @@ class FinalizedDatadogAgentConfig {
   std::chrono::steady_clock::duration shutdown_timeout;
   std::chrono::steady_clock::duration remote_configuration_poll_interval;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+
+  // Origin detection
+  Optional<std::string> admission_controller_uid;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(

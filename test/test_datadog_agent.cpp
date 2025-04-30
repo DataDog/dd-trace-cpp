@@ -18,7 +18,9 @@ using namespace datadog;
 using namespace datadog::tracing;
 using namespace std::chrono_literals;
 
-TEST_CASE("CollectorResponse", "[datadog_agent]") {
+#define DATADOG_AGENT_TEST(x) TEST_CASE(x, "[datadog_agent]")
+
+DATADOG_AGENT_TEST("CollectorResponse") {
   TracerConfig config;
   config.service = "testsvc";
   const auto logger =
@@ -180,7 +182,7 @@ TEST_CASE("CollectorResponse", "[datadog_agent]") {
 //   - telemetry is disabled, no event scheduled.
 //   - telemetry is enabled, after x sec generate metrics is called.
 //   - send_app_started?
-TEST_CASE("Remote Configuration", "[datadog_agent]") {
+DATADOG_AGENT_TEST("Remote Configuration") {
   const auto logger =
       std::make_shared<MockLogger>(std::cerr, MockLogger::ERRORS_ONLY);
   logger->echo = nullptr;

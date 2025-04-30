@@ -1,5 +1,7 @@
 #include "platform_util.h"
 
+#include <fstream>
+
 // clang-format off
 #if defined(__x86_64__) || defined(_M_X64)
 #  define DD_SDK_CPU_ARCH "x86_64"
@@ -24,11 +26,13 @@
 #    define DD_SDK_OS "GNU/Linux"
 #    define DD_SDK_KERNEL "Linux"
 #    include "string_util.h"
+#    include <errno.h>
 #    include <fstream>
+#    include <fcntl.h>
 #    include <sys/types.h>
 #    include <sys/mman.h>
-#    include <fcntl.h>
-#    include <errno.h>
+#    include <sys/stat.h>
+#    include <sys/statfs.h>
 #  endif
 #elif defined(_MSC_VER)
 #  include <windows.h>
@@ -102,7 +106,7 @@ std::tuple<std::string, std::string> get_windows_info() {
   // application manifest, which is the lowest version supported by the
   // application. Use `RtlGetVersion` to obtain the accurate OS version
   // regardless of the manifest.
-  using RtlGetVersion = auto(*)(LPOSVERSIONINFOEXW)->NTSTATUS;
+  using RtlGetVersion = auto (*)(LPOSVERSIONINFOEXW)->NTSTATUS;
 
   RtlGetVersion func =
       (RtlGetVersion)GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
@@ -280,6 +284,127 @@ Expected<InMemoryFile> InMemoryFile::make(StringView) {
   return Error{Error::Code::NOT_IMPLEMENTED, "In-memory file not implemented"};
 }
 #endif
+
+namespace container {
+namespace {
+#if defined(__linux__) || defined(__unix__)
+/// Magic numbers from linux/magic.h:
+/// <https://github.com/torvalds/linux/blob/ca91b9500108d4cf083a635c2e11c884d5dd20ea/include/uapi/linux/magic.h#L71>
+constexpr uint64_t CGROUP_SUPER_MAGIC = 0x27e0eb;
+constexpr uint64_t CGROUP2_SUPER_MAGIC = 0x63677270;
+
+/// Magic number from linux/proc_ns.h:
+/// <https://github.com/torvalds/linux/blob/5859a2b1991101d6b978f3feb5325dad39421f29/include/linux/proc_ns.h#L41-L49>
+constexpr ino_t HOST_CGROUP_NAMESPACE_INODE = 0xeffffffb;
+
+/// Represents the cgroup version of the current process.
+enum class Cgroup : char { v1, v2 };
+
+Optional<ino_t> get_inode(std::string_view path) {
+  struct stat buf;
+  if (stat(path.data(), &buf) != 0) {
+    return nullopt;
+  }
+
+  return buf.st_ino;
+}
+
+// Host namespace inode number are hardcoded, which allows for dectection of
+// whether the binary is running in host or not. However, it does not work when
+// running in a Docker in Docker environment.
+bool is_running_in_host_namespace() {
+  if (auto inode = get_inode("/proc/self/ns/cgroup")) {
+    return *inode == HOST_CGROUP_NAMESPACE_INODE;
+  }
+
+  return false;
+}
+
+Optional<Cgroup> get_cgroup_version() {
+  struct statfs buf;
+
+  if (statfs("/sys/fs/cgroup", &buf) != 0) {
+    return nullopt;
+  }
+
+  if (buf.f_type == CGROUP_SUPER_MAGIC)
+    return Cgroup::v1;
+  else if (buf.f_type == CGROUP2_SUPER_MAGIC)
+    return Cgroup::v2;
+
+  return nullopt;
+}
+
+Optional<std::string> find_docker_container_id_from_cgroup() {
+  constexpr std::string_view cgroup_path = "/proc/self/cgroup";
+
+  auto cgroup_fd = std::ifstream(cgroup_path.data(), std::ios::in);
+  if (!cgroup_fd.is_open()) return nullopt;
+
+  return find_docker_container_id(cgroup_fd);
+}
+#endif
+}  // namespace
+
+Optional<std::string> find_docker_container_id(std::istream& source) {
+  constexpr std::string_view docker_str = "docker-";
+
+  std::string line;
+  while (std::getline(source, line)) {
+    // Example:
+    // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
+    if (auto beg = line.find(docker_str); beg != std::string::npos) {
+      beg += docker_str.size();
+      auto end = line.find(".scope", beg);
+      if (end == std::string::npos || end - beg <= 0) {
+        continue;
+      }
+
+      auto container_id = line.substr(beg, end - beg);
+      return container_id;
+    }
+  }
+
+  return nullopt;
+}
+
+Optional<ContainerID> get_id() {
+#if defined(__linux__) || defined(__unix__)
+  if (is_running_in_host_namespace()) {
+    // Not in a container, no need to continue.
+    return nullopt;
+  }
+
+  auto maybe_cgroup = get_cgroup_version();
+  if (!maybe_cgroup) return nullopt;
+
+  ContainerID id;
+  switch (*maybe_cgroup) {
+    case Cgroup::v1: {
+      if (auto maybe_id = find_docker_container_id_from_cgroup()) {
+        id.value = *maybe_id;
+        id.type = ContainerID::Type::container_id;
+        break;
+      }
+    }
+      // NOTE(@dmehala): failed to find the container ID, try getting the cgroup
+      // inode.
+      [[fallthrough]];
+    case Cgroup::v2: {
+      if (auto maybe_inode = get_inode("/sys/fs/cgroup")) {
+        id.type = ContainerID::Type::cgroup_inode;
+        id.value = std::to_string(*maybe_inode);
+      }
+    }; break;
+  }
+
+  return id;
+#else
+  return nullopt;
+#endif
+}
+
+}  // namespace container
 
 }  // namespace tracing
 }  // namespace datadog

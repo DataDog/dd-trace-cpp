@@ -53,3 +53,4 @@ services:
             - DD_APM_ENABLED=true
             - DD_LOG_LEVEL=ERROR
             - DOCKER_HOST
+            - DD_SITE

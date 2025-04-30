@@ -529,6 +529,19 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
       REQUIRE(agent->url.authority == test_case.expected_authority);
     }
   }
+
+  SECTION("Admission Controller UID") {
+    const EnvGuard env_guard{"DD_EXTERNAL_ENV",
+                             "c8e4eba8-3287-4cc2-ae1a-30e14be6e470"};
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    const auto* const agent =
+        std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+    REQUIRE(agent);
+    REQUIRE(agent->admission_controller_uid);
+    CHECK(agent->admission_controller_uid ==
+          "c8e4eba8-3287-4cc2-ae1a-30e14be6e470");
+  }
 }
 
 TRACER_CONFIG_TEST("TracerConfig::trace_sampler") {
