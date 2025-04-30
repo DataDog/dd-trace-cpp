@@ -232,9 +232,9 @@ void DatadogAgent::flush() {
   auto end = std::chrono::steady_clock::now();
 
   telemetry::distribution::add(
-      metrics::tracer:: trace_chunk_serialization_duration,
+      metrics::tracer::trace_chunk_serialization_duration,
       std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count());
-  telemetry::distribution::add(metrics::tracer:: trace_chunk_serialized_bytes,
+  telemetry::distribution::add(metrics::tracer::trace_chunk_serialized_bytes,
                                static_cast<uint64_t>(body.size()));
 
   if (auto* error = encode_result.if_error()) {
