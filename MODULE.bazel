@@ -11,10 +11,24 @@ bazel_dep(
     name = "rules_cc",
     version = "0.0.9",
 )
+bazel_dep(
+    name = "customlabels",
+    version = "1.0.0",
+)
+bazel_dep(
+    name = "platforms",
+    version = "0.0.11",
+)
 # -- bazel_dep definitions -- #
 
 non_module_dependencies = use_extension("//:extensions.bzl", "non_module_dependencies")
 use_repo(
     non_module_dependencies,
     "com_google_absl",
+)
+
+git_override(
+    module_name = "customlabels",
+    remote = "https://github.com/DataDog/custom-labels.git",
+    commit = "1bc74232c0e414f2c63139f7cf7ac0bdce57d258",
 )
