@@ -226,6 +226,7 @@ void Telemetry::schedule_tasks() {
 }
 
 Telemetry::~Telemetry() {
+  shutting_down_.store(true, std::memory_order_release);
   if (!tasks_.empty()) {
     cancel_tasks(tasks_);
     capture_metrics();
@@ -252,6 +253,7 @@ Telemetry::Telemetry(Telemetry&& rhs)
       seq_id_(rhs.seq_id_),
       config_seq_ids_(rhs.config_seq_ids_),
       host_info_(rhs.host_info_) {
+  rhs.shutting_down_.store(true, std::memory_order_release);
   cancel_tasks(rhs.tasks_);
   schedule_tasks();
 }
@@ -740,6 +742,9 @@ void Telemetry::log(std::string message, telemetry::LogLevel level,
                        clock_().wall.time_since_epoch())
                        .count();
   std::lock_guard l{log_mutex_};
+  if (shutting_down_.load(std::memory_order_acquire)) {
+    return;
+  }
   logs_.emplace_back(
       telemetry::LogMessage{std::move(message), level, stacktrace, timestamp});
 }
@@ -751,6 +756,9 @@ void Telemetry::increment_counter(const Counter& id) {
 void Telemetry::increment_counter(const Counter& id,
                                   const std::vector<std::string>& tags) {
   std::lock_guard l{counter_mutex_};
+  if (shutting_down_.load(std::memory_order_acquire)) {
+    return;
+  }
   counters_[{id, tags}] += 1;
 }
 
@@ -761,6 +769,9 @@ void Telemetry::decrement_counter(const Counter& id) {
 void Telemetry::decrement_counter(const Counter& id,
                                   const std::vector<std::string>& tags) {
   std::lock_guard l{counter_mutex_};
+  if (shutting_down_.load(std::memory_order_acquire)) {
+    return;
+  }
   auto& v = counters_[{id, tags}];
   if (v > 0) v -= 1;
 }
@@ -773,6 +784,9 @@ void Telemetry::set_counter(const Counter& id,
                             const std::vector<std::string>& tags,
                             uint64_t value) {
   std::lock_guard l{counter_mutex_};
+  if (shutting_down_.load(std::memory_order_acquire)) {
+    return;
+  }
   counters_[{id, tags}] = value;
 }
 
@@ -783,6 +797,9 @@ void Telemetry::set_rate(const Rate& id, uint64_t value) {
 void Telemetry::set_rate(const Rate& id, const std::vector<std::string>& tags,
                          uint64_t value) {
   std::lock_guard l{rate_mutex_};
+  if (shutting_down_.load(std::memory_order_acquire)) {
+    return;
+  }
   rates_[{id, tags}] = value;
 }
 
@@ -794,6 +811,9 @@ void Telemetry::add_datapoint(const Distribution& id,
                               const std::vector<std::string>& tags,
                               uint64_t value) {
   std::lock_guard l{distributions_mutex_};
+  if (shutting_down_.load(std::memory_order_acquire)) {
+    return;
+  }
   distributions_[{id, tags}].emplace_back(value);
 }
 

@@ -9,6 +9,7 @@
 #include <datadog/telemetry/metrics.h>
 #include <datadog/tracer_signature.h>
 
+#include <atomic>
 #include <mutex>
 
 #include "json.hpp"
@@ -39,6 +40,7 @@ class Telemetry final {
   std::shared_ptr<tracing::HTTPClient> http_client_;
   tracing::Clock clock_;
   std::shared_ptr<tracing::EventScheduler> scheduler_;
+  std::atomic<bool> shutting_down_{false};
 
   /// Counter
   std::mutex counter_mutex_;
