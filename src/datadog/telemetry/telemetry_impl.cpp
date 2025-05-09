@@ -234,8 +234,8 @@ Telemetry::~Telemetry() {
     // final metric values.
     send_telemetry("app-closing", app_closing());
     http_client_->drain(clock_().tick + 2s);
-    http_client_.reset();
   }
+  http_client_.reset();
 }
 
 Telemetry::Telemetry(Telemetry&& rhs)
