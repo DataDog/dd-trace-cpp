@@ -214,7 +214,7 @@ class CurlImpl {
   };
 
   void run();
-  void handle_message(const CURLMsg &, std::unique_lock<std::mutex> &);
+  void handle_message(const CURLMsg &);
   CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
 
@@ -386,16 +386,13 @@ Expected<void> CurlImpl::post(
         handle.get(), (url.scheme + "://" + url.authority + url.path).c_str()));
   }
 
-  std::list<CURL *> node;
-  node.push_back(handle.get());
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    new_handles_.splice(new_handles_.end(), node);
-
-    (void)headers.release();
-    (void)handle.release();
-    (void)request.release();
+    new_handles_.emplace_back(handle.get());
   }
+  std::ignore = headers.release();
+  std::ignore = handle.release();
+  std::ignore = request.release();
 
   log_on_error(curl_.multi_wakeup(multi_handle_));
 
@@ -405,6 +402,8 @@ Expected<void> CurlImpl::post(
 }
 
 void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
+  log_on_error(curl_.multi_wakeup(multi_handle_));
+
   std::unique_lock<std::mutex> lock(mutex_);
   no_requests_.wait_until(lock, deadline, [this]() {
     return num_active_handles_ == 0 && new_handles_.empty();
@@ -465,31 +464,32 @@ CURLMcode CurlImpl::log_on_error(CURLMcode result) {
 }
 
 void CurlImpl::run() {
-  int num_messages_remaining;
-  CURLMsg *message;
-  constexpr int max_wait_milliseconds = 10000;
-  std::unique_lock<std::mutex> lock(mutex_);
+  int num_active_handles = 0;
+  int num_messages_remaining = 0;
 
-  for (;;) {
-    log_on_error(curl_.multi_perform(multi_handle_, &num_active_handles_));
-    if (num_active_handles_ == 0) {
-      no_requests_.notify_all();
-    }
+  bool shutting_down = false;
+  CURLMsg *message = nullptr;
+  constexpr int max_wait_milliseconds = 10'000;
 
-    // If a request is done or errored out, curl will enqueue a "message" for
-    // us to handle.  Handle any pending messages.
-    while ((message = curl_.multi_info_read(multi_handle_,
-                                            &num_messages_remaining))) {
-      handle_message(*message, lock);
-    }
-    lock.unlock();
-    log_on_error(curl_.multi_poll(multi_handle_, nullptr, 0,
-                                  max_wait_milliseconds, nullptr));
+  std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+  std::list<CURL *> handles_to_process;
+
+  while (true) {
     lock.lock();
+    shutting_down = shutting_down_;
+
+    handles_to_process.splice(handles_to_process.begin(), new_handles_);
+    assert(new_handles_.empty());
+
+    num_active_handles_ =
+        num_active_handles + static_cast<int>(handles_to_process.size());
+    lock.unlock();
+
+    no_requests_.notify_all();
 
     // New requests might have been added while we were sleeping.
-    for (; !new_handles_.empty(); new_handles_.pop_front()) {
-      CURL *handle = new_handles_.front();
+    for (; !handles_to_process.empty(); handles_to_process.pop_front()) {
+      CURL *handle = handles_to_process.front();
       char *user_data;
       if (log_on_error(curl_.easy_getinfo_private(handle, &user_data)) !=
           CURLE_OK) {
@@ -528,9 +528,18 @@ void CurlImpl::run() {
       request_handles_.insert(handle);
     }
 
-    if (shutting_down_) {
-      break;
+    if (shutting_down) break;
+
+    log_on_error(curl_.multi_perform(multi_handle_, &num_active_handles));
+
+    // If a request is done or errored out, curl will enqueue a "message" for
+    // us to handle. Handle any pending messages.
+    while ((message = curl_.multi_info_read(multi_handle_,
+                                            &num_messages_remaining))) {
+      handle_message(*message);
     }
+    log_on_error(curl_.multi_poll(multi_handle_, nullptr, 0,
+                                  max_wait_milliseconds, nullptr));
   }
 
   // We're shutting down.  Clean up any remaining request handles.
@@ -548,8 +557,7 @@ void CurlImpl::run() {
   request_handles_.clear();
 }
 
-void CurlImpl::handle_message(const CURLMsg &message,
-                              std::unique_lock<std::mutex> &lock) {
+void CurlImpl::handle_message(const CURLMsg &message) {
   if (message.msg != CURLMSG_DONE) {
     return;
   }
@@ -571,10 +579,8 @@ void CurlImpl::handle_message(const CURLMsg &message,
     error_message += curl_.easy_strerror(result);
     error_message += "): ";
     error_message += request.error_buffer;
-    lock.unlock();
     request.on_error(
         Error{Error::CURL_REQUEST_FAILURE, std::move(error_message)});
-    lock.lock();
   } else {
     long status;
     if (log_on_error(curl_.easy_getinfo_response_code(request_handle,
@@ -582,10 +588,8 @@ void CurlImpl::handle_message(const CURLMsg &message,
       status = -1;
     }
     HeaderReader reader(&request.response_headers_lower);
-    lock.unlock();
     request.on_response(static_cast<int>(status), reader,
                         std::move(request.response_body));
-    lock.lock();
   }
 
   log_on_error(curl_.multi_remove_handle(multi_handle_, request_handle));

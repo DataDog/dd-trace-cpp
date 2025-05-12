@@ -34,8 +34,6 @@ class Telemetry final {
   /// Shared pointer to the user logger instance.
   std::shared_ptr<tracing::Logger> logger_;
   std::vector<tracing::EventScheduler::Cancel> tasks_;
-  tracing::HTTPClient::ResponseHandler telemetry_on_response_;
-  tracing::HTTPClient::ErrorHandler telemetry_on_error_;
   tracing::HTTPClient::URL telemetry_endpoint_;
   tracing::TracerSignature tracer_signature_;
   std::shared_ptr<tracing::HTTPClient> http_client_;

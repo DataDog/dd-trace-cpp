@@ -33,6 +33,15 @@ bool is_valid_telemetry_payload(const nlohmann::json& json) {
          json.contains("/host"_json_pointer);
 }
 
+std::optional<nlohmann::json> find_payload(const nlohmann::json& messages,
+                                           std::string_view kind) {
+  for (const auto& m : messages) {
+    if (m["request_type"].get<std::string_view>() == kind) return m;
+  }
+
+  return std::nullopt;
+};
+
 struct FakeEventScheduler : public EventScheduler {
   size_t count_tasks = 0;
   std::function<void()> heartbeat_callback = nullptr;
@@ -287,9 +296,11 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
 
     auto message_batch = nlohmann::json::parse(client->request_body);
     REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-    REQUIRE(message_batch["payload"].size() == 1);
-    auto heartbeat = message_batch["payload"][0];
-    REQUIRE(heartbeat["request_type"] == "app-closing");
+    REQUIRE(message_batch["payload"].size() >= 1);
+
+    auto app_closing_payload =
+        find_payload(message_batch["payload"], "app-closing");
+    REQUIRE(app_closing_payload.has_value());
   }
 }
 
@@ -321,9 +332,9 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     auto heartbeat_message = client->request_body;
     auto message_batch = nlohmann::json::parse(heartbeat_message);
     REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-    REQUIRE(message_batch["payload"].size() == 1);
-    auto heartbeat = message_batch["payload"][0];
-    REQUIRE(heartbeat["request_type"] == "app-heartbeat");
+    REQUIRE(message_batch["payload"].size() >= 1);
+
+    REQUIRE(find_payload(message_batch["payload"], "app-heartbeat"));
   }
 
   SECTION("metrics reporting") {
@@ -355,13 +366,15 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-      REQUIRE(message_batch["payload"].size() == 2);
-      auto generate_metrics = message_batch["payload"][1];
-      REQUIRE(generate_metrics["request_type"] == "generate-metrics");
-      auto payload = generate_metrics["payload"];
+      REQUIRE(message_batch["payload"].size() >= 2);
+
+      auto generate_metrics =
+          find_payload(message_batch["payload"], "generate-metrics");
+      REQUIRE(generate_metrics.has_value());
+      auto payload = (*generate_metrics)["payload"];
 
       auto series = payload["series"];
-      REQUIRE(series.size() == 2);
+      REQUIRE(series.size() >= 2);
 
       const auto expected_metrics = nlohmann::json::parse(R"(
         [
@@ -390,10 +403,12 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       )");
 
       for (const auto& s : series) {
-        if (s.contains("tags")) {
-          CHECK(s == expected_metrics[0]);
-        } else {
-          CHECK(s == expected_metrics[1]);
+        if (s["metric"] == "my_counter") {
+          if (s.contains("tags")) {
+            CHECK(s == expected_metrics[0]);
+          } else {
+            CHECK(s == expected_metrics[1]);
+          }
         }
       }
 
@@ -404,10 +419,9 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch2 = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
-      REQUIRE(message_batch2["payload"].size() == 1);
+      REQUIRE(message_batch2["payload"].size() >= 1);
 
-      auto payload2 = message_batch["payload"][0];
-      CHECK(payload2["request_type"] == "app-heartbeat");
+      CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
     }
 
     SECTION("counters can't go below zero") {
@@ -422,17 +436,17 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-      REQUIRE(message_batch["payload"].size() == 2);
+      REQUIRE(message_batch["payload"].size() >= 2);
 
-      auto generate_metrics = message_batch["payload"][1];
-      REQUIRE(generate_metrics["request_type"] == "generate-metrics");
-      auto payload = generate_metrics["payload"];
+      auto generate_metrics =
+          find_payload(message_batch["payload"], "generate-metrics");
+      REQUIRE(generate_metrics);
+      auto payload = (*generate_metrics)["payload"];
 
       auto series = payload["series"];
-      REQUIRE(series.size() == 1);
+      REQUIRE(series.size() >= 1);
 
-      const auto expected_metrics = nlohmann::json::parse(R"(
-        [
+      const auto expected_metric = nlohmann::json::parse(R"(
           {
             "common": true,
             "metric": "positive_counter",
@@ -442,9 +456,13 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
             ],
             "type": "count"
           }
-        ]
       )");
-      CHECK(series == expected_metrics);
+
+      for (const auto& s : series) {
+        if (s["metric"] == "positive_counter") {
+          CHECK(s == expected_metric);
+        }
+      }
     }
 
     SECTION("rate") {
@@ -468,13 +486,14 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-      REQUIRE(message_batch["payload"].size() == 2);
-      auto generate_metrics = message_batch["payload"][1];
-      REQUIRE(generate_metrics["request_type"] == "generate-metrics");
-      auto payload = generate_metrics["payload"];
+      REQUIRE(message_batch["payload"].size() >= 2);
+      auto generate_metrics =
+          find_payload(message_batch["payload"], "generate-metrics");
+      REQUIRE(generate_metrics);
+      auto payload = (*generate_metrics)["payload"];
 
       auto series = payload["series"];
-      REQUIRE(series.size() == 2);
+      REQUIRE(series.size() >= 2);
 
       const auto expected_metrics = nlohmann::json::parse(R"(
         [
@@ -502,10 +521,12 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       )");
 
       for (const auto& s : series) {
-        if (s.contains("tags")) {
-          CHECK(s == expected_metrics[0]);
-        } else {
-          CHECK(s == expected_metrics[1]);
+        if (s["metric"] == "request") {
+          if (s.contains("tags")) {
+            CHECK(s == expected_metrics[0]);
+          } else {
+            CHECK(s == expected_metrics[1]);
+          }
         }
       }
 
@@ -516,10 +537,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch2 = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
-      REQUIRE(message_batch2["payload"].size() == 1);
-
-      auto payload2 = message_batch["payload"][0];
-      CHECK(payload2["request_type"] == "app-heartbeat");
+      REQUIRE(message_batch2["payload"].size() >= 1);
+      CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
     }
 
     SECTION("distribution") {
@@ -552,7 +571,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       REQUIRE(distribution_message["request_type"] == "distributions");
 
       auto distribution_series = distribution_message["payload"]["series"];
-      REQUIRE(distribution_series.size() == 3);
+      REQUIRE(distribution_series.size() >= 3);
 
       const auto expected_series = nlohmann::json::parse(R"([
         {
@@ -585,8 +604,6 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
           }
         } else if (s["metric"] == "request_size") {
           CHECK(s == expected_series[1]);
-        } else {
-          FAIL();
         }
       }
 
@@ -597,10 +614,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch2 = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
-      REQUIRE(message_batch2["payload"].size() == 1);
-
-      auto payload = message_batch["payload"][0];
-      CHECK(payload["request_type"] == "app-heartbeat");
+      REQUIRE(message_batch2["payload"].size() >= 1);
+      CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
     }
 
     SECTION("dtor sends metrics and distributions") {
@@ -626,7 +641,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
         const auto& req_type = payload["request_type"];
         if (req_type == "generate-metrics") {
           const auto& metrics_series = payload["payload"]["series"];
-          REQUIRE(metrics_series.size() == 2);
+          REQUIRE(metrics_series.size() >= 2);
 
           for (const auto& s : metrics_series) {
             if (s["metric"] == "my_counter") {
@@ -651,15 +666,12 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
                 }
               )");
               CHECK(s == expected_rate);
-            } else {
-              FAIL("unexpected metrics name, got " << s["metric"]);
             }
           }
         } else if (req_type == "distributions") {
           const auto& distribution_series = payload["payload"]["series"];
-          REQUIRE(distribution_series.size() == 1);
+          REQUIRE(distribution_series.size() >= 1);
 
-          const auto& d0 = distribution_series[0];
           const auto expected_d0 = nlohmann::json::parse(R"(
             {
               "common":false,
@@ -668,7 +680,12 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
               "points": [128]
             }
           )");
-          CHECK(d0 == expected_d0);
+
+          for (const auto& d : distribution_series) {
+            if (d["metric"] == "response_time") {
+              CHECK(d == expected_d0);
+            };
+          }
         }
       }
     }
@@ -725,12 +742,12 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch));
-      REQUIRE(message_batch["payload"].size() == 2);
+      REQUIRE(message_batch["payload"].size() >= 2);
 
-      auto logs_message = message_batch["payload"][1];
-      REQUIRE(logs_message["request_type"] == "logs");
+      auto logs_message = find_payload(message_batch["payload"], "logs");
+      REQUIRE(logs_message);
 
-      auto logs_payload = logs_message["payload"]["logs"];
+      auto logs_payload = (*logs_message)["payload"]["logs"];
       REQUIRE(logs_payload.size() == 1);
       CHECK(logs_payload[0]["level"] == test_case.expected_log_level);
       CHECK(logs_payload[0]["message"] == test_case.input);
@@ -749,10 +766,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch2 = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
-      REQUIRE(message_batch2["payload"].size() == 1);
-
-      auto payload2 = message_batch["payload"][0];
-      CHECK(payload2["request_type"] == "app-heartbeat");
+      REQUIRE(message_batch2["payload"].size() >= 1);
+      CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
     }
 
     SECTION("dtor sends logs in `app-closing` message") {
@@ -765,12 +780,12 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       auto message_batch = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch));
-      REQUIRE(message_batch["payload"].size() == 2);
+      REQUIRE(message_batch["payload"].size() >= 2);
 
-      auto logs_message = message_batch["payload"][1];
-      REQUIRE(logs_message["request_type"] == "logs");
+      auto logs_message = find_payload(message_batch["payload"], "logs");
+      REQUIRE(logs_message);
 
-      auto logs_payload = logs_message["payload"]["logs"];
+      auto logs_payload = (*logs_message)["payload"]["logs"];
       REQUIRE(logs_payload.size() == 1);
       CHECK(logs_payload[0]["level"] == "WARNING");
       CHECK(logs_payload[0]["message"] == "Be careful!");
@@ -842,7 +857,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
 
     auto message_batch = nlohmann::json::parse(client->request_body);
     REQUIRE(is_valid_telemetry_payload(message_batch));
-    REQUIRE(message_batch["payload"].size() == 1);
-    CHECK(message_batch["payload"][0]["request_type"] == "app-heartbeat");
+    REQUIRE(message_batch["payload"].size() >= 1);
+    CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
   }
 }

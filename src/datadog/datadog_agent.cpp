@@ -246,8 +246,24 @@ void DatadogAgent::flush() {
     return;
   }
 
+  // Ideally:
+  /*auto [encode_result, duration] = mesure([&trace_chunks] {*/
+  /*  std::string body;*/
+  /*  msgpack_encode(body, trace_chunks);*/
+  /*});*/
+
   std::string body;
+
+  auto beg = std::chrono::steady_clock::now();
   auto encode_result = msgpack_encode(body, trace_chunks);
+  auto end = std::chrono::steady_clock::now();
+
+  telemetry::distribution::add(
+      metrics::tracer::trace_chunk_serialization_duration,
+      std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count());
+  telemetry::distribution::add(metrics::tracer::trace_chunk_serialized_bytes,
+                               static_cast<uint64_t>(body.size()));
+
   if (auto* error = encode_result.if_error()) {
     logger_->log_error(*error);
     return;
@@ -335,11 +351,17 @@ void DatadogAgent::flush() {
   };
 
   telemetry::counter::increment(metrics::tracer::api::requests);
+  telemetry::distribution::add(metrics::tracer::api::bytes_sent,
+                               static_cast<uint64_t>(body.size()));
+
   auto post_result =
       http_client_->post(traces_endpoint_, std::move(set_request_headers),
                          std::move(body), std::move(on_response),
                          std::move(on_error), clock_().tick + request_timeout_);
   if (auto* error = post_result.if_error()) {
+    // NOTE(@dmehala): `technical` is a better kind of errors.
+    telemetry::counter::increment(metrics::tracer::api::errors,
+                                  {"type:network"});
     logger_->log_error(
         error->with_prefix("Unexpected error submitting traces: "));
   }
