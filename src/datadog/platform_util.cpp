@@ -314,7 +314,8 @@ Optional<ino_t> get_inode(std::string_view path) {
 // whether the binary is running in host or not. However, it does not work when
 // running in a Docker in Docker environment.
 bool is_running_in_host_namespace() {
-  // linux procfs file that represents the cgroup namespace of the current process
+  // linux procfs file that represents the cgroup namespace of the current
+  // process.
   if (auto inode = get_inode("/proc/self/ns/cgroup")) {
     return *inode == HOST_CGROUP_NAMESPACE_INODE;
   }
