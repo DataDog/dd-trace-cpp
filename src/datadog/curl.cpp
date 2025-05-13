@@ -234,6 +234,8 @@ class CurlImpl {
                       std::chrono::steady_clock::time_point deadline);
 
   void drain(std::chrono::steady_clock::time_point deadline);
+
+  void clear_requests();
 };
 
 namespace {
@@ -401,13 +403,32 @@ Expected<void> CurlImpl::post(
   return Error{Error::CURL_REQUEST_SETUP_FAILED, curl_.easy_strerror(error)};
 }
 
+void CurlImpl::clear_requests() {
+  for (const auto &handle : request_handles_) {
+    char *user_data;
+    if (log_on_error(curl_.easy_getinfo_private(handle, &user_data)) ==
+        CURLE_OK) {
+      delete reinterpret_cast<Request *>(user_data);
+    }
+
+    log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
+    curl_.easy_cleanup(handle);
+  }
+
+  request_handles_.clear();
+}
+
 void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
   log_on_error(curl_.multi_wakeup(multi_handle_));
 
   std::unique_lock<std::mutex> lock(mutex_);
   no_requests_.wait_until(lock, deadline, [this]() {
+    curl_.multi_wakeup(multi_handle_);
     return num_active_handles_ == 0 && new_handles_.empty();
   });
+
+  log_on_error(curl_.multi_wakeup(multi_handle_));
+  clear_requests();
 }
 
 std::size_t CurlImpl::on_read_header(char *data, std::size_t,
@@ -542,19 +563,8 @@ void CurlImpl::run() {
                                   max_wait_milliseconds, nullptr));
   }
 
-  // We're shutting down.  Clean up any remaining request handles.
-  for (const auto &handle : request_handles_) {
-    char *user_data;
-    if (log_on_error(curl_.easy_getinfo_private(handle, &user_data)) ==
-        CURLE_OK) {
-      delete reinterpret_cast<Request *>(user_data);
-    }
-
-    log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
-    curl_.easy_cleanup(handle);
-  }
-
-  request_handles_.clear();
+  // We're shutting down. Clean up any remaining request handles.
+  clear_requests();
 }
 
 void CurlImpl::handle_message(const CURLMsg &message) {

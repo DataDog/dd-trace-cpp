@@ -53,6 +53,8 @@ const telemetry::Distribution request_duration{"telemetry_api.ms", "telemetry",
 
 namespace {
 
+constexpr std::chrono::steady_clock::duration request_timeout = 2s;
+
 HTTPClient::URL make_telemetry_endpoint(HTTPClient::URL url) {
   append(url.path, "/telemetry/proxy/api/v2/apmtelemetry");
   return url;
@@ -206,10 +208,8 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
       host_info_(get_host_info()) {
-  // Callback for successful telemetry HTTP requests, to examine HTTP
-  // status.
   send_telemetry("app-started", app_started());
-  http_client_->drain(clock_().tick + 2s);
+  http_client_->drain(clock_().tick + request_timeout);
   schedule_tasks();
 }
 
@@ -232,7 +232,7 @@ Telemetry::~Telemetry() {
     // The app-closing message is bundled with a message containing the
     // final metric values.
     send_telemetry("app-closing", app_closing());
-    http_client_->drain(clock_().tick + 2s);
+    http_client_->drain(clock_().tick + request_timeout);
   }
 }
 
@@ -361,10 +361,10 @@ void Telemetry::send_telemetry(StringView request_type, std::string payload) {
   add_datapoint(internal_metrics::bytes_sent, {"endpoint:agent"},
                 payload.size());
 
-  auto post_result =
-      http_client_->post(telemetry_endpoint_, set_telemetry_headers,
-                         std::move(payload), std::move(telemetry_on_response),
-                         std::move(telemetry_on_error), clock_().tick + 5s);
+  auto post_result = http_client_->post(
+      telemetry_endpoint_, set_telemetry_headers, std::move(payload),
+      std::move(telemetry_on_response), std::move(telemetry_on_error),
+      clock_().tick + request_timeout);
   if (auto* error = post_result.if_error()) {
     increment_counter(internal_metrics::errors,
                       {"type:network", "endpoint:agent"});
