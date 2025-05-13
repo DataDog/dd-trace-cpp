@@ -94,7 +94,7 @@ Optional<std::string> find_docker_container_id(std::istream& source);
 
 /// Function to retrieve the container metadata.
 ///
-/// @return A `ContainerMetadata` object containing metadata of the container in
+/// @return A `ContainerID` object containing id of the container in
 /// which the current process is running.
 Optional<ContainerID> get_id();
 
