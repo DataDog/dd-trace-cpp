@@ -71,6 +71,13 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       baggage_injection_enabled_(false),
       baggage_extraction_enabled_(false),
       correlate_full_host_profiles_(config.correlate_full_host_profiles) {
+#ifdef __linux__
+  // TODO: change the way this is done to handle programs that fork.
+  if (correlate_full_host_profiles_)
+    elastic_apm_profiling_correlation_process_storage_v1 =
+        *signature_.generate_process_correlation_storage();
+#endif
+
   telemetry::init(config.telemetry, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {
@@ -103,13 +110,6 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       break;
     }
   }
-
-#ifdef __linux__
-  // TODO: change the way this is done to handle programs that fork.
-  if (correlate_full_host_profiles_)
-    elastic_apm_profiling_correlation_process_storage_v1 =
-        *signature_.generate_process_correlation_storage();
-#endif
 
   if (config.log_on_startup) {
     logger_->log_startup([configuration = this->config()](std::ostream& log) {
