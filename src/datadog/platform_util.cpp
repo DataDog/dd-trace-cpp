@@ -338,8 +338,6 @@ Optional<Cgroup> get_cgroup_version() {
 }
 
 Optional<std::string> find_docker_container_id_from_cgroup() {
-  constexpr std::string_view cgroup_path = "/proc/self/cgroup";
-
   auto cgroup_fd = std::ifstream("/proc/self/cgroup", std::ios::in);
   if (!cgroup_fd.is_open()) return nullopt;
 
