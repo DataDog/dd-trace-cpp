@@ -177,6 +177,23 @@ if (BUILD_SHARED_LIBS)
   add_library(dd_trace_cpp-shared SHARED $<TARGET_OBJECTS:dd_trace_cpp-objects>)
   add_library(dd_trace::shared ALIAS dd_trace_cpp-shared)
 
+  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+      set(TLS_DIALECT desc)
+    elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
+      set(TLS_DIALECT gnu2)
+    else()
+      message(FATAL_ERROR "Only aarch64 and x86-64 are supported (found: ${CMAKE_SYSTEM_PROCESSOR})")
+    endif()
+ 
+    target_compile_options(dd_trace_cpp-shared PRIVATE
+     -g
+     -fPIC
+     -ftls-model=global-dynamic
+     -mtls-dialect=${TLS_DIALECT}
+    )
+  endif()
+
   if (DD_TRACE_TRANSPORT STREQUAL "curl")
     add_dependencies(dd_trace_cpp-shared CURL::libcurl_shared)
 
