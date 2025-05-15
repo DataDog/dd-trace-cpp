@@ -17,6 +17,7 @@
 #include "collector_response.h"
 #include "json.hpp"
 #include "msgpack.h"
+#include "platform_util.h"
 #include "span_data.h"
 #include "telemetry_metrics.h"
 #include "trace_sampler.h"
@@ -156,9 +157,35 @@ DatadogAgent::DatadogAgent(
       flush_interval_(config.flush_interval),
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
-      remote_config_(tracer_signature, rc_listeners, logger),
-      tracer_signature_(tracer_signature) {
+      remote_config_(tracer_signature, rc_listeners, logger) {
   assert(logger_);
+
+  // Set HTTP headers
+  headers_.emplace("Content-Type", "application/msgpack");
+  headers_.emplace("Datadog-Meta-Lang", "cpp");
+  headers_.emplace("Datadog-Meta-Lang-Version",
+                   tracer_signature.library_language_version);
+  headers_.emplace("Datadog-Meta-Tracer-Version",
+                   tracer_signature.library_version);
+
+  // Origin Detection headers are not necessary when Unix Domain Socket (UDS)
+  // is used to communicate with the Datadog Agent.
+  if (!contains(config.url.scheme, "unix")) {
+    if (auto container_id = container::get_id()) {
+      if (container_id->type == container::ContainerID::Type::container_id) {
+        headers_.emplace("Datadog-Container-ID", container_id->value);
+        headers_.emplace("Datadog-Entity-Id", "ci-" + container_id->value);
+      } else if (container_id->type ==
+                 container::ContainerID::Type::cgroup_inode) {
+        headers_.emplace("Datadog-Entity-Id", "in-" + container_id->value);
+      }
+    }
+
+    if (config.admission_controller_uid) {
+      headers_.emplace("Datadog-External-Env",
+                       *config.admission_controller_uid);
+    }
+  }
 
   tasks_.emplace_back(event_scheduler_->schedule_recurring_event(
       config.flush_interval, [this]() { flush(); }));
@@ -252,14 +279,11 @@ void DatadogAgent::flush() {
 
   // This is the callback for setting request headers.
   // It's invoked synchronously (before `post` returns).
-  auto set_request_headers = [&](DictWriter& headers) {
-    headers.set("Content-Type", "application/msgpack");
-    headers.set("Datadog-Meta-Lang", "cpp");
-    headers.set("Datadog-Meta-Lang-Version",
-                tracer_signature_.library_language_version);
-    headers.set("Datadog-Meta-Tracer-Version",
-                tracer_signature_.library_version);
-    headers.set("X-Datadog-Trace-Count", std::to_string(trace_chunks.size()));
+  auto set_request_headers = [&](DictWriter& writer) {
+    writer.set("X-Datadog-Trace-Count", std::to_string(trace_chunks.size()));
+    for (const auto& [key, value] : headers_) {
+      writer.set(key, value);
+    }
   };
 
   // This is the callback for the HTTP response.  It's invoked
