@@ -36,8 +36,7 @@ struct Ctor_param final {
 
 TelemetryProxy make_telemetry(const Ctor_param& init) {
   if (!init.configuration.enabled) {
-    init.logger->log_error(
-        "Telemetry is disabled. No telemetry will be sent."); 
+    init.logger->log_error("Telemetry is disabled. No telemetry will be sent.");
     return NoopTelemetry{};
   }
   return Telemetry{init.configuration, init.logger,    init.client,
