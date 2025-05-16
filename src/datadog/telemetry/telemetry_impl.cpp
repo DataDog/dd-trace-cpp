@@ -172,6 +172,7 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
       host_info_(get_host_info()) {
+  logger_->log_error("Constructing telemetry object");
   // Callback for successful telemetry HTTP requests, to examine HTTP
   // status.
   telemetry_on_response_ = [logger = logger_](
@@ -198,6 +199,7 @@ Telemetry::Telemetry(FinalizedConfiguration config,
 }
 
 void Telemetry::schedule_tasks() {
+  logger_->log_error("Scheduling telemetry tasks");
   tasks_.emplace_back(scheduler_->schedule_recurring_event(
       config_.heartbeat_interval, [this]() {
         send_telemetry("app-heartbeat", heartbeat_and_telemetry());
@@ -273,6 +275,7 @@ void Telemetry::log_warning(std::string message) {
 }
 
 void Telemetry::send_telemetry(StringView request_type, std::string payload) {
+  logger_->log_error("Sending telemetry event: " + std::string(request_type));
   auto set_telemetry_headers = [request_type, payload_size = payload.size(),
                                 debug_enabled = config_.debug,
                                 tracer_signature =

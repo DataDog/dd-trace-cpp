@@ -59,6 +59,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
       baggage_extraction_enabled_(false) {
+  logger_->log_error("Constructing tracer object");
   telemetry::init(config.telemetry, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {

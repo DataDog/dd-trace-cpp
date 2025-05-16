@@ -35,7 +35,11 @@ struct Ctor_param final {
 };
 
 TelemetryProxy make_telemetry(const Ctor_param& init) {
-  if (!init.configuration.enabled) return NoopTelemetry{};
+  if (!init.configuration.enabled) {
+    init.logger->log_error(
+        "Telemetry is disabled. No telemetry will be sent."); 
+    return NoopTelemetry{};
+  }
   return Telemetry{init.configuration, init.logger,    init.client,
                    init.scheduler,     init.agent_url, init.clock};
 }
@@ -51,6 +55,8 @@ void init(FinalizedConfiguration configuration,
           std::shared_ptr<tracing::HTTPClient> client,
           std::shared_ptr<tracing::EventScheduler> event_scheduler,
           tracing::HTTPClient::URL agent_url, tracing::Clock clock) {
+  logger->log_error("Initializing telemetry with agents URL: " +
+                    agent_url.authority);
   instance(Ctor_param{configuration, logger, client, event_scheduler, agent_url,
                       clock});
 }
