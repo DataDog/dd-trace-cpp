@@ -1,3 +1,8 @@
+config_setting(
+    name              = "is_linux",
+    constraint_values = ["@platforms//os:linux"],
+)
+
 cc_library(
     name = "dd_trace_cpp",
     srcs = [
@@ -67,6 +72,7 @@ cc_library(
       "src/datadog/limiter.h",
       "src/datadog/msgpack.h",
       "src/datadog/null_logger.h",
+      "src/datadog/otel_identifiers.h",
       "src/datadog/parse_util.h",
       "src/datadog/platform_util.h",
       "src/datadog/random.h",
@@ -134,5 +140,8 @@ cc_library(
     deps = [
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-    ],
+    ] + select({
+        ":is_linux": ["@customlabels//:customlabels"],
+        "//conditions:default": [],
+    }),
 )
