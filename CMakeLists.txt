@@ -24,6 +24,11 @@ endif ()
 
 set(DD_TRACE_TRANSPORT "curl" CACHE STRING "HTTP transport that dd-trace-cpp uses to communicate with the Datadog Agent, can be either 'none' or 'curl'")
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  include(cmake/deps/customlabels.cmake)
+  message(STATUS "customlabels Library is available")
+endif()
+
 if(DD_TRACE_TRANSPORT STREQUAL "curl")
   include(cmake/deps/curl.cmake)
   message(STATUS "DD_TRACE_TRANSPORT is set to 'curl', including curl")
@@ -207,6 +212,13 @@ if (BUILD_SHARED_LIBS)
       dd_trace::specs
   )
 
+  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+   target_link_libraries(dd_trace_cpp-shared
+     PUBLIC
+       customlabels
+   )
+  endif ()
+
   install(TARGETS dd_trace_cpp-objects dd_trace_cpp-shared
     EXPORT dd_trace_cpp-export
     FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
@@ -249,6 +261,13 @@ if (BUILD_STATIC_LIBS)
       dd_trace::specs
   )
 
+  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+   target_link_libraries(dd_trace_cpp-static
+     PUBLIC
+       customlabels
+   )
+  endif ()
+
   install(TARGETS dd_trace_cpp-objects dd_trace_cpp-static
     EXPORT dd_trace_cpp-export
     FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
@@ -257,3 +276,10 @@ if (BUILD_STATIC_LIBS)
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 endif ()
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_include_directories(dd_trace_cpp-objects
+  PRIVATE
+    ${customlabels_SOURCE_DIR}/src
+  )
+endif()

@@ -127,6 +127,10 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
           lookup(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)) {
     env_cfg.generate_128bit_trace_ids = !falsy(*enabled_env);
   }
+  if (auto enabled_env =
+          lookup(environment::DD_TRACE_CORRELATE_FULL_HOST_PROFILES)) {
+    env_cfg.correlate_full_host_profiles = !falsy(*enabled_env);
+  }
 
   // Baggage
   if (auto baggage_items_env =
@@ -360,6 +364,11 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.metadata[ConfigName::GENEREATE_128BIT_TRACE_IDS] =
       ConfigMetadata(ConfigName::GENEREATE_128BIT_TRACE_IDS,
                      to_string(final_config.generate_128bit_trace_ids), origin);
+
+  // Correlate with Full Host Profiles
+  final_config.correlate_full_host_profiles =
+      value_or(env_config->correlate_full_host_profiles,
+               user_config.correlate_full_host_profiles, false);
 
   // Integration name & version
   final_config.integration_name = value_or(
