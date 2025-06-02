@@ -4,10 +4,12 @@
 #include <datadog/span_config.h>
 #include <datadog/string_view.h>
 #include <datadog/trace_segment.h>
+#include <datadog/tracer.h>
 
 #include <cassert>
 #include <string>
 
+#include "otel_identifiers.h"
 #include "span_data.h"
 #include "tags.h"
 
@@ -39,6 +41,19 @@ Span::~Span() {
     const auto now = clock_();
     data_->duration = now - data_->start;
   }
+
+#ifdef __linux__
+  // When a span is finished, we must update the span_id to its parent's.
+  if (process_storage != nullptr && parent_id().has_value()) {
+    auto span_id = std::to_string(parent_id().value());
+    custom_labels_labelset_set(
+        custom_labels_current_set,
+        {sizeof(OTEL_SPAN_ID_IDENTIFIER),
+         reinterpret_cast<const unsigned char*>(OTEL_SPAN_ID_IDENTIFIER)},
+        {span_id.size(),
+         reinterpret_cast<const unsigned char*>(span_id.c_str())});
+  }
+#endif
 
   trace_segment_->span_finished();
 }
