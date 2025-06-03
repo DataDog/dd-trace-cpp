@@ -7,7 +7,9 @@
 namespace datadog {
 namespace tracing {
 
-struct InjectionOptions {};
+struct InjectionOptions {
+  bool has_appsec_matches{};
+};
 
 }  // namespace tracing
 }  // namespace datadog

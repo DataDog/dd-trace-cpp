@@ -22,7 +22,7 @@ struct MockCollector : public Collector {
   std::vector<std::vector<std::unique_ptr<SpanData>>> chunks;
 
   Expected<void> send(std::vector<std::unique_ptr<SpanData>>&& spans,
-                      const std::shared_ptr<TraceSampler>&) override {
+                      const std::shared_ptr<ErasedTraceSampler>&) override {
     chunks.emplace_back(std::move(spans));
     return {};
   }
@@ -51,7 +51,7 @@ struct MockCollectorWithResponse : public MockCollector {
 
   Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
-      const std::shared_ptr<TraceSampler>& response_handler) override {
+      const std::shared_ptr<ErasedTraceSampler>& response_handler) override {
     MockCollector::send(std::move(spans), response_handler);
     response_handler->handle_collector_response(response);
     return {};
@@ -64,7 +64,7 @@ struct PriorityCountingCollector : public Collector {
   std::map<double, std::size_t> sampling_priority_count;
 
   Expected<void> send(std::vector<std::unique_ptr<SpanData>>&& spans,
-                      const std::shared_ptr<TraceSampler>&) override {
+                      const std::shared_ptr<ErasedTraceSampler>&) override {
     const SpanData& root = root_span(spans);
     const auto priority =
         root.numeric_tags.at(tags::internal::sampling_priority);
@@ -127,7 +127,7 @@ struct PriorityCountingCollectorWithResponse
 
   Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
-      const std::shared_ptr<TraceSampler>& response_handler) override {
+      const std::shared_ptr<ErasedTraceSampler>& response_handler) override {
     PriorityCountingCollector::send(std::move(spans), response_handler);
     REQUIRE(response_handler);
     response_handler->handle_collector_response(response);
@@ -141,7 +141,7 @@ struct FailureCollector : public Collector {
   Error failure{Error::OTHER, "send(...) failed because I told it to."};
 
   Expected<void> send(std::vector<std::unique_ptr<SpanData>>&&,
-                      const std::shared_ptr<TraceSampler>&) override {
+                      const std::shared_ptr<ErasedTraceSampler>&) override {
     return failure;
   }
 

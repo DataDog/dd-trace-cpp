@@ -5,11 +5,13 @@
 #include <datadog/injection_options.h>
 #include <datadog/logger.h>
 #include <datadog/optional.h>
+#include <datadog/sampling_mechanism.h>
 #include <datadog/span_defaults.h>
 #include <datadog/telemetry/metrics.h>
 #include <datadog/telemetry/telemetry.h>
 #include <datadog/trace_segment.h>
 
+#include <algorithm>
 #include <cassert>
 #include <string>
 #include <unordered_map>
@@ -83,7 +85,7 @@ void inject_trace_tags(
 TraceSegment::TraceSegment(
     const std::shared_ptr<Logger>& logger,
     const std::shared_ptr<Collector>& collector,
-    const std::shared_ptr<TraceSampler>& trace_sampler,
+    std::shared_ptr<ErasedTraceSampler> trace_sampler, bool apm_tracing_enabled,
     const std::shared_ptr<SpanSampler>& span_sampler,
     const std::shared_ptr<const SpanDefaults>& defaults,
     const std::shared_ptr<ConfigManager>& config_manager,
@@ -98,7 +100,8 @@ TraceSegment::TraceSegment(
     std::unique_ptr<SpanData> local_root)
     : logger_(logger),
       collector_(collector),
-      trace_sampler_(trace_sampler),
+      trace_sampler_(std::move(trace_sampler)),
+      apm_tracing_enabled_(apm_tracing_enabled),
       span_sampler_(span_sampler),
       defaults_(defaults),
       runtime_id_(runtime_id),
@@ -231,6 +234,13 @@ void TraceSegment::span_finished() {
     local_root.tags[tags::internal::sampling_decider] = "0";
   }
 
+  // RFC seems to only mandate that this be set if the trace is kept.
+  // However, system-tests expect this to be always be set.
+  // Add it all the time; can't hurt
+  if (!apm_tracing_enabled_) {
+    local_root.numeric_tags[tags::internal::apm_enabled] = 0;
+  }
+
   // Some tags are repeated on all spans.
   for (const auto& span_ptr : spans_) {
     SpanData& span = *span_ptr;
@@ -279,7 +289,23 @@ void TraceSegment::make_sampling_decision_if_null() {
     return;
   }
 
-  const SpanData& local_root = *spans_.front();
+  SpanData& local_root = *spans_.front();
+
+  // ApmDisabledTraceSampler needs to know the value of _dd.p.ts. Copy it here
+  // so that the value is accessible in the span passed to decide().
+  // The value may have been set because it was propagated from upstream or from
+  // a WAF run we already did
+  if (!apm_tracing_enabled_) {
+    auto it = std::find_if(
+        trace_tags_.begin(), trace_tags_.end(),
+        [](const auto& entry) { return entry.first == "_dd.p.ts"; });
+    if (it != trace_tags_.end()) {
+      local_root.tags.insert_or_assign(it->first, it->second);
+      // don't move the strings or erase the entry from trace_tags_:
+      // besides filling meta, it may still be in the tags propagation header
+    }
+  }
+
   sampling_decision_ = trace_sampler_->decide(local_root);
 
   update_decision_maker_trace_tag();
@@ -317,11 +343,15 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span) {
 }
 
 bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
-                          const InjectionOptions&) {
+                          const InjectionOptions& inj_opts) {
   // If the only injection style is `NONE`, then don't do anything.
   if (injection_styles_.size() == 1 &&
       injection_styles_[0] == PropagationStyle::NONE) {
     return false;
+  }
+
+  if (inj_opts.has_appsec_matches) {
+    trace_tags_.emplace_back(tags::internal::trace_source, "02");
   }
 
   // The sampling priority can change (it can be overridden on another thread),
@@ -336,6 +366,23 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     assert(sampling_decision_);
     sampling_priority = sampling_decision_->priority;
     trace_tags = trace_tags_;
+  }
+
+  // with APM tracing disabled, stop propagation unless we must keep the trace
+  if (!apm_tracing_enabled_) {
+    if (sampling_priority != 2) {
+      writer.set("x-datadog-trace-id", {});
+      writer.set("x-datadog-parent-id", {});
+      writer.set("x-datadog-sampling-priority", {});
+      writer.set("x-datadog-origin", {});
+      writer.set("x-datadog-tags", {});
+      writer.set("x-b3-traceid", {});
+      writer.set("x-b3-spanid", {});
+      writer.set("x-b3-sampled", {});
+      writer.set("traceparent", {});
+      writer.set("tracestate", {});
+      return true;
+    }
   }
 
   for (const auto style : injection_styles_) {

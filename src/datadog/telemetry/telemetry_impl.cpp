@@ -107,6 +107,8 @@ std::string to_string(datadog::tracing::ConfigName name) {
       return "trace_baggage_max_bytes";
     case ConfigName::TRACE_BAGGAGE_MAX_ITEMS:
       return "trace_baggage_max_items";
+    case ConfigName::APM_TRACING_ENABLED:
+      return "apm_tracing_enabled";
   }
 
   std::abort();

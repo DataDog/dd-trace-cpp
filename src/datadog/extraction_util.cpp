@@ -34,7 +34,7 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
   }
 
   for (auto& [key, value] : *maybe_trace_tags) {
-    if (!starts_with(key, "_dd.p.")) {
+    if (!starts_with(key, "_dd.p.") && key != "_dd.p.ts") {
       continue;
     }
 
