@@ -861,7 +861,7 @@ TEST_CASE("128-bit trace ID injection") {
   REQUIRE(found->second == "deadbeefdeadbeefcafebabecafebabe");
 }
 
-TEST_CASE("injection with has_appsec_matches option") {
+TEST_CASE("injection with trace_source option") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
@@ -872,16 +872,16 @@ TEST_CASE("injection with has_appsec_matches option") {
   REQUIRE(finalized_config);
   Tracer tracer{*finalized_config};
 
-  SECTION("has_appsec_matches = false (default)") {
+  SECTION("trace_source is not set (default)") {
     auto span = tracer.create_span();
     InjectionOptions options;
-    options.has_appsec_matches = false;
+    options.trace_source = std::nullopt;
 
     MockDictWriter writer;
     span.inject(writer, options);
 
     const auto& headers = writer.items;
-    // When has_appsec_matches is false, there should be no x-datadog-tags
+    // When there is no trace source, there should be no x-datadog-tags
     // header or if there is one, it should not contain _dd.p.ts
     if (headers.count("x-datadog-tags") > 0) {
       const auto decoded_tags = decode_tags(headers.at("x-datadog-tags"));
@@ -893,10 +893,10 @@ TEST_CASE("injection with has_appsec_matches option") {
     }
   }
 
-  SECTION("has_appsec_matches = true") {
+  SECTION("trace_source is 02 (appsec)") {
     auto span = tracer.create_span();
     InjectionOptions options;
-    options.has_appsec_matches = true;
+    options.trace_source = {'0', '2'};
 
     MockDictWriter writer;
     span.inject(writer, options);
@@ -918,7 +918,7 @@ TEST_CASE("injection with has_appsec_matches option") {
     REQUIRE(found_trace_source);
   }
 
-  SECTION("has_appsec_matches with existing trace tags") {
+  SECTION("trace source is 02 (appsec) with existing trace tags") {
     // Extract a span with existing trace tags
     const std::unordered_map<std::string, std::string> headers{
         {"x-datadog-trace-id", "123"},
@@ -930,7 +930,7 @@ TEST_CASE("injection with has_appsec_matches option") {
     REQUIRE(span);
 
     InjectionOptions options;
-    options.has_appsec_matches = true;
+    options.trace_source = {'0', '2'};
 
     MockDictWriter writer;
     span->inject(writer, options);
@@ -961,7 +961,7 @@ TEST_CASE("injection with has_appsec_matches option") {
     REQUIRE(found_another);
   }
 
-  SECTION("has_appsec_matches with APM tracing disabled") {
+  SECTION("trace_source with APM tracing disabled") {
     // Test the scenario where APM tracing is disabled
     TracerConfig apm_disabled_config;
     apm_disabled_config.service = "testsvc";
@@ -983,7 +983,7 @@ TEST_CASE("injection with has_appsec_matches option") {
       span.trace_segment().override_sampling_priority(1);
 
       InjectionOptions options;
-      options.has_appsec_matches = true;
+      options.trace_source = {'0', '2'};
 
       MockDictWriter writer;
       span.inject(writer, options);
