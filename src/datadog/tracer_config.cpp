@@ -6,6 +6,7 @@
 #include <cassert>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "datadog_agent.h"
@@ -14,6 +15,7 @@
 #include "parse_util.h"
 #include "platform_util.h"
 #include "string_util.h"
+#include "tags.h"
 #include "threaded_event_scheduler.h"
 
 namespace datadog {
@@ -126,6 +128,10 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   if (auto enabled_env =
           lookup(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)) {
     env_cfg.generate_128bit_trace_ids = !falsy(*enabled_env);
+  }
+
+  if (auto apm_enabled_env = lookup(environment::DD_APM_TRACING_ENABLED)) {
+    env_cfg.apm_tracing_enabled = !falsy(*apm_enabled_env);
   }
 
   // Baggage
@@ -344,6 +350,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       pick(env_config->report_traces, user_config.report_traces, true);
   final_config.metadata[ConfigName::REPORT_TRACES] = ConfigMetadata(
       ConfigName::REPORT_TRACES, to_string(final_config.report_traces), origin);
+
+  // APM Tracing Enabled
+  std::tie(origin, final_config.apm_tracing_enabled) = pick(
+      env_config->apm_tracing_enabled, user_config.apm_tracing_enabled, true);
+  final_config.metadata[ConfigName::APM_TRACING_ENABLED] =
+      ConfigMetadata(ConfigName::APM_TRACING_ENABLED,
+                     to_string(final_config.apm_tracing_enabled), origin);
 
   // Report hostname
   final_config.report_hostname =

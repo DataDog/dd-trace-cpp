@@ -860,3 +860,147 @@ TEST_CASE("128-bit trace ID injection") {
   REQUIRE(found != writer.items.end());
   REQUIRE(found->second == "deadbeefdeadbeefcafebabecafebabe");
 }
+
+TEST_CASE("injection with has_appsec_matches option") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.collector = std::make_shared<MockCollector>();
+  config.logger = std::make_shared<MockLogger>();
+  config.injection_styles = {PropagationStyle::DATADOG};
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  SECTION("has_appsec_matches = false (default)") {
+    auto span = tracer.create_span();
+    InjectionOptions options;
+    options.has_appsec_matches = false;
+
+    MockDictWriter writer;
+    span.inject(writer, options);
+
+    const auto& headers = writer.items;
+    // When has_appsec_matches is false, there should be no x-datadog-tags
+    // header or if there is one, it should not contain _dd.p.ts
+    if (headers.count("x-datadog-tags") > 0) {
+      const auto decoded_tags = decode_tags(headers.at("x-datadog-tags"));
+      REQUIRE(decoded_tags);
+      auto found =
+          std::find_if(decoded_tags->begin(), decoded_tags->end(),
+                       [](const auto& tag) { return tag.first == "_dd.p.ts"; });
+      REQUIRE(found == decoded_tags->end());
+    }
+  }
+
+  SECTION("has_appsec_matches = true") {
+    auto span = tracer.create_span();
+    InjectionOptions options;
+    options.has_appsec_matches = true;
+
+    MockDictWriter writer;
+    span.inject(writer, options);
+
+    const auto& headers = writer.items;
+    REQUIRE(headers.count("x-datadog-tags") == 1);
+
+    const auto decoded_tags = decode_tags(headers.at("x-datadog-tags"));
+    REQUIRE(decoded_tags);
+
+    // Check that _dd.p.ts=02 is present in the trace tags
+    bool found_trace_source = false;
+    for (const auto& [key, value] : *decoded_tags) {
+      if (key == "_dd.p.ts" && value == "02") {
+        found_trace_source = true;
+        break;
+      }
+    }
+    REQUIRE(found_trace_source);
+  }
+
+  SECTION("has_appsec_matches with existing trace tags") {
+    // Extract a span with existing trace tags
+    const std::unordered_map<std::string, std::string> headers{
+        {"x-datadog-trace-id", "123"},
+        {"x-datadog-parent-id", "456"},
+        {"x-datadog-sampling-priority", "1"},
+        {"x-datadog-tags", "_dd.p.existing=value,_dd.p.another=test"}};
+    MockDictReader reader{headers};
+    auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+
+    InjectionOptions options;
+    options.has_appsec_matches = true;
+
+    MockDictWriter writer;
+    span->inject(writer, options);
+
+    const auto& output_headers = writer.items;
+    REQUIRE(output_headers.count("x-datadog-tags") == 1);
+
+    const auto decoded_tags = decode_tags(output_headers.at("x-datadog-tags"));
+    REQUIRE(decoded_tags);
+
+    // Check that _dd.p.ts=02 is present along with existing tags
+    bool found_trace_source = false;
+    bool found_existing = false;
+    bool found_another = false;
+
+    for (const auto& [key, value] : *decoded_tags) {
+      if (key == "_dd.p.ts" && value == "02") {
+        found_trace_source = true;
+      } else if (key == "_dd.p.existing" && value == "value") {
+        found_existing = true;
+      } else if (key == "_dd.p.another" && value == "test") {
+        found_another = true;
+      }
+    }
+
+    REQUIRE(found_trace_source);
+    REQUIRE(found_existing);
+    REQUIRE(found_another);
+  }
+
+  SECTION("has_appsec_matches with APM tracing disabled") {
+    // Test the scenario where APM tracing is disabled
+    TracerConfig apm_disabled_config;
+    apm_disabled_config.service = "testsvc";
+    apm_disabled_config.collector = std::make_shared<MockCollector>();
+    apm_disabled_config.logger = std::make_shared<MockLogger>();
+    apm_disabled_config.injection_styles = {
+        PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C};
+    // Disable APM tracing
+    apm_disabled_config.apm_tracing_enabled = false;
+
+    auto apm_disabled_finalized_config = finalize_config(apm_disabled_config);
+    REQUIRE(apm_disabled_finalized_config);
+    Tracer apm_disabled_tracer{*apm_disabled_finalized_config};
+
+    SECTION(
+        "sampling priority != 2 (USER-KEEP) and no _dd.p.ts - headers should "
+        "be cleared") {
+      auto span = apm_disabled_tracer.create_span();
+      span.trace_segment().override_sampling_priority(1);
+
+      InjectionOptions options;
+      options.has_appsec_matches = true;
+
+      MockDictWriter writer;
+      span.inject(writer, options);
+
+      const auto& headers = writer.items;
+      // all headers should be empty when APM tracing is disabled and sampling
+      // priority != 2
+      REQUIRE(headers.at("x-datadog-trace-id").empty());
+      REQUIRE(headers.at("x-datadog-parent-id").empty());
+      REQUIRE(headers.at("x-datadog-sampling-priority").empty());
+      REQUIRE(headers.at("x-datadog-origin").empty());
+      REQUIRE(headers.at("x-datadog-tags").empty());
+      REQUIRE(headers.at("x-b3-traceid").empty());
+      REQUIRE(headers.at("x-b3-spanid").empty());
+      REQUIRE(headers.at("x-b3-sampled").empty());
+      REQUIRE(headers.at("traceparent").empty());
+      REQUIRE(headers.at("tracestate").empty());
+    }
+  }
+}
