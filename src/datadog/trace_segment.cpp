@@ -350,8 +350,11 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     return false;
   }
 
-  if (inj_opts.has_appsec_matches) {
-    trace_tags_.emplace_back(tags::internal::trace_source, "02");
+  if (inj_opts.trace_source) {
+    std::string trace_source = std::string(inj_opts.trace_source->begin(),
+                                           inj_opts.trace_source->end());
+    trace_tags_.emplace_back(tags::internal::trace_source,
+                             std::move(trace_source));
   }
 
   // The sampling priority can change (it can be overridden on another thread),
