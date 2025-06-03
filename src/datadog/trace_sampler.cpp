@@ -129,15 +129,16 @@ SamplingDecision ApmDisabledTraceSampler::decide(const SpanData& span_data) {
   SamplingDecision decision;
   decision.origin = SamplingDecision::Origin::LOCAL;
 
+  auto now = clock_();
+  uint64_t num_allowed;
   if (span_data.tags.find(tags::internal::trace_source) !=
       span_data.tags.end()) {
     decision.mechanism = static_cast<int>(SamplingMechanism::APP_SEC);
     decision.priority = static_cast<int>(SamplingPriority::USER_KEEP);
+    last_kept_.store(now.wall, std::memory_order_relaxed);
+    num_allowed = num_allowed_.fetch_add(1, std::memory_order_relaxed) + 1;
   } else {
-    auto now = clock_();
     auto last_kept = last_kept_.load(std::memory_order_relaxed);
-    auto num_asked = num_asked_.fetch_add(1, std::memory_order_relaxed) + 1;
-    uint64_t num_allowed;
     if (now.wall - last_kept >= INTERVAL) {
       if (last_kept_.compare_exchange_strong(last_kept, now.wall)) {
         decision.priority = static_cast<int>(SamplingPriority::USER_KEEP);
@@ -151,15 +152,16 @@ SamplingDecision ApmDisabledTraceSampler::decide(const SpanData& span_data) {
       decision.priority = static_cast<int>(SamplingPriority::USER_DROP);
       num_allowed = num_allowed_.load(std::memory_order_relaxed);
     }
-
-    decision.limiter_max_per_second = ALLOWED_PER_SECOND;
-    double effective_rate = static_cast<double>(num_allowed) / num_asked;
-    if (effective_rate > 1.0) {
-      // can happen due to the relaxed atomic operations
-      effective_rate = 1.0;
-    }
-    decision.limiter_effective_rate = Rate::from(effective_rate).value();
   }
+
+  auto num_asked = num_asked_.fetch_add(1, std::memory_order_relaxed) + 1;
+  decision.limiter_max_per_second = ALLOWED_PER_SECOND;
+  double effective_rate = static_cast<double>(num_allowed) / num_asked;
+  if (effective_rate > 1.0) {
+    // can happen due to the relaxed atomic operations
+    effective_rate = 1.0;
+  }
+  decision.limiter_effective_rate = Rate::from(effective_rate).value();
 
   return decision;
 }
