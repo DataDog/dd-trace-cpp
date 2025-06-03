@@ -1566,6 +1566,48 @@ TEST_CASE("128-bit trace IDs") {
   REQUIRE(*high == trace_id.high);
 }
 
+#ifdef __linux__
+TEST_CASE("correlate full host profiles") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.collector = std::make_shared<NullCollector>();
+  config.logger = std::make_shared<NullLogger>();
+
+  SECTION("is off by default") {
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+    REQUIRE(elastic_apm_profiling_correlation_process_storage_v1 == nullptr);
+  }
+
+  SECTION("is available when enabled") {
+    config.correlate_full_host_profiles = true;
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+    REQUIRE(elastic_apm_profiling_correlation_process_storage_v1 != nullptr);
+    {
+      auto span = tracer.create_span();
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1 != nullptr);
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1->trace_present == 1);
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1->valid == 1);
+      REQUIRE(
+          elastic_apm_profiling_correlation_tls_v1->trace_flags ==
+          (span.trace_segment().sampling_decision().has_value() &&
+                   (span.trace_segment().sampling_decision().value().priority >
+                    0)
+               ? 1
+               : 0));
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1->span_id != 0);
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1->transaction_id != 0);
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1->trace_id_high != 0);
+      REQUIRE(elastic_apm_profiling_correlation_tls_v1->trace_id_low != 0);
+    }
+    REQUIRE(elastic_apm_profiling_correlation_tls_v1->trace_present == 0);
+  }
+}
+#endif
+
 TEST_CASE(
     "_dd.p.tid invalid or inconsistent with trace ID results in error tag") {
   struct TestCase {

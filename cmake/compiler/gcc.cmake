@@ -5,6 +5,26 @@
 add_library(dd_trace_cpp-specs INTERFACE)
 add_library(dd_trace::specs ALIAS dd_trace_cpp-specs)
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    set(TLS_DIALECT desc)
+  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
+    set(TLS_DIALECT gnu2)
+  else()
+    message(FATAL_ERROR "Only aarch64 and x86-64 are supported (found: ${CMAKE_SYSTEM_PROCESSOR})")
+  endif()
+
+  include(CheckCompilerFlag)
+  check_compiler_flag(CXX "-mtls-dialect=${TLS_DIALECT}" TLS_DIALECT_OK)
+  if (TLS_DIALECT_OK)
+      target_compile_options(dd_trace_cpp-specs INTERFACE
+       -fPIC
+       -ftls-model=global-dynamic
+       -mtls-dialect=${TLS_DIALECT}
+      )
+  endif()
+endif()
+
 target_compile_options(dd_trace_cpp-specs
   INTERFACE
     -Wall
