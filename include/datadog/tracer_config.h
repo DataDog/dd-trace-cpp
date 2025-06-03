@@ -28,6 +28,7 @@ class Collector;
 class Logger;
 class SpanSampler;
 class TraceSampler;
+class ErasedTraceSampler;
 
 struct TracerConfig {
   // Set the service name.
@@ -79,6 +80,16 @@ struct TracerConfig {
   // `telemetry` configures the telemetry module. See
   // `telemetry/configuration.h` By default, the telemetry module is enabled.
   telemetry::Configuration telemetry;
+
+  // `apm_tracing_enabled` indicates whether APM traces and APM trace metrics
+  // are enabled. If `false`, APM-specific traces are dropped and APM trace
+  // metrics are not computed. This allows other products (e.g., AppSec) to
+  // operate independently.
+  // This is distinct from `report_traces`, which controls whether any traces
+  // are sent at all.
+  // `apm_tracing_enabled` is overridden by the `DD_APM_TRACING_ENABLED`
+  // environment variable. Defaults to `true`.
+  Optional<bool> apm_tracing_enabled;
 
   // `trace_sampler` configures trace sampling.  Trace sampling determines which
   // traces are sent to Datadog.  See `trace_sampler_config.h`.
@@ -197,6 +208,7 @@ class FinalizedTracerConfig final {
   std::shared_ptr<Logger> logger;
   bool log_on_startup;
   bool generate_128bit_trace_ids;
+  bool apm_tracing_enabled;
   Optional<RuntimeID> runtime_id;
   Clock clock;
   std::string integration_name;

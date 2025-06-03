@@ -48,6 +48,11 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       signature_{runtime_id_, config.defaults.service,
                  config.defaults.environment},
       config_manager_(std::make_shared<ConfigManager>(config)),
+      apm_tracing_disabled_sampler_(
+          config.apm_tracing_enabled
+              ? nullptr
+              : std::make_shared<ErasedTraceSampler>(
+                    std::make_unique<ApmDisabledTraceSampler>(config.clock))),
       collector_(/* see constructor body */),
       span_sampler_(
           std::make_shared<SpanSampler>(config.span_sampler, config.clock)),
@@ -180,14 +185,22 @@ Span Tracer::create_span(const SpanConfig& config) {
                             hex_padded(span_data->trace_id.high));
   }
 
+  std::shared_ptr<ErasedTraceSampler> trace_sampler;
+  if (is_apm_tracing_enabled()) {
+    trace_sampler = config_manager_->trace_sampler();
+  } else {
+    trace_sampler = apm_tracing_disabled_sampler_;
+  }
+
   const auto span_data_ptr = span_data.get();
   telemetry::counter::increment(metrics::tracer::trace_segments_created,
                                 {"new_continued:new"});
   const auto segment = std::make_shared<TraceSegment>(
-      logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
-      defaults, config_manager_, runtime_id_, injection_styles_, hostname_,
-      nullopt /* origin */, tags_header_max_size_, std::move(trace_tags),
-      nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
+      logger_, collector_, std::move(trace_sampler), is_apm_tracing_enabled(),
+      span_sampler_, defaults, config_manager_, runtime_id_, injection_styles_,
+      hostname_, nullopt /* origin */, tags_header_max_size_,
+      std::move(trace_tags), nullopt /* sampling_decision */,
+      nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
@@ -378,7 +391,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   Optional<SamplingDecision> sampling_decision;
-  if (merged_context.sampling_priority) {
+  if (merged_context.sampling_priority && is_apm_tracing_enabled()) {
     SamplingDecision decision;
     decision.priority = *merged_context.sampling_priority;
     // `decision.mechanism` is null.  We might be able to infer it once we
@@ -388,15 +401,22 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     sampling_decision = decision;
   }
 
+  std::shared_ptr<ErasedTraceSampler> trace_sampler;
+  if (is_apm_tracing_enabled()) {
+    trace_sampler = config_manager_->trace_sampler();
+  } else {
+    trace_sampler = apm_tracing_disabled_sampler_;
+  }
+
   const auto span_data_ptr = span_data.get();
   telemetry::counter::increment(metrics::tracer::trace_segments_created,
                                 {"new_continued:continued"});
   const auto segment = std::make_shared<TraceSegment>(
-      logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
-      config_manager_->span_defaults(), config_manager_, runtime_id_,
-      injection_styles_, hostname_, std::move(merged_context.origin),
-      tags_header_max_size_, std::move(merged_context.trace_tags),
-      std::move(sampling_decision),
+      logger_, collector_, std::move(trace_sampler), is_apm_tracing_enabled(),
+      span_sampler_, config_manager_->span_defaults(), config_manager_,
+      runtime_id_, injection_styles_, hostname_,
+      std::move(merged_context.origin), tags_header_max_size_,
+      std::move(merged_context.trace_tags), std::move(sampling_decision),
       std::move(merged_context.additional_w3c_tracestate),
       std::move(merged_context.additional_datadog_w3c_tracestate),
       std::move(span_data));

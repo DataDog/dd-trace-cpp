@@ -31,6 +31,10 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
     env_config.remote_configuration_poll_interval_seconds = *res;
   }
 
+  if (auto apm_enabled_env = lookup(environment::DD_APM_TRACING_ENABLED)) {
+    env_config.apm_tracing_enabled = !falsy(*apm_enabled_env);
+  }
+
   auto env_host = lookup(environment::DD_AGENT_HOST);
   auto env_port = lookup(environment::DD_TRACE_AGENT_PORT);
 
@@ -134,6 +138,9 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.remote_configuration_enabled =
       value_or(env_config->remote_configuration_enabled,
                user_config.remote_configuration_enabled, true);
+
+  result.apm_tracing_enabled = value_or(env_config->apm_tracing_enabled,
+                                        user_config.apm_tracing_enabled, true);
 
   const auto [origin, url] =
       pick(env_config->url, user_config.url, "http://localhost:8126");
