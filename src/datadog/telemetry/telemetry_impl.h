@@ -76,6 +76,7 @@ class Telemetry final {
   /// @param logger User logger instance.
   /// @param metrics A vector user metrics to report.
   Telemetry(FinalizedConfiguration configuration,
+            tracing::TracerSignature tracer_signature,
             std::shared_ptr<tracing::Logger> logger,
             std::shared_ptr<tracing::HTTPClient> client,
             std::shared_ptr<tracing::EventScheduler> event_scheduler,

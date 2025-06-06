@@ -59,7 +59,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
       baggage_extraction_enabled_(false) {
-  telemetry::init(config.telemetry, logger_, config.http_client,
+  telemetry::init(config.telemetry, signature_, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {
     hostname_ = get_hostname();
