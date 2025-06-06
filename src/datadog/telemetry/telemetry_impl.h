@@ -129,7 +129,10 @@ class Telemetry final {
                      const std::vector<std::string>& tags, uint64_t value);
 
  private:
-  void send_telemetry(tracing::StringView request_type, std::string payload);
+  void app_started();
+  void app_closing();
+
+  void send_payload(tracing::StringView request_type, std::string payload);
 
   void schedule_tasks();
 
@@ -144,13 +147,13 @@ class Telemetry final {
 
   // Constructs an `app-started` message using information provided when
   // constructed and the tracer_config value passed in.
-  std::string app_started();
+  std::string app_started_payload();
   // Constructs a messsage-batch containing `app-heartbeat`, and if metrics
   // have been modified, a `generate-metrics` message.
   std::string heartbeat_and_telemetry();
   // Constructs a message-batch containing `app-closing`, and if metrics have
   // been modified, a `generate-metrics` message.
-  std::string app_closing();
+  std::string app_closing_payload();
 };
 
 }  // namespace datadog::telemetry
