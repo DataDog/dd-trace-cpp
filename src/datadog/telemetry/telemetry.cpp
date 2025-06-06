@@ -42,7 +42,7 @@ TelemetryProxy make_telemetry(const Ctor_param& init) {
 
 TelemetryProxy& instance(
     const tracing::Optional<Ctor_param>& init = tracing::nullopt) {
-  static TelemetryProxy telemetry(make_telemetry(*init));
+  static TelemetryProxy telemetry = make_telemetry(*init);
   return telemetry;
 }
 
