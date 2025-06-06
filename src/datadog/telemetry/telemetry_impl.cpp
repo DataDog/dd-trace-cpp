@@ -195,6 +195,7 @@ nlohmann::json encode_distributions(
 }  // namespace
 
 Telemetry::Telemetry(FinalizedConfiguration config,
+                     TracerSignature tracer_signature,
                      std::shared_ptr<tracing::Logger> logger,
                      std::shared_ptr<tracing::HTTPClient> client,
                      std::shared_ptr<tracing::EventScheduler> event_scheduler,
@@ -202,8 +203,7 @@ Telemetry::Telemetry(FinalizedConfiguration config,
     : config_(std::move(config)),
       logger_(std::move(logger)),
       telemetry_endpoint_(make_telemetry_endpoint(agent_url)),
-      tracer_signature_(tracing::RuntimeID::generate(),
-                        tracing::get_process_name(), ""),
+      tracer_signature_(tracer_signature),
       http_client_(client),
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
