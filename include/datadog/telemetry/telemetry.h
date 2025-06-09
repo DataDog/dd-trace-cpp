@@ -7,6 +7,7 @@
 #include <datadog/logger.h>
 #include <datadog/telemetry/configuration.h>
 #include <datadog/telemetry/metrics.h>
+#include <datadog/tracer_signature.h>
 
 #include <memory>
 #include <vector>
@@ -29,6 +30,14 @@ namespace datadog::telemetry {
 /// NOTE: Make sure to call `init` before calling any of the other telemetry
 /// functions.
 void init(FinalizedConfiguration configuration,
+          std::shared_ptr<tracing::Logger> logger,
+          std::shared_ptr<tracing::HTTPClient> client,
+          std::shared_ptr<tracing::EventScheduler> event_scheduler,
+          tracing::HTTPClient::URL agent_url,
+          tracing::Clock clock = tracing::default_clock);
+
+void init(FinalizedConfiguration configuration,
+          tracing::TracerSignature tracer_signature,
           std::shared_ptr<tracing::Logger> logger,
           std::shared_ptr<tracing::HTTPClient> client,
           std::shared_ptr<tracing::EventScheduler> event_scheduler,

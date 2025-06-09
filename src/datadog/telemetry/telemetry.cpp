@@ -27,6 +27,7 @@ using TelemetryProxy = std::variant<NoopTelemetry, Telemetry>;
 /// NOTE(@dmehala): Here to facilitate Meyer's singleton construction.
 struct Ctor_param final {
   FinalizedConfiguration configuration;
+  tracing::TracerSignature tracer_signature;
   std::shared_ptr<tracing::Logger> logger;
   std::shared_ptr<tracing::HTTPClient> client;
   std::shared_ptr<tracing::EventScheduler> scheduler;
@@ -36,8 +37,9 @@ struct Ctor_param final {
 
 TelemetryProxy make_telemetry(const Ctor_param& init) {
   if (!init.configuration.enabled) return NoopTelemetry{};
-  return Telemetry{init.configuration, init.logger,    init.client,
-                   init.scheduler,     init.agent_url, init.clock};
+  return Telemetry{init.configuration, init.tracer_signature, init.logger,
+                   init.client,        init.scheduler,        init.agent_url,
+                   init.clock};
 }
 
 TelemetryProxy& instance(
@@ -51,8 +53,20 @@ void init(FinalizedConfiguration configuration,
           std::shared_ptr<tracing::HTTPClient> client,
           std::shared_ptr<tracing::EventScheduler> event_scheduler,
           tracing::HTTPClient::URL agent_url, tracing::Clock clock) {
-  instance(Ctor_param{configuration, logger, client, event_scheduler, agent_url,
-                      clock});
+  instance(Ctor_param{configuration,
+                      tracing::TracerSignature(tracing::RuntimeID::generate(),
+                                               tracing::get_process_name(), ""),
+                      logger, client, event_scheduler, agent_url, clock});
+}
+
+void init(FinalizedConfiguration configuration,
+          tracing::TracerSignature tracer_signature,
+          std::shared_ptr<tracing::Logger> logger,
+          std::shared_ptr<tracing::HTTPClient> client,
+          std::shared_ptr<tracing::EventScheduler> event_scheduler,
+          tracing::HTTPClient::URL agent_url, tracing::Clock clock) {
+  instance(Ctor_param{configuration, tracer_signature, logger, client,
+                      event_scheduler, agent_url, clock});
 }
 
 void send_configuration_change() {
