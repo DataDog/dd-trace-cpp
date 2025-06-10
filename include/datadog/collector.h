@@ -19,7 +19,7 @@ namespace datadog {
 namespace tracing {
 
 struct SpanData;
-class TraceSampler;
+class ErasedTraceSampler;
 
 class Collector {
  public:
@@ -29,7 +29,7 @@ class Collector {
   // occurs.
   virtual Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
-      const std::shared_ptr<TraceSampler>& response_handler) = 0;
+      const std::shared_ptr<ErasedTraceSampler>& response_handler) = 0;
 
   // Return a JSON representation of this object's configuration. The JSON
   // representation is an object with the following properties:

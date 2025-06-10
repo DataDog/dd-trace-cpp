@@ -60,6 +60,7 @@ namespace environment {
   MACRO(DD_INSTRUMENTATION_INSTALL_ID)               \
   MACRO(DD_INSTRUMENTATION_INSTALL_TYPE)             \
   MACRO(DD_INSTRUMENTATION_INSTALL_TIME)             \
+  MACRO(DD_APM_TRACING_ENABLED)                      \
   MACRO(DD_EXTERNAL_ENV)
 
 #define WITH_COMMA(ARG) ARG,
