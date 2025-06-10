@@ -1,4 +1,5 @@
 stages:
   - benchmarks
+  - benchmarks-gate
 
 include: ".gitlab/benchmarks.yml"
