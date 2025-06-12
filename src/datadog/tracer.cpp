@@ -170,6 +170,15 @@ Span Tracer::create_span(const SpanConfig& config) {
   auto defaults = config_manager_->span_defaults();
   auto span_data = std::make_unique<SpanData>();
   span_data->apply_config(*defaults, config, clock_);
+
+  // PERFORMANCE REGRESSION: Add expensive computation to simulate heavy workload
+  // This will cause significant performance degradation in span creation
+  volatile std::uint64_t regression_work = 0;
+  for (int i = 0; i < 1000000; ++i) {
+    regression_work += (i * i) % 997;  // Use a prime modulus for more work
+    regression_work += regression_work * 31;  // Additional computation
+  }
+
   span_data->trace_id = generator_->trace_id(span_data->start);
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
