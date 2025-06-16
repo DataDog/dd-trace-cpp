@@ -1,24 +1,26 @@
 variables:
-  BASE_CI_IMAGE: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/benchmarking-platform:dd-trace-cpp
+  BENCHMARKS_CI_IMAGE: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/benchmarking-platform:dd-trace-cpp
 
 benchmarks:
   stage: benchmarks
   when: on_success
   tags: ["runner:apm-k8s-tweaked-metal"]
-  image: $BASE_CI_IMAGE
+  image: $BENCHMARKS_CI_IMAGE
   interruptible: true
   timeout: 15m
   script:
     - export ARTIFACTS_DIR="$(pwd)/reports" && (mkdir "${ARTIFACTS_DIR}" || :)
     - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
-    - git clone --branch dd-trace-cpp https://github.com/DataDog/benchmarking-platform /platform && cd /platform
-    - ./steps/capture-hardware-software-info.sh
-    - ./steps/run-benchmarks.sh
-    - ./steps/analyze-results.sh
-    - "./steps/upload-results-to-s3.sh || :"
-    - "./steps/post-pr-comment.sh || :"
+    - git clone --branch dd-trace-cpp https://github.com/DataDog/benchmarking-platform /platform
+    - export PATH="$PATH:/platform/steps"
+    - capture-hardware-software-info.sh
+    - run-benchmarks.sh
+    - analyze-results.sh
+    - "upload-results-to-s3.sh || :"
+    - "post-pr-comment.sh || :"
   artifacts:
     name: "reports"
+    when: always
     paths:
       - reports/
     expire_in: 3 months
@@ -30,3 +32,23 @@ benchmarks:
 
     KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: dd-trace-cpp
     FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "true"
+
+check-big-regressions:
+  stage: benchmarks-report
+  needs: [ benchmarks ]
+  when: on_success
+  allow_failure: false
+  tags: ["arch:amd64"]
+  image: $BENCHMARKS_CI_IMAGE
+  script: |
+    export ARTIFACTS_DIR="$(pwd)/reports/"
+    if [[ -n "$CI_JOB_TOKEN" ]];
+    then
+      git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
+    fi
+    git clone --branch dd-trace-cpp https://github.com/DataDog/benchmarking-platform /platform
+    export PATH="$PATH:/platform/steps"
+
+    bp-runner /platform/bp-runner.fail-on-regression.yml --debug
+  variables:
+    KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: dd-trace-cpp

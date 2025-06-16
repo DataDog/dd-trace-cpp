@@ -1,4 +1,5 @@
 stages:
   - benchmarks
+  - benchmarks-report
 
 include: ".gitlab/benchmarks.yml"
