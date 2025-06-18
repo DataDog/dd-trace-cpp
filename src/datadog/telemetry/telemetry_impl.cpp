@@ -226,7 +226,7 @@ void Telemetry::schedule_tasks() {
 Telemetry::~Telemetry() {
   if (!tasks_.empty()) {
     cancel_tasks(tasks_);
-    app_closing();
+    /*app_closing();*/
   }
 }
 
