@@ -88,6 +88,7 @@
 #include <datadog/rate.h>
 #include <datadog/trace_sampler_config.h>
 
+#include <atomic>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -125,6 +126,51 @@ class TraceSampler {
   void handle_collector_response(const CollectorResponse&);
 
   nlohmann::json config_json() const;
+};
+
+class ApmDisabledTraceSampler {
+ public:
+  ApmDisabledTraceSampler(const Clock& clock) : clock_(clock) {}
+
+  SamplingDecision decide(const SpanData& span_data);
+  void handle_collector_response(const CollectorResponse& response);
+  nlohmann::json config_json() const;
+
+ private:
+  static constexpr auto ALLOWED_PER_SECOND = 1.0 / 60.0;
+  // allow a bit more than the declared ALLOWED_PER_SECOND rate
+  static constexpr auto INTERVAL = std::chrono::seconds(50);
+
+  // the Limiter is not used, it's difficult to test reliably
+  Clock clock_;
+  std::atomic<decltype(clock_().wall)> last_kept_{};
+  std::atomic<std::uint64_t> num_allowed_{0};
+  std::atomic<std::uint64_t> num_asked_{0};
+};
+
+/* Erases the actual type implementing the decide function */
+class ErasedTraceSampler {
+ public:
+  template <typename Ptr>
+  ErasedTraceSampler(Ptr samplerImpl);
+
+  SamplingDecision decide(const SpanData& span_data);
+  void handle_collector_response(const CollectorResponse& response);
+  nlohmann::json config_json() const;
+
+ private:
+  struct Concept {
+    virtual ~Concept() = default;
+    virtual SamplingDecision decide(const SpanData& span_data) = 0;
+    virtual void handle_collector_response(
+        const CollectorResponse& response) = 0;
+    virtual nlohmann::json config_json() const = 0;
+  };
+
+  template <typename Ptr>
+  struct Model;
+
+  std::unique_ptr<Concept> impl_;
 };
 
 }  // namespace tracing

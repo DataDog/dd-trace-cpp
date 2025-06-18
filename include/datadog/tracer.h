@@ -29,7 +29,7 @@ namespace tracing {
 class ConfigManager;
 class DictReader;
 struct SpanConfig;
-class TraceSampler;
+class ErasedTraceSampler;
 class SpanSampler;
 class IDGenerator;
 class InMemoryFile;
@@ -39,6 +39,8 @@ class Tracer {
   RuntimeID runtime_id_;
   TracerSignature signature_;
   std::shared_ptr<ConfigManager> config_manager_;
+  std::shared_ptr<ErasedTraceSampler>
+      apm_tracing_disabled_sampler_;  // empty if enabled
   std::shared_ptr<Collector> collector_;
   std::shared_ptr<SpanSampler> span_sampler_;
   std::shared_ptr<const IDGenerator> generator_;
@@ -103,6 +105,10 @@ class Tracer {
   // Return a JSON object describing this Tracer's configuration. It is the
   // same JSON object that was logged when this Tracer was created.
   std::string config() const;
+
+  bool is_apm_tracing_enabled() const {
+    return apm_tracing_disabled_sampler_ == nullptr;
+  }
 
  private:
   void store_config();
