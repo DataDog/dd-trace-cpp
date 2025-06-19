@@ -208,7 +208,7 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
       host_info_(get_host_info()) {
-  app_started();
+  /*app_started();*/
   schedule_tasks();
 }
 
@@ -226,7 +226,7 @@ void Telemetry::schedule_tasks() {
 Telemetry::~Telemetry() {
   if (!tasks_.empty()) {
     cancel_tasks(tasks_);
-    /*app_closing();*/
+    app_closing();
   }
 }
 
