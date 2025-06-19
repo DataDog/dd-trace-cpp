@@ -427,8 +427,8 @@ void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
     return num_active_handles_ == 0 && new_handles_.empty();
   });
 
-  log_on_error(curl_.multi_wakeup(multi_handle_));
-  clear_requests();
+  /*log_on_error(curl_.multi_wakeup(multi_handle_));*/
+  /*clear_requests();*/
 }
 
 std::size_t CurlImpl::on_read_header(char *data, std::size_t,
