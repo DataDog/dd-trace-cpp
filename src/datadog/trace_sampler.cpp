@@ -12,7 +12,6 @@
 #include "json_serializer.h"
 #include "sampling_util.h"
 #include "span_data.h"
-#include "tags.h"
 
 namespace datadog {
 namespace tracing {
@@ -123,98 +122,6 @@ nlohmann::json TraceSampler::config_json() const {
       {"rules", rules},
       {"max_per_second", limiter_max_per_second_},
   });
-}
-
-SamplingDecision ApmDisabledTraceSampler::decide(const SpanData& span_data) {
-  SamplingDecision decision;
-  decision.origin = SamplingDecision::Origin::LOCAL;
-
-  auto now = clock_();
-  uint64_t num_allowed;
-  if (span_data.tags.find(tags::internal::trace_source) !=
-      span_data.tags.end()) {
-    decision.mechanism = static_cast<int>(SamplingMechanism::APP_SEC);
-    decision.priority = static_cast<int>(SamplingPriority::USER_KEEP);
-    last_kept_.store(now.wall, std::memory_order_relaxed);
-    num_allowed = num_allowed_.fetch_add(1, std::memory_order_relaxed) + 1;
-  } else {
-    auto last_kept = last_kept_.load(std::memory_order_relaxed);
-    if (now.wall - last_kept >= INTERVAL) {
-      if (last_kept_.compare_exchange_strong(last_kept, now.wall)) {
-        decision.priority = static_cast<int>(SamplingPriority::USER_KEEP);
-        num_allowed = num_allowed_.fetch_add(1, std::memory_order_relaxed) + 1;
-      } else {
-        // another thread got to it first
-        decision.priority = static_cast<int>(SamplingPriority::USER_DROP);
-        num_allowed = num_allowed_.load(std::memory_order_relaxed);
-      }
-    } else {
-      decision.priority = static_cast<int>(SamplingPriority::USER_DROP);
-      num_allowed = num_allowed_.load(std::memory_order_relaxed);
-    }
-  }
-
-  auto num_asked = num_asked_.fetch_add(1, std::memory_order_relaxed) + 1;
-  decision.limiter_max_per_second = ALLOWED_PER_SECOND;
-  double effective_rate = static_cast<double>(num_allowed) / num_asked;
-  if (effective_rate > 1.0) {
-    // can happen due to the relaxed atomic operations
-    effective_rate = 1.0;
-  }
-  decision.limiter_effective_rate = Rate::from(effective_rate).value();
-
-  return decision;
-}
-
-void ApmDisabledTraceSampler::handle_collector_response(
-    const CollectorResponse&) {
-  // do nothing
-}
-
-nlohmann::json ApmDisabledTraceSampler::config_json() const {
-  return nlohmann::json::object({
-      {"max_per_second", ALLOWED_PER_SECOND},
-  });
-}
-
-template <typename Ptr>
-struct ErasedTraceSampler::Model : Concept {
-  Model(Ptr&& samplerImpl) : impl_(std::move(samplerImpl)) {}
-
-  SamplingDecision decide(const SpanData& span_data) override {
-    return impl_->decide(span_data);
-  }
-
-  void handle_collector_response(const CollectorResponse& response) override {
-    impl_->handle_collector_response(response);
-  }
-
-  nlohmann::json config_json() const override { return impl_->config_json(); }
-
- private:
-  Ptr impl_;
-};
-
-template <typename Ptr>
-ErasedTraceSampler::ErasedTraceSampler(Ptr samplerImpl) {
-  impl_ = std::make_unique<Model<Ptr>>(std::move(samplerImpl));
-}
-
-template ErasedTraceSampler::ErasedTraceSampler(std::shared_ptr<TraceSampler>);
-template ErasedTraceSampler::ErasedTraceSampler(
-    std::unique_ptr<ApmDisabledTraceSampler>);
-
-SamplingDecision ErasedTraceSampler::decide(const SpanData& span_data) {
-  return impl_->decide(span_data);
-}
-
-void ErasedTraceSampler::handle_collector_response(
-    const CollectorResponse& response) {
-  impl_->handle_collector_response(response);
-}
-
-nlohmann::json ErasedTraceSampler::config_json() const {
-  return impl_->config_json();
 }
 
 }  // namespace tracing

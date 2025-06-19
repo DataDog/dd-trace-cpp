@@ -130,8 +130,6 @@ ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
       default_metadata_(config.metadata),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock_)),
-      erased_trace_sampler_(
-          std::make_shared<ErasedTraceSampler>(trace_sampler_)),
       rules_(config.trace_sampler.rules),
       span_defaults_(std::make_shared<SpanDefaults>(config.defaults)),
       report_traces_(config.report_traces) {}
@@ -165,9 +163,9 @@ void ConfigManager::on_revert(const Configuration&) {
   telemetry::capture_configuration_change(config_metadata);
 }
 
-std::shared_ptr<ErasedTraceSampler> ConfigManager::trace_sampler() {
+std::shared_ptr<TraceSampler> ConfigManager::trace_sampler() {
   std::lock_guard<std::mutex> lock(mutex_);
-  return erased_trace_sampler_;
+  return trace_sampler_;
 }
 
 std::shared_ptr<const SpanDefaults> ConfigManager::span_defaults() {

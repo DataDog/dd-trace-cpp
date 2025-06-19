@@ -157,8 +157,7 @@ DatadogAgent::DatadogAgent(
       flush_interval_(config.flush_interval),
       request_timeout_(config.request_timeout),
       shutdown_timeout_(config.shutdown_timeout),
-      remote_config_(tracer_signature, rc_listeners, logger),
-      apm_tracing_enabled_(config.apm_tracing_enabled) {
+      remote_config_(tracer_signature, rc_listeners, logger) {
   assert(logger_);
 
   // Set HTTP headers
@@ -212,7 +211,7 @@ DatadogAgent::~DatadogAgent() {
 
 Expected<void> DatadogAgent::send(
     std::vector<std::unique_ptr<SpanData>>&& spans,
-    const std::shared_ptr<ErasedTraceSampler>& response_handler) {
+    const std::shared_ptr<TraceSampler>& response_handler) {
   std::lock_guard<std::mutex> lock(mutex_);
   trace_chunks_.push_back(TraceChunk{std::move(spans), response_handler});
   return nullopt;
@@ -273,7 +272,7 @@ void DatadogAgent::flush() {
   // One HTTP request to the Agent could possibly involve trace chunks from
   // multiple tracers, and thus multiple trace samplers might need to have
   // their rates updated. Unlikely, but possible.
-  std::unordered_set<std::shared_ptr<ErasedTraceSampler>> response_handlers;
+  std::unordered_set<std::shared_ptr<TraceSampler>> response_handlers;
   for (auto& chunk : trace_chunks) {
     response_handlers.insert(std::move(chunk.response_handler));
   }
@@ -284,9 +283,6 @@ void DatadogAgent::flush() {
     writer.set("X-Datadog-Trace-Count", std::to_string(trace_chunks.size()));
     for (const auto& [key, value] : headers_) {
       writer.set(key, value);
-    }
-    if (!apm_tracing_enabled_) {
-      writer.set("Datadog-Client-Computed-Stats", "yes");
     }
   };
 

@@ -66,9 +66,6 @@ struct DatadogAgentConfig {
   // How often, in seconds, to query the Datadog Agent for remote configuration
   // updates.
   Optional<double> remote_configuration_poll_interval_seconds;
-  // Whether APM tracing is enabled. This affects whether the
-  // "Datadog-Client-Computed-Stats: yes" header is sent with trace requests.
-  Optional<bool> apm_tracing_enabled;
 };
 
 class FinalizedDatadogAgentConfig {
@@ -90,7 +87,6 @@ class FinalizedDatadogAgentConfig {
   std::chrono::steady_clock::duration shutdown_timeout;
   std::chrono::steady_clock::duration remote_configuration_poll_interval;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
-  bool apm_tracing_enabled;
 
   // Origin detection
   Optional<std::string> admission_controller_uid;

@@ -53,7 +53,7 @@ class Logger;
 struct SpanData;
 struct SpanDefaults;
 class SpanSampler;
-class ErasedTraceSampler;
+class TraceSampler;
 class ConfigManager;
 
 class TraceSegment {
@@ -61,8 +61,7 @@ class TraceSegment {
 
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<Collector> collector_;
-  std::shared_ptr<ErasedTraceSampler> trace_sampler_;
-  bool apm_tracing_enabled_;
+  std::shared_ptr<TraceSampler> trace_sampler_;
   std::shared_ptr<SpanSampler> span_sampler_;
 
   std::shared_ptr<const SpanDefaults> defaults_;
@@ -84,8 +83,7 @@ class TraceSegment {
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
                const std::shared_ptr<Collector>& collector,
-               std::shared_ptr<ErasedTraceSampler> trace_sampler,
-               bool apm_tracing_enabled,
+               const std::shared_ptr<TraceSampler>& trace_sampler,
                const std::shared_ptr<SpanSampler>& span_sampler,
                const std::shared_ptr<const SpanDefaults>& defaults,
                const std::shared_ptr<ConfigManager>& config_manager,

@@ -11,7 +11,7 @@ namespace tracing {
 class NullCollector : public Collector {
  public:
   Expected<void> send(std::vector<std::unique_ptr<SpanData>>&&,
-                      const std::shared_ptr<ErasedTraceSampler>&) override {
+                      const std::shared_ptr<TraceSampler>&) override {
     return {};
   }
 

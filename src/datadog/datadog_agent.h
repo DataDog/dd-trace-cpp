@@ -21,17 +21,17 @@
 namespace datadog {
 namespace tracing {
 
-class ErasedTraceSampler;
 class FinalizedDatadogAgentConfig;
 class Logger;
 struct SpanData;
+class TraceSampler;
 struct TracerSignature;
 
 class DatadogAgent : public Collector {
  public:
   struct TraceChunk {
     std::vector<std::unique_ptr<SpanData>> spans;
-    std::shared_ptr<ErasedTraceSampler> response_handler;
+    std::shared_ptr<TraceSampler> response_handler;
   };
 
  private:
@@ -51,7 +51,6 @@ class DatadogAgent : public Collector {
   remote_config::Manager remote_config_;
 
   std::unordered_map<std::string, std::string> headers_;
-  bool apm_tracing_enabled_;
 
   void flush();
 
@@ -64,7 +63,7 @@ class DatadogAgent : public Collector {
 
   Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
-      const std::shared_ptr<ErasedTraceSampler>& response_handler) override;
+      const std::shared_ptr<TraceSampler>& response_handler) override;
 
   void get_and_apply_remote_configuration_updates();
 
