@@ -1,6 +1,7 @@
 #include "w3c_propagation.h"
 
 #include <datadog/propagation_style.h>
+#include <datadog/trace_source.h>
 
 #include <algorithm>
 #include <cassert>
@@ -233,6 +234,10 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
       }
     } else if (key == "p") {
       result.datadog_w3c_parent_id = std::string(value);
+    } else if (key == "ts") {
+      if (validate_trace_source(value)) {
+        result.trace_tags.emplace_back(tags::internal::trace_source, value);
+      }
     } else if (starts_with(key, "t.")) {
       // The part of the key that follows "t." is the name of a trace tag,
       // except without the "_dd.p." prefix.

@@ -145,11 +145,15 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.metadata[ConfigName::AGENT_URL] =
       ConfigMetadata(ConfigName::AGENT_URL, url, origin);
 
-  /// Starting Agent X, the admission controller inject a unique identifier
-  /// through `DD_EXTERNAL_ENV`. This uid is used for origin detection.
+  // Starting Datadog Agent 7.62.0, the admission controller inject a unique
+  // identifier through `DD_EXTERNAL_ENV`. This uid is used for origin
+  // detection.
   if (auto external_env = lookup(environment::DD_EXTERNAL_ENV)) {
     result.admission_controller_uid = std::string(*external_env);
   }
+
+  // Not supported yet but required for APM tracing disablement.
+  result.stats_computation_enabled = false;
 
   return result;
 }

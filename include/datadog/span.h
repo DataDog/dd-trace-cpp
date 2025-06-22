@@ -49,6 +49,7 @@
 #include "optional.h"
 #include "string_view.h"
 #include "trace_id.h"
+#include "trace_source.h"
 
 namespace datadog {
 namespace tracing {
@@ -162,6 +163,8 @@ class Span {
   // Set end time of this span.  Doing so will override the default behavior of
   // using the current time in the destructor.
   void set_end_time(std::chrono::steady_clock::time_point);
+  // Specifies the product (AppSec, DBM) that created this span.
+  void set_source(Source);
 
   // Write information about this span and its trace into the specified `writer`
   // using all of the configured injection propagation styles.

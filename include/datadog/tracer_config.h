@@ -169,8 +169,15 @@ struct TracerConfig {
   /// separate thread.
   std::shared_ptr<EventScheduler> event_scheduler;
 
-  /// TBD
-  Optional<bool> apm_tracing_enabled;
+  /// `tracing_enabled` indicates whether APM traces and APM trace metrics
+  /// are enabled. If `false`, APM-specific traces are and metrics are dropped
+  /// This allows other products to operate independently (for example, AppSec).
+  /// This is distinct from `report_traces`, which controls whether any traces
+  /// are sent at all.
+  ///
+  /// Overridden by the `DD_APM_TRACING_ENABLED` environment variable. Defaults
+  /// to `true`.
+  Optional<bool> tracing_enabled;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -210,7 +217,7 @@ class FinalizedTracerConfig final {
   HTTPClient::URL agent_url;
   std::shared_ptr<EventScheduler> event_scheduler;
   std::shared_ptr<HTTPClient> http_client;
-  bool apm_tracing_enabled;
+  bool tracing_enabled;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

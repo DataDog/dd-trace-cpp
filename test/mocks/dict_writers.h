@@ -14,4 +14,6 @@ struct MockDictWriter : public DictWriter {
   void set(StringView key, StringView value) override {
     items.insert_or_assign(std::string(key), std::string(value));
   }
+
+  void erase(StringView key) override { items.erase(std::string(key)); }
 };
