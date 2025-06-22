@@ -1773,7 +1773,7 @@ TEST_TRACER("APM tracing disabled") {
       span_cfg.tags[tags::internal::trace_source] =
           tags::internal::source::appsec;
       {
-        tracer.create_span(span_cfg);
+        auto span = tracer.create_span(span_cfg);
       }
 
       REQUIRE(collector->chunks.size() == 1);

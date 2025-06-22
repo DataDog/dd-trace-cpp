@@ -7,10 +7,7 @@
 namespace datadog {
 namespace tracing {
 
-struct InjectionOptions {
-  /// Enforce context injection when `DD_APM_TRACING_ENABLED=false`.
-  bool force;
-};
+struct InjectionOptions {};
 
 }  // namespace tracing
 }  // namespace datadog

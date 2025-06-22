@@ -326,9 +326,16 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span) {
 }
 
 bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
-                          const InjectionOptions& opts) {
-  if (!apm_tracing_enabled_ && !opts.force) {
-    return true;
+                          const InjectionOptions& /*opts*/) {
+  auto& local_root_tags = spans_.front()->tags;
+
+  if (!apm_tracing_enabled_) {
+    auto ts_tag_found = std::find_if(
+        local_root_tags.cbegin(), local_root_tags.cend(),
+        [](const auto& p) { return p.first == tags::internal::trace_source; });
+    if (ts_tag_found == local_root_tags.cend()) {
+      return true;
+    }
   }
 
   // If the only injection style is `NONE`, then don't do anything.
@@ -351,6 +358,14 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     trace_tags = trace_tags_;
   }
 
+  // NOTE(@dmehala): Add `_dd.p.ts` to `trace_tags` for injection.
+  auto ts_tag_found = std::find_if(
+      local_root_tags.cbegin(), local_root_tags.cend(),
+      [](const auto& p) { return p.first == tags::internal::trace_source; });
+  if (ts_tag_found != local_root_tags.cend()) {
+    trace_tags.emplace_back(tags::internal::trace_source, ts_tag_found->second);
+  }
+
   for (const auto style : injection_styles_) {
     switch (style) {
       case PropagationStyle::DATADOG:
@@ -362,7 +377,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
           writer.set("x-datadog-origin", *origin_);
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          spans_.front()->tags, *logger_);
+                          local_root_tags, *logger_);
 
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:datadog"});
@@ -379,7 +394,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
           writer.set("x-datadog-origin", *origin_);
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          spans_.front()->tags, *logger_);
+                          local_root_tags, *logger_);
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:b3multi"});
         break;
