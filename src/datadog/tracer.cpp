@@ -58,7 +58,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       tags_header_max_size_(config.tags_header_size),
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
-      baggage_extraction_enabled_(false) {
+      baggage_extraction_enabled_(false),
+      apm_tracing_enabled_(config.apm_tracing_enabled) {
   telemetry::init(config.telemetry, signature_, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {
@@ -188,7 +189,8 @@ Span Tracer::create_span(const SpanConfig& config) {
       defaults, config_manager_, runtime_id_, injection_styles_, hostname_,
       nullopt /* origin */, tags_header_max_size_, std::move(trace_tags),
       nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
-      nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
+      nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data),
+      apm_tracing_enabled_);
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
@@ -399,7 +401,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       std::move(sampling_decision),
       std::move(merged_context.additional_w3c_tracestate),
       std::move(merged_context.additional_datadog_w3c_tracestate),
-      std::move(span_data));
+      std::move(span_data), apm_tracing_enabled_);
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};

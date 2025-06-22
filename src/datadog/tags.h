@@ -41,11 +41,19 @@ extern const std::string sampling_decider;
 extern const std::string w3c_parent_id;
 extern const std::string trace_source;  // _dd.p.ts
 extern const std::string apm_enabled;   // _dd.apm.enabled
+
+// TBD
+namespace source {
+constexpr std::string_view appsec = "02";
+constexpr std::string_view datastream_monitoring = "04";
+constexpr std::string_view datajob_monitoring = "08";
+constexpr std::string_view database_monitoring = "10";
+}  // namespace source
 }  // namespace internal
 
 // Return whether the specified `tag_name` is reserved for use internal to this
 // library.
-inline bool is_internal(StringView tag_name) {
+constexpr inline bool is_internal(StringView tag_name) {
   return starts_with(tag_name, "_dd.");
 }
 

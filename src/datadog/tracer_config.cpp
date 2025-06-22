@@ -6,7 +6,6 @@
 #include <cassert>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "datadog_agent.h"
@@ -351,13 +350,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.metadata[ConfigName::REPORT_TRACES] = ConfigMetadata(
       ConfigName::REPORT_TRACES, to_string(final_config.report_traces), origin);
 
-  // APM Tracing Enabled
-  std::tie(origin, final_config.apm_tracing_enabled) = pick(
-      env_config->apm_tracing_enabled, user_config.apm_tracing_enabled, true);
-  final_config.metadata[ConfigName::APM_TRACING_ENABLED] =
-      ConfigMetadata(ConfigName::APM_TRACING_ENABLED,
-                     to_string(final_config.apm_tracing_enabled), origin);
-
   // Report hostname
   final_config.report_hostname =
       value_or(env_config->report_hostname, user_config.report_hostname, false);
@@ -416,12 +408,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   if (auto *error = agent_finalized.if_error()) {
     return std::move(*error);
   }
-  if (!user_config.collector) {
-    final_config.collector = *agent_finalized;
-    final_config.metadata.merge(agent_finalized->metadata);
-  } else {
-    final_config.collector = user_config.collector;
-  }
 
   if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
     final_config.metadata.merge(trace_sampler_config->metadata);
@@ -458,6 +444,44 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
         nullopt, final_config.metadata});
   } else {
     return std::move(telemetry_final_config.error());
+  }
+
+  // APM Tracing Enabled
+  std::tie(origin, final_config.apm_tracing_enabled) = pick(
+      env_config->apm_tracing_enabled, user_config.apm_tracing_enabled, true);
+  final_config.metadata[ConfigName::APM_TRACING_ENABLED] =
+      ConfigMetadata(ConfigName::APM_TRACING_ENABLED,
+                     to_string(final_config.apm_tracing_enabled), origin);
+  // Whether APM tracing is enabled. This affects whether the
+  // "Datadog-Client-Computed-Stats: yes" header is sent with trace requests.
+  agent_finalized->stats_computation_enabled =
+      !final_config.apm_tracing_enabled;
+
+  if (!user_config.collector) {
+    final_config.collector = *agent_finalized;
+    final_config.metadata.merge(agent_finalized->metadata);
+  } else {
+    final_config.collector = user_config.collector;
+  }
+
+  // Configure the trace sampler to tracer 1trace/s
+  if (!final_config.apm_tracing_enabled) {
+    TraceSamplerRule rule;
+    rule.rate = Rate::one();
+    rule.matcher.tags.emplace(tags::internal::trace_source,
+                              tags::internal::source::appsec);
+    rule.mechanism = SamplingMechanism::APP_SEC;
+    final_config.trace_sampler.rules.emplace_back(std::move(rule));
+
+    // equivalent to:
+    /*user_config.trace_sampler.rules = 1.0;*/
+    TraceSamplerRule all;
+    all.rate = Rate::one();
+    all.matcher.service = "*";
+    all.mechanism = SamplingMechanism::DEFAULT;
+    final_config.trace_sampler.rules.emplace_back(std::move(all));
+
+    final_config.trace_sampler.max_per_second = 1. / 60;
   }
 
   return final_config;

@@ -48,11 +48,14 @@ std::ostream& operator<<(std::ostream& stream,
 }  // namespace datadog
 
 using namespace datadog::tracing;
+using namespace std::chrono_literals;
+
+#define TEST_TRACER(x) TEST_CASE(x, "[tracer]")
 
 // Verify that the `.defaults.*` (`SpanDefaults`) properties of a tracer's
 // configuration do determine the default properties of spans created by the
 // tracer.
-TEST_CASE("tracer span defaults") {
+TEST_TRACER("tracer span defaults") {
   TracerConfig config;
   config.service = "foosvc";
   config.service_type = "crawler";
@@ -307,7 +310,7 @@ TEST_CASE("tracer span defaults") {
   }
 }
 
-TEST_CASE("span extraction") {
+TEST_TRACER("span extraction") {
   TracerConfig config;
   config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
@@ -1393,7 +1396,7 @@ TEST_CASE("span extraction") {
   }
 }
 
-TEST_CASE("baggage usage") {
+TEST_TRACER("baggage usage") {
   TracerConfig config;
   config.logger = std::make_shared<NullLogger>();
   config.collector = std::make_shared<NullCollector>();
@@ -1434,7 +1437,7 @@ TEST_CASE("baggage usage") {
   }
 }
 
-TEST_CASE("report hostname") {
+TEST_TRACER("report hostname") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<NullCollector>();
@@ -1456,7 +1459,7 @@ TEST_CASE("report hostname") {
   }
 }
 
-TEST_CASE("128-bit trace IDs") {
+TEST_TRACER("128-bit trace IDs") {
   // Use a clock that always returns a hard-coded `TimePoint`.
   // May 6, 2010 14:45:13 America/New_York
   const std::time_t flash_crash = 1273171513;
@@ -1566,7 +1569,7 @@ TEST_CASE("128-bit trace IDs") {
   REQUIRE(*high == trace_id.high);
 }
 
-TEST_CASE(
+TEST_TRACER(
     "_dd.p.tid invalid or inconsistent with trace ID results in error tag") {
   struct TestCase {
     int line;
@@ -1618,7 +1621,7 @@ TEST_CASE(
           test_case.expected_error_prefix + test_case.tid_tag_value);
 }
 
-TEST_CASE("heterogeneous extraction") {
+TEST_TRACER("heterogeneous extraction") {
   // These test cases verify that when W3C is among the configured extraction
   // styles, then non-Datadog and unexpected Datadog fields in an incoming
   // `tracestate` are extracted, under certain conditions, even when trace
@@ -1731,7 +1734,7 @@ TEST_CASE("heterogeneous extraction") {
   REQUIRE(writer.items == test_case.expected_injected_headers);
 }
 
-TEST_CASE("move semantics") {
+TEST_TRACER("move semantics") {
   // Verify that `Tracer` can be moved.
   TracerConfig config;
   config.service = "testsvc";
@@ -1747,136 +1750,167 @@ TEST_CASE("move semantics") {
   (void)tracer2;
 }
 
-TEST_CASE("apm_tracing_enabled behavior") {
-  TracerConfig base_config;
-  base_config.service = "testsvc";
-  base_config.name = "test.op";
+TEST_TRACER("APM tracing disabled") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.name = "test.op";
   auto collector = std::make_shared<MockCollector>();
-  base_config.collector = collector;
-  base_config.logger = std::make_shared<NullLogger>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+  config.apm_tracing_enabled = false;
 
   TimePoint current_time = default_clock();
   auto clock = [&current_time]() { return current_time; };
 
-  SECTION(
-      "APM tracing disabled - span with _dd.p.ts is kept, _dd.apm.enabled tag "
-      "added") {
-    TracerConfig config = base_config;
-    config.apm_tracing_enabled = false;
+  SECTION("sampling behaviour") {
+    SECTION("span with _dd.p.ts is kept") {
+      auto finalized_config = finalize_config(config, clock);
+      REQUIRE(finalized_config);
+      REQUIRE(!finalized_config->apm_tracing_enabled);
+      Tracer tracer{*finalized_config};
 
-    auto finalized_config = finalize_config(config, clock);
-    REQUIRE(finalized_config);
-    REQUIRE(!finalized_config->apm_tracing_enabled);
-    Tracer tracer{*finalized_config};
+      SpanConfig span_cfg;
+      span_cfg.tags[tags::internal::trace_source] =
+          tags::internal::source::appsec;
+      {
+        tracer.create_span(span_cfg);
+      }
 
-    SpanConfig span_cfg;
-    span_cfg.tags[tags::internal::trace_source] = "02";
-    { tracer.create_span(span_cfg); }
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+      const datadog::tracing::SpanData& span_data =
+          *collector->chunks.front().front();
 
-    REQUIRE(collector->chunks.size() == 1);
-    REQUIRE(collector->chunks.front().size() == 1);
-    const datadog::tracing::SpanData& span_data =
-        *collector->chunks.front().front();
-
-    REQUIRE(span_data.tags.at("_dd.p.dm") == "-5");
-    REQUIRE(span_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
-    REQUIRE(span_data.numeric_tags.at(tags::internal::sampling_priority) == 2);
-  }
-
-  SECTION("APM tracing disabled - no _dd.p.ts - rate limited to 1/min") {
-    TracerConfig config = base_config;
-    config.apm_tracing_enabled = false;
-
-    auto finalized_config = finalize_config(config, clock);
-    REQUIRE(finalized_config);
-    Tracer tracer{*finalized_config};
-    { auto root1 = tracer.create_span(); }
-    REQUIRE(collector->chunks.size() == 1);
-    REQUIRE(collector->chunks.front().size() == 1);
-    const datadog::tracing::SpanData& span1_data =
-        *collector->chunks.front().front();
-    CHECK(span1_data.numeric_tags.at(tags::internal::sampling_priority) == 2);
-    CHECK(span1_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
-    CHECK(std::stoi(span1_data.tags.at("_dd.p.dm")) < -10);
-
-    collector->chunks.clear();
-
-    current_time +=
-        std::chrono::seconds(1);  // Advance clock a bit, still within 1 min
-    { auto root2 = tracer.create_span(); }
-    REQUIRE(collector->chunks.size() == 1);
-    REQUIRE(collector->chunks.front().size() == 1);
-    const datadog::tracing::SpanData& span2_data =
-        *collector->chunks.front().front();
-    CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) == -1);
-    CHECK(span2_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
-
-    collector->chunks.clear();
-
-    current_time += std::chrono::minutes(1) +
-                    std::chrono::seconds(1);  // Advance clock past 1 min
-    { auto root3 = tracer.create_span(); }
-    REQUIRE(collector->chunks.size() == 1);
-    REQUIRE(collector->chunks.front().size() == 1);
-    const auto& span3_data = *collector->chunks.front().front();
-    CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) == 2);
-    CHECK(span3_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
-  }
-
-  SECTION("APM tracing disabled - extracted context behavior") {
-    TracerConfig config = base_config;
-    config.apm_tracing_enabled = false;
-
-    auto finalized_config = finalize_config(config, clock);
-    REQUIRE(finalized_config);
-    Tracer tracer{*finalized_config};
-
-    // Case 1: extracted context with priority, but no _dd.p.ts → dropped
-    // To ensure this, let's make this the *second* span in this disabled state
-    // for this test section. The first consumes the limiter slot.
-    { auto dummy_span = tracer.create_span(); }
-    collector->chunks.clear();
-
-    const std::unordered_map<std::string, std::string> headers_with_priority{
-        {"x-datadog-trace-id", "123"},
-        {"x-datadog-parent-id", "456"},
-        {"x-datadog-sampling-priority", "2"}  // USER_KEEP
-    };
-    MockDictReader reader_with_priority{headers_with_priority};
-    {
-      auto span = tracer.extract_span(reader_with_priority);
-      REQUIRE(span);
+      CHECK(span_data.tags.at("_dd.p.dm") == "-5");
+      CHECK(span_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      CHECK(span_data.numeric_tags.at(tags::internal::sampling_priority) == 2);
     }
-    REQUIRE(collector->chunks.size() == 1);
-    REQUIRE(collector->chunks.front().size() == 1);
-    const SpanData& span1_data = *collector->chunks.front().front();
-    // although incoming priority was USER_KEEP, we should still drop it
-    CHECK(span1_data.numeric_tags.at(tags::internal::sampling_priority) == -1);
-    CHECK(span1_data.numeric_tags.at(tags::internal::apm_enabled) == 0.);
 
-    collector->chunks.clear();
+    SECTION("spans without _dd.p.ts are rate limited to 1/min") {
+      auto finalized_config = finalize_config(config, clock);
+      REQUIRE(finalized_config);
+      Tracer tracer{*finalized_config};
+      {
+        auto root1 = tracer.create_span();
+      }
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
 
-    // Case 2: Extracted context with priority AND _dd.p.ts -> Kept by AppSec
-    // rule
-    current_time +=
-        std::chrono::minutes(1) + std::chrono::seconds(1);  // Refresh limiter
-    const std::unordered_map<std::string, std::string>
-        headers_with_priority_and_appsec{
-            {"x-datadog-trace-id", "789"},
-            {"x-datadog-parent-id", "101"},
-            {"x-datadog-sampling-priority",
-             "-1"},  // USER_DROP, to show _dd.p.ts overrides
-            {tags::internal::trace_source, "02"}};
-    MockDictReader reader_with_priority_and_appsec{
-        headers_with_priority_and_appsec};
-    {
-      auto span = tracer.extract_span(reader_with_priority_and_appsec);
-      REQUIRE(span);
+      {
+        const datadog::tracing::SpanData& span1_data =
+            *collector->chunks.front().front();
+        CHECK(span1_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              2);
+        CHECK(span1_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+        CHECK(span1_data.tags.at("_dd.p.dm") == "-0");
+      }
+
+      collector->chunks.clear();
+
+      {
+        current_time += 1s;  // Advance clock a bit, still within 1 min window
+        tracer.create_span();
+      }
+
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+
+      // Expect the span to be dropped because we already ingested 1 trace in
+      // the current 1 min window.
+      {
+        const datadog::tracing::SpanData& span2_data =
+            *collector->chunks.front().front();
+        CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              -1);
+        CHECK(span2_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      }
+
+      collector->chunks.clear();
+
+      {
+        current_time += 1min + 1s;  // Advance clock past 1 min
+        auto root3 = tracer.create_span();
+      }
+
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+
+      // Expect to be ingested.
+      {
+        const auto& span3_data = *collector->chunks.front().front();
+        CHECK(span3_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              2);
+        CHECK(span3_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      }
     }
-    REQUIRE(collector->chunks.size() == 1);
-    REQUIRE(collector->chunks.front().size() == 1);
-    const SpanData& span2_data = *collector->chunks.front().front();
-    CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) == 2);
-    CHECK(span2_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
   }
+
+  // NOTE(@dmehala): the behaviour below is not specified.
+  /*SECTION("extracted context behavior") {*/
+  /*  auto finalized_config = finalize_config(config, clock);*/
+  /*  REQUIRE(finalized_config);*/
+  /*  Tracer tracer{*finalized_config};*/
+  /**/
+  /*  // Case 1: extracted context with priority, but no _dd.p.ts → dropped*/
+  /*  // To ensure this, let's make this the *second* span in this disabled
+   * state*/
+  /*  // for this test section. The first consumes the limiter slot.*/
+  /*  {*/
+  /*    tracer.create_span();*/
+  /*  }*/
+  /*  collector->chunks.clear();*/
+  /**/
+  /*  const std::unordered_map<std::string, std::string>
+   * headers_with_priority{*/
+  /*      {"x-datadog-trace-id", "123"},*/
+  /*      {"x-datadog-parent-id", "456"},*/
+  /*      {"x-datadog-sampling-priority", "2"}  // USER_KEEP*/
+  /*  };*/
+  /*  {*/
+  /*    MockDictReader reader{headers_with_priority};*/
+  /*    auto span = tracer.extract_span(reader);*/
+  /*    REQUIRE(span);*/
+  /*  }*/
+  /*  REQUIRE(collector->chunks.size() == 1);*/
+  /*  REQUIRE(collector->chunks.front().size() == 1);*/
+  /**/
+  /*  // although incoming priority was USER_KEEP, we should still drop it*/
+  /*  {*/
+  /*    const SpanData& span1_data = *collector->chunks.front().front();*/
+  /*    CHECK(span1_data.numeric_tags.at(tags::internal::sampling_priority) ==*/
+  /*          -1);*/
+  /*    CHECK(span1_data.numeric_tags.at(tags::internal::apm_enabled) == 0.);*/
+  /*  }*/
+  /**/
+  /*  collector->chunks.clear();*/
+  /**/
+  /*  // Case 2: Extracted context with priority AND _dd.p.ts -> Kept by
+   * AppSec*/
+  /*  // rule*/
+  /*  current_time += 1min + 1s;  // Refresh limiter*/
+  /**/
+  /*  const std::unordered_map<std::string, std::string>*/
+  /*      headers_with_priority_and_appsec{*/
+  /*          {"x-datadog-trace-id", "789"},*/
+  /*          {"x-datadog-parent-id", "101"},*/
+  /*          // USER_DROP, to show _dd.p.ts overrides*/
+  /*          {"x-datadog-sampling-priority", "-1"},*/
+  /*          {"x-datadog-tags", "_dd.p.ts=02"}};*/
+  /**/
+  /*  {*/
+  /*    MockDictReader reader{headers_with_priority_and_appsec};*/
+  /*    auto span = tracer.extract_span(reader);*/
+  /*    REQUIRE(span);*/
+  /*  }*/
+  /**/
+  /*  REQUIRE(collector->chunks.size() == 1);*/
+  /*  REQUIRE(collector->chunks.front().size() == 1);*/
+  /**/
+  /*  {*/
+  /*    const SpanData& span2_data = *collector->chunks.front().front();*/
+  /*    CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) ==
+   * 2);*/
+  /*    CHECK(span2_data.numeric_tags.at(tags::internal::apm_enabled) == 0);*/
+  /*  }*/
+  /*}*/
 }

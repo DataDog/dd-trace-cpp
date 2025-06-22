@@ -80,6 +80,8 @@ class TraceSegment {
 
   std::shared_ptr<ConfigManager> config_manager_;
 
+  bool apm_tracing_enabled_;
+
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
                const std::shared_ptr<Collector>& collector,
@@ -95,7 +97,8 @@ class TraceSegment {
                Optional<SamplingDecision> sampling_decision,
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
-               std::unique_ptr<SpanData> local_root);
+               std::unique_ptr<SpanData> local_root,
+               bool apm_tracing_enabled = true);
 
   const SpanDefaults& defaults() const;
   const Optional<std::string>& hostname() const;

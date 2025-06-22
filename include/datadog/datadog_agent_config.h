@@ -90,6 +90,9 @@ class FinalizedDatadogAgentConfig {
 
   // Origin detection
   Optional<std::string> admission_controller_uid;
+
+  // TBD
+  bool stats_computation_enabled = false;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(

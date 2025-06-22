@@ -95,7 +95,7 @@ TraceSegment::TraceSegment(
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
-    std::unique_ptr<SpanData> local_root)
+    std::unique_ptr<SpanData> local_root, bool apm_tracing_enabled)
     : logger_(logger),
       collector_(collector),
       trace_sampler_(trace_sampler),
@@ -112,7 +112,8 @@ TraceSegment::TraceSegment(
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)),
-      config_manager_(config_manager) {
+      config_manager_(config_manager),
+      apm_tracing_enabled_(apm_tracing_enabled) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);
@@ -224,11 +225,19 @@ void TraceSegment::span_finished() {
       }
     }
   }
+
   if (decision.origin == SamplingDecision::Origin::DELEGATED &&
       local_root.parent_id == 0) {
     // Convey the fact that, even though we are the root service, we delegated
     // the sampling decision and so are not the "sampling decider."
     local_root.tags[tags::internal::sampling_decider] = "0";
+  }
+
+  // RFC seems to only mandate that this be set if the trace is kept.
+  // However, system-tests expect this to be always be set.
+  // Add it all the time; can't hurt
+  if (!apm_tracing_enabled_) {
+    local_root.numeric_tags[tags::internal::apm_enabled] = 0;
   }
 
   // Some tags are repeated on all spans.
@@ -317,7 +326,11 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span) {
 }
 
 bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
-                          const InjectionOptions&) {
+                          const InjectionOptions& opts) {
+  if (!apm_tracing_enabled_ && !opts.force) {
+    return true;
+  }
+
   // If the only injection style is `NONE`, then don't do anything.
   if (injection_styles_.size() == 1 &&
       injection_styles_[0] == PropagationStyle::NONE) {

@@ -167,6 +167,9 @@ DatadogAgent::DatadogAgent(
                    tracer_signature.library_language_version);
   headers_.emplace("Datadog-Meta-Tracer-Version",
                    tracer_signature.library_version);
+  if (config.stats_computation_enabled) {
+    headers_.emplace("Datadog-Client-Computed-Stats", "yes");
+  }
 
   // Origin Detection headers are not necessary when Unix Domain Socket (UDS)
   // is used to communicate with the Datadog Agent.
