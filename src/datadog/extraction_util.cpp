@@ -1,6 +1,7 @@
 #include "extraction_util.h"
 
 #include <datadog/logger.h>
+#include <datadog/trace_source.h>
 
 #include <cstdint>
 #include <sstream>
@@ -51,21 +52,7 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
         result.trace_id->high = *high;
       }
     } else if (key == tags::internal::trace_source) {
-      if (value.size() > 2) continue;
-
-      auto parsed_ts = parse_uint64(value, 10);
-      if (parsed_ts.if_error()) {
-        continue;
-      }
-
-      // Bit twiddling magic is coming from
-      // <http://www.graphics.stanford.edu/~seander/bithacks.html> <3.
-      auto is_power_of_2 = [](uint64_t v) -> bool {
-        return v && !(v & (v - 1));
-      };
-
-      // NOTE(@dmehala): ensures `ts` is a power of 2.
-      if (!is_power_of_2(*parsed_ts)) continue;
+      if (!validate_trace_source(value)) continue;
     }
 
     result.trace_tags.emplace_back(std::move(key), std::move(value));

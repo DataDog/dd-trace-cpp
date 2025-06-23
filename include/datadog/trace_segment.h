@@ -124,6 +124,9 @@ class TraceSegment {
   void override_sampling_priority(int priority);
   void override_sampling_priority(SamplingPriority priority);
 
+  // TBD
+  SpanData& local_root() const;
+
  private:
   // If `sampling_decision_` is null, use `trace_sampler_` to make a
   // sampling decision and assign it to `sampling_decision_`.

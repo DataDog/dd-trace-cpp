@@ -421,5 +421,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
   return true;
 }
 
+SpanData& TraceSegment::local_root() const { return *spans_.front(); }
+
 }  // namespace tracing
 }  // namespace datadog

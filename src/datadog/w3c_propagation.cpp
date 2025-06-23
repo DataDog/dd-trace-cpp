@@ -1,6 +1,7 @@
 #include "w3c_propagation.h"
 
 #include <datadog/propagation_style.h>
+#include <datadog/trace_source.h>
 
 #include <algorithm>
 #include <cassert>
@@ -234,23 +235,9 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
     } else if (key == "p") {
       result.datadog_w3c_parent_id = std::string(value);
     } else if (key == "ts") {
-      if (value.size() > 2) continue;
-
-      auto parsed_ts = parse_uint64(value, 10);
-      if (parsed_ts.if_error()) {
-        continue;
+      if (validate_trace_source(value)) {
+        result.trace_tags.emplace_back(tags::internal::trace_source, value);
       }
-
-      // Bit twiddling magic is coming from
-      // <http://www.graphics.stanford.edu/~seander/bithacks.html> <3.
-      auto is_power_of_2 = [](uint64_t v) -> bool {
-        return v && !(v & (v - 1));
-      };
-
-      // NOTE(@dmehala): ensures `ts` is a power of 2.
-      if (!is_power_of_2(*parsed_ts)) continue;
-
-      result.trace_tags.emplace_back(tags::internal::trace_source, value);
     } else if (starts_with(key, "t.")) {
       // The part of the key that follows "t." is the name of a trace tag,
       // except without the "_dd.p." prefix.
