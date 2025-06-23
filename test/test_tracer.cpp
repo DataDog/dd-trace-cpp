@@ -986,9 +986,11 @@ TEST_TRACER("span extraction") {
             "wow",     // tracestate
             0,         // expected_sampling_priority
             "France",  // expected_origin
-            {{"_dd.p.foo", "thing1"},
-             {"_dd.p.bar", "thing2"}},  // expected_trace_tags
-            nullopt,                    // expected_additional_w3c_tracestate
+            {
+                {"_dd.p.foo", "thing1"},
+                {"_dd.p.bar", "thing2"},
+            },                   // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
             "x:wow;y:wow",       // expected_additional_datadog_w3c_tracestate
             "00000000000d69ac",  // expected_datadog_w3c_parent_id
         },
@@ -1146,6 +1148,47 @@ TEST_TRACER("span extraction") {
             {},                  // expected_trace_tags
             nullopt,             // expected_additional_w3c_tracestate
             nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "invalid trace state (1/2)",
+            traceparent_keep,
+            "dd=ts:0001",
+            1,
+            nullopt,
+            {},
+            nullopt,
+            nullopt,
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "invalid trace state (2/2)",
+            traceparent_keep,
+            "dd=ts:AA",
+            1,
+            nullopt,
+            {},
+            nullopt,
+            nullopt,
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "valid trace state",
+            traceparent_keep,
+            "dd=o:dsm;ts:04",
+            1,
+            "dsm",
+            {
+                {"_dd.p.ts", "04"},
+            },
+            nullopt,
+            nullopt,
             "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
     }));
@@ -1757,7 +1800,7 @@ TEST_TRACER("APM tracing disabled") {
   auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
   config.logger = std::make_shared<NullLogger>();
-  config.apm_tracing_enabled = false;
+  config.tracing_enabled = false;
 
   TimePoint current_time = default_clock();
   auto clock = [&current_time]() { return current_time; };
@@ -1766,7 +1809,7 @@ TEST_TRACER("APM tracing disabled") {
     SECTION("span with _dd.p.ts is kept") {
       auto finalized_config = finalize_config(config, clock);
       REQUIRE(finalized_config);
-      REQUIRE(!finalized_config->apm_tracing_enabled);
+      REQUIRE(!finalized_config->tracing_enabled);
       Tracer tracer{*finalized_config};
 
       SpanConfig span_cfg;
@@ -1828,8 +1871,28 @@ TEST_TRACER("APM tracing disabled") {
       collector->chunks.clear();
 
       {
+        auto span = tracer.create_span();
+        span.set_tag(tags::internal::trace_source,
+                     tags::internal::source::appsec);
+      }
+
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+
+      // Expect the span to be kept because the trace source is set.
+      {
+        const datadog::tracing::SpanData& span2_data =
+            *collector->chunks.front().front();
+        CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              2);
+        CHECK(span2_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      }
+
+      collector->chunks.clear();
+
+      {
         current_time += 1min + 1s;  // Advance clock past 1 min
-        auto root3 = tracer.create_span();
+        tracer.create_span();
       }
 
       REQUIRE(collector->chunks.size() == 1);

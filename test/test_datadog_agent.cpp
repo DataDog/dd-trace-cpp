@@ -246,7 +246,7 @@ DATADOG_AGENT_TEST("Datadog-Client-Computed-Stats header") {
   config.telemetry.enabled = false;
 
   SECTION("header sent when apm_tracing_enabled is false") {
-    config.apm_tracing_enabled = false;
+    config.tracing_enabled = false;
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
 
@@ -265,7 +265,7 @@ DATADOG_AGENT_TEST("Datadog-Client-Computed-Stats header") {
   }
 
   SECTION("header not sent when apm_tracing_enabled is true") {
-    config.apm_tracing_enabled = true;
+    config.tracing_enabled = true;
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
 

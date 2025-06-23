@@ -59,7 +59,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
       baggage_extraction_enabled_(false),
-      apm_tracing_enabled_(config.apm_tracing_enabled) {
+      tracing_enabled_(config.tracing_enabled) {
   telemetry::init(config.telemetry, signature_, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {
@@ -190,7 +190,7 @@ Span Tracer::create_span(const SpanConfig& config) {
       nullopt /* origin */, tags_header_max_size_, std::move(trace_tags),
       nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data),
-      apm_tracing_enabled_);
+      tracing_enabled_);
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
@@ -379,6 +379,18 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         *merged_context.datadog_w3c_parent_id;
   }
 
+  // trace source tag is not a trace tag, move it to a simple tag on the local
+  // root span.
+  if (const auto found = std::find_if(
+          merged_context.trace_tags.cbegin(), merged_context.trace_tags.cend(),
+          [](const auto& p) {
+            return p.first == tags::internal::trace_source;
+          });
+      found != merged_context.trace_tags.cend()) {
+    span_data->tags.emplace(tags::internal::trace_source, found->second);
+    merged_context.trace_tags.erase(found);
+  }
+
   Optional<SamplingDecision> sampling_decision;
   if (merged_context.sampling_priority) {
     SamplingDecision decision;
@@ -401,7 +413,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       std::move(sampling_decision),
       std::move(merged_context.additional_w3c_tracestate),
       std::move(merged_context.additional_datadog_w3c_tracestate),
-      std::move(span_data), apm_tracing_enabled_);
+      std::move(span_data), tracing_enabled_);
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};

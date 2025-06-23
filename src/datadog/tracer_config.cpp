@@ -130,7 +130,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   }
 
   if (auto apm_enabled_env = lookup(environment::DD_APM_TRACING_ENABLED)) {
-    env_cfg.apm_tracing_enabled = !falsy(*apm_enabled_env);
+    env_cfg.tracing_enabled = !falsy(*apm_enabled_env);
   }
 
   // Baggage
@@ -447,41 +447,44 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   }
 
   // APM Tracing Enabled
-  std::tie(origin, final_config.apm_tracing_enabled) = pick(
-      env_config->apm_tracing_enabled, user_config.apm_tracing_enabled, true);
+  std::tie(origin, final_config.tracing_enabled) =
+      pick(env_config->tracing_enabled, user_config.tracing_enabled, true);
   final_config.metadata[ConfigName::APM_TRACING_ENABLED] =
       ConfigMetadata(ConfigName::APM_TRACING_ENABLED,
-                     to_string(final_config.apm_tracing_enabled), origin);
+                     to_string(final_config.tracing_enabled), origin);
+
   // Whether APM tracing is enabled. This affects whether the
   // "Datadog-Client-Computed-Stats: yes" header is sent with trace requests.
-  agent_finalized->stats_computation_enabled =
-      !final_config.apm_tracing_enabled;
+  if (!final_config.tracing_enabled) {
+    agent_finalized->stats_computation_enabled = !final_config.tracing_enabled;
+
+    // Configure the trace sampler to send one trace per minute for service
+    // liveness and tracer 1trace/s
+    TraceSamplerRule rule;
+    rule.rate = Rate::one();
+    rule.matcher.tags.emplace(tags::internal::trace_source,
+                              tags::internal::source::appsec);
+    rule.mechanism = SamplingMechanism::APP_SEC;
+    rule.bypass_limiter = true;
+    final_config.trace_sampler.rules.emplace_back(std::move(rule));
+
+    // equivalent to:
+    // trace_sampler.rules = 1.0;
+    TraceSamplerRule all;
+    all.rate = Rate::one();
+    all.mechanism = SamplingMechanism::DEFAULT;
+    final_config.trace_sampler.rules.emplace_back(std::move(all));
+
+    // For service liveness (services showed in the service catalog for
+    // example), allow 1 trace/min.
+    final_config.trace_sampler.max_per_second = 1. / 60;
+  }
 
   if (!user_config.collector) {
     final_config.collector = *agent_finalized;
     final_config.metadata.merge(agent_finalized->metadata);
   } else {
     final_config.collector = user_config.collector;
-  }
-
-  // Configure the trace sampler to tracer 1trace/s
-  if (!final_config.apm_tracing_enabled) {
-    TraceSamplerRule rule;
-    rule.rate = Rate::one();
-    rule.matcher.tags.emplace(tags::internal::trace_source,
-                              tags::internal::source::appsec);
-    rule.mechanism = SamplingMechanism::APP_SEC;
-    final_config.trace_sampler.rules.emplace_back(std::move(rule));
-
-    // equivalent to:
-    /*user_config.trace_sampler.rules = 1.0;*/
-    TraceSamplerRule all;
-    all.rate = Rate::one();
-    all.matcher.service = "*";
-    all.mechanism = SamplingMechanism::DEFAULT;
-    final_config.trace_sampler.rules.emplace_back(std::move(all));
-
-    final_config.trace_sampler.max_per_second = 1. / 60;
   }
 
   return final_config;

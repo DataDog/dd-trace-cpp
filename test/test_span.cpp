@@ -978,7 +978,7 @@ TEST_SPAN("injection behaviour when apm tracing is disabled") {
   config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
   config.logger = std::make_shared<MockLogger>();
-  config.apm_tracing_enabled = false;
+  config.tracing_enabled = false;
 
   auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);

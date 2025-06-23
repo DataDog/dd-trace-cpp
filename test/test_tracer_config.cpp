@@ -280,14 +280,14 @@ TRACER_CONFIG_TEST("DD_APM_TRACING_ENABLED") {
     const EnvGuard guard{"DD_APM_TRACING_ENABLED", ""};
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(finalized->apm_tracing_enabled);
+    REQUIRE(finalized->tracing_enabled);
   }
 
   SECTION("can be set to false") {
     const EnvGuard guard{"DD_APM_TRACING_ENABLED", "false"};
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
-    REQUIRE(!finalized->apm_tracing_enabled);
+    REQUIRE(!finalized->tracing_enabled);
   }
 }
 

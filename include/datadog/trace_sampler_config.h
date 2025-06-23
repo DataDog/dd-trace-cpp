@@ -24,6 +24,7 @@ struct TraceSamplerRule final {
   Rate rate;
   SpanMatcher matcher;
   SamplingMechanism mechanism;
+  bool bypass_limiter = false;
 };
 
 struct TraceSamplerConfig {

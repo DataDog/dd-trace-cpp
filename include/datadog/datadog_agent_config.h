@@ -22,7 +22,6 @@
 #include "expected.h"
 #include "http_client.h"
 #include "remote_config/listener.h"
-#include "string_view.h"
 
 namespace datadog {
 namespace tracing {
@@ -91,8 +90,11 @@ class FinalizedDatadogAgentConfig {
   // Origin detection
   Optional<std::string> admission_controller_uid;
 
-  // TBD
-  bool stats_computation_enabled = false;
+  // Indicate if stats computation should be delegated to the Agent.
+  // This feature is not supported yet, however, we need to inform the Agent to
+  // not compute stats when APM Tracing `DD_APM_TRACING_ENABLED=false` is
+  // disabled.
+  bool stats_computation_enabled;
 };
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(

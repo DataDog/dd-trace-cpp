@@ -32,7 +32,6 @@
 #include <utility>
 #include <vector>
 
-#include "expected.h"
 #include "optional.h"
 #include "propagation_style.h"
 #include "runtime_id.h"
@@ -80,7 +79,7 @@ class TraceSegment {
 
   std::shared_ptr<ConfigManager> config_manager_;
 
-  bool apm_tracing_enabled_;
+  bool tracing_enabled_;
 
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
@@ -98,7 +97,7 @@ class TraceSegment {
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
                std::unique_ptr<SpanData> local_root,
-               bool apm_tracing_enabled = true);
+               bool tracing_enabled = true);
 
   const SpanDefaults& defaults() const;
   const Optional<std::string>& hostname() const;

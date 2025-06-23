@@ -113,7 +113,7 @@ TraceSegment::TraceSegment(
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)),
       config_manager_(config_manager),
-      apm_tracing_enabled_(apm_tracing_enabled) {
+      tracing_enabled_(apm_tracing_enabled) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);
@@ -236,7 +236,7 @@ void TraceSegment::span_finished() {
   // RFC seems to only mandate that this be set if the trace is kept.
   // However, system-tests expect this to be always be set.
   // Add it all the time; can't hurt
-  if (!apm_tracing_enabled_) {
+  if (!tracing_enabled_) {
     local_root.numeric_tags[tags::internal::apm_enabled] = 0;
   }
 
@@ -329,7 +329,10 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
                           const InjectionOptions& /*opts*/) {
   auto& local_root_tags = spans_.front()->tags;
 
-  if (!apm_tracing_enabled_) {
+  // When tracing is disabled, the tracing context is not propagated unless the
+  // local root span is created by another product (AppSec for example).
+  // `_dd.p.ts` tag reflect the enabled product which created the span.
+  if (!tracing_enabled_) {
     auto ts_tag_found = std::find_if(
         local_root_tags.cbegin(), local_root_tags.cend(),
         [](const auto& p) { return p.first == tags::internal::trace_source; });
@@ -358,7 +361,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     trace_tags = trace_tags_;
   }
 
-  // NOTE(@dmehala): Add `_dd.p.ts` to `trace_tags` for injection.
+  // Add `_dd.p.ts` to `trace_tags` for context propagation.
   auto ts_tag_found = std::find_if(
       local_root_tags.cbegin(), local_root_tags.cend(),
       [](const auto& p) { return p.first == tags::internal::trace_source; });
