@@ -1,8 +1,8 @@
 #include "platform_util.h"
 
+#include <cassert>
 #include <cstdint>
 #include <fstream>
-#include <cassert>
 #include <regex>
 
 // clang-format off
@@ -350,12 +350,14 @@ Optional<std::string> find_container_id_from_cgroup() {
 }  // namespace
 
 Optional<std::string> find_container_id(std::istream& source) {
-  static const std::string uuid_regex_str = "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
+  static const std::string uuid_regex_str =
+      "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
+      "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
   static const std::string container_regex_str = "[0-9a-f]{64}";
   static const std::string task_regex_str = "[0-9a-f]{32}-\\d+";
-  static const std::regex path_reg(
-      "(?:.+)?(" + uuid_regex_str + "|" + container_regex_str + "|" + task_regex_str +
-      ")(?:\\.scope)?$");
+  static const std::regex path_reg("(?:.+)?(" + uuid_regex_str + "|" +
+                                   container_regex_str + "|" + task_regex_str +
+                                   ")(?:\\.scope)?$");
 
   std::string line;
   while (std::getline(source, line)) {
