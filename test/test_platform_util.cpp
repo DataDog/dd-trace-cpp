@@ -19,8 +19,8 @@ PLATFORM_UTIL_TEST("find docker container ID") {
       {__LINE__, "empty inputs", "", nullopt},
       {__LINE__, "no docker container ID", "coucou", nullopt},
       {__LINE__, "one line with docker container ID",
-       "0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope",
-       "abcdef0123456789abcdef0123456789"},
+       "0::/system.slice/docker-cde7c2bab394630a42d73dc610b9c57415dced996106665d427f6d0566594411.scope",
+       "cde7c2bab394630a42d73dc610b9c57415dced996106665d427f6d0566594411"},
       {__LINE__, "multiline wihtout docker container ID", R"(
 0::/
 10:memory:/user.slice/user-0.slice/session-14.scope
@@ -41,7 +41,7 @@ PLATFORM_UTIL_TEST("find docker container ID") {
 9:hugetlb:/
 8:cpuset:/
 7:pids:/user.slice/user-0.slice/session-14.scope
-3:cpu:/system.slice/docker-abcdef0123456789abcdef0123456789.scope
+3:cpu:/system.slice/docker-cde7c2bab394630a42d73dc610b9c57415dced996106665d427f6d0566594411.scope
 6:freezer:/
 5:net_cls,net_prio:/
 4:perf_event:/
@@ -49,7 +49,7 @@ PLATFORM_UTIL_TEST("find docker container ID") {
 2:devices:/user.slice/user-0.slice/session-14.scope
 1:name=systemd:/user.slice/user-0.slice/session-14.scope
     )",
-       "abcdef0123456789abcdef0123456789"},
+       "cde7c2bab394630a42d73dc610b9c57415dced996106665d427f6d0566594411"},
   }));
 
   CAPTURE(test_case.name);
