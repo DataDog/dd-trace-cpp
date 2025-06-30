@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <fstream>
+#include <cassert>
+#include <regex>
 
 // clang-format off
 #if defined(__x86_64__) || defined(_M_X64)
@@ -338,31 +340,33 @@ Optional<Cgroup> get_cgroup_version() {
   return nullopt;
 }
 
-Optional<std::string> find_docker_container_id_from_cgroup() {
+Optional<std::string> find_container_id_from_cgroup() {
   auto cgroup_fd = std::ifstream("/proc/self/cgroup", std::ios::in);
   if (!cgroup_fd.is_open()) return nullopt;
 
-  return find_docker_container_id(cgroup_fd);
+  return find_container_id(cgroup_fd);
 }
 #endif
 }  // namespace
 
-Optional<std::string> find_docker_container_id(std::istream& source) {
-  constexpr std::string_view docker_str = "docker-";
+Optional<std::string> find_container_id(std::istream& source) {
+  static const std::string uuid_regex_str = "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
+  static const std::string container_regex_str = "[0-9a-f]{64}";
+  static const std::string task_regex_str = "[0-9a-f]{32}-\\d+";
+  static const std::regex path_reg(
+      "(?:.+)?(" + uuid_regex_str + "|" + container_regex_str + "|" + task_regex_str +
+      ")(?:\\.scope)?$");
 
   std::string line;
   while (std::getline(source, line)) {
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
-    if (auto beg = line.find(docker_str); beg != std::string::npos) {
-      beg += docker_str.size();
-      auto end = line.find(".scope", beg);
-      if (end == std::string::npos || end - beg <= 0) {
-        continue;
-      }
+    std::smatch match;
+    if (std::regex_match(line, match, path_reg)) {
+      assert(match.ready());
+      assert(match.size() == 2);
 
-      auto container_id = line.substr(beg, end - beg);
-      return container_id;
+      return match.str(1);
     }
   }
 
@@ -382,7 +386,7 @@ Optional<ContainerID> get_id() {
   ContainerID id;
   switch (*maybe_cgroup) {
     case Cgroup::v1: {
-      if (auto maybe_id = find_docker_container_id_from_cgroup()) {
+      if (auto maybe_id = find_container_id_from_cgroup()) {
         id.value = *maybe_id;
         id.type = ContainerID::Type::container_id;
         break;
