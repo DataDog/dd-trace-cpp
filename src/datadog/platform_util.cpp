@@ -297,15 +297,15 @@ namespace {
 #if defined(__linux__) || defined(__unix__)
 /// Magic numbers from linux/magic.h:
 /// <https://github.com/torvalds/linux/blob/ca91b9500108d4cf083a635c2e11c884d5dd20ea/include/uapi/linux/magic.h#L71>
-constexpr uint64_t CGROUP_SUPER_MAGIC = 0x27e0eb;
-constexpr uint64_t CGROUP2_SUPER_MAGIC = 0x63677270;
+// constexpr uint64_t CGROUP_SUPER_MAGIC = 0x27e0eb;
+// constexpr uint64_t CGROUP2_SUPER_MAGIC = 0x63677270;
 
 /// Magic number from linux/proc_ns.h:
 /// <https://github.com/torvalds/linux/blob/5859a2b1991101d6b978f3feb5325dad39421f29/include/linux/proc_ns.h#L41-L49>
 // constexpr ino_t HOST_CGROUP_NAMESPACE_INODE = 0xeffffffb;
 
 /// Represents the cgroup version of the current process.
-enum class Cgroup : char { v1, v2 };
+// enum class Cgroup : char { v1, v2 };
 
 Optional<ino_t> get_inode(std::string_view path) {
   struct stat buf;
@@ -314,21 +314,6 @@ Optional<ino_t> get_inode(std::string_view path) {
   }
 
   return buf.st_ino;
-}
-
-Optional<Cgroup> get_cgroup_version() {
-  struct statfs buf;
-
-  if (statfs("/sys/fs/cgroup", &buf) != 0) {
-    return nullopt;
-  }
-
-  if (buf.f_type == CGROUP_SUPER_MAGIC)
-    return Cgroup::v1;
-  else if (buf.f_type == CGROUP2_SUPER_MAGIC)
-    return Cgroup::v2;
-
-  return nullopt;
 }
 
 Optional<std::string> find_container_id_from_cgroup(
@@ -377,32 +362,17 @@ Optional<std::string> find_container_id(std::istream& source,
 Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger) {
 #if defined(__linux__) || defined(__unix__)
   // Comment out the host namespace check, following the algorithm from other tracers.
+  // Also don't get the cgroup version upfront, following the algorithm from other tracers.
   // This should allow us to detect containers running in Docker Desktop.
 
-  auto maybe_cgroup = get_cgroup_version();
-  if (!maybe_cgroup) {
-    logger->log_error("Failed to get cgroup version.");
-    return nullopt;
-  }
-
   ContainerID id;
-  switch (*maybe_cgroup) {
-    case Cgroup::v1: {
-      if (auto maybe_id = find_container_id_from_cgroup(logger)) {
-        id.value = *maybe_id;
-        id.type = ContainerID::Type::container_id;
-        break;
-      }
-    }
-      // NOTE(@dmehala): failed to find the container ID, try getting the cgroup
-      // inode.
-      [[fallthrough]];
-    case Cgroup::v2: {
-      if (auto maybe_inode = get_inode("/sys/fs/cgroup")) {
-        id.type = ContainerID::Type::cgroup_inode;
-        id.value = std::to_string(*maybe_inode);
-      }
-    }; break;
+  if (auto maybe_id = find_container_id_from_cgroup(logger)) {
+    id.value = *maybe_id;
+    id.type = ContainerID::Type::container_id;
+  } else if (auto maybe_inode = get_inode("/sys/fs/cgroup")) {
+    // NOTE(@dmehala): failed to find the container ID, try getting the cgroup inode.
+    id.type = ContainerID::Type::cgroup_inode;
+    id.value = std::to_string(*maybe_inode);
   }
 
   return id;
