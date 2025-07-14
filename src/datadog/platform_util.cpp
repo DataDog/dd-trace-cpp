@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <regex>
 
 // clang-format off
@@ -44,6 +45,8 @@
 #  include <winsock.h>
 #endif
 // clang-format on
+
+#include <datadog/logger.h>
 
 namespace datadog {
 namespace tracing {
@@ -341,19 +344,21 @@ Optional<Cgroup> get_cgroup_version() {
   return nullopt;
 }
 
-Optional<std::string> find_container_id_from_cgroup() {
+Optional<std::string> find_container_id_from_cgroup(
+    const std::shared_ptr<tracing::Logger>& logger) {
   auto cgroup_fd = std::ifstream("/proc/self/cgroup", std::ios::in);
   if (!cgroup_fd.is_open()) {
-    std::cerr << "failed to open /proc/self/cgroup" << std::endl;
+    logger->log_error("failed to open /proc/self/cgroup");
     return nullopt;
   }
 
-  return find_container_id(cgroup_fd);
+  return find_container_id(cgroup_fd, logger);
 }
 #endif
 }  // namespace
 
-Optional<std::string> find_container_id(std::istream& source) {
+Optional<std::string> find_container_id(std::istream& source,
+                                        const std::shared_ptr<tracing::Logger>& logger) {
   static const std::string uuid_regex_str =
       "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
       "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
@@ -365,7 +370,7 @@ Optional<std::string> find_container_id(std::istream& source) {
 
   std::string line;
   while (std::getline(source, line)) {
-    std::cout << "Reading line: " << line << std::endl;
+    logger->log_error("Reading line: " + line);
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
     std::smatch match;
@@ -373,29 +378,33 @@ Optional<std::string> find_container_id(std::istream& source) {
       assert(match.ready());
       assert(match.size() == 2);
 
-      std::cout << "Found container ID: " << match.str(1) << std::endl;
+      logger->log_error("Found container ID: " + match.str(1));
       return match.str(1);
     }
   }
 
-  std::cout << "No container ID found" << std::endl;
+  logger->log_error("No container ID found");
   return nullopt;
 }
 
-Optional<ContainerID> get_id() {
+Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger) {
 #if defined(__linux__) || defined(__unix__)
   if (is_running_in_host_namespace()) {
     // Not in a container, no need to continue.
+    logger->log_error("Not in a container, no need to continue.");
     return nullopt;
   }
 
   auto maybe_cgroup = get_cgroup_version();
-  if (!maybe_cgroup) return nullopt;
+  if (!maybe_cgroup) {
+    logger->log_error("Failed to get cgroup version.");
+    return nullopt;
+  }
 
   ContainerID id;
   switch (*maybe_cgroup) {
     case Cgroup::v1: {
-      if (auto maybe_id = find_container_id_from_cgroup()) {
+      if (auto maybe_id = find_container_id_from_cgroup(logger)) {
         id.value = *maybe_id;
         id.type = ContainerID::Type::container_id;
         break;

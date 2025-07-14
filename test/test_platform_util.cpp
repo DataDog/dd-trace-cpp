@@ -2,6 +2,7 @@
 
 #include "platform_util.h"
 #include "test.h"
+#include "null_logger.h"
 
 using namespace datadog::tracing;
 
@@ -58,7 +59,7 @@ PLATFORM_UTIL_TEST("find docker container ID") {
 
   std::istringstream is(test_case.input);
 
-  auto maybe_container_id = container::find_container_id(is);
+  auto maybe_container_id = container::find_container_id(is, std::make_shared<NullLogger>());
   if (test_case.expected_container_id.has_value()) {
     REQUIRE(maybe_container_id.has_value());
     CHECK(*maybe_container_id == *test_case.expected_container_id);
@@ -186,7 +187,7 @@ PLATFORM_UTIL_TEST("find multiline container IDs") {
 
   std::istringstream is(test_case.input);
 
-  auto maybe_container_id = container::find_container_id(is);
+  auto maybe_container_id = container::find_container_id(is, std::make_shared<NullLogger>());
   if (test_case.expected_container_id.has_value()) {
     REQUIRE(maybe_container_id.has_value());
     CHECK(*maybe_container_id == *test_case.expected_container_id);
