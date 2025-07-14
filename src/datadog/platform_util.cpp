@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdint>
 #include <fstream>
+#include <iostream>
 #include <regex>
 
 // clang-format off
@@ -342,7 +343,10 @@ Optional<Cgroup> get_cgroup_version() {
 
 Optional<std::string> find_container_id_from_cgroup() {
   auto cgroup_fd = std::ifstream("/proc/self/cgroup", std::ios::in);
-  if (!cgroup_fd.is_open()) return nullopt;
+  if (!cgroup_fd.is_open()) {
+    std::cerr << "failed to open /proc/self/cgroup" << std::endl;
+    return nullopt;
+  }
 
   return find_container_id(cgroup_fd);
 }
@@ -361,6 +365,7 @@ Optional<std::string> find_container_id(std::istream& source) {
 
   std::string line;
   while (std::getline(source, line)) {
+    std::cout << "Reading line: " << line << std::endl;
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
     std::smatch match;
@@ -368,10 +373,12 @@ Optional<std::string> find_container_id(std::istream& source) {
       assert(match.ready());
       assert(match.size() == 2);
 
+      std::cout << "Found container ID: " << match.str(1) << std::endl;
       return match.str(1);
     }
   }
 
+  std::cout << "No container ID found" << std::endl;
   return nullopt;
 }
 
