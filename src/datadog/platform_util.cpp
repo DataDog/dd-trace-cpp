@@ -302,7 +302,7 @@ namespace {
 
 /// Magic number from linux/proc_ns.h:
 /// <https://github.com/torvalds/linux/blob/5859a2b1991101d6b978f3feb5325dad39421f29/include/linux/proc_ns.h#L41-L49>
-// constexpr ino_t HOST_CGROUP_NAMESPACE_INODE = 0xeffffffb;
+constexpr ino_t HOST_CGROUP_NAMESPACE_INODE = 0xeffffffb;
 
 /// Represents the cgroup version of the current process.
 // enum class Cgroup : char { v1, v2 };
@@ -314,6 +314,19 @@ Optional<ino_t> get_inode(std::string_view path) {
   }
 
   return buf.st_ino;
+}
+
+// Host namespace inode number are hardcoded, which allows for dectection of
+// whether the binary is running in host or not. However, it does not work when
+// running in a Docker in Docker environment.
+bool is_running_in_host_namespace() {
+  // linux procfs file that represents the cgroup namespace of the current
+  // process.
+  if (auto inode = get_inode("/proc/self/ns/cgroup")) {
+    return *inode == HOST_CGROUP_NAMESPACE_INODE;
+  }
+
+  return false;
 }
 
 Optional<std::string> find_container_id_from_cgroup(
@@ -361,18 +374,18 @@ Optional<std::string> find_container_id(std::istream& source,
 
 Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger) {
 #if defined(__linux__) || defined(__unix__)
-  // Comment out the host namespace check, following the algorithm from other tracers.
-  // Also don't get the cgroup version upfront, following the algorithm from other tracers.
-  // This should allow us to detect containers running in Docker Desktop.
-
+  // Determine the container ID or inode
   ContainerID id;
   if (auto maybe_id = find_container_id_from_cgroup(logger)) {
     id.value = *maybe_id;
     id.type = ContainerID::Type::container_id;
-  } else if (auto maybe_inode = get_inode("/sys/fs/cgroup")) {
+  } else if (!is_running_in_host_namespace()) {
     // NOTE(@dmehala): failed to find the container ID, try getting the cgroup inode.
-    id.type = ContainerID::Type::cgroup_inode;
-    id.value = std::to_string(*maybe_inode);
+    auto maybe_inode = get_inode("/sys/fs/cgroup");
+    if (maybe_inode) {
+      id.type = ContainerID::Type::cgroup_inode;
+      id.value = std::to_string(*maybe_inode);
+    }
   }
 
   return id;
