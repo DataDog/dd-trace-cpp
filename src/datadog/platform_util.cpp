@@ -302,7 +302,7 @@ constexpr uint64_t CGROUP2_SUPER_MAGIC = 0x63677270;
 
 /// Magic number from linux/proc_ns.h:
 /// <https://github.com/torvalds/linux/blob/5859a2b1991101d6b978f3feb5325dad39421f29/include/linux/proc_ns.h#L41-L49>
-constexpr ino_t HOST_CGROUP_NAMESPACE_INODE = 0xeffffffb;
+// constexpr ino_t HOST_CGROUP_NAMESPACE_INODE = 0xeffffffb;
 
 /// Represents the cgroup version of the current process.
 enum class Cgroup : char { v1, v2 };
@@ -314,19 +314,6 @@ Optional<ino_t> get_inode(std::string_view path) {
   }
 
   return buf.st_ino;
-}
-
-// Host namespace inode number are hardcoded, which allows for dectection of
-// whether the binary is running in host or not. However, it does not work when
-// running in a Docker in Docker environment.
-bool is_running_in_host_namespace() {
-  // linux procfs file that represents the cgroup namespace of the current
-  // process.
-  if (auto inode = get_inode("/proc/self/ns/cgroup")) {
-    return *inode == HOST_CGROUP_NAMESPACE_INODE;
-  }
-
-  return false;
 }
 
 Optional<Cgroup> get_cgroup_version() {
@@ -389,11 +376,8 @@ Optional<std::string> find_container_id(std::istream& source,
 
 Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger) {
 #if defined(__linux__) || defined(__unix__)
-  if (is_running_in_host_namespace()) {
-    // Not in a container, no need to continue.
-    logger->log_error("Not in a container, no need to continue.");
-    return nullopt;
-  }
+  // Comment out the host namespace check, following the algorithm from other tracers.
+  // This should allow us to detect containers running in Docker Desktop.
 
   auto maybe_cgroup = get_cgroup_version();
   if (!maybe_cgroup) {
