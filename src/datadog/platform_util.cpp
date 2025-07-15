@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <memory>
 #include <regex>
 
 // clang-format off
@@ -45,8 +44,6 @@
 #  include <winsock.h>
 #endif
 // clang-format on
-
-#include <datadog/logger.h>
 
 namespace datadog {
 namespace tracing {
@@ -295,17 +292,9 @@ Expected<InMemoryFile> InMemoryFile::make(StringView) {
 namespace container {
 namespace {
 #if defined(__linux__) || defined(__unix__)
-/// Magic numbers from linux/magic.h:
-/// <https://github.com/torvalds/linux/blob/ca91b9500108d4cf083a635c2e11c884d5dd20ea/include/uapi/linux/magic.h#L71>
-// constexpr uint64_t CGROUP_SUPER_MAGIC = 0x27e0eb;
-// constexpr uint64_t CGROUP2_SUPER_MAGIC = 0x63677270;
-
 /// Magic number from linux/proc_ns.h:
 /// <https://github.com/torvalds/linux/blob/5859a2b1991101d6b978f3feb5325dad39421f29/include/linux/proc_ns.h#L41-L49>
 constexpr ino_t HOST_CGROUP_NAMESPACE_INODE = 0xeffffffb;
-
-/// Represents the cgroup version of the current process.
-// enum class Cgroup : char { v1, v2 };
 
 Optional<ino_t> get_inode(std::string_view path) {
   struct stat buf;
@@ -329,21 +318,18 @@ bool is_running_in_host_namespace() {
   return false;
 }
 
-Optional<std::string> find_container_id_from_cgroup(
-    const std::shared_ptr<tracing::Logger>& logger) {
+Optional<std::string> find_container_id_from_cgroup() {
   auto cgroup_fd = std::ifstream("/proc/self/cgroup", std::ios::in);
   if (!cgroup_fd.is_open()) {
-    logger->log_error("failed to open /proc/self/cgroup");
     return nullopt;
   }
 
-  return find_container_id(cgroup_fd, logger);
+  return find_container_id(cgroup_fd);
 }
 #endif
 }  // namespace
 
-Optional<std::string> find_container_id(std::istream& source,
-                                        const std::shared_ptr<tracing::Logger>& logger) {
+Optional<std::string> find_container_id(std::istream& source) {
   static const std::string uuid_regex_str =
       "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
       "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
@@ -355,7 +341,6 @@ Optional<std::string> find_container_id(std::istream& source,
 
   std::string line;
   while (std::getline(source, line)) {
-    logger->log_error("Reading line: " + line);
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
     std::smatch match;
@@ -363,20 +348,18 @@ Optional<std::string> find_container_id(std::istream& source,
       assert(match.ready());
       assert(match.size() == 2);
 
-      logger->log_error("Found container ID: " + match.str(1));
       return match.str(1);
     }
   }
 
-  logger->log_error("No container ID found");
   return nullopt;
 }
 
-Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger) {
+Optional<ContainerID> get_id() {
 #if defined(__linux__) || defined(__unix__)
   // Determine the container ID or inode
   ContainerID id;
-  if (auto maybe_id = find_container_id_from_cgroup(logger)) {
+  if (auto maybe_id = find_container_id_from_cgroup()) {
     id.value = *maybe_id;
     id.type = ContainerID::Type::container_id;
   } else if (!is_running_in_host_namespace()) {
