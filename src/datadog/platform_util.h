@@ -3,8 +3,10 @@
 // This component provides platform-dependent miscellanea.
 
 #include <datadog/expected.h>
+#include <datadog/logger.h>
 #include <datadog/string_view.h>
 
+#include <memory>
 #include <string>
 
 namespace datadog {
@@ -96,7 +98,7 @@ Optional<std::string> find_container_id(std::istream& source);
 ///
 /// @return A `ContainerID` object containing id of the container in
 /// which the current process is running.
-Optional<ContainerID> get_id();
+Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger);
 
 }  // namespace container
 

@@ -171,7 +171,7 @@ DatadogAgent::DatadogAgent(
   // Origin Detection headers are not necessary when Unix Domain Socket (UDS)
   // is used to communicate with the Datadog Agent.
   if (!contains(config.url.scheme, "unix")) {
-    if (auto container_id = container::get_id()) {
+    if (auto container_id = container::get_id(logger_)) {
       if (container_id->type == container::ContainerID::Type::container_id) {
         headers_.emplace("Datadog-Container-ID", container_id->value);
         headers_.emplace("Datadog-Entity-Id", "ci-" + container_id->value);

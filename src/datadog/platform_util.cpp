@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <regex>
 
 // clang-format off
@@ -44,6 +45,8 @@
 #  include <winsock.h>
 #endif
 // clang-format on
+
+#include <datadog/logger.h>
 
 namespace datadog {
 namespace tracing {
@@ -292,9 +295,17 @@ Expected<InMemoryFile> InMemoryFile::make(StringView) {
 namespace container {
 namespace {
 #if defined(__linux__) || defined(__unix__)
+/// Magic numbers from linux/magic.h:
+/// <https://github.com/torvalds/linux/blob/ca91b9500108d4cf083a635c2e11c884d5dd20ea/include/uapi/linux/magic.h#L71>
+constexpr uint64_t CGROUP_SUPER_MAGIC = 0x27e0eb;
+constexpr uint64_t CGROUP2_SUPER_MAGIC = 0x63677270;
+
 /// Magic number from linux/proc_ns.h:
 /// <https://github.com/torvalds/linux/blob/5859a2b1991101d6b978f3feb5325dad39421f29/include/linux/proc_ns.h#L41-L49>
 constexpr ino_t HOST_CGROUP_NAMESPACE_INODE = 0xeffffffb;
+
+/// Represents the cgroup version of the current process.
+enum class Cgroup : char { v1, v2 };
 
 Optional<ino_t> get_inode(std::string_view path) {
   struct stat buf;
@@ -316,6 +327,25 @@ bool is_running_in_host_namespace() {
   }
 
   return false;
+}
+
+Optional<Cgroup> get_cgroup_version(const std::shared_ptr<tracing::Logger>& logger) {
+  struct statfs buf;
+
+  if (statfs("/sys/fs/cgroup", &buf) != 0) {
+    logger->log_error("Failed to statfs /sys/fs/cgroup");
+    return nullopt;
+  }
+
+  logger->log_error([&](auto& stream) {
+    stream << "statfs /sys/fs/cgroup: f_type = " << buf.f_type;
+  });
+  if (buf.f_type == CGROUP_SUPER_MAGIC)
+    return Cgroup::v1;
+  else if (buf.f_type == CGROUP2_SUPER_MAGIC)
+    return Cgroup::v2;
+
+  return nullopt;
 }
 
 Optional<std::string> find_container_id_from_cgroup() {
@@ -355,8 +385,11 @@ Optional<std::string> find_container_id(std::istream& source) {
   return nullopt;
 }
 
-Optional<ContainerID> get_id() {
+Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger) {
 #if defined(__linux__) || defined(__unix__)
+  auto maybe_cgroup = get_cgroup_version(logger);
+  if (!maybe_cgroup) return nullopt;
+
   // Determine the container ID or inode
   ContainerID id;
   if (auto maybe_id = find_container_id_from_cgroup()) {
