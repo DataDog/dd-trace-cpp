@@ -30,9 +30,6 @@ benchmarks:
     UPSTREAM_BRANCH: $CI_COMMIT_REF_NAME # The branch or tag name for which project is built.
     UPSTREAM_COMMIT_SHA: $CI_COMMIT_SHA # The commit revision the project is built for.
 
-    KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: dd-trace-cpp
-    FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "true"
-
 check-big-regressions:
   stage: benchmarks-report
   needs: [ benchmarks ]
@@ -50,5 +47,3 @@ check-big-regressions:
     export PATH="$PATH:/platform/steps"
 
     bp-runner /platform/bp-runner.fail-on-regression.yml --debug
-  variables:
-    KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: dd-trace-cpp
