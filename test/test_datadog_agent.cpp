@@ -231,3 +231,58 @@ DATADOG_AGENT_TEST("Remote Configuration") {
     CHECK(logger->error_count() == 1);
   }
 }
+
+TEST_CASE("Datadog-Client-Computed-Stats header", "[datadog_agent]") {
+  const auto logger =
+      std::make_shared<MockLogger>(std::cerr, MockLogger::ERRORS_ONLY);
+  const auto event_scheduler = std::make_shared<MockEventScheduler>();
+  const auto http_client = std::make_shared<MockHTTPClient>();
+
+  TracerConfig config;
+  config.service = "testsvc";
+  config.logger = logger;
+  config.agent.event_scheduler = event_scheduler;
+  config.agent.http_client = http_client;
+  config.telemetry.enabled = false;
+
+  SECTION("header sent when apm_tracing_enabled is false") {
+    config.agent.apm_tracing_enabled = false;
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    {
+      http_client->response_status = 200;
+      http_client->response_body << "{}";
+      Tracer tracer{*finalized};
+      Span span = tracer.create_span();
+    }
+
+    http_client->drain(std::chrono::steady_clock::now());
+
+    // the header is present
+    auto header_it = http_client->request_headers.items.find(
+        "Datadog-Client-Computed-Stats");
+    REQUIRE(header_it != http_client->request_headers.items.end());
+    REQUIRE(header_it->second == "yes");
+  }
+
+  SECTION("header not sent when apm_tracing_enabled is true") {
+    config.agent.apm_tracing_enabled = true;
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    {
+      http_client->response_status = 200;
+      http_client->response_body << "{}";
+      Tracer tracer{*finalized};
+      Span span = tracer.create_span();
+    }
+
+    http_client->drain(std::chrono::steady_clock::now());
+
+    // verify trhat the header is not present
+    auto header_it = http_client->request_headers.items.find(
+        "Datadog-Client-Computed-Stats");
+    REQUIRE(header_it == http_client->request_headers.items.end());
+  }
+}

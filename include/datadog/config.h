@@ -27,6 +27,7 @@ enum class ConfigName : char {
   SPAN_SAMPLING_RULES,
   TRACE_BAGGAGE_MAX_BYTES,
   TRACE_BAGGAGE_MAX_ITEMS,
+  APM_TRACING_ENABLED,
 };
 
 // Represents metadata for configuration parameters

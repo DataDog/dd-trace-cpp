@@ -70,6 +70,9 @@ class ConfigManager : public remote_config::Listener {
   std::unordered_map<ConfigName, ConfigMetadata> default_metadata_;
 
   std::shared_ptr<TraceSampler> trace_sampler_;
+  // wraps trace_sampler_ and should be changed if trace_sampler_ is changed
+  // Could be created every time, but that would be a waste
+  std::shared_ptr<ErasedTraceSampler> erased_trace_sampler_;
   std::vector<TraceSamplerRule> rules_;
 
   DynamicConfig<std::shared_ptr<const SpanDefaults>> span_defaults_;
@@ -93,7 +96,7 @@ class ConfigManager : public remote_config::Listener {
   void on_post_process() override{};
 
   // Return the `TraceSampler` consistent with the most recent configuration.
-  std::shared_ptr<TraceSampler> trace_sampler();
+  std::shared_ptr<ErasedTraceSampler> trace_sampler();
 
   // Return the `SpanDefaults` consistent with the most recent configuration.
   std::shared_ptr<const SpanDefaults> span_defaults();
