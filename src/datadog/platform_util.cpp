@@ -351,6 +351,7 @@ Optional<std::string> find_container_id_from_cgroup() {
 }  // namespace
 
 Optional<std::string> find_container_id(std::istream& source) {
+  constexpr std::string_view docker_str = "docker-";
   static const std::string uuid_regex_str =
       "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
       "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
@@ -361,6 +362,28 @@ Optional<std::string> find_container_id(std::istream& source) {
                                    ")(?:\\.scope)?$");
 
   std::string line;
+
+  // First, iterate using the simple substring match.
+  while (std::getline(source, line)) {
+    // Example:
+    // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
+    if (auto beg = line.find(docker_str); beg != std::string::npos) {
+      beg += docker_str.size();
+      auto end = line.find(".scope", beg);
+      if (end == std::string::npos || end - beg <= 0) {
+        continue;
+      }
+
+      auto container_id = line.substr(beg, end - beg);
+      return container_id;
+    }
+  }
+
+  // Reset the stream to the beginning.
+  source.clear();
+  source.seekg(0);
+
+  // If no match is found, iterate using the regex match.
   while (std::getline(source, line)) {
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
