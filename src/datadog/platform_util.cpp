@@ -351,19 +351,11 @@ Optional<std::string> find_container_id_from_cgroup() {
 }  // namespace
 
 Optional<std::string> find_container_id(std::istream& source) {
-  constexpr std::string_view docker_str = "docker-";
-  static const std::string uuid_regex_str =
-      "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
-      "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
-  static const std::string container_regex_str = "[0-9a-f]{64}";
-  static const std::string task_regex_str = "[0-9a-f]{32}-\\d+";
-  static const std::regex path_reg("(?:.+)?(" + uuid_regex_str + "|" +
-                                   container_regex_str + "|" + task_regex_str +
-                                   ")(?:\\.scope)?$");
-
   std::string line;
 
   // Look for Docker container IDs in the basic format: `docker-<uuid>.scope`.
+  constexpr std::string_view docker_str = "docker-";
+
   while (std::getline(source, line)) {
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
@@ -385,6 +377,15 @@ Optional<std::string> find_container_id(std::istream& source) {
 
   // Perform a second pass using a regular expression for matching container IDs in a Fargate environment. 
   // This two-step approach is used because STL `regex` is relatively slow, so we avoid using it unless necessary.
+  static const std::string uuid_regex_str =
+      "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
+      "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
+  static const std::string container_regex_str = "[0-9a-f]{64}";
+  static const std::string task_regex_str = "[0-9a-f]{32}-\\d+";
+  static const std::regex path_reg("(?:.+)?(" + uuid_regex_str + "|" +
+                                   container_regex_str + "|" + task_regex_str +
+                                   ")(?:\\.scope)?$");
+
   while (std::getline(source, line)) {
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
