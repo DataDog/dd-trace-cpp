@@ -363,7 +363,7 @@ Optional<std::string> find_container_id(std::istream& source) {
 
   std::string line;
 
-  // First, iterate using the simple substring match.
+  // Look for Docker container IDs in the basic format: `docker-<uuid>.scope`.
   while (std::getline(source, line)) {
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
@@ -383,12 +383,13 @@ Optional<std::string> find_container_id(std::istream& source) {
   source.clear();
   source.seekg(0);
 
-  // If no match is found, iterate using the regex match.
+  // Perform a second pass using a regular expression for matching container IDs in a Fargate environment. 
+  // This two-step approach is used because STL `regex` is relatively slow, so we avoid using it unless necessary.
   while (std::getline(source, line)) {
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
     std::smatch match;
-    if (std::regex_match(line, match, path_reg)) {
+    if (std::regex_match(line, match, path_reg) && match.size() == 2) {
       assert(match.ready());
       assert(match.size() == 2);
 
