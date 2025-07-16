@@ -297,6 +297,7 @@ namespace {
 #if defined(__linux__) || defined(__unix__)
 /// Magic numbers from linux/magic.h:
 /// <https://github.com/torvalds/linux/blob/ca91b9500108d4cf083a635c2e11c884d5dd20ea/include/uapi/linux/magic.h#L71>
+constexpr uint64_t TMPFS_MAGIC = 0x01021994;
 constexpr uint64_t CGROUP_SUPER_MAGIC = 0x27e0eb;
 constexpr uint64_t CGROUP2_SUPER_MAGIC = 0x63677270;
 
@@ -340,7 +341,7 @@ Optional<Cgroup> get_cgroup_version(const std::shared_ptr<tracing::Logger>& logg
   logger->log_error([&](auto& stream) {
     stream << "statfs /sys/fs/cgroup: f_type = " << buf.f_type;
   });
-  if (buf.f_type == CGROUP_SUPER_MAGIC)
+  if (buf.f_type == CGROUP_SUPER_MAGIC || buf.f_type == TMPFS_MAGIC)
     return Cgroup::v1;
   else if (buf.f_type == CGROUP2_SUPER_MAGIC)
     return Cgroup::v2;
@@ -392,16 +393,26 @@ Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger) {
 
   // Determine the container ID or inode
   ContainerID id;
-  if (auto maybe_id = find_container_id_from_cgroup()) {
-    id.value = *maybe_id;
-    id.type = ContainerID::Type::container_id;
-  } else if (!is_running_in_host_namespace()) {
-    // NOTE(@dmehala): failed to find the container ID, try getting the cgroup inode.
-    auto maybe_inode = get_inode("/sys/fs/cgroup");
-    if (maybe_inode) {
-      id.type = ContainerID::Type::cgroup_inode;
-      id.value = std::to_string(*maybe_inode);
+  switch (*maybe_cgroup) {
+    case Cgroup::v1: {
+      if (auto maybe_id = find_container_id_from_cgroup()) {
+        id.value = *maybe_id;
+        id.type = ContainerID::Type::container_id;
+        break;
+      }
     }
+      // NOTE(@dmehala): failed to find the container ID, try getting the cgroup
+      // inode.
+      [[fallthrough]];
+    case Cgroup::v2: {
+      if (!is_running_in_host_namespace()) {
+        auto maybe_inode = get_inode("/sys/fs/cgroup");
+        if (maybe_inode) {
+          id.type = ContainerID::Type::cgroup_inode;
+          id.value = std::to_string(*maybe_inode);
+        }
+      }
+    }; break;
   }
 
   return id;
