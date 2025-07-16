@@ -375,8 +375,9 @@ Optional<std::string> find_container_id(std::istream& source) {
   source.clear();
   source.seekg(0);
 
-  // Perform a second pass using a regular expression for matching container IDs in a Fargate environment. 
-  // This two-step approach is used because STL `regex` is relatively slow, so we avoid using it unless necessary.
+  // Perform a second pass using a regular expression for matching container IDs
+  // in a Fargate environment. This two-step approach is used because STL
+  // `regex` is relatively slow, so we avoid using it unless necessary.
   static const std::string uuid_regex_str =
       "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
       "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
