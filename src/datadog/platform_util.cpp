@@ -3,8 +3,6 @@
 #include <cassert>
 #include <cstdint>
 #include <fstream>
-#include <iostream>
-#include <memory>
 #include <regex>
 
 // clang-format off
@@ -45,8 +43,6 @@
 #  include <winsock.h>
 #endif
 // clang-format on
-
-#include <datadog/logger.h>
 
 namespace datadog {
 namespace tracing {
@@ -330,17 +326,13 @@ bool is_running_in_host_namespace() {
   return false;
 }
 
-Optional<Cgroup> get_cgroup_version(const std::shared_ptr<tracing::Logger>& logger) {
+Optional<Cgroup> get_cgroup_version() {
   struct statfs buf;
 
   if (statfs("/sys/fs/cgroup", &buf) != 0) {
-    logger->log_error("Failed to statfs /sys/fs/cgroup");
     return nullopt;
   }
 
-  logger->log_error([&](auto& stream) {
-    stream << "statfs /sys/fs/cgroup: f_type = " << buf.f_type;
-  });
   if (buf.f_type == CGROUP_SUPER_MAGIC || buf.f_type == TMPFS_MAGIC)
     return Cgroup::v1;
   else if (buf.f_type == CGROUP2_SUPER_MAGIC)
@@ -351,9 +343,7 @@ Optional<Cgroup> get_cgroup_version(const std::shared_ptr<tracing::Logger>& logg
 
 Optional<std::string> find_container_id_from_cgroup() {
   auto cgroup_fd = std::ifstream("/proc/self/cgroup", std::ios::in);
-  if (!cgroup_fd.is_open()) {
-    return nullopt;
-  }
+  if (!cgroup_fd.is_open()) return nullopt;
 
   return find_container_id(cgroup_fd);
 }
@@ -386,12 +376,11 @@ Optional<std::string> find_container_id(std::istream& source) {
   return nullopt;
 }
 
-Optional<ContainerID> get_id(const std::shared_ptr<tracing::Logger>& logger) {
+Optional<ContainerID> get_id() {
 #if defined(__linux__) || defined(__unix__)
-  auto maybe_cgroup = get_cgroup_version(logger);
+  auto maybe_cgroup = get_cgroup_version();
   if (!maybe_cgroup) return nullopt;
 
-  // Determine the container ID or inode
   ContainerID id;
   switch (*maybe_cgroup) {
     case Cgroup::v1: {
