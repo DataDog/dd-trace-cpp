@@ -1,8 +1,8 @@
 #include "extraction_util.h"
 
 #include <datadog/logger.h>
+#include <datadog/trace_source.h>
 
-#include <algorithm>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -51,6 +51,8 @@ void handle_trace_tags(StringView trace_tags, ExtractedData& result,
         // been extracted (i.e. we look for X-Datadog-Trace-ID first).
         result.trace_id->high = *high;
       }
+    } else if (key == tags::internal::trace_source) {
+      if (!validate_trace_source(value)) continue;
     }
 
     result.trace_tags.emplace_back(std::move(key), std::move(value));

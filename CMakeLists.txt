@@ -150,6 +150,7 @@ target_sources(dd_trace_cpp-objects
     src/datadog/trace_sampler_config.cpp
     src/datadog/trace_sampler.cpp
     src/datadog/trace_segment.cpp
+    src/datadog/trace_source.cpp
     src/datadog/telemetry_metrics.cpp
     src/datadog/version.cpp
     src/datadog/w3c_propagation.cpp

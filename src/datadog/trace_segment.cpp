@@ -95,7 +95,7 @@ TraceSegment::TraceSegment(
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
-    std::unique_ptr<SpanData> local_root)
+    std::unique_ptr<SpanData> local_root, bool apm_tracing_enabled)
     : logger_(logger),
       collector_(collector),
       trace_sampler_(trace_sampler),
@@ -112,7 +112,8 @@ TraceSegment::TraceSegment(
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)),
-      config_manager_(config_manager) {
+      config_manager_(config_manager),
+      tracing_enabled_(apm_tracing_enabled) {
   assert(logger_);
   assert(collector_);
   assert(trace_sampler_);
@@ -224,11 +225,19 @@ void TraceSegment::span_finished() {
       }
     }
   }
+
   if (decision.origin == SamplingDecision::Origin::DELEGATED &&
       local_root.parent_id == 0) {
     // Convey the fact that, even though we are the root service, we delegated
     // the sampling decision and so are not the "sampling decider."
     local_root.tags[tags::internal::sampling_decider] = "0";
+  }
+
+  // RFC seems to only mandate that this be set if the trace is kept.
+  // However, system-tests expect this to be always be set.
+  // Add it all the time; can't hurt
+  if (!tracing_enabled_) {
+    local_root.numeric_tags[tags::internal::apm_enabled] = 0;
   }
 
   // Some tags are repeated on all spans.
@@ -321,7 +330,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
   // If the only injection style is `NONE`, then don't do anything.
   if (injection_styles_.size() == 1 &&
       injection_styles_[0] == PropagationStyle::NONE) {
-    return false;
+    return true;
   }
 
   // The sampling priority can change (it can be overridden on another thread),
@@ -338,6 +347,39 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     trace_tags = trace_tags_;
   }
 
+  auto& local_root_tags = spans_.front()->tags;
+
+  auto ts_tag_found = std::find_if(
+      local_root_tags.cbegin(), local_root_tags.cend(),
+      [](const auto& p) { return p.first == tags::internal::trace_source; });
+
+  // When tracing (the product) is disabled, skip tracing context propagation
+  // when:
+  //  - the local root span is NOT created by another product (no `_dd.p.ts`)
+  //  - sampling priority is DROP
+  if (!tracing_enabled_) {
+    if (ts_tag_found == local_root_tags.cend() && sampling_priority <= 0) {
+      writer.erase("x-datadog-trace-id");
+      writer.erase("x-datadog-parent-id");
+      writer.erase("x-datadog-sampling-priority");
+      writer.erase("x-datadog-origin");
+      writer.erase("x-datadog-trace-id");
+      writer.erase("x-datadog-tags");
+      writer.erase("x-b3-traceid");
+      writer.erase("x-b3-spanid");
+      writer.erase("x-b3-sampled");
+      writer.erase("x-datadog-origin");
+      writer.erase("traceparent");
+      writer.erase("tracestate");
+      return false;
+    }
+  }
+
+  // Add `_dd.p.ts` to `trace_tags` for context propagation.
+  if (ts_tag_found != local_root_tags.cend()) {
+    trace_tags.emplace_back(tags::internal::trace_source, ts_tag_found->second);
+  }
+
   for (const auto style : injection_styles_) {
     switch (style) {
       case PropagationStyle::DATADOG:
@@ -349,7 +391,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
           writer.set("x-datadog-origin", *origin_);
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          spans_.front()->tags, *logger_);
+                          local_root_tags, *logger_);
 
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:datadog"});
@@ -366,7 +408,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
           writer.set("x-datadog-origin", *origin_);
         }
         inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          spans_.front()->tags, *logger_);
+                          local_root_tags, *logger_);
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:b3multi"});
         break;
@@ -389,6 +431,8 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
 
   return true;
 }
+
+SpanData& TraceSegment::local_root() const { return *spans_.front(); }
 
 }  // namespace tracing
 }  // namespace datadog

@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <limits>
 
 #include "collector_response.h"
 #include "json_serializer.h"
@@ -56,6 +55,11 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
     decision.configured_rate = rule.rate;
     const std::uint64_t threshold = max_id_from_rate(rule.rate);
     if (knuth_hash(span.trace_id.low) <= threshold) {
+      if (rule.bypass_limiter) {
+        decision.priority = int(SamplingPriority::USER_KEEP);
+        return decision;
+      }
+
       const auto result = limiter_.allow();
       if (result.allowed) {
         decision.priority = int(SamplingPriority::USER_KEEP);

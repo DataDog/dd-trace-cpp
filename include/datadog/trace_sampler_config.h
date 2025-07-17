@@ -24,6 +24,7 @@ struct TraceSamplerRule final {
   Rate rate;
   SpanMatcher matcher;
   SamplingMechanism mechanism;
+  bool bypass_limiter = false;
 };
 
 struct TraceSamplerConfig {
@@ -50,6 +51,10 @@ class FinalizedTraceSamplerConfig {
   double max_per_second;
   std::vector<TraceSamplerRule> rules;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+
+ public:
+  /// Returns the trace sampler configuration when APM Tracing is disabled.
+  static FinalizedTraceSamplerConfig apm_tracing_disabled_config();
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(

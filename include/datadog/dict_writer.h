@@ -21,6 +21,9 @@ class DictWriter {
   // implementation may, but is not required to, overwrite any previous value at
   // `key`.
   virtual void set(StringView key, StringView value) = 0;
+
+  // Removes the entry associated with the given key.
+  virtual void erase(StringView){};
 };
 
 }  // namespace tracing

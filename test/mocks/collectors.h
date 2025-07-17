@@ -27,6 +27,8 @@ struct MockCollector : public Collector {
     return {};
   }
 
+  void clear() { chunks.clear(); }
+
   std::string config() const override;
 
   SpanData& first_span() const {
