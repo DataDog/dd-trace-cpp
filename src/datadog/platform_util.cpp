@@ -1,7 +1,9 @@
 #include "platform_util.h"
 
+#include <cassert>
 #include <cstdint>
 #include <fstream>
+#include <regex>
 
 // clang-format off
 #if defined(__x86_64__) || defined(_M_X64)
@@ -291,6 +293,7 @@ namespace {
 #if defined(__linux__) || defined(__unix__)
 /// Magic numbers from linux/magic.h:
 /// <https://github.com/torvalds/linux/blob/ca91b9500108d4cf083a635c2e11c884d5dd20ea/include/uapi/linux/magic.h#L71>
+constexpr uint64_t TMPFS_MAGIC = 0x01021994;
 constexpr uint64_t CGROUP_SUPER_MAGIC = 0x27e0eb;
 constexpr uint64_t CGROUP2_SUPER_MAGIC = 0x63677270;
 
@@ -330,7 +333,7 @@ Optional<Cgroup> get_cgroup_version() {
     return nullopt;
   }
 
-  if (buf.f_type == CGROUP_SUPER_MAGIC)
+  if (buf.f_type == CGROUP_SUPER_MAGIC || buf.f_type == TMPFS_MAGIC)
     return Cgroup::v1;
   else if (buf.f_type == CGROUP2_SUPER_MAGIC)
     return Cgroup::v2;
@@ -338,19 +341,21 @@ Optional<Cgroup> get_cgroup_version() {
   return nullopt;
 }
 
-Optional<std::string> find_docker_container_id_from_cgroup() {
+Optional<std::string> find_container_id_from_cgroup() {
   auto cgroup_fd = std::ifstream("/proc/self/cgroup", std::ios::in);
   if (!cgroup_fd.is_open()) return nullopt;
 
-  return find_docker_container_id(cgroup_fd);
+  return find_container_id(cgroup_fd);
 }
 #endif
 }  // namespace
 
-Optional<std::string> find_docker_container_id(std::istream& source) {
+Optional<std::string> find_container_id(std::istream& source) {
+  std::string line;
+
+  // Look for Docker container IDs in the basic format: `docker-<uuid>.scope`.
   constexpr std::string_view docker_str = "docker-";
 
-  std::string line;
   while (std::getline(source, line)) {
     // Example:
     // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
@@ -366,23 +371,46 @@ Optional<std::string> find_docker_container_id(std::istream& source) {
     }
   }
 
+  // Reset the stream to the beginning.
+  source.clear();
+  source.seekg(0);
+
+  // Perform a second pass using a regular expression for matching container IDs
+  // in a Fargate environment. This two-step approach is used because STL
+  // `regex` is relatively slow, so we avoid using it unless necessary.
+  static const std::string uuid_regex_str =
+      "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
+      "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
+  static const std::string container_regex_str = "[0-9a-f]{64}";
+  static const std::string task_regex_str = "[0-9a-f]{32}-\\d+";
+  static const std::regex path_reg("(?:.+)?(" + uuid_regex_str + "|" +
+                                   container_regex_str + "|" + task_regex_str +
+                                   ")(?:\\.scope)?$");
+
+  while (std::getline(source, line)) {
+    // Example:
+    // `0::/system.slice/docker-abcdef0123456789abcdef0123456789.scope`
+    std::smatch match;
+    if (std::regex_match(line, match, path_reg) && match.size() == 2) {
+      assert(match.ready());
+      assert(match.size() == 2);
+
+      return match.str(1);
+    }
+  }
+
   return nullopt;
 }
 
 Optional<ContainerID> get_id() {
 #if defined(__linux__) || defined(__unix__)
-  if (is_running_in_host_namespace()) {
-    // Not in a container, no need to continue.
-    return nullopt;
-  }
-
   auto maybe_cgroup = get_cgroup_version();
   if (!maybe_cgroup) return nullopt;
 
   ContainerID id;
   switch (*maybe_cgroup) {
     case Cgroup::v1: {
-      if (auto maybe_id = find_docker_container_id_from_cgroup()) {
+      if (auto maybe_id = find_container_id_from_cgroup()) {
         id.value = *maybe_id;
         id.type = ContainerID::Type::container_id;
         break;
@@ -392,9 +420,12 @@ Optional<ContainerID> get_id() {
       // inode.
       [[fallthrough]];
     case Cgroup::v2: {
-      if (auto maybe_inode = get_inode("/sys/fs/cgroup")) {
-        id.type = ContainerID::Type::cgroup_inode;
-        id.value = std::to_string(*maybe_inode);
+      if (!is_running_in_host_namespace()) {
+        auto maybe_inode = get_inode("/sys/fs/cgroup");
+        if (maybe_inode) {
+          id.type = ContainerID::Type::cgroup_inode;
+          id.value = std::to_string(*maybe_inode);
+        }
       }
     }; break;
   }

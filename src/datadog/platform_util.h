@@ -84,13 +84,13 @@ struct ContainerID final {
   std::string value;
 };
 
-/// Find the docker container ID from a given source.
+/// Find the container ID from a given source.
 /// This function is exposed mainly for testing purposes.
 ///
-/// @param source The input from which to read the Docker container ID.
-/// @return An Optional containing the Docker container ID if found, otherwise
+/// @param source The input from which to read the container ID.
+/// @return An Optional containing the container ID if found, otherwise
 /// nothing.
-Optional<std::string> find_docker_container_id(std::istream& source);
+Optional<std::string> find_container_id(std::istream& source);
 
 /// Function to retrieve the container metadata.
 ///
