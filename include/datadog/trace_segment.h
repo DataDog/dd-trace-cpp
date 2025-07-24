@@ -32,7 +32,6 @@
 #include <utility>
 #include <vector>
 
-#include "expected.h"
 #include "optional.h"
 #include "propagation_style.h"
 #include "runtime_id.h"
@@ -80,6 +79,8 @@ class TraceSegment {
 
   std::shared_ptr<ConfigManager> config_manager_;
 
+  bool tracing_enabled_;
+
  public:
   TraceSegment(const std::shared_ptr<Logger>& logger,
                const std::shared_ptr<Collector>& collector,
@@ -95,7 +96,8 @@ class TraceSegment {
                Optional<SamplingDecision> sampling_decision,
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
-               std::unique_ptr<SpanData> local_root);
+               std::unique_ptr<SpanData> local_root,
+               bool tracing_enabled = true);
 
   const SpanDefaults& defaults() const;
   const Optional<std::string>& hostname() const;
@@ -118,9 +120,12 @@ class TraceSegment {
   void span_finished();
 
   // Set the sampling decision to be a local, manual decision with the specified
-  // sampling `priority`.  Overwrite any previous sampling decision.
+  // sampling `priority`. Overwrite any previous sampling decision.
   void override_sampling_priority(int priority);
   void override_sampling_priority(SamplingPriority priority);
+
+  // Retrieves the local root span.
+  SpanData& local_root() const;
 
  private:
   // If `sampling_decision_` is null, use `trace_sampler_` to make a

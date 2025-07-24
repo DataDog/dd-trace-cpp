@@ -19,7 +19,6 @@
 #include <string>
 
 #include "catch.hpp"
-#include "datadog/sampling_mechanism.h"
 #include "matchers.h"
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
@@ -29,8 +28,11 @@
 #include "test.h"
 
 using namespace datadog::tracing;
+using namespace std::chrono_literals;
 
-TEST_CASE("set_tag") {
+#define TEST_SPAN(x) TEST_CASE(x, "[span]")
+
+TEST_SPAN("set_tag") {
   TracerConfig config;
   config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
@@ -91,7 +93,7 @@ TEST_CASE("set_tag") {
   }
 }
 
-TEST_CASE("lookup_tag") {
+TEST_SPAN("lookup_tag") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
@@ -134,7 +136,7 @@ TEST_CASE("lookup_tag") {
   }
 }
 
-TEST_CASE("remove_tag") {
+TEST_SPAN("remove_tag") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
@@ -166,7 +168,7 @@ TEST_CASE("remove_tag") {
   }
 }
 
-TEST_CASE("set_metric") {
+TEST_SPAN("set_metric") {
   TracerConfig config;
   config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
@@ -222,7 +224,7 @@ TEST_CASE("set_metric") {
   }
 }
 
-TEST_CASE("lookup_metric") {
+TEST_SPAN("lookup_metric") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
@@ -251,7 +253,7 @@ TEST_CASE("lookup_metric") {
   }
 }
 
-TEST_CASE("remove_metric") {
+TEST_SPAN("remove_metric") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
@@ -282,7 +284,7 @@ TEST_CASE("remove_metric") {
   }
 }
 
-TEST_CASE("span duration") {
+TEST_SPAN("span duration") {
   TracerConfig config;
   config.service = "testsvc";
   auto collector = std::make_shared<MockCollector>();
@@ -328,7 +330,7 @@ TEST_CASE("span duration") {
   }
 }
 
-TEST_CASE(".error() and .set_error*()") {
+TEST_SPAN(".error() and .set_error*()") {
   struct TestCase {
     std::string name;
     std::function<void(Span&)> mutate;
@@ -408,7 +410,7 @@ TEST_CASE(".error() and .set_error*()") {
   }
 }
 
-TEST_CASE("property setters and getters") {
+TEST_SPAN("property setters and getters") {
   // Verify that modifications made by `Span::set_...` are visible both in the
   // corresponding getter method and in the resulting span data sent to the
   // collector.
@@ -465,7 +467,7 @@ TEST_CASE("property setters and getters") {
 
 // Trace context injection is implemented in `TraceSegment`, but it's part of
 // the interface of `Span`, so the test is here.
-TEST_CASE("injection") {
+TEST_SPAN("injection") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<MockCollector>();
@@ -483,6 +485,30 @@ TEST_CASE("injection") {
   };
   Tracer tracer{*finalized_config, std::make_shared<Generator>(42)};
 
+  SECTION("APM Disabled cancel context propagation") {
+    config.tracing_enabled = false;
+    auto finalized_disable_config = finalize_config(config);
+    REQUIRE(finalized_disable_config);
+
+    Tracer apm_disabled_tracer{*finalized_disable_config};
+
+    auto apm_span = tracer.create_span();
+    MockDictWriter writer;
+    apm_span.inject(writer);
+
+    REQUIRE(writer.items.empty() == false);
+
+    // Consume the span that MUST be kept for service liveness.
+    { apm_disabled_tracer.create_span(); }
+
+    auto span = apm_disabled_tracer.create_span();
+
+    // reuse the same writer. Since span generated from apm_disabled_tracer is
+    // not marked by a product injection should be cancelled.
+    span.inject(writer);
+    CHECK(writer.items.empty());
+  }
+
   SECTION("trace ID, parent ID ,and sampling priority") {
     auto span = tracer.create_span();
     REQUIRE(span.trace_id() == 42);
@@ -497,7 +523,6 @@ TEST_CASE("injection") {
     REQUIRE(headers.at("x-datadog-trace-id") == "42");
     REQUIRE(headers.at("x-datadog-parent-id") == "42");
     REQUIRE(headers.at("x-datadog-sampling-priority") == "3");
-    REQUIRE(headers.count("x-datadog-delegate-trace-sampling") == 0);
     REQUIRE(headers.at("x-b3-traceid") == "000000000000002a");
     REQUIRE(headers.at("x-b3-spanid") == "000000000000002a");
     REQUIRE(headers.at("x-b3-sampled") == "1");
@@ -546,9 +571,49 @@ TEST_CASE("injection") {
       REQUIRE_THAT(*input, ContainsSubset(*output));
     }
   }
+
+  SECTION("trace source is not set (default)") {
+    auto span = tracer.create_span();
+
+    MockDictWriter writer;
+    span.inject(writer);
+
+    const auto& headers = writer.items;
+    REQUIRE(headers.count("x-datadog-tags") > 0);
+
+    // When there is no trace source, there should be no `_dd.p.ts` tag.
+    const auto decoded_tags = decode_tags(headers.at("x-datadog-tags"));
+    REQUIRE(decoded_tags);
+    auto found = std::find_if(
+        decoded_tags->begin(), decoded_tags->end(), [](const auto& tag) {
+          return tag.first == tags::internal::trace_source;
+        });
+    CHECK(found == decoded_tags->end());
+  }
+
+  SECTION("trace source is propagated") {
+    auto span = tracer.create_span();
+    span.set_source(Source::database_monitoring);
+
+    MockDictWriter writer;
+    span.inject(writer);
+
+    const auto& headers = writer.items;
+    REQUIRE(headers.count("x-datadog-tags") > 0);
+
+    const auto decoded_tags = decode_tags(headers.at("x-datadog-tags"));
+    REQUIRE(decoded_tags);
+    auto found = std::find_if(
+        decoded_tags->begin(), decoded_tags->end(), [](const auto& tag) {
+          return tag.first == tags::internal::trace_source;
+        });
+
+    REQUIRE(found != decoded_tags->cend());
+    CHECK(found->second == to_tag(Source::database_monitoring));
+  }
 }
 
-TEST_CASE("injection can be disabled using the \"none\" style") {
+TEST_SPAN("injection can be disabled using the \"none\" style") {
   TracerConfig config;
   config.service = "testsvc";
   config.name = "spanny";
@@ -567,7 +632,7 @@ TEST_CASE("injection can be disabled using the \"none\" style") {
   REQUIRE(writer.items == empty);
 }
 
-TEST_CASE("injecting W3C traceparent header") {
+TEST_SPAN("injecting W3C traceparent header") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<NullCollector>();
@@ -656,7 +721,7 @@ TEST_CASE("injecting W3C traceparent header") {
   }
 }
 
-TEST_CASE("injecting W3C tracestate header") {
+TEST_SPAN("injecting W3C tracestate header") {
   // Concerns:
   // - the basics:
   //   - sampling priority
@@ -702,86 +767,157 @@ TEST_CASE("injecting W3C tracestate header") {
   static const auto traceparent_drop =
       "00-00000000000000000000000000000001-0000000000000001-00";
 
-  // clang-format off
   auto test_case = GENERATE(values<TestCase>({
-    {__LINE__, "sampling priority",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-sampling-priority", "2"}},
-     "dd=s:2;p:$parent_id"},
+      {__LINE__,
+       "sampling priority",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-sampling-priority", "2"},
+       },
+       "dd=s:2;p:$parent_id"},
 
-    {__LINE__, "origin",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-origin", "France"}},
-      // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;p:$parent_id;o:France"},
+      {__LINE__,
+       "origin",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-origin", "France"},
+       },
+       // The "s:-1" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;o:France"},
 
-    {__LINE__, "trace tags",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-tags", "_dd.p.foo=x,_dd.p.bar=y,ignored=wrong_prefix"}},
-      // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;p:$parent_id;t.foo:x;t.bar:y"},
+      {__LINE__,
+       "trace tags",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-tags", "_dd.p.foo=x,_dd.p.bar=y,ignored=wrong_prefix"},
+       },
+       // The "s:-1" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;t.foo:x;t.bar:y"},
 
-    {__LINE__, "extra fields",
-     {{"traceparent", traceparent_drop}, {"tracestate", "dd=foo:bar;boing:boing"}},
-    // The "s:0" comes from the sampling decision in `traceparent_drop`.
-    "dd=s:0;p:$parent_id;foo:bar;boing:boing"},
+      {__LINE__,
+       "extra fields",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate", "dd=foo:bar;boing:boing"},
+       },
+       // The "s:0" comes from the sampling decision in `traceparent_drop`.
+       "dd=s:0;p:$parent_id;foo:bar;boing:boing"},
 
-    {__LINE__, "all of the above",
-     {{"traceparent", traceparent_drop},
-      {"tracestate", "dd=o:France;t.foo:x;t.bar:y;foo:bar;boing:boing"}},
-    // The "s:0" comes from the sampling decision in `traceparent_drop`.
-    "dd=s:0;p:$parent_id;o:France;t.foo:x;t.bar:y;foo:bar;boing:boing"},
+      {__LINE__,
+       "all of the above",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate", "dd=o:France;t.foo:x;t.bar:y;foo:bar;boing:boing"},
+       },
+       // The "s:0" comes from the sampling decision in `traceparent_drop`.
+       "dd=s:0;p:$parent_id;o:France;t.foo:x;t.bar:y;foo:bar;boing:boing"},
 
-    {__LINE__, "replace invalid characters in origin",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-origin", "France, is a country=nation; so is 台北."}},
-      // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;p:$parent_id;o:France_ is a country~nation_ so is ______."},
+      {__LINE__,
+       "replace invalid characters in origin",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-origin", "France, is a country=nation; so is 台北."},
+       },
+       // The "s:-1" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;o:France_ is a country~nation_ so is ______."},
 
-    {__LINE__, "replace invalid characters in trace tag key",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-tags", "_dd.p.a;d台北x =foo,_dd.p.ok=bar"}},
-      // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;p:$parent_id;t.a_d______x_:foo;t.ok:bar"},
+      {__LINE__,
+       "replace invalid characters in trace tag key",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-tags", "_dd.p.a;d台北x =foo,_dd.p.ok=bar"},
+       },
+       // The "s:-1" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;t.a_d______x_:foo;t.ok:bar"},
 
-    {__LINE__, "replace invalid characters in trace tag value",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-tags", "_dd.p.wacky=hello fr~d; how are คุณ?"}},
-      // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;p:$parent_id;t.wacky:hello fr_d_ how are _________?"},
+      {__LINE__,
+       "replace invalid characters in trace tag value",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-tags", "_dd.p.wacky=hello fr~d; how are คุณ?"},
+       },
+       // The "s:-1" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;t.wacky:hello fr_d_ how are _________?"},
 
-    {__LINE__, "replace equal signs with tildes in trace tag value",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-tags", "_dd.p.base64_thingy=d2Fra2EhIHdhaw=="}},
-      // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;p:$parent_id;t.base64_thingy:d2Fra2EhIHdhaw~~"},
+      {__LINE__,
+       "replace equal signs with tildes in trace tag value",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-tags", "_dd.p.base64_thingy=d2Fra2EhIHdhaw=="},
+       },
+       // The "s:-1" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;t.base64_thingy:d2Fra2EhIHdhaw~~"},
 
-    {__LINE__, "oversized origin truncates it and subsequent fields",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-origin", "long cat is looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong"},
-      {"x-datadog-tags", "_dd.p.foo=bar,_dd.p.honk=honk"}},
-      // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;p:$parent_id"},
+      {__LINE__,
+       "oversized origin truncates it and subsequent fields",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-origin",
+            "long cat is "
+            "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "ooooooooooooooooooooooooooooooooong"},
+           {"x-datadog-tags", "_dd.p.foo=bar,_dd.p.honk=honk"},
+       },
+       // The "s:-1" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id"},
 
-    {__LINE__, "oversized trace tag truncates it and subsequent fields",
-     {{"x-datadog-trace-id", "1"}, {"x-datadog-parent-id", "1"},
-      {"x-datadog-tags", "_dd.p.foo=bar,_dd.p.long_cat_is=looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,_dd.p.lost=forever"}},
-      // The "s:-1" comes from the 0% sample rate.
-     "dd=s:-1;p:$parent_id;t.foo:bar"},
+      {__LINE__,
+       "oversized trace tag truncates it and subsequent fields",
+       {
+           {"x-datadog-trace-id", "1"},
+           {"x-datadog-parent-id", "1"},
+           {"x-datadog-tags",
+            "_dd.p.foo=bar,_dd.p.long_cat_is="
+            "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "ooooooooooooooooooong,_dd.p.lost=forever"},
+       },
+       // The "s:-1" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;t.foo:bar"},
 
-    {__LINE__, "oversized extra field truncates itself and subsequent fields",
-     {{"traceparent", traceparent_drop},
-      {"tracestate", "dd=foo:bar;long_cat_is:looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong;lost:forever"}},
-     // The "s:0" comes from the sampling decision in `traceparent_drop`.
-     "dd=s:0;p:$parent_id;foo:bar"},
+      {__LINE__,
+       "oversized extra field truncates itself and subsequent fields",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate",
+            "dd=foo:bar;long_cat_is:"
+            "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+            "ooo"
+            "ooooooooooooooooooooooooooooooooong;lost:forever"},
+       },
+       // The "s:0" comes from the sampling decision in `traceparent_drop`.
+       "dd=s:0;p:$parent_id;foo:bar"},
 
-    {__LINE__, "non-Datadog tracestate",
-     {{"traceparent", traceparent_drop},
-      {"tracestate", "foo=bar,boing=boing"}},
-     // The "s:0" comes from the sampling decision in `traceparent_drop`.
-     "dd=s:0;p:$parent_id,foo=bar,boing=boing"},
+      {__LINE__,
+       "non-Datadog tracestate",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate", "foo=bar,boing=boing"},
+       },
+       // The "s:0" comes from the sampling decision in `traceparent_drop`.
+       "dd=s:0;p:$parent_id,foo=bar,boing=boing"},
   }));
-  // clang-format on
 
   CAPTURE(test_case.name);
   CAPTURE(test_case.line);
@@ -808,7 +944,7 @@ TEST_CASE("injecting W3C tracestate header") {
   REQUIRE(logger->error_count() == 0);
 }
 
-TEST_CASE("128-bit trace ID injection") {
+TEST_SPAN("128-bit trace ID injection") {
   TracerConfig config;
   config.service = "testsvc";
   config.logger = std::make_shared<MockLogger>();
@@ -859,4 +995,83 @@ TEST_CASE("128-bit trace ID injection") {
   found = writer.items.find("x-b3-traceid");
   REQUIRE(found != writer.items.end());
   REQUIRE(found->second == "deadbeefdeadbeefcafebabecafebabe");
+}
+
+TEST_SPAN("injection behaviour when apm tracing is disabled") {
+  // Test Case:
+  // ==========
+  // Assess only traces to KEEP are propagated, UNLESS, the trace source is set.
+  TracerConfig config;
+  config.service = "testsvc";
+  config.collector = std::make_shared<MockCollector>();
+  config.logger = std::make_shared<MockLogger>();
+  config.tracing_enabled = false;
+
+  TimePoint current_time = default_clock();
+  auto clock = [&current_time]() { return current_time; };
+
+  auto finalized_config = finalize_config(config, clock);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const auto contains_tracing_context = [](const auto& headers) {
+    return headers.count("x-datadog-trace-id") == 1 &&
+           headers.count("x-datadog-parent-id") == 1;
+  };
+
+  // This span is permitted for propagation as it falls within the 1
+  // trace/second window.
+  {
+    auto span = tracer.create_span();
+
+    MockDictWriter writer;
+    REQUIRE(writer.items.empty());
+
+    span.inject(writer);
+    CHECK(contains_tracing_context(writer.items));
+  }
+
+  // Advance the clock but we are still in the same 1 trace/second window.
+  current_time += 10s;
+
+  // A trace has already been permitted within the current 1 trace/second
+  // window. Consequently, the following span will be marked as DROPPED and will
+  // not propagate.
+  {
+    auto span = tracer.create_span();
+
+    MockDictWriter writer;
+    REQUIRE(writer.items.empty());
+
+    span.inject(writer);
+    REQUIRE(writer.items.empty());
+  }
+
+  // The following span set the trace source, thus it is propagated even if we
+  // are still within the 1 trace/second window.
+  {
+    auto span = tracer.create_span();
+    span.set_source(Source::appsec);
+
+    MockDictWriter writer;
+    REQUIRE(writer.items.empty());
+
+    span.inject(writer);
+    CHECK(contains_tracing_context(writer.items));
+  }
+
+  // Progress beyond the current window; a span without trace state will be
+  // retained
+  current_time += 1min;
+
+  // Following span should be propagated.
+  {
+    auto span = tracer.create_span();
+
+    MockDictWriter writer;
+    REQUIRE(writer.items.empty());
+
+    span.inject(writer);
+    CHECK(contains_tracing_context(writer.items));
+  }
 }

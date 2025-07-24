@@ -58,7 +58,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       tags_header_max_size_(config.tags_header_size),
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
-      baggage_extraction_enabled_(false) {
+      baggage_extraction_enabled_(false),
+      tracing_enabled_(config.tracing_enabled) {
   telemetry::init(config.telemetry, signature_, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {
@@ -188,7 +189,8 @@ Span Tracer::create_span(const SpanConfig& config) {
       defaults, config_manager_, runtime_id_, injection_styles_, hostname_,
       nullopt /* origin */, tags_header_max_size_, std::move(trace_tags),
       nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
-      nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data));
+      nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data),
+      tracing_enabled_);
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
@@ -377,8 +379,24 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
         *merged_context.datadog_w3c_parent_id;
   }
 
+  // Trace source tag is not a trace tag, move it to a simple tag on the local
+  // root span.
+  if (const auto found = std::find_if(
+          merged_context.trace_tags.cbegin(), merged_context.trace_tags.cend(),
+          [](const auto& p) {
+            return p.first == tags::internal::trace_source;
+          });
+      found != merged_context.trace_tags.cend()) {
+    span_data->tags.emplace(tags::internal::trace_source, found->second);
+    merged_context.trace_tags.erase(found);
+  }
+
+  // When APM Tracing is disabled, the incoming sampling decision MAY be
+  // overridden based on locally generated spans. As such, the received sampling
+  // decision is intentionally ignored, and the tracer is expected to make its
+  // own decision in accordance with the locally enabled product configuration.
   Optional<SamplingDecision> sampling_decision;
-  if (merged_context.sampling_priority) {
+  if (tracing_enabled_ && merged_context.sampling_priority) {
     SamplingDecision decision;
     decision.priority = *merged_context.sampling_priority;
     // `decision.mechanism` is null.  We might be able to infer it once we
@@ -399,7 +417,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       std::move(sampling_decision),
       std::move(merged_context.additional_w3c_tracestate),
       std::move(merged_context.additional_datadog_w3c_tracestate),
-      std::move(span_data));
+      std::move(span_data), tracing_enabled_);
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};

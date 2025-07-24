@@ -48,11 +48,14 @@ std::ostream& operator<<(std::ostream& stream,
 }  // namespace datadog
 
 using namespace datadog::tracing;
+using namespace std::chrono_literals;
+
+#define TEST_TRACER(x) TEST_CASE(x, "[tracer]")
 
 // Verify that the `.defaults.*` (`SpanDefaults`) properties of a tracer's
 // configuration do determine the default properties of spans created by the
 // tracer.
-TEST_CASE("tracer span defaults") {
+TEST_TRACER("tracer span defaults") {
   TracerConfig config;
   config.service = "foosvc";
   config.service_type = "crawler";
@@ -307,7 +310,7 @@ TEST_CASE("tracer span defaults") {
   }
 }
 
-TEST_CASE("span extraction") {
+TEST_TRACER("span extraction") {
   TracerConfig config;
   config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
@@ -983,9 +986,11 @@ TEST_CASE("span extraction") {
             "wow",     // tracestate
             0,         // expected_sampling_priority
             "France",  // expected_origin
-            {{"_dd.p.foo", "thing1"},
-             {"_dd.p.bar", "thing2"}},  // expected_trace_tags
-            nullopt,                    // expected_additional_w3c_tracestate
+            {
+                {"_dd.p.foo", "thing1"},
+                {"_dd.p.bar", "thing2"},
+            },                   // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
             "x:wow;y:wow",       // expected_additional_datadog_w3c_tracestate
             "00000000000d69ac",  // expected_datadog_w3c_parent_id
         },
@@ -1143,6 +1148,47 @@ TEST_CASE("span extraction") {
             {},                  // expected_trace_tags
             nullopt,             // expected_additional_w3c_tracestate
             nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "invalid trace state (1/2)",
+            traceparent_keep,
+            "dd=ts:0001",
+            1,
+            nullopt,
+            {},
+            nullopt,
+            nullopt,
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "invalid trace state (2/2)",
+            traceparent_keep,
+            "dd=ts:AA",
+            1,
+            nullopt,
+            {},
+            nullopt,
+            nullopt,
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "valid trace state",
+            traceparent_keep,
+            "dd=o:dsm;ts:04",
+            1,
+            "dsm",
+            {
+                {"_dd.p.ts", "04"},
+            },
+            nullopt,
+            nullopt,
             "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
     }));
@@ -1393,7 +1439,7 @@ TEST_CASE("span extraction") {
   }
 }
 
-TEST_CASE("baggage usage") {
+TEST_TRACER("baggage usage") {
   TracerConfig config;
   config.logger = std::make_shared<NullLogger>();
   config.collector = std::make_shared<NullCollector>();
@@ -1434,7 +1480,7 @@ TEST_CASE("baggage usage") {
   }
 }
 
-TEST_CASE("report hostname") {
+TEST_TRACER("report hostname") {
   TracerConfig config;
   config.service = "testsvc";
   config.collector = std::make_shared<NullCollector>();
@@ -1456,7 +1502,7 @@ TEST_CASE("report hostname") {
   }
 }
 
-TEST_CASE("128-bit trace IDs") {
+TEST_TRACER("128-bit trace IDs") {
   // Use a clock that always returns a hard-coded `TimePoint`.
   // May 6, 2010 14:45:13 America/New_York
   const std::time_t flash_crash = 1273171513;
@@ -1566,7 +1612,7 @@ TEST_CASE("128-bit trace IDs") {
   REQUIRE(*high == trace_id.high);
 }
 
-TEST_CASE(
+TEST_TRACER(
     "_dd.p.tid invalid or inconsistent with trace ID results in error tag") {
   struct TestCase {
     int line;
@@ -1618,7 +1664,7 @@ TEST_CASE(
           test_case.expected_error_prefix + test_case.tid_tag_value);
 }
 
-TEST_CASE("heterogeneous extraction") {
+TEST_TRACER("heterogeneous extraction") {
   // These test cases verify that when W3C is among the configured extraction
   // styles, then non-Datadog and unexpected Datadog fields in an incoming
   // `tracestate` are extracted, under certain conditions, even when trace
@@ -1731,7 +1777,7 @@ TEST_CASE("heterogeneous extraction") {
   REQUIRE(writer.items == test_case.expected_injected_headers);
 }
 
-TEST_CASE("move semantics") {
+TEST_TRACER("move semantics") {
   // Verify that `Tracer` can be moved.
   TracerConfig config;
   config.service = "testsvc";
@@ -1745,4 +1791,233 @@ TEST_CASE("move semantics") {
   // This must compile.
   Tracer tracer2{std::move(tracer1)};
   (void)tracer2;
+}
+
+TEST_TRACER("APM tracing disabled") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.name = "test.op";
+  auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+  config.tracing_enabled = false;
+
+  TimePoint current_time = default_clock();
+  auto clock = [&current_time]() { return current_time; };
+
+  SECTION("sampling behaviour") {
+    SECTION("span with _dd.p.ts is kept") {
+      auto finalized_config = finalize_config(config, clock);
+      REQUIRE(finalized_config);
+      REQUIRE(!finalized_config->tracing_enabled);
+      Tracer tracer{*finalized_config};
+
+      {
+        auto span = tracer.create_span();
+        span.set_source(Source::appsec);
+      }
+
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+      const datadog::tracing::SpanData& span_data =
+          *collector->chunks.front().front();
+
+      CHECK(span_data.tags.at("_dd.p.dm") == "-5");
+      CHECK(span_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      CHECK(span_data.numeric_tags.at(tags::internal::sampling_priority) == 2);
+    }
+
+    SECTION("spans without _dd.p.ts are rate limited to 1/min") {
+      auto finalized_config = finalize_config(config, clock);
+      REQUIRE(finalized_config);
+      Tracer tracer{*finalized_config};
+      { auto root1 = tracer.create_span(); }
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+
+      {
+        const datadog::tracing::SpanData& span1_data =
+            *collector->chunks.front().front();
+        CHECK(span1_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              2);
+        CHECK(span1_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+        CHECK(span1_data.tags.at("_dd.p.dm") == "-0");
+      }
+
+      collector->chunks.clear();
+
+      {
+        current_time += 1s;  // Advance clock a bit, still within 1 min window
+        tracer.create_span();
+      }
+
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+
+      // Expect the span to be dropped because we already ingested 1 trace in
+      // the current 1 min window.
+      {
+        const datadog::tracing::SpanData& span2_data =
+            *collector->chunks.front().front();
+        CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              -1);
+        CHECK(span2_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      }
+
+      collector->chunks.clear();
+
+      {
+        auto span = tracer.create_span();
+        span.set_source(Source::appsec);
+      }
+
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+
+      // Expect the span to be kept because the trace source is set.
+      {
+        const datadog::tracing::SpanData& span2_data =
+            *collector->chunks.front().front();
+        CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              2);
+        CHECK(span2_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      }
+
+      collector->chunks.clear();
+
+      {
+        current_time += 1min + 1s;  // Advance clock past 1 min
+        tracer.create_span();
+      }
+
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+
+      // Expect to be ingested.
+      {
+        const auto& span3_data = *collector->chunks.front().front();
+        CHECK(span3_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              2);
+        CHECK(span3_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      }
+    }
+  }
+
+  SECTION("extracted context behavior") {
+    auto finalized_config = finalize_config(config, clock);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+
+    // When APM Tracing is disabled, we allow one trace per second for service
+    // liveness. To ensure consistency, consume the limiter slot.
+    { tracer.create_span(); }
+    collector->chunks.clear();
+
+    // Case 1: extracted context with priority, but no `_dd.p.ts` → depends if
+    // local spans are marked by a product.
+    SECTION("no trace source extracted") {
+      const std::unordered_map<std::string, std::string> headers_with_priority{
+          {"x-datadog-trace-id", "123"},
+          {"x-datadog-parent-id", "456"},
+          {"x-datadog-sampling-priority", "2"}  // USER_KEEP
+      };
+
+      SECTION(
+          "tracer apply its own sampling decision in accordance with the "
+          "locally enabled product") {
+        {
+          MockDictReader reader{headers_with_priority};
+          auto span = tracer.extract_span(reader);
+          REQUIRE(span);
+        }
+
+        REQUIRE(collector->chunks.size() == 1);
+        REQUIRE(collector->chunks.front().size() == 1);
+
+        // although incoming priority was USER_KEEP, we should still drop it
+        // because we already consumed the only slot from the limiter.
+        {
+          const SpanData& span_data = *collector->chunks.front().front();
+          CHECK(span_data.numeric_tags.at(tags::internal::sampling_priority) ==
+                -1);
+          CHECK(span_data.numeric_tags.at(tags::internal::apm_enabled) == 0.);
+          collector->chunks.clear();
+        }
+
+        // Mark the span as generated by the Appsec product. This should ensure
+        // the span is retained.
+        {
+          MockDictReader reader{headers_with_priority};
+          auto span = tracer.extract_span(reader);
+          REQUIRE(span);
+          span->set_source(Source::appsec);
+        }
+
+        REQUIRE(collector->chunks.size() == 1);
+        REQUIRE(collector->chunks.front().size() == 1);
+
+        {
+          const SpanData& span_data = *collector->chunks.front().front();
+          CHECK(span_data.numeric_tags.at(tags::internal::sampling_priority) ==
+                2);
+          CHECK(span_data.tags.at(tags::internal::decision_maker) == "-5");
+          CHECK(span_data.tags.at(tags::internal::trace_source) ==
+                to_tag(Source::appsec));
+          CHECK(span_data.numeric_tags.at(tags::internal::apm_enabled) == 0.);
+          collector->chunks.clear();
+        }
+
+        // Advance the clock to reset the limiter.
+        current_time += 1min + 10s;
+
+        // This span qualifies as the one trace per minute allowed for service
+        // liveness, so it will be retained.
+        {
+          MockDictReader reader{headers_with_priority};
+          auto span = tracer.extract_span(reader);
+          REQUIRE(span);
+        }
+
+        REQUIRE(collector->chunks.size() == 1);
+        REQUIRE(collector->chunks.front().size() == 1);
+
+        {
+          const SpanData& span_data = *collector->chunks.front().front();
+          CHECK(span_data.numeric_tags.at(tags::internal::sampling_priority) ==
+                2);
+          CHECK(span_data.tags.at(tags::internal::decision_maker) == "-0");
+          CHECK(span_data.numeric_tags.at(tags::internal::apm_enabled) == 0.);
+          collector->chunks.clear();
+        }
+      }
+    }
+
+    // Case 2: Extracted context with priority AND _dd.p.ts -> Kept by AppSec
+    // rule.
+    SECTION("trace source is extracted") {
+      const std::unordered_map<std::string, std::string>
+          headers_with_priority_and_appsec{
+              {"x-datadog-trace-id", "789"},
+              {"x-datadog-parent-id", "101"},
+              // USER_DROP, to show _dd.p.ts overrides
+              {"x-datadog-sampling-priority", "-1"},
+              {"x-datadog-tags", "_dd.p.ts=02"}};
+
+      {
+        MockDictReader reader{headers_with_priority_and_appsec};
+        auto span = tracer.extract_span(reader);
+        REQUIRE(span);
+      }
+
+      REQUIRE(collector->chunks.size() == 1);
+      REQUIRE(collector->chunks.front().size() == 1);
+
+      {
+        const SpanData& span2_data = *collector->chunks.front().front();
+        CHECK(span2_data.numeric_tags.at(tags::internal::sampling_priority) ==
+              2);
+        CHECK(span2_data.numeric_tags.at(tags::internal::apm_enabled) == 0);
+      }
+    }
+  }
 }

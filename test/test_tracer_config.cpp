@@ -272,6 +272,25 @@ TRACER_CONFIG_TEST("TracerConfig::log_on_startup") {
   }
 }
 
+TRACER_CONFIG_TEST("DD_APM_TRACING_ENABLED") {
+  TracerConfig config;
+  config.service = "testsvc";  // Required for finalize_config
+
+  SECTION("default is true") {
+    const EnvGuard guard{"DD_APM_TRACING_ENABLED", ""};
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->tracing_enabled);
+  }
+
+  SECTION("can be set to false") {
+    const EnvGuard guard{"DD_APM_TRACING_ENABLED", "false"};
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(!finalized->tracing_enabled);
+  }
+}
+
 TRACER_CONFIG_TEST("TracerConfig::report_traces") {
   TracerConfig config;
   config.service = "testsvc";

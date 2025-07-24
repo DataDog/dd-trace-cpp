@@ -1,5 +1,6 @@
 #include <datadog/environment.h>
 #include <datadog/trace_sampler_config.h>
+#include <datadog/trace_source.h>
 
 #include <cmath>
 #include <unordered_set>
@@ -8,6 +9,7 @@
 #include "json_serializer.h"
 #include "parse_util.h"
 #include "string_util.h"
+#include "tags.h"
 
 namespace datadog {
 namespace tracing {
@@ -242,6 +244,34 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   result.max_per_second = max_per_second;
 
   return result;
+}
+
+FinalizedTraceSamplerConfig
+FinalizedTraceSamplerConfig::apm_tracing_disabled_config() {
+  FinalizedTraceSamplerConfig config;
+
+  // Set a rule to always keep spans with an appsec trace source.
+  TraceSamplerRule appsec_rule;
+  appsec_rule.rate = Rate::one();
+  appsec_rule.matcher.tags.emplace(tags::internal::trace_source,
+                                   to_tag(Source::appsec));
+  appsec_rule.mechanism = SamplingMechanism::APP_SEC;
+  // The rule is not subject to the global limiter.
+  appsec_rule.bypass_limiter = true;
+  config.rules.emplace_back(std::move(appsec_rule));
+
+  // Set default sampling rate to 1.0. This is balanced by the limiter define
+  // below.
+  TraceSamplerRule all;
+  all.rate = Rate::one();
+  all.mechanism = SamplingMechanism::DEFAULT;
+  config.rules.emplace_back(std::move(all));
+
+  // For service liveness (services showed in the service catalog for
+  // example), allow 1 trace/min.
+  config.max_per_second = 1. / 60;
+
+  return config;
 }
 
 }  // namespace tracing

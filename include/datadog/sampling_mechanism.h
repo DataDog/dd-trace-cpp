@@ -49,7 +49,7 @@ enum class SamplingMechanism {
   // The sampling decision was made explicitly by the user, who set a sampling
   // priority.
   MANUAL = 4,
-  // Reserved for future use.
+  // Trace was kept because of AppSec event.
   APP_SEC = 5,
   // Reserved for future use.
   REMOTE_RATE_USER_DEFINED = 6,

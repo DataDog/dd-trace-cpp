@@ -159,6 +159,11 @@ void Span::set_end_time(std::chrono::steady_clock::time_point end_time) {
   end_time_ = end_time;
 }
 
+void Span::set_source(Source source) {
+  trace_segment_->local_root().tags.emplace(tags::internal::trace_source,
+                                            to_tag(source));
+}
+
 TraceSegment& Span::trace_segment() { return *trace_segment_; }
 
 const TraceSegment& Span::trace_segment() const { return *trace_segment_; }
