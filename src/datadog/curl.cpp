@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "json.hpp"
 #include "string_util.h"
 
 namespace datadog {
