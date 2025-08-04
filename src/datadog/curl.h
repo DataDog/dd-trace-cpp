@@ -19,8 +19,6 @@
 #include <string>
 #include <thread>
 
-#include "json.hpp"
-
 namespace datadog {
 namespace tracing {
 
