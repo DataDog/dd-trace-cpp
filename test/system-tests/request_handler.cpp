@@ -154,6 +154,7 @@ void RequestHandler::on_span_start(const httplib::Request& req,
 
 void RequestHandler::on_span_end(const httplib::Request& req,
                                  httplib::Response& res) {
+  const auto now = std::chrono::steady_clock::now();
   const auto request_json = nlohmann::json::parse(req.body);
 
   auto span_id = utils::get_if_exists<uint64_t>(request_json, "span_id");
@@ -168,6 +169,7 @@ void RequestHandler::on_span_end(const httplib::Request& req,
     VALIDATION_ERROR(res, msg);
   }
 
+  span_it->second.set_end_time(now);
   res.status = 200;
 }
 
