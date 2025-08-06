@@ -94,6 +94,18 @@ void RequestHandler::on_span_start(const httplib::Request& req,
     span_cfg.resource = *resource;
   }
 
+  if (auto tags = request_json.find("span_tags");
+      tags != request_json.cend() && tags->is_array()) {
+    for (const auto& tag : *tags) {
+      if (tag.size() != 2) {
+        // TBD: log something
+        continue;
+      }
+
+      span_cfg.tags.emplace(tag[0], tag[1]);
+    }
+  }
+
   auto success = [](const datadog::tracing::Span& span,
                     httplib::Response& res) {
     // clang-format off

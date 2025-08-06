@@ -26,69 +26,150 @@ nlohmann::json to_json(const SpanDefaults& defaults) {
 }
 
 using Rules = std::vector<TraceSamplerRule>;
+using Tags = std::unordered_map<std::string, std::string>;
+
+Expected<Tags> parse_tags_from_sampling_rules(const nlohmann::json& json_tags) {
+  assert(json_tags.is_array());
+
+  Tags tags;
+  for (const auto& json_tag : json_tags) {
+    auto key = json_tag.find("key");
+    if (key == json_tag.cend() || key->is_string() == false) {
+      std::string message = "TBD";
+      return Error{Error::RULE_PROPERTY_WRONG_TYPE, std::move(message)};
+    }
+
+    auto value = json_tag.find("value_glob");
+    if (value == json_tag.cend() || value->is_string() == false) {
+      std::string message = "TBD";
+      return Error{Error::RULE_PROPERTY_WRONG_TYPE, std::move(message)};
+    }
+
+    tags.emplace(*key, *value);
+  }
+
+  return tags;
+}
+
+Expected<TraceSamplerRule> parse_rule(const nlohmann::json& json_rule) {
+  const auto make_error = [&json_rule](StringView property,
+                                       const nlohmann::json& value,
+                                       StringView expected_type) {
+    std::string message;
+    message += "Rule property \"";
+    append(message, property);
+    message += "\" should have type \"";
+    append(message, expected_type);
+    message += "\", but has type \"";
+    message += value.type_name();
+    message += "\": ";
+    message += value.dump();
+    message += " in rule ";
+    message += json_rule.dump();
+    return Error{Error::RULE_PROPERTY_WRONG_TYPE, std::move(message)};
+  };
+
+  TraceSamplerRule rule;
+
+  // Required: service, resource, sample_rate, provenance.
+  if (auto service = json_rule.find("service"); service != json_rule.cend()) {
+    if (service->is_string() == false) {
+      return make_error("service", *service, "string");
+    }
+    rule.matcher.service = *service;
+  } else {
+    return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
+                 "Missing \"service\" field"};
+  }
+
+  if (auto resource = json_rule.find("resource");
+      resource != json_rule.cend()) {
+    if (resource->is_string() == false) {
+      return make_error("resource", *resource, "string");
+    }
+    rule.matcher.resource = *resource;
+  } else {
+    return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
+                 "Missing \"resource\" field"};
+  }
+
+  if (auto sample_rate = json_rule.find("sample_rate");
+      sample_rate != json_rule.end()) {
+    if (sample_rate->is_number() == false) {
+      std::string message;
+      return Error{Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE,
+                   std::move(message)};
+    }
+
+    auto maybe_rate = Rate::from(*sample_rate);
+    if (auto error = maybe_rate.if_error()) {
+      return *error;
+    }
+
+    rule.rate = *maybe_rate;
+  } else {
+    return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
+                 "Missing \"sample_rate\" field"};
+  }
+
+  if (auto provenance_it = json_rule.find("provenance");
+      provenance_it != json_rule.cend()) {
+    if (!provenance_it->is_string()) {
+      std::string message;
+      return Error{Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE,
+                   std::move(message)};
+    }
+
+    auto provenance = to_lower(provenance_it->get<StringView>());
+    if (provenance == "customer") {
+      rule.mechanism = SamplingMechanism::REMOTE_RULE;
+    } else if (provenance == "dynamic") {
+      rule.mechanism = SamplingMechanism::REMOTE_ADAPTIVE_RULE;
+    } else {
+      return Error{Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY,
+                   "Unknown \"provenance\" value"};
+    }
+  } else {
+    return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
+                 "Missing \"provenance\" field"};
+  }
+
+  // Parse optional
+  if (auto name = json_rule.find("name"); name != json_rule.cend()) {
+    if (name->is_string() == false) {
+      return make_error("name", *name, "string");
+    }
+    rule.matcher.name = *name;
+  } else if (auto tags = json_rule.find("tags"); tags != json_rule.cend()) {
+    if (tags->is_array() == false) {
+      return make_error("tags", *tags, "array");
+    }
+
+    auto maybe_tags = parse_tags_from_sampling_rules(*tags);
+    if (auto* error = maybe_tags.if_error()) {
+      return *error;
+    }
+
+    rule.matcher.tags = std::move(*maybe_tags);
+  }
+
+  return rule;
+}
 
 Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
-  Rules parsed_rules;
-
-  std::string type = json_rules.type_name();
-  if (type != "array") {
+  if (json_rules.is_array() == false) {
     std::string message;
     return Error{Error::TRACE_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
   }
 
+  Rules parsed_rules;
   for (const auto& json_rule : json_rules) {
-    auto matcher = from_json(json_rule);
-    if (auto* error = matcher.if_error()) {
-      std::string prefix;
-      return error->with_prefix(prefix);
+    auto maybe_rule = parse_rule(json_rule);
+    if (auto error = maybe_rule.if_error()) {
+      return *error;
     }
 
-    TraceSamplerRule rule;
-    rule.matcher = std::move(*matcher);
-
-    if (auto sample_rate = json_rule.find("sample_rate");
-        sample_rate != json_rule.end()) {
-      type = sample_rate->type_name();
-      if (type != "number") {
-        std::string message;
-        return Error{Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE,
-                     std::move(message)};
-      }
-
-      auto maybe_rate = Rate::from(*sample_rate);
-      if (auto error = maybe_rate.if_error()) {
-        return *error;
-      }
-
-      rule.rate = *maybe_rate;
-    } else {
-      return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
-                   "Missing \"sample_rate\" field"};
-    }
-
-    if (auto provenance_it = json_rule.find("provenance");
-        provenance_it != json_rule.cend()) {
-      if (!provenance_it->is_string()) {
-        std::string message;
-        return Error{Error::TRACE_SAMPLING_RULES_SAMPLE_RATE_WRONG_TYPE,
-                     std::move(message)};
-      }
-
-      auto provenance = to_lower(provenance_it->get<StringView>());
-      if (provenance == "customer") {
-        rule.mechanism = SamplingMechanism::REMOTE_RULE;
-      } else if (provenance == "dynamic") {
-        rule.mechanism = SamplingMechanism::REMOTE_ADAPTIVE_RULE;
-      } else {
-        return Error{Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY,
-                     "Unknown \"provenance\" value"};
-      }
-    } else {
-      return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON,
-                   "Missing \"provenance\" field"};
-    }
-
-    parsed_rules.emplace_back(std::move(rule));
+    parsed_rules.emplace_back(std::move(*maybe_rule));
   }
 
   return parsed_rules;
@@ -215,7 +296,7 @@ std::vector<ConfigMetadata> ConfigManager::apply_update(
     rule.rate = *rate;
     rule.matcher = catch_all;
     rule.mechanism = SamplingMechanism::RULE;
-    rules.emplace(rules.cbegin(), std::move(rule));
+    rules.emplace_back(std::move(rule));
 
     metadata.emplace_back(std::move(trace_sampling_metadata));
   }
