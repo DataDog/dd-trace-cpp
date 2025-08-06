@@ -17,20 +17,19 @@ inline void to_json(nlohmann::json& j, const SpanMatcher& matcher) {
 inline Expected<SpanMatcher> from_json(const nlohmann::json& json) {
   SpanMatcher result;
 
-  std::string type = json.type_name();
-  if (type != "object") {
+  if (json.is_object() == false) {
     std::string message;
     message += "A rule must be a JSON object, but this is of type \"";
-    message += type;
+    message += json.type_name();
     message += "\": ";
     message += json.dump();
     return Error{Error::RULE_WRONG_TYPE, std::move(message)};
   }
 
   const auto check_property_type =
-      [&](StringView property, const nlohmann::json& value,
-          StringView expected_type) -> Optional<Error> {
-    type = value.type_name();
+      [&json](StringView property, const nlohmann::json& value,
+              StringView expected_type) -> Optional<Error> {
+    const StringView type = value.type_name();
     if (type == expected_type) {
       return nullopt;
     }
@@ -41,7 +40,7 @@ inline Expected<SpanMatcher> from_json(const nlohmann::json& json) {
     message += "\" should have type \"";
     append(message, expected_type);
     message += "\", but has type \"";
-    message += type;
+    append(message, type);
     message += "\": ";
     message += value.dump();
     message += " in rule ";
@@ -70,13 +69,12 @@ inline Expected<SpanMatcher> from_json(const nlohmann::json& json) {
         return *error;
       }
       for (const auto& [tag_name, tag_value] : value.items()) {
-        type = tag_value.type_name();
-        if (type != "string") {
+        if (tag_value.is_string() == false) {
           std::string message;
           message += "Rule tag pattern must be a string, but ";
           message += tag_value.dump();
           message += " has type \"";
-          message += type;
+          message += tag_value.type_name();
           message += "\" for tag named \"";
           message += tag_name;
           message += "\" in rule: ";
@@ -86,7 +84,7 @@ inline Expected<SpanMatcher> from_json(const nlohmann::json& json) {
         result.tags.emplace(std::string(tag_name), std::string(tag_value));
       }
     } else {
-      // Unknown properties are OK.  `SpanMatcher` is used as a base class for
+      // Unknown properties are OK. `SpanMatcher` is used as a base class for
       // trace sampling rules and span sampling rules.  Those derived types
       // will have additional properties in their JSON representations.
     }

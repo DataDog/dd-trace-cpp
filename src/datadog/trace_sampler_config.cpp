@@ -209,7 +209,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   }
 
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
-  // appended to the end of `rules`.  First, though, we have to make sure the
+  // appended to the end of `rules`. First, though, we have to make sure the
   // sample rate is valid.
   if (sample_rate) {
     auto maybe_rate = Rate::from(*sample_rate);
