@@ -296,7 +296,10 @@ std::vector<ConfigMetadata> ConfigManager::apply_update(
     rule.rate = *rate;
     rule.matcher = catch_all;
     rule.mechanism = SamplingMechanism::RULE;
-    rules.emplace_back(std::move(rule));
+    // TODO: use a map and override catch all / rules if exist
+    // For me: the trick was to always be on top of existing rules but that's an
+    // issue with catchall
+    rules.emplace(rules.cbegin(), std::move(rule));
 
     metadata.emplace_back(std::move(trace_sampling_metadata));
   }
