@@ -10,7 +10,6 @@
 #include "developer_noise.h"
 #include "httplib.h"
 #include "manual_scheduler.h"
-#include "utils.h"
 
 class RequestHandler final {
  public:
