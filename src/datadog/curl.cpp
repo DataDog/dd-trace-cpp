@@ -11,7 +11,6 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
-#include <iterator>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -19,6 +18,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "json.hpp"
 #include "string_util.h"
 
 namespace datadog {
@@ -428,7 +428,6 @@ void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
   });
 
   log_on_error(curl_.multi_wakeup(multi_handle_));
-  clear_requests();
 }
 
 std::size_t CurlImpl::on_read_header(char *data, std::size_t,

@@ -156,31 +156,6 @@ const auto ignore = [](auto &&...) {};
 
 using namespace std::chrono_literals;
 
-CURL_TEST("API") {
-  const auto clock = default_clock;
-  const auto logger = std::make_shared<MockLogger>();
-  SingleRequestMockCurlLibrary library;
-  const auto client = std::make_shared<Curl>(logger, clock, library);
-
-  SECTION("drain remove requests in-flight") {
-    /// Prevent to process the request.
-    library.on_multi_perform = [] { return CURLM_OK; };
-
-    const HTTPClient::URL url = {"http", "whatever", ""};
-
-    const auto result = client->post(url, ignore, "whatever", ignore, ignore,
-                                     clock().tick + 60min);
-
-    REQUIRE(result);
-    REQUIRE(library.created_handles_.size() == 1);
-    REQUIRE(library.destroyed_handles_.size() == 0);
-
-    client->drain(clock().tick + 1s);
-    CHECK(library.created_handles_.size() == 1);
-    CHECK(library.destroyed_handles_.size() == 1);
-  }
-}
-
 CURL_TEST("parse response headers and body") {
   const auto clock = default_clock;
   const auto logger = std::make_shared<MockLogger>();
