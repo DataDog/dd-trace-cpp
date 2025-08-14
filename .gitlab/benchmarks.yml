@@ -34,7 +34,6 @@ benchmarks:
 # Verify that the check-big-regressions CI job has passed. If any regression happened, merging this PR will be blocked.
 
 # If bypassing is necessary, see https://datadoghq.atlassian.net/wiki/spaces/APMINT/pages/5158175217/Performance+quality+gates+-+User+Guide for more details.
--->
 check-big-regressions:
   stage: benchmarks-report
   needs: [ benchmarks ]
