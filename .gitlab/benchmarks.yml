@@ -30,6 +30,10 @@ benchmarks:
     UPSTREAM_BRANCH: $CI_COMMIT_REF_NAME # The branch or tag name for which project is built.
     UPSTREAM_COMMIT_SHA: $CI_COMMIT_SHA # The commit revision the project is built for.
 
+# This repository is using PR-level performance quality gates.
+# Verify that the check-big-regressions CI job has passed. If any regression happened, merging this PR will be blocked.
+
+# If bypassing is necessary, see https://datadoghq.atlassian.net/wiki/spaces/APMINT/pages/5158175217/Performance+quality+gates+-+User+Guide for more details.
 check-big-regressions:
   stage: benchmarks-report
   needs: [ benchmarks ]
