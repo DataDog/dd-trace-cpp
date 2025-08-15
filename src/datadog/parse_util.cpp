@@ -141,11 +141,10 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
 
     if (separator == std::string::npos) {
       key = std::string{trim(token)};
+      if (key.empty()) continue;
     } else {
       key = std::string{trim(token.substr(0, separator))};
-      if (key.empty()) {
-        continue;
-      }
+      if (key.empty()) continue;
       value = std::string{trim(token.substr(separator + 1))};
     }
 
@@ -183,7 +182,6 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
       break;
     } else if (input[i] == ' ') {
       separator = ' ';
-      break;
     }
   }
 
@@ -191,7 +189,7 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
     goto capture_all;
   }
 
-  for (; i < end; ++i) {
+  for (i = beg; i < end; ++i) {
     if (input[i] == separator) {
       auto tag = input.substr(beg, i - beg);
       if (tag.size() > 0) {
