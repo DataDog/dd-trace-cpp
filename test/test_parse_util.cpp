@@ -145,56 +145,72 @@ PARSE_UTIL_TEST("parse_tags") {
   };
 
   auto test_case = GENERATE(values<TestCase>({
+      {
+          __LINE__,
+          "space separated tags",
+          "env:test aKey:aVal bKey:bVal cKey:",
+          {
+              {"env", "test"},
+              {"aKey", "aVal"},
+              {"bKey", "bVal"},
+              {"cKey", ""},
+          },
+      },
+      {
+          __LINE__,
+          "comma separated tags",
+          "env:test,aKey:aVal,bKey:bVal,cKey:",
+          {
+              {"env", "test"},
+              {"aKey", "aVal"},
+              {"bKey", "bVal"},
+              {"cKey", ""},
+          },
+      },
+      {
+          __LINE__,
+          "mixed separator 1/3",
+          "env:test,aKey:aVal bKey:bVal cKey:",
+          {
+              {"env", "test"},
+              {"aKey", "aVal bKey:bVal cKey:"},
+          },
+      },
+      {
+          __LINE__,
+          "mixed separator 2/3",
+          "env:test     bKey :bVal, dKey: dVal cKey:",
+          {
+              {"env", "test     bKey :bVal"},
+              {"dKey", "dVal cKey:"},
+          },
+      },
+      {
+          __LINE__,
+          "mixed separator 3/3",
+          "env :test, aKey : aVal bKey:bVal cKey:",
+          {
+              {"env", "test"},
+              {"aKey", "aVal bKey:bVal cKey:"},
+          },
+      },
+      {
+          __LINE__,
+          "multiple semi-colons",
+          "env:keyWithA:Semicolon bKey:bVal cKey",
+          {
+              {"env", "keyWithA:Semicolon"},
+              {"bKey", "bVal"},
+              {"cKey", ""},
+          },
+      },
       {__LINE__,
-       "space separated tags",
-       "env:test aKey:aVal bKey:bVal cKey:",
+       "mixed separator edge case",
+       "env:keyWith:  , ,   Lots:Of:Semicolons ",
        {
-           {"env", "test"},
-           {"aKey", "aVal"},
-           {"bKey", "bVal"},
-           {"cKey", ""},
+           {"env", "keyWith:"},
+           {"Lots", "Of:Semicolons"},
        }},
-      {__LINE__,
-       "comma separated tags",
-       "env:test aKey:aVal bKey:bVal cKey:",
-       {
-           {"env", "test"},
-           {"aKey", "aVal"},
-           {"bKey", "bVal"},
-           {"cKey", ""},
-       }},
-      {__LINE__,
-       "mixed separator but comma first",
-       "env:test,aKey:aVal bKey:bVal cKey:",
-       {
-           {"env", "test"},
-           {"aKey", "aVal bKey:bVal cKey:"},
-       }},
-      {__LINE__,
-       "mixed separator but space first",
-       "env:test     bKey :bVal dKey: dVal cKey:",
-       {
-           {"env", "test"},
-           {"bKey", ""},
-           {"dKey", ""},
-           {"dVal", ""},
-           {"cKey", ""},
-       }},
-      {__LINE__,
-       "mixed separator but space first",
-       "env:keyWithA:Semicolon bKey:bVal cKey",
-       {
-           {"env", "keyWithA:Semicolon"},
-           {"bKey", "bVal"},
-           {"cKey", ""},
-       }},
-      // {__LINE__,
-      //  "mixed separator edge case",
-      //  "env:keyWith:  , ,   Lots:Of:Semicolons ",
-      //  {
-      //      {"env", "keyWith:"},
-      //      {"Lots", "Of:Semicolons"},
-      //  }},
       {__LINE__,
        "comma separated but some tags without value",
        "a:b,c,d",
@@ -210,19 +226,23 @@ PARSE_UTIL_TEST("parse_tags") {
            {"a", ""},
            {"1", ""},
        }},
-      {__LINE__,
-       "no separator",
-       "a:b:c:d",
-       {
-           {"a", "b:c:d"},
-       }},
-      {__LINE__,
-       "input is trimed",
-       "key1:val1, key2 : val2 ",
-       {
-           {"key1", "val1"},
-           {"key2", "val2"},
-       }},
+      {
+          __LINE__,
+          "no separator",
+          "a:b:c:d",
+          {
+              {"a", "b:c:d"},
+          },
+      },
+      {
+          __LINE__,
+          "input is trimed",
+          "key1:val1, key2 : val2 ",
+          {
+              {"key1", "val1"},
+              {"key2", "val2"},
+          },
+      },
   }));
 
   CAPTURE(test_case.line);
