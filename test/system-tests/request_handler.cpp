@@ -70,6 +70,9 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
   res.set_content(response_body.dump(), "application/json");
 }
 
+// TODO: Refact endpoint handler to return 404 when an unknown field is passed
+// in the payload. that would send a clear message instead of silently creating
+// a span.
 void RequestHandler::on_span_start(const httplib::Request& req,
                                    httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);
@@ -92,6 +95,23 @@ void RequestHandler::on_span_start(const httplib::Request& req,
   if (auto resource =
           utils::get_if_exists<std::string_view>(request_json, "resource")) {
     span_cfg.resource = *resource;
+  }
+
+  if (auto tags = request_json.find("span_tags");
+      tags != request_json.cend() && tags->is_array()) {
+    for (const auto& tag : *tags) {
+      if (tag.size() != 2) {
+        // TODO: refactor to log errors
+        continue;
+      }
+
+      if (tag[0].is_string() == false || tag[1].is_string() == false) {
+        // TODO: refactor to log errors
+        continue;
+      }
+
+      span_cfg.tags.emplace(tag[0], tag[1]);
+    }
   }
 
   auto success = [](const datadog::tracing::Span& span,
