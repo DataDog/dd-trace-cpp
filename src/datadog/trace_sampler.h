@@ -127,5 +127,7 @@ class TraceSampler {
   nlohmann::json config_json() const;
 };
 
+nlohmann::json to_json(const TraceSamplerRule&);
+
 }  // namespace tracing
 }  // namespace datadog
