@@ -24,6 +24,15 @@ nlohmann::json to_json(const SpanDefaults& defaults) {
   return result;
 }
 
+nlohmann::json to_json(const std::vector<TraceSamplerRule>& rules) {
+  std::vector<nlohmann::json> j;
+  for (const auto& rule : rules) {
+    j.push_back(to_json(rule));
+  }
+
+  return j;
+}
+
 using Rules = std::vector<TraceSamplerRule>;
 using Tags = std::unordered_map<std::string, std::string>;
 
@@ -35,7 +44,8 @@ Expected<Tags> parse_tags_from_sampling_rules(const nlohmann::json& json_tags) {
     auto key = json_tag_entry.find("key");
     if (key == json_tag_entry.cend() || key->is_string() == false) {
       std::string err_msg =
-          "Failed to parse tags: the required \"key\" field is either missing "
+          "failed to parse tags from sampling rule: the required \"key\" field "
+          "is either missing "
           "or incorrectly formatted. (input: ";
       err_msg += json_tags.dump();
       err_msg += ")";
@@ -46,7 +56,8 @@ Expected<Tags> parse_tags_from_sampling_rules(const nlohmann::json& json_tags) {
     auto value = json_tag_entry.find("value_glob");
     if (value == json_tag_entry.cend() || value->is_string() == false) {
       std::string err_msg =
-          "Failed to parse tags: the required \"value_glob\" field is either "
+          "failed to parse tags from sampling rule: the required "
+          "\"value_glob\" field is either "
           "missing or incorrectly formatted. (input: ";
       err_msg += json_tags.dump();
       err_msg += ")";
@@ -61,10 +72,18 @@ Expected<Tags> parse_tags_from_sampling_rules(const nlohmann::json& json_tags) {
 }
 
 Expected<TraceSamplerRule> parse_rule(const nlohmann::json& json_rule) {
-  assert(json_rule.is_object());
+  if (!json_rule.is_object()) {
+    std::string err_msg =
+        "failed to parse sampling rule: expected a JSON object but got a ";
+    err_msg += json_rule.type_name();
+    err_msg += " instead. (input: ";
+    err_msg += json_rule.dump();
+    err_msg += ")";
+    return Error{Error::TRACE_SAMPLING_RULES_INVALID_JSON, std::move(err_msg)};
+  }
 
   auto make_error = [&json_rule](StringView field_name) {
-    std::string err_msg = "Failed to parse sampling rule: the required \"";
+    std::string err_msg = "failed to parse sampling rule: the required \"";
     append(err_msg, field_name);
     err_msg += "\" field is missing. (input: ";
     err_msg += json_rule.dump();
@@ -76,7 +95,7 @@ Expected<TraceSamplerRule> parse_rule(const nlohmann::json& json_rule) {
                                                 const nlohmann::json& value,
                                                 StringView expected_type) {
     std::string message;
-    message += "Rule property \"";
+    message += "rule property \"";
     append(message, property);
     message += "\" should have type \"";
     append(message, expected_type);
@@ -139,7 +158,7 @@ Expected<TraceSamplerRule> parse_rule(const nlohmann::json& json_rule) {
     } else if (provenance == "dynamic") {
       rule.mechanism = SamplingMechanism::REMOTE_ADAPTIVE_RULE;
     } else {
-      std::string err_msg = "Failed to parse sampling rule: unknown \"";
+      std::string err_msg = "failed to parse sampling rule: unknown \"";
       err_msg += provenance;
       err_msg += "\" value. Expected either \"customer\" or \"dynamic\"";
       return Error{Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY,
@@ -174,11 +193,6 @@ Expected<TraceSamplerRule> parse_rule(const nlohmann::json& json_rule) {
 }
 
 Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
-  if (json_rules.is_array() == false) {
-    std::string message;
-    return Error{Error::TRACE_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
-  }
-
   Rules parsed_rules;
   for (const auto& json_rule : json_rules) {
     auto maybe_rule = parse_rule(json_rule);
@@ -192,28 +206,74 @@ Expected<Rules> parse_trace_sampling_rules(const nlohmann::json& json_rules) {
   return parsed_rules;
 }
 
-ConfigManager::Update parse_dynamic_config(const nlohmann::json& j) {
+Expected<ConfigManager::Update> parse_dynamic_config(const nlohmann::json& j) {
+  auto make_err_property_msg = [](StringView field_name,
+                                  StringView unexpected_type) {
+    std::string err_msg{"field \""};
+    append(err_msg, field_name);
+    err_msg += "\" expected a float number value but got ";
+    append(err_msg, unexpected_type);
+    err_msg += " instead.";
+    return Error{Error::Code::REMOTE_CONFIGURATION_INVALID_JSON,
+                 std::move(err_msg)};
+  };
+
   ConfigManager::Update config_update;
 
   if (auto sampling_rate_it = j.find("tracing_sampling_rate");
-      sampling_rate_it != j.cend() && sampling_rate_it->is_number()) {
-    config_update.trace_sampling_rate = sampling_rate_it->get<double>();
+      sampling_rate_it != j.cend()) {
+    if (!sampling_rate_it->is_number_float()) {
+      return make_err_property_msg("tracing_sampling_rate",
+                                   sampling_rate_it->type_name());
+    }
+
+    auto maybe_rate = Rate::from(sampling_rate_it->get<double>());
+    if (auto* error = maybe_rate.if_error()) {
+      return error->with_prefix(
+          "\"tracing_sampling_rate\" field got an invalid input. ");
+    }
+
+    config_update.trace_sampling_rate = *maybe_rate;
   }
 
-  if (auto tags_it = j.find("tracing_tags");
-      tags_it != j.cend() && tags_it->is_array()) {
-    config_update.tags = tags_it->get<std::vector<StringView>>();
+  if (auto tags_it = j.find("tracing_tags"); tags_it != j.cend()) {
+    if (!tags_it->is_array()) {
+      return make_err_property_msg("tracing_tags", tags_it->type_name());
+    }
+
+    auto maybe_tags = parse_tags(tags_it->get<std::vector<StringView>>());
+    if (auto error = maybe_tags.if_error()) {
+      return *error;
+    }
+
+    config_update.tags = std::move(*maybe_tags);
   }
 
   if (auto tracing_enabled_it = j.find("tracing_enabled");
-      tracing_enabled_it != j.cend() && tracing_enabled_it->is_boolean()) {
+      tracing_enabled_it != j.cend()) {
+    if (!tracing_enabled_it->is_boolean()) {
+      return make_err_property_msg("tracing_enabled",
+                                   tracing_enabled_it->type_name());
+    }
+
     config_update.report_traces = tracing_enabled_it->get<bool>();
   }
 
   if (auto tracing_sampling_rules_it = j.find("tracing_sampling_rules");
-      tracing_sampling_rules_it != j.cend() &&
-      tracing_sampling_rules_it->is_array()) {
-    config_update.trace_sampling_rules = &(*tracing_sampling_rules_it);
+      tracing_sampling_rules_it != j.cend()) {
+    if (!tracing_sampling_rules_it->is_array()) {
+      return make_err_property_msg("tracing_sampling_rules",
+                                   tracing_sampling_rules_it->type_name());
+    }
+
+    auto maybe_sampling_rules =
+        parse_trace_sampling_rules(*tracing_sampling_rules_it);
+
+    if (auto error = maybe_sampling_rules.if_error()) {
+      return *error;
+    }
+
+    config_update.trace_sampling_rules = std::move(*maybe_sampling_rules);
   }
 
   return config_update;
@@ -247,19 +307,18 @@ Optional<std::string> ConfigManager::on_update(const Configuration& config) {
 
   const auto config_json = nlohmann::json::parse(config.content);
 
-  auto config_update = parse_dynamic_config(config_json.at("lib_config"));
+  auto maybe_config_update = parse_dynamic_config(config_json.at("lib_config"));
+  if (auto err = maybe_config_update.if_error()) {
+    return err
+        ->with_prefix("Failed to parse APM remote configuration payload: ")
+        .message;
+  }
 
-  auto config_metadata = apply_update(config_update);
-  telemetry::capture_configuration_change(config_metadata);
-
-  // TODO:
+  apply_update(*maybe_config_update);
   return nullopt;
 }
 
-void ConfigManager::on_revert(const Configuration&) {
-  auto config_metadata = apply_update({});
-  telemetry::capture_configuration_change(config_metadata);
-}
+void ConfigManager::on_revert(const Configuration&) { apply_update({}); }
 
 std::shared_ptr<TraceSampler> ConfigManager::trace_sampler() {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -276,115 +335,107 @@ bool ConfigManager::report_traces() {
   return report_traces_.value();
 }
 
-std::vector<ConfigMetadata> ConfigManager::apply_update(
-    const ConfigManager::Update& conf) {
+void ConfigManager::apply_update(const ConfigManager::Update& conf) {
   std::vector<ConfigMetadata> metadata;
 
-  std::lock_guard<std::mutex> lock(mutex_);
+  // TODO: We're doing too much while holding the lock. Refactor to reduce lock
+  // contention.
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
 
-  // NOTE(@dmehala): Sampling rules are generally not well specified.
-  //
-  // Rules are evaluated in the order they are inserted, which means the most
-  // specific matching rule might not be evaluated, even though it should be.
-  // For now, we must follow this legacy behavior.
-  //
-  // Additionally, I exploit this behavior to avoid a merge operation.
-  // The resulting array can contain duplicate `SpanMatcher`, but only the first
-  // encountered one will be evaluated, acting as an override.
-  //
-  // Remote Configuration rules will/should always be placed at the begining of
-  // the array, ensuring they are evaluated first.
-  auto rules = rules_;
+    // NOTE(@dmehala): Sampling rules are generally not well specified.
+    //
+    // Rules are evaluated in the order they are inserted, which means the most
+    // specific matching rule might not be evaluated, even though it should be.
+    // For now, we must follow this legacy behavior.
+    //
+    // Additionally, I exploit this behavior to avoid a merge operation.
+    // The resulting array can contain duplicate `SpanMatcher`, but only the
+    // first encountered one will be evaluated, acting as an override.
+    //
+    // Remote Configuration rules will/should always be placed at the begining
+    // of the array, ensuring they are evaluated first.
+    auto rules = rules_;
 
-  if (!conf.trace_sampling_rate) {
-    auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RATE);
-    if (found != default_metadata_.cend()) {
-      metadata.push_back(found->second);
-    }
-  } else {
-    ConfigMetadata trace_sampling_metadata(
-        ConfigName::TRACE_SAMPLING_RATE,
-        to_string(*conf.trace_sampling_rate, 1),
-        ConfigMetadata::Origin::REMOTE_CONFIG);
-
-    auto rate = Rate::from(*conf.trace_sampling_rate);
-
-    TraceSamplerRule rule;
-    rule.rate = *rate;
-    rule.matcher = catch_all;
-    rule.mechanism = SamplingMechanism::RULE;
-
-    // Convention: Catch-all rules should ALWAYS be the last in the list.
-    // If a catch-all rule already exists, replace it.
-    // If NOT, add the new one at the end of the rules list.
-    if (rules.empty()) {
-      rules.emplace_back(std::move(rule));
+    if (!conf.trace_sampling_rate) {
+      auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RATE);
+      if (found != default_metadata_.cend()) {
+        metadata.push_back(found->second);
+      }
     } else {
-      if (auto& last_rule = rules.back(); last_rule.matcher == catch_all) {
-        last_rule = rule;
-      } else {
+      ConfigMetadata trace_sampling_metadata(
+          ConfigName::TRACE_SAMPLING_RATE,
+          to_string(*conf.trace_sampling_rate, 1),
+          ConfigMetadata::Origin::REMOTE_CONFIG);
+
+      TraceSamplerRule rule;
+      rule.rate = *conf.trace_sampling_rate;
+      rule.matcher = catch_all;
+      rule.mechanism = SamplingMechanism::RULE;
+
+      // Convention: Catch-all rules should ALWAYS be the last in the list.
+      // If a catch-all rule already exists, replace it.
+      // If NOT, add the new one at the end of the rules list.
+      if (rules.empty()) {
         rules.emplace_back(std::move(rule));
+      } else {
+        if (auto& last_rule = rules.back(); last_rule.matcher == catch_all) {
+          last_rule = rule;
+        } else {
+          rules.emplace_back(std::move(rule));
+        }
+      }
+
+      metadata.emplace_back(std::move(trace_sampling_metadata));
+    }
+
+    if (!conf.trace_sampling_rules) {
+      auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RULES);
+      if (found != default_metadata_.cend()) {
+        metadata.emplace_back(found->second);
+      }
+    } else {
+      rules.insert(rules.cbegin(), conf.trace_sampling_rules->begin(),
+                   conf.trace_sampling_rules->end());
+
+      ConfigMetadata trace_sampling_rules_metadata(
+          ConfigName::TRACE_SAMPLING_RULES,
+          to_json(*conf.trace_sampling_rules).dump(),
+          ConfigMetadata::Origin::REMOTE_CONFIG);
+      metadata.emplace_back(std::move(trace_sampling_rules_metadata));
+    }
+
+    trace_sampler_->set_rules(std::move(rules));
+
+    if (!conf.tags) {
+      reset_config(ConfigName::TAGS, span_defaults_, metadata);
+    } else {
+      ConfigMetadata tags_metadata(ConfigName::TAGS, join_tags(*conf.tags),
+                                   ConfigMetadata::Origin::REMOTE_CONFIG);
+
+      if (*conf.tags != span_defaults_.value()->tags) {
+        auto new_span_defaults =
+            std::make_shared<SpanDefaults>(*span_defaults_.value());
+        new_span_defaults->tags = std::move(*conf.tags);
+
+        span_defaults_ = new_span_defaults;
+        metadata.emplace_back(std::move(tags_metadata));
       }
     }
 
-    metadata.emplace_back(std::move(trace_sampling_metadata));
-  }
-
-  if (!conf.trace_sampling_rules) {
-    auto found = default_metadata_.find(ConfigName::TRACE_SAMPLING_RULES);
-    if (found != default_metadata_.cend()) {
-      metadata.emplace_back(found->second);
-    }
-  } else {
-    ConfigMetadata trace_sampling_rules_metadata(
-        ConfigName::TRACE_SAMPLING_RULES, conf.trace_sampling_rules->dump(),
-        ConfigMetadata::Origin::REMOTE_CONFIG);
-
-    auto maybe_rules = parse_trace_sampling_rules(*conf.trace_sampling_rules);
-    if (auto error = maybe_rules.if_error()) {
-      trace_sampling_rules_metadata.error = std::move(*error);
+    if (!conf.report_traces) {
+      reset_config(ConfigName::REPORT_TRACES, report_traces_, metadata);
     } else {
-      rules.insert(rules.cbegin(), maybe_rules->begin(), maybe_rules->end());
-    }
-
-    metadata.emplace_back(std::move(trace_sampling_rules_metadata));
-  }
-
-  trace_sampler_->set_rules(std::move(rules));
-
-  if (!conf.tags) {
-    reset_config(ConfigName::TAGS, span_defaults_, metadata);
-  } else {
-    ConfigMetadata tags_metadata(ConfigName::TAGS, join(*conf.tags, ","),
-                                 ConfigMetadata::Origin::REMOTE_CONFIG);
-
-    auto parsed_tags = parse_tags(*conf.tags);
-    if (auto error = parsed_tags.if_error()) {
-      tags_metadata.error = *error;
-    }
-
-    if (*parsed_tags != span_defaults_.value()->tags) {
-      auto new_span_defaults =
-          std::make_shared<SpanDefaults>(*span_defaults_.value());
-      new_span_defaults->tags = std::move(*parsed_tags);
-
-      span_defaults_ = new_span_defaults;
-      metadata.emplace_back(std::move(tags_metadata));
+      if (conf.report_traces != report_traces_.value()) {
+        report_traces_ = *conf.report_traces;
+        metadata.emplace_back(ConfigName::REPORT_TRACES,
+                              to_string(*conf.report_traces),
+                              ConfigMetadata::Origin::REMOTE_CONFIG);
+      }
     }
   }
 
-  if (!conf.report_traces) {
-    reset_config(ConfigName::REPORT_TRACES, report_traces_, metadata);
-  } else {
-    if (conf.report_traces != report_traces_.value()) {
-      report_traces_ = *conf.report_traces;
-      metadata.emplace_back(ConfigName::REPORT_TRACES,
-                            to_string(*conf.report_traces),
-                            ConfigMetadata::Origin::REMOTE_CONFIG);
-    }
-  }
-
-  return metadata;
+  telemetry::capture_configuration_change(metadata);
 }
 
 template <typename T>

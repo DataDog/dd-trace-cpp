@@ -25,11 +25,11 @@ class ConfigManager : public remote_config::Listener {
   //
   // Configurations can be `nullopt` to signal the absence of a value from the
   // remote configuration value.
-  struct Update {
+  struct Update final {
     Optional<bool> report_traces;
-    Optional<double> trace_sampling_rate;
-    Optional<std::vector<StringView>> tags;
-    const nlohmann::json* trace_sampling_rules = nullptr;
+    Optional<Rate> trace_sampling_rate;
+    Optional<std::unordered_map<std::string, std::string>> tags;
+    Optional<std::vector<TraceSamplerRule>> trace_sampling_rules;
   };
 
  private:
@@ -105,7 +105,7 @@ class ConfigManager : public remote_config::Listener {
   // object.
   nlohmann::json config_json() const;
 
-  std::vector<ConfigMetadata> apply_update(const ConfigManager::Update& conf);
+  void apply_update(const ConfigManager::Update& conf);
 };
 
 }  // namespace tracing
