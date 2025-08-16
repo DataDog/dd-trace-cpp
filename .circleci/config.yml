@@ -17,11 +17,11 @@ orbs:
 executors:
   docker-amd64:
     docker:
-      - image: "datadog/docker-library:dd-trace-cpp-ci-ec46070cb"
+      - image: "datadog/docker-library:dd-trace-cpp-ci-91c12776"
     resource_class: xlarge
   docker-arm64:
     docker:
-      - image: "datadog/docker-library:dd-trace-cpp-ci-ec46070cb"
+      - image: "datadog/docker-library:dd-trace-cpp-ci-91c12776"
     resource_class: arm.xlarge
 
 commands:
@@ -48,7 +48,7 @@ commands:
 jobs:
   format:
     docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    - image: "datadog/docker-library:dd-trace-cpp-ci-91c12776"
     resource_class: small
     steps:
     - checkout
@@ -56,7 +56,7 @@ jobs:
 
   shellcheck:
     docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    - image: "datadog/docker-library:dd-trace-cpp-ci-91c12776"
     resource_class: small
     steps:
     - checkout
@@ -164,7 +164,7 @@ jobs:
 
   coverage:
     docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci-ec46070cb"
+    - image: "datadog/docker-library:dd-trace-cpp-ci-91c12776"
     resource_class: xlarge
     environment:
       MAKE_JOB_COUNT: 8
@@ -224,7 +224,7 @@ jobs:
 
   fuzz-testing:
     docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    - image: "datadog/docker-library:dd-trace-cpp-ci-91c12776"
     resource_class: xlarge
     environment:
       MAKE_JOB_COUNT: 8
