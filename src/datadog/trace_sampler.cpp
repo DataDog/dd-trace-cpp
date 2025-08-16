@@ -14,15 +14,12 @@
 
 namespace datadog {
 namespace tracing {
-namespace {
 
 nlohmann::json to_json(const TraceSamplerRule& rule) {
   nlohmann::json j = rule.matcher;
   j["sample_rate"] = rule.rate.value();
   return j;
 }
-
-}  // namespace
 
 TraceSampler::TraceSampler(const FinalizedTraceSamplerConfig& config,
                            const Clock& clock)

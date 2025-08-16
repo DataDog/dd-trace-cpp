@@ -35,16 +35,16 @@ struct Ctor_param final {
   tracing::Clock clock = tracing::default_clock;
 };
 
-TelemetryProxy make_telemetry(const Ctor_param& init) {
-  if (!init.configuration.enabled) return NoopTelemetry{};
-  return Telemetry{init.configuration, init.tracer_signature, init.logger,
-                   init.client,        init.scheduler,        init.agent_url,
-                   init.clock};
+TelemetryProxy make_telemetry(const tracing::Optional<Ctor_param>& init) {
+  if (!init || !init->configuration.enabled) return NoopTelemetry{};
+  return Telemetry{init->configuration, init->tracer_signature, init->logger,
+                   init->client,        init->scheduler,        init->agent_url,
+                   init->clock};
 }
 
 TelemetryProxy& instance(
     const tracing::Optional<Ctor_param>& init = tracing::nullopt) {
-  static TelemetryProxy telemetry = make_telemetry(*init);
+  static TelemetryProxy telemetry = make_telemetry(init);
   return telemetry;
 }
 
