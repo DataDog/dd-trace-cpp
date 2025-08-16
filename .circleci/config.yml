@@ -164,7 +164,7 @@ jobs:
 
   coverage:
     docker:
-    - image: "datadog/docker-library:dd-trace-cpp-ci"
+    - image: "datadog/docker-library:dd-trace-cpp-ci-ec46070cb"
     resource_class: xlarge
     environment:
       MAKE_JOB_COUNT: 8
