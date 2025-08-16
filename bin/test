@@ -5,14 +5,16 @@ set -e
 MAKE_JOB_COUNT=${MAKE_JOB_COUNT:-$(nproc)}
 
 if [ "$1" = '--coverage' ]; then
-    coverage_flags=-DDD_TRACE_ENABLE_COVERAGE=1
+    enable_coverage=1
+    cmake_preset=coverage
     shift
 else
-    coverage_flags=''
+    enable_coverage=0
+    cmake_preset='default'
 fi
 
 if [ "$1" = '--verbose' ]; then
-    verbosity_flags='VERBOSE=1'
+    verbosity_flags='-v'
     shift
 else
     verbosity_flags=''
@@ -20,7 +22,7 @@ fi
 
 if [ "$1" = '--show-coverage' ]; then
     # implies --coverage
-    coverage_flags=-DDD_TRACE_ENABLE_COVERAGE=1
+    cmake_preset=coverage
     show_coverage=1
     shift
 else
@@ -35,33 +37,48 @@ fi
 
 cd "$(dirname "$0")"/..
 
-mkdir -p .build
-cd .build
 # shellcheck disable=SC2086
-cmake .. $coverage_flags -DDD_TRACE_BUILD_TESTING=1
+cmake --preset "${cmake_preset}" -B .build
 # Clean up any code coverage artifacts.
 find . -type f -name '*.gcda' -print0 | xargs -0 rm -f
 # shellcheck disable=SC2086
-make -j "$MAKE_JOB_COUNT" $verbosity_flags
+cmake --build .build -j "$MAKE_JOB_COUNT" $verbosity_flags
 
 if [ "$build_only" -eq 1 ]; then
     exit
 fi
 
 echo 'Running tests...'
-./test/tests "$@"
+./.build/test/tests "$@"
 
-if [ "$coverage_flags" != '' ]; then
+if [ "$enable_coverage" != '' ]; then
     printf 'Generating Code Coverage Report ... '
-    cd ../
     rm -rf .coverage
     mkdir -p .coverage
+
+    # Read files to filter out from the coverage report.
+    files_to_ignore=""
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Skip empty lines and comments
+        case "$line" in
+            ''|\#*) continue ;;
+        esac
+
+        case "$line" in
+            /*) full="$line" ;;
+            *)  full="$(pwd)/$line" ;;
+        esac
+
+        # Quote each full path and add to args
+        files_to_ignore="$files_to_ignore $full"
+    done < ".lcovignore"
+
     # Compile the .gcdo files into an intermediate format.
     # Use the faster JSON Perl module, JSON:XS, to speed things up.
     lcov --quiet --capture --directory .build --output-file .coverage/raw.info --rc geninfo_json_module=JSON::XS
     # Filter out system headers and test drivers.
-    lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
-
+    # shellcheck disable=SC2086
+    lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info $files_to_ignore
     echo 'Done.'
 fi
 

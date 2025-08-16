@@ -30,6 +30,14 @@
         "DD_TRACE_BUILD_EXAMPLES": "ON",
         "DD_TRACE_BUILD_FUZZERS": "OFF"
       }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Coverage",
+      "cacheVariables": {
+        "DD_TRACE_BUILD_TESTING": "ON",
+        "DD_TRACE_ENABLE_COVERAGE": "ON"
+      }
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Note: Make sure that this version is the same as that in
 # "./CheckRequiredCMakeVersion.cmake".
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.26)
 cmake_policy(SET CMP0077 NEW)
 
 project(dd-trace-cpp)
