@@ -17,11 +17,11 @@ orbs:
 executors:
   docker-amd64:
     docker:
-      - image: "datadog/docker-library:dd-trace-cpp-ci"
+      - image: "datadog/docker-library:dd-trace-cpp-ci-ec46070cb"
     resource_class: xlarge
   docker-arm64:
     docker:
-      - image: "datadog/docker-library:dd-trace-cpp-ci"
+      - image: "datadog/docker-library:dd-trace-cpp-ci-ec46070cb"
     resource_class: arm.xlarge
 
 commands:
