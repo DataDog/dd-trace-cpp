@@ -61,8 +61,8 @@ target_compile_definitions(tests
 
 target_link_libraries(tests 
   PRIVATE
-    dd_trace_cpp-static
-    dd_trace::specs
+    dd-trace-cpp::static
+    dd-trace-cpp::specs
 )
 
 if(DD_TRACE_TRANSPORT STREQUAL "curl")
@@ -74,4 +74,5 @@ if(DD_TRACE_TRANSPORT STREQUAL "curl")
   )
 endif()
 
-add_subdirectory(system-tests)
+catch_discover_tests(tests)
+
