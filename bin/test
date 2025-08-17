@@ -70,7 +70,7 @@ if [ "$enable_coverage" != '' ]; then
         esac
 
         # Quote each full path and add to args
-        files_to_ignore="$files_to_ignore $full"
+        files_to_ignore="$files_to_ignore \"$full\""
     done < ".lcovignore"
 
     # Compile the .gcdo files into an intermediate format.
