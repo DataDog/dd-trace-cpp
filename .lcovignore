@@ -1,0 +1,10 @@
+# List of files to exclude from the code coverage report.
+# Paths that do not start with `/` are treated as relative,
+# and the project's root directory is prepended.
+
+# System headers
+/usr/*
+
+test/*
+src/datadog/json.hpp
+src/datadog/common/hash.*
