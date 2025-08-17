@@ -78,7 +78,8 @@ if [ "$enable_coverage" != '' ]; then
     lcov --quiet --capture --directory .build --output-file .coverage/raw.info --rc geninfo_json_module=JSON::XS
     # Filter out system headers and test drivers.
     # shellcheck disable=SC2086
-    lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info $files_to_ignore
+    lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
+    # lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info $files_to_ignore
     echo 'Done.'
 fi
 
