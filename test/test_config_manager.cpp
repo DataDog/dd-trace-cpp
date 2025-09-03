@@ -184,4 +184,41 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
     const auto reverted_tracing_status = config_manager.report_traces();
     CHECK(old_tracing_status == reverted_tracing_status);
   }
+
+  SECTION("handling of `tracing_sampling_rules`") {
+    SECTION("valid input") {
+      config_update.content = R"({
+        "lib_config": {
+          "library_language": "all",
+          "library_version": "latest",
+          "service_name": "testsvc",
+          "env": "test",
+          "tracing_sampling_rules": [
+            {
+              "service": "foo",
+              "resource": "GET /hello",
+              "sample_rate": 0.1,
+              "provenance": "customer",
+              "name": "test",
+              "tags": [
+                { "key": "tag1", "value_glob": "value1" }
+              ]
+            }
+          ]
+        },
+        "service_target": {
+           "service": "testsvc",
+           "env": "test"
+        }
+      })";
+
+      const auto old_sampler_cfg =
+          config_manager.trace_sampler()->config_json();
+      const auto err = config_manager.on_update(config_update);
+      const auto new_sampler_cfg =
+          config_manager.trace_sampler()->config_json();
+
+      CHECK(old_sampler_cfg != new_sampler_cfg);
+    }
+  }
 }
