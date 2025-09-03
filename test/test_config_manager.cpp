@@ -486,12 +486,12 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
           {
               __LINE__,
               "invalid value for `tags` field",
-              R"("tracing_sampling_rules": [{"service": "bar", "resource": "yo", "sample_rate": "0.5", "provenance": "customer", "tags": "tag1"}])",
+              R"("tracing_sampling_rules": [{"service": "bar", "resource": "yo", "sample_rate": 0.2, "provenance": "customer", "tags": "tag1"}])",
           },
           {
               __LINE__,
               "invalid second rules",
-              R"("tracing_sampling_rules": [{"service": "bar", "resource": "yo", "sample_rate": "0.5", "provenance": "customer"}, {"foo": "bar"}])",
+              R"("tracing_sampling_rules": [{"service": "bar", "resource": "yo", "sample_rate": 0.2, "provenance": "customer"}, {"foo": "bar"}])",
           },
       }));
 
