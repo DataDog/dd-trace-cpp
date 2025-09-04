@@ -221,7 +221,7 @@ Expected<ConfigManager::Update> parse_dynamic_config(const nlohmann::json& j) {
   ConfigManager::Update config_update;
 
   if (auto sampling_rate_it = j.find("tracing_sampling_rate");
-      sampling_rate_it != j.cend()) {
+      sampling_rate_it != j.cend() && !sampling_rate_it->is_null()) {
     if (!sampling_rate_it->is_number_float()) {
       return make_err_property_msg("tracing_sampling_rate",
                                    sampling_rate_it->type_name());
@@ -236,7 +236,8 @@ Expected<ConfigManager::Update> parse_dynamic_config(const nlohmann::json& j) {
     config_update.trace_sampling_rate = *maybe_rate;
   }
 
-  if (auto tags_it = j.find("tracing_tags"); tags_it != j.cend()) {
+  if (auto tags_it = j.find("tracing_tags");
+      tags_it != j.cend() && !tags_it->is_null()) {
     if (!tags_it->is_array()) {
       return make_err_property_msg("tracing_tags", tags_it->type_name());
     }
@@ -250,7 +251,7 @@ Expected<ConfigManager::Update> parse_dynamic_config(const nlohmann::json& j) {
   }
 
   if (auto tracing_enabled_it = j.find("tracing_enabled");
-      tracing_enabled_it != j.cend()) {
+      tracing_enabled_it != j.cend() && !tracing_enabled_it->is_null()) {
     if (!tracing_enabled_it->is_boolean()) {
       return make_err_property_msg("tracing_enabled",
                                    tracing_enabled_it->type_name());
@@ -260,7 +261,8 @@ Expected<ConfigManager::Update> parse_dynamic_config(const nlohmann::json& j) {
   }
 
   if (auto tracing_sampling_rules_it = j.find("tracing_sampling_rules");
-      tracing_sampling_rules_it != j.cend()) {
+      tracing_sampling_rules_it != j.cend() &&
+      !tracing_sampling_rules_it->is_null()) {
     if (!tracing_sampling_rules_it->is_array()) {
       return make_err_property_msg("tracing_sampling_rules",
                                    tracing_sampling_rules_it->type_name());

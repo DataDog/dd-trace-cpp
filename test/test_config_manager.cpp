@@ -109,10 +109,31 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
     }
 
     SECTION(
-        "an RC payload without the `tracing_sampling_rate` does not raise an "
-        "error nor update the sampling rate") {
-      config_update.content = R"({
+        "an RC payload without the `tracing_sampling_rate` or with a null "
+        "value does not raise an error nor update the sampling rate") {
+      struct TestCase {
+        size_t line;
+        std::string_view name;
+        std::string_view input;
+      };
+
+      const auto test_case = GENERATE(values<TestCase>({
+          {
+              __LINE__,
+              "tracing_sampling_rate is missing",
+              "",
+          },
+          {
+              __LINE__,
+              "tracing_sampling_rate is null",
+              R"("tracing_sampling_rate": null,)",
+          },
+      }));
+
+      char payload[1024];
+      std::snprintf(payload, 1024, R"({
         "lib_config": {
+          %s
           "library_language": "all",
           "library_version": "latest",
           "service_name": "testsvc",
@@ -122,7 +143,13 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
            "service": "testsvc",
            "env": "test"
         }
-      })";
+      })",
+                    test_case.input.data());
+
+      config_update.content = payload;
+
+      CAPTURE(test_case.line);
+      CAPTURE(test_case.name);
 
       const auto old_trace_sampler_config =
           config_manager.trace_sampler()->config_json();
@@ -232,10 +259,35 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
     }
 
     SECTION(
-        "payload without `tracing_tags` does not raise an error nor update the "
+        "payload without `tracing_tags` or with a null value does not raise an "
+        "error nor update the "
         "list of tags") {
-      config_update.content = R"({
+      struct TestCase {
+        size_t line;
+        std::string_view name;
+        std::string_view input;
+      };
+
+      const auto test_case = GENERATE(values<TestCase>({
+          {
+              __LINE__,
+              "tracing_tags is missing",
+              "",
+          },
+          {
+              __LINE__,
+              "tracing_tags is null",
+              R"("tracing_tags": null,)",
+          },
+      }));
+
+      CAPTURE(test_case.line);
+      CAPTURE(test_case.name);
+
+      char payload[1024];
+      std::snprintf(payload, 1024, R"({
         "lib_config": {
+          %s
           "library_language": "all",
           "library_version": "latest",
           "service_name": "testsvc",
@@ -245,7 +297,10 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
            "service": "testsvc",
            "env": "test"
         }
-      })";
+      })",
+                    test_case.input.data());
+
+      config_update.content = payload;
 
       const auto old_tags = config_manager.span_defaults()->tags;
 
@@ -357,10 +412,34 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
     }
 
     SECTION(
-        "An RC payload without `tracing_enabled` does not raise an error nor "
-        "update the value") {
-      config_update.content = R"({
+        "An RC payload without `tracing_enabled` or with a null value does not "
+        "raise an error nor update the value") {
+      struct TestCase {
+        size_t line;
+        std::string_view name;
+        std::string_view input;
+      };
+
+      const auto test_case = GENERATE(values<TestCase>({
+          {
+              __LINE__,
+              "tracing_enabled is absent from the RC payload",
+              "",
+          },
+          {
+              __LINE__,
+              "tracing_enabled is null",
+              R"("tracing_enabled": null,)",
+          },
+      }));
+
+      CAPTURE(test_case.line);
+      CAPTURE(test_case.name);
+
+      char payload[1024];
+      std::snprintf(payload, 1024, R"({
         "lib_config": {
+          %s
           "library_language": "all",
           "library_version": "latest",
           "service_name": "testsvc",
@@ -370,7 +449,10 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
            "service": "testsvc",
            "env": "test"
         }
-      })";
+      })",
+                    test_case.input.data());
+
+      config_update.content = payload;
 
       const auto old_tracing_status = config_manager.report_traces();
 
@@ -526,9 +608,33 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
       CHECK(old_sampler_cfg == new_sampler_cfg);
     }
 
-    SECTION("empty") {
-      config_update.content = R"({
+    SECTION("null value or the absence of the field is ignored") {
+      struct TestCase {
+        size_t line;
+        std::string_view name;
+        std::string_view input;
+      };
+
+      const auto test_case = GENERATE(values<TestCase>({
+          {
+              __LINE__,
+              "tracing_sampling_rules is absent from the RC payload",
+              "",
+          },
+          {
+              __LINE__,
+              "tracing_sampling_rules is null",
+              R"("tracing_sampling_rules": null,)",
+          },
+      }));
+
+      CAPTURE(test_case.line);
+      CAPTURE(test_case.name);
+
+      char payload[1024];
+      std::snprintf(payload, 1024, R"({
         "lib_config": {
+          %s
           "library_language": "all",
           "library_version": "latest",
           "service_name": "testsvc",
@@ -538,7 +644,10 @@ CONFIG_MANAGER_TEST("remote configuration handling") {
            "service": "testsvc",
            "env": "test"
         }
-      })";
+      })",
+                    test_case.input.data());
+
+      config_update.content = payload;
 
       const auto old_sampler_cfg =
           config_manager.trace_sampler()->config_json();
