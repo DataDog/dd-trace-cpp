@@ -240,6 +240,10 @@ jobs:
           description: Run Base64 fuzzer
           command: timeout 5m ./.build/fuzz/base64/base64-fuzz
           duration: 5m
+      - run_timeout: 
+          description: Run Remote Configuration fuzzer
+          command: timeout 5m ./.build/fuzz/remote-configuration/remote-config-fuzz
+          duration: 5m
 
 workflows:
   pull-request:
