@@ -28,6 +28,7 @@ Span::Span(SpanData* data, const std::shared_ptr<TraceSegment>& trace_segment,
 }
 
 Span::~Span() {
+  const auto now = clock_();
   if (!trace_segment_) {
     // We were moved from.
     return;
@@ -36,7 +37,6 @@ Span::~Span() {
   if (end_time_) {
     data_->duration = *end_time_ - data_->start.tick;
   } else {
-    const auto now = clock_();
     data_->duration = now - data_->start;
   }
 
@@ -44,8 +44,10 @@ Span::~Span() {
 }
 
 Span Span::create_child(const SpanConfig& config) const {
+  auto now = clock_();
   auto span_data = std::make_unique<SpanData>();
-  span_data->apply_config(trace_segment_->defaults(), config, clock_);
+  span_data->start = now;
+  span_data->apply_config(trace_segment_->defaults(), config);
   span_data->trace_id = data_->trace_id;
   span_data->parent_id = data_->span_id;
   span_data->span_id = generate_span_id_();
