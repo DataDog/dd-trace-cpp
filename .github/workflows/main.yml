@@ -1,0 +1,59 @@
+name: "Main"
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  call-dev-workflow:
+    uses: ./.github/workflows/dev.yml
+      # - name: Upload artifact
+      #   uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      #   with:
+      #     name: binaries
+      #     path: .musl-build/ngx_http_datadog_module.so
+
+  system-tests:
+    uses:  DataDog/system-tests/.github/workflows/system-tests.yml@main
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+    with:
+      library: cpp
+      binaries_artifact: binaries
+      desired_execution_time: 300  # 5 minutes
+      scenarios_groups: appsec
+      scenarios: DEFAULT
+      excluded_scenarios: INTEGRATIONS  # no test activated, and long warm-up
+      skip_empty_scenarios: true
+
+  # Ensure the main job is run to completion
+  check-system-tests:
+    needs: system-tests
+    name: Check system tests success
+    runs-on: ubuntu-latest
+    steps:
+    - run: exit 0
+
+  fuzz-testing:
+    needs: call-dev-workflow
+    runs-on: ubuntu-22.04-arm
+    container:
+      image: datadog/docker-library:dd-trace-cpp-ci-91c12776-arm64
+    env:
+      DURATION_SEC: 300 # 5min
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Configure
+        run: bin/with-toolchain llvm cmake . -B .build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_FUZZERS=1 -DDD_TRACE_ENABLE_SANITIZE=1
+      - name: Build
+        run: cmake --build .build -j --target dd_trace_cpp-fuzzers
+      - name: Run W3C propagation fuzzer
+        run: ./.build/fuzz/w3c-propagation/w3c-propagation-fuzz -max_total_time=${DURATION_SEC}
+      - name: Run Base64 fuzzer
+        run: ./.build/fuzz/base64/base64-fuzz -max_total_time=${DURATION_SEC}
+      - name: Run Remote Configuration fuzzer
+        run: ./.build/fuzz/remote-configuration/remote-config-fuzz -max_total_time=${DURATION_SEC}
+
