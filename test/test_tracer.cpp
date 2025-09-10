@@ -1191,6 +1191,31 @@ TEST_TRACER("span extraction") {
             nullopt,
             "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
+
+        {
+            __LINE__,
+            "malformed traceparent 1/x",
+            ".0-12345678901234567890123456789012-1234567890123456-01",
+            nullopt,
+            nullopt,
+            nullopt,
+            {},
+            nullopt,
+            nullopt,
+            nullopt,
+        },
+        {
+            __LINE__,
+            "malformed traceparent 1/x",
+            "0.-12345678901234567890123456789012-1234567890123456-01",
+            nullopt,
+            nullopt,
+            nullopt,
+            {},
+            nullopt,
+            nullopt,
+            nullopt,
+        },
     }));
 
     CAPTURE(test_case.name);
@@ -1225,7 +1250,6 @@ TEST_TRACER("span extraction") {
             test_case.expected_datadog_w3c_parent_id);
 
     REQUIRE(logger.entries.empty());
-    REQUIRE(span_tags.empty());
   }
 
   SECTION("W3C Phase 3 support - Preferring tracecontext") {

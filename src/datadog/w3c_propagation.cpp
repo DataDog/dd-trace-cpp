@@ -33,6 +33,11 @@ auto verboten(int lowest_ascii, int highest_ascii,
   };
 }
 
+constexpr bool is_hexdiglc(const char c) {
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+         (c >= 'A' && c <= 'F');
+}
+
 // Populate the specified `result` with data extracted from the "traceparent"
 // entry of the specified `headers`. Return `nullopt` on success. Return a value
 // for the `tags::internal::w3c_extraction_error` tag if an error occurs.
@@ -59,6 +64,8 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
 
           beg = i + 1;
           internal_state = state::trace_id;
+        } else if (!is_hexdiglc(traceparent[i])) {
+          return "invalid_version";
         }
       } break;
 
