@@ -27,9 +27,10 @@ set(CURL_DISABLE_SRP ON)
 set(SHARE_LIB_OBJECT ON)
 
 FetchContent_Declare(
-  curl
+  CURL
   URL "https://github.com/curl/curl/releases/download/curl-8_8_0/curl-8.8.0.tar.gz"
   URL_MD5 "2300048f61e6196678281a8612a873ef"
+  FIND_PACKAGE_ARGS NAMES CURL
 )
 
-FetchContent_MakeAvailable(curl)
+FetchContent_MakeAvailable(CURL)
