@@ -453,6 +453,11 @@ Expected<Baggage, Baggage::Error> Tracer::extract_baggage(
   if (maybe_baggage) {
     telemetry::counter::increment(metrics::tracer::trace_context::extracted,
                                   {"header_style:baggage"});
+  } else if (auto err = maybe_baggage.if_error()) {
+    if (err->code == Baggage::Error::MALFORMED_BAGGAGE_HEADER) {
+      telemetry::counter::increment(metrics::tracer::trace_context::malformed,
+                                    {"header_style:baggage"});
+    }
   }
   return maybe_baggage;
 }

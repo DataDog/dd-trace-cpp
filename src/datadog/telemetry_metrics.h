@@ -109,6 +109,10 @@ extern const telemetry::Counter extracted;
 /// reason for truncation (`truncation_reason:baggage_item_count_exceeded`,
 /// `truncation_reason:baggage_byte_count_exceeded`)
 extern const telemetry::Counter truncated;
+
+/// The number of times baggage headers are dropped because they're malformed
+/// (missing key/value/'='), tagged by header style (`header_style:baggage`)
+extern const telemetry::Counter malformed;
 }  // namespace trace_context
 
 }  // namespace tracer

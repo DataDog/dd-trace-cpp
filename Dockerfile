@@ -20,7 +20,7 @@ run apt-get update && apt-get install --yes software-properties-common && \
     apt-get update && apt-get upgrade --yes && \
     apt-get install --yes \
         wget build-essential clang sed gdb clang-format git ssh shellcheck \
-        libc++-dev libc++abi-dev python3 pip coreutils curl gnupg
+        libc++-dev libc++abi-dev python3 pip coreutils curl gnupg nodejs
 
 # bazelisk, a launcher for bazel. `bazelisk --help` will cause the latest
 # version to be downloaded.
