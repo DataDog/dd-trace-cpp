@@ -56,8 +56,8 @@ const telemetry::Counter extracted = {"context_header_style.extracted",
                                       "tracers", true};
 const telemetry::Counter truncated = {"context_header.truncated", "tracers",
                                       true};
-const telemetry::Counter malformed = {"context_header_style.malformed", "tracers",
-                                      true};
+const telemetry::Counter malformed = {"context_header_style.malformed",
+                                      "tracers", true};
 }  // namespace trace_context
 
 }  // namespace tracer

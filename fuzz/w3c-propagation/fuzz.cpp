@@ -15,12 +15,41 @@ namespace dd = datadog::tracing;
 
 namespace {
 
+// TODO: Move in `src` and be the default client if transport is `none`.
+class NullHttpClient : public dd::HTTPClient {
+ public:
+  dd::Expected<void> post(
+      const URL& url, HeadersSetter set_headers, std::string body,
+      ResponseHandler on_response, ErrorHandler on_error,
+      std::chrono::steady_clock::time_point deadline) override {
+    return {};
+  }
+
+  // Wait until there are no more outstanding requests, or until the specified
+  // `deadline`.
+  void drain(std::chrono::steady_clock::time_point deadline) override {}
+
+  // Return a JSON representation of this object's configuration. The JSON
+  // representation is an object with the following properties:
+  //
+  // - "type" is the unmangled, qualified name of the most-derived class, e.g.
+  //   "datadog::tracing::Curl".
+  // - "config" is an object containing this object's configuration. "config"
+  //   may be omitted if the derived class has no configuration.
+  std::string config() const override {
+    return R"({"type": "NullHttpClient"})";
+  };
+
+  ~NullHttpClient() override = default;
+};
+
 dd::Tracer& tracer_singleton() {
   thread_local auto tracer = []() {
     dd::TracerConfig config;
     config.service = "fuzzer";
     config.collector = std::make_shared<dd::NullCollector>();
     config.extraction_styles = {dd::PropagationStyle::W3C};
+    config.agent.http_client = std::make_shared<NullHttpClient>();
 
     const auto finalized_config = dd::finalize_config(config);
     if (!finalized_config) {
