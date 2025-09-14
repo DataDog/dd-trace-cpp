@@ -3,6 +3,7 @@
 #include <datadog/string_view.h>
 
 #include <cstdint>
+#include <mutex>
 #include <sstream>
 #include <string>
 
