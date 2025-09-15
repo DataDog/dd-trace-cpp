@@ -168,9 +168,11 @@ void Tracer::store_config() {
 Span Tracer::create_span() { return create_span(SpanConfig{}); }
 
 Span Tracer::create_span(const SpanConfig& config) {
+  auto now = clock_();
   auto defaults = config_manager_->span_defaults();
   auto span_data = std::make_unique<SpanData>();
-  span_data->apply_config(*defaults, config, clock_);
+  span_data->start = now;
+  span_data->apply_config(*defaults, config);
   span_data->trace_id = generator_->trace_id(span_data->start);
   span_data->span_id = span_data->trace_id.low;
   span_data->parent_id = 0;
@@ -203,6 +205,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader) {
 
 Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
+  auto now = clock_();
   assert(!extraction_styles_.empty());
 
   AuditedReader audited_reader{reader};
@@ -335,7 +338,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
   // We're done extracting fields.  Now create the span.
   // This is similar to what we do in `create_span`.
-  span_data->apply_config(*config_manager_->span_defaults(), config, clock_);
+  span_data->start = now;
+  span_data->apply_config(*config_manager_->span_defaults(), config);
   span_data->span_id = generator_->span_id();
   span_data->trace_id = *merged_context.trace_id;
   span_data->parent_id = *merged_context.parent_id;
