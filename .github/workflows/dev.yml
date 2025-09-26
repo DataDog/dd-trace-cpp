@@ -49,7 +49,7 @@ jobs:
       - name: Upload test report to Datadog
         run: |
           curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-${{ matrix.arch }}" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
-          datadog-ci junit upload --service dd-trace-cpp .build/report.xml
+          datadog-ci junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp .build/report.xml
 
   build-linux-bazel:
     needs: format
@@ -138,7 +138,7 @@ jobs:
       - name: Upload test report to Datadog
         run: |
           Invoke-WebRequest -Uri "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_win-x64" -OutFile "datadog-ci.exe"
-          ./datadog-ci.exe junit upload --service dd-trace-cpp report.xml
+          ./datadog-ci.exe junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp  report.xml
 
   coverage:
     needs: build-linux-cmake 
