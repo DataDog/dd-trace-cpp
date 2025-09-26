@@ -1,7 +1,7 @@
 include(FetchContent)
 
-set(JSON_BuildTests OFF)
-set(JSON_Install OFF)
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(nlohmann_json
   URL https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz
