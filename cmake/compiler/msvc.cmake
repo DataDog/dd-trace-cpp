@@ -29,9 +29,9 @@ set(WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # This target interface encapsulates compiler and linker options for the project.
 # It provides a convenient way to apply these options to multiple targets.
 # ----
-# Usage: Link `dd_trace_cpp-specs` to targets using target_link_libraries.
-add_library(dd_trace_cpp-specs INTERFACE)
-add_library(dd_trace::specs ALIAS dd_trace_cpp-specs)
+# Usage: Link `dd-trace-cpp-specs` to targets using target_link_libraries.
+add_library(dd-trace-cpp-specs INTERFACE)
+add_library(dd-trace-cpp::specs ALIAS dd-trace-cpp-specs)
 
 if (DD_TRACE_STATIC_CRT)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -39,7 +39,7 @@ if (DD_TRACE_STATIC_CRT)
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
 endif ()
 
-target_compile_options(dd_trace_cpp-specs
+target_compile_options(dd-trace-cpp-specs
   INTERFACE
     /W4
     /wd4706
@@ -47,13 +47,13 @@ target_compile_options(dd_trace_cpp-specs
     /D_WIN32_WINNT=${win_ver}
 )
 
-target_link_options(dd_trace_cpp-specs
+target_link_options(dd-trace-cpp-specs
   INTERFACE
     ws2_32.lib
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug|RelWithDebInfo")
-  target_compile_options(dd_trace_cpp-specs
+  target_compile_options(dd-trace-cpp-specs
     INTERFACE
       # Embedded debug information in binaries (no pdb)
       /Z7
@@ -69,12 +69,12 @@ if (DD_TRACE_BUILD_FUZZERS)
 endif ()
 
 if (DD_TRACE_ENABLE_SANITIZE)
-  target_compile_options(dd_trace_cpp-specs
+  target_compile_options(dd-trace-cpp-specs
     INTERFACE
       /fsanitize=address
       /RTC1
   )
-  target_link_options(dd_trace_cpp-specs
+  target_link_options(dd-trace-cpp-specs
     INTERFACE
       /fsanitize=address
   )

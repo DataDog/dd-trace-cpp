@@ -10,7 +10,7 @@ if [ "$(uname)" != Linux ]; then
     exit 1
 fi
 
-VERSION=3.24.2
+VERSION=3.28.6
 REPO=$(dirname "$0")/..
 
 # If a suitably recent version of cmake is already installed, then don't bother.
