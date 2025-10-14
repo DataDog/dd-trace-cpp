@@ -129,13 +129,20 @@ std::string Tracer::config() const {
   return config.dump();
 }
 
+constexpr size_t kPROCESS_DISCOVERY_MAX_SIZE = 64 * 1024;  //< 64KiB
+
 void Tracer::store_config() {
-  auto maybe_file =
-      InMemoryFile::make(std::string("datadog-tracer-info-") + short_uuid());
+  std::string id{"datadog-tracer-info-"};
+#if defined(_MSC_VER)
+  id += std::to_string(get_process_id());
+#else
+  id += short_uuid();
+#endif
+  auto maybe_file = InMemoryFile::make(id, kPROCESS_DISCOVERY_MAX_SIZE);
   if (auto error = maybe_file.if_error()) {
     if (error->code == Error::Code::NOT_IMPLEMENTED) return;
 
-    logger_->log_error("Failed to open anonymous file");
+    logger_->log_error(error->with_prefix("Failed to open in-memory file: "));
     return;
   }
 
@@ -144,7 +151,7 @@ void Tracer::store_config() {
   auto defaults = config_manager_->span_defaults();
 
   std::string buffer;
-  buffer.reserve(1024);
+  buffer.reserve(kPROCESS_DISCOVERY_MAX_SIZE);
 
   // clang-format off
   msgpack::pack_map(
@@ -160,8 +167,10 @@ void Tracer::store_config() {
   );
   // clang-format on
 
-  if (!metadata_file_->write_then_seal(buffer)) {
-    logger_->log_error("Either failed to write or seal the configuration file");
+  if (auto maybe_write = metadata_file_->write_then_seal(buffer);
+      auto error = maybe_write.if_error()) {
+    logger_->log_error(error->with_prefix(
+        "Failed to store the configuration in the memory file: "));
   }
 }
 

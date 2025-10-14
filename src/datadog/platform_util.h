@@ -40,13 +40,14 @@ class InMemoryFile final {
   /// @param content The data to write into the in-memory file.
   /// @return `true` if the write and seal operations succeed, `false`
   /// otherwise.
-  bool write_then_seal(const std::string& content);
+  Expected<void> write_then_seal(const std::string& content);
 
   /// Creates an in-memory file with the given name.
   ///
   /// @param name The name of the in-memoru file.
+  /// @param size Maximum size of the file.
   /// @return An `InMemoryFile` if successful, or an error on failure.
-  static Expected<InMemoryFile> make(StringView name);
+  static Expected<InMemoryFile> make(const std::string& name, size_t size);
 };
 
 // Hold host information mainly used for telemetry purposes

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdint>
 #include <fstream>
+#include <iostream>
 #include <regex>
 
 // clang-format off
@@ -109,7 +110,7 @@ std::tuple<std::string, std::string> get_windows_info() {
   // application manifest, which is the lowest version supported by the
   // application. Use `RtlGetVersion` to obtain the accurate OS version
   // regardless of the manifest.
-  using RtlGetVersion = auto(*)(LPOSVERSIONINFOEXW)->NTSTATUS;
+  using RtlGetVersion = auto (*)(LPOSVERSIONINFOEXW)->NTSTATUS;
 
   RtlGetVersion func =
       (RtlGetVersion)GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
@@ -257,18 +258,22 @@ InMemoryFile::~InMemoryFile() {
   delete (data);
 }
 
-bool InMemoryFile::write_then_seal(const std::string& data) {
+Expected<void> InMemoryFile::write_then_seal(const std::string& data) {
   int fd = *static_cast<int*>(handle_);
 
   size_t written = write(fd, data.data(), data.size());
-  if (written != data.size()) return false;
+  if (written != data.size()) {
+    std::string err_msg = "failed to write the whole content. errno = ";
+    err_msg += std::to_string(errno);
+    return Error{Error::Code::OTHER, std::move(err_msg)};
+  };
 
   return fcntl(fd, F_ADD_SEALS,
                F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) == 0;
 }
 
-Expected<InMemoryFile> InMemoryFile::make(StringView name) {
-  int fd = memfd_create(name.data(), MFD_CLOEXEC | MFD_ALLOW_SEALING);
+Expected<InMemoryFile> InMemoryFile::make(const std::string& name, size_t) {
+  int fd = memfd_create(name.c_str(), MFD_CLOEXEC | MFD_ALLOW_SEALING);
   if (fd == -1) {
     std::string err_msg = "failed to create an anonymous file. errno = ";
     err_msg += std::to_string(errno);
@@ -280,10 +285,93 @@ Expected<InMemoryFile> InMemoryFile::make(StringView name) {
   return InMemoryFile(handle);
 }
 
+#elif defined(_MSC_VER)
+
+namespace windows {
+struct AnonymousFile final {
+  HANDLE handle;
+  size_t size;
+};
+
+constexpr DWORD kERR_MSG_MAX = 10 * 1024;  //< 10KiB
+
+std::string format_err(DWORD err) {
+  char buffer[kERR_MSG_MAX];
+
+  auto len = FormatMessageA(
+      FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, err,
+      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer, kERR_MSG_MAX, nullptr);
+  if (len == 0) {
+    return "";
+  }
+
+  return buffer;
+}
+
+}  // namespace windows
+
+InMemoryFile::~InMemoryFile() {
+  if (handle_ == nullptr) return;
+
+  auto anonfile = static_cast<windows::AnonymousFile*>(handle_);
+  CloseHandle(anonfile->handle);
+}
+
+Expected<void> InMemoryFile::write_then_seal(const std::string& data) {
+  if (handle_ == nullptr) return {};
+
+  auto anonfile = static_cast<windows::AnonymousFile*>(handle_);
+  if (data.size() >= anonfile->size) {
+    return {};
+  }
+
+  void* buffer = MapViewOfFile(anonfile->handle, FILE_MAP_WRITE, 0, 0, 0);
+  if (buffer == nullptr) {
+    auto last_err = GetLastError();
+    std::string err_msg = "failed to create an anonymous file: ";
+    err_msg += windows::format_err(last_err);
+    err_msg += "(errno: ";
+    err_msg += std::to_string(last_err);
+    err_msg += ")";
+    return Error{Error::Code::OTHER, std::move(err_msg)};
+  }
+
+  /*__try {*/
+  std::memcpy(buffer, (void*)data.c_str(), data.size());
+  /*} __except (GetExceptionCode() == EXCEPTION_IN_PAGE_ERROR*/
+  /*                ? EXCEPTION_EXECUTE_HANDLER*/
+  /*                : EXCEPTION_CONTINUE_SEARCH) {*/
+  /*  return Error{Error::Code::OTHER, "failed to write"};*/
+  /*}*/
+
+  UnmapViewOfFile(buffer);
+  return {};
+}
+
+Expected<InMemoryFile> InMemoryFile::make(const std::string& name,
+                                          size_t size) {
+  HANDLE h = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
+                               (DWORD)size, name.c_str());
+  if (h == nullptr) {
+    auto last_err = GetLastError();
+    std::string err_msg = "failed to create an anonymous file: ";
+    err_msg += windows::format_err(last_err);
+    err_msg += "(errno: ";
+    err_msg += std::to_string(last_err);
+    err_msg += ")";
+    return Error{Error::Code::OTHER, std::move(err_msg)};
+  }
+
+  void* anonfile = new windows::AnonymousFile{h, size};
+  return InMemoryFile{anonfile};
+}
+
 #else
 InMemoryFile::~InMemoryFile() {}
-bool InMemoryFile::write_then_seal(const std::string&) { return false; }
-Expected<InMemoryFile> InMemoryFile::make(StringView) {
+Expected<void> InMemoryFile::write_then_seal(const std::string&) {
+  return false;
+}
+Expected<InMemoryFile> InMemoryFile::make(const std::string&, size_t) {
   return Error{Error::Code::NOT_IMPLEMENTED, "In-memory file not implemented"};
 }
 #endif
