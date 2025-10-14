@@ -5,7 +5,7 @@ jobs:
   format:
     runs-on: ubuntu-22.04-arm
     container:
-      image: datadog/docker-library:dd-trace-cpp-ci-5f5c273-arm64
+      image: datadog/docker-library:dd-trace-cpp-ci-23768e9-arm64
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Check format
@@ -29,7 +29,7 @@ jobs:
     needs: format
     runs-on: ${{ matrix.runner }}
     container:
-      image: datadog/docker-library:dd-trace-cpp-ci-5f5c273-${{matrix.docker-arch}}
+      image: datadog/docker-library:dd-trace-cpp-ci-23768e9-${{matrix.docker-arch}}
     environment:
       name: dev
     permissions:
@@ -68,7 +68,7 @@ jobs:
             docker-arch: amd64
     runs-on: ${{ matrix.runner }}
     container:
-      image: datadog/docker-library:dd-trace-cpp-ci-5f5c273-${{matrix.docker-arch}}
+      image: datadog/docker-library:dd-trace-cpp-ci-23768e9-${{matrix.docker-arch}}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Build
@@ -144,7 +144,7 @@ jobs:
     needs: build-linux-cmake 
     runs-on: ubuntu-22.04-arm
     container:
-      image: datadog/docker-library:dd-trace-cpp-ci-5f5c273-arm64
+      image: datadog/docker-library:dd-trace-cpp-ci-23768e9-arm64
     environment:
       name: dev
     permissions:

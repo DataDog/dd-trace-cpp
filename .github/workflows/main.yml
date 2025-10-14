@@ -40,7 +40,7 @@ jobs:
     needs: call-dev-workflow
     runs-on: ubuntu-22.04-arm
     container:
-      image: datadog/docker-library:dd-trace-cpp-ci-5f5c273-arm64
+      image: datadog/docker-library:dd-trace-cpp-ci-23768e9-arm64
     env:
       DURATION_SEC: 300 # 5min
     steps:
