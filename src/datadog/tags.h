@@ -37,10 +37,10 @@ extern const std::string trace_id_high;
 extern const std::string process_id;
 extern const std::string language;
 extern const std::string runtime_id;
-extern const std::string sampling_decider;
 extern const std::string w3c_parent_id;
 extern const std::string trace_source;  // _dd.p.ts
 extern const std::string apm_enabled;   // _dd.apm.enabled
+extern const std::string ksr;           // _dd.p.ksr
 
 }  // namespace internal
 
