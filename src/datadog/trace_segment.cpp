@@ -11,6 +11,7 @@
 #include <datadog/trace_segment.h>
 
 #include <cassert>
+#include <charconv>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -226,13 +227,6 @@ void TraceSegment::span_finished() {
     }
   }
 
-  if (decision.origin == SamplingDecision::Origin::DELEGATED &&
-      local_root.parent_id == 0) {
-    // Convey the fact that, even though we are the root service, we delegated
-    // the sampling decision and so are not the "sampling decider."
-    local_root.tags[tags::internal::sampling_decider] = "0";
-  }
-
   // RFC seems to only mandate that this be set if the trace is kept.
   // However, system-tests expect this to be always be set.
   // Add it all the time; can't hurt
@@ -292,6 +286,10 @@ void TraceSegment::make_sampling_decision_if_null() {
   sampling_decision_ = trace_sampler_->decide(local_root);
 
   update_decision_maker_trace_tag();
+
+  trace_tags_.emplace_back(
+      tags::internal::ksr,
+      std::to_string(*sampling_decision_->configured_rate));
 }
 
 void TraceSegment::update_decision_maker_trace_tag() {
