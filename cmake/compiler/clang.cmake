@@ -2,10 +2,10 @@
 # It provides a convenient way to apply these options to multiple targets.
 # ----
 # Usage: Link `dd_trace_cpp-specs` to targets using target_link_libraries.
-add_library(dd_trace_cpp-specs INTERFACE)
-add_library(dd_trace::specs ALIAS dd_trace_cpp-specs)
+add_library(dd-trace-cpp-specs INTERFACE)
+add_library(dd-trace-cpp::specs ALIAS dd-trace-cpp-specs)
 
-target_compile_options(dd_trace_cpp-specs
+target_compile_options(dd-trace-cpp-specs
   INTERFACE
     -Wall
     -Wextra
@@ -27,7 +27,7 @@ target_compile_options(dd_trace_cpp-specs
 )
 
 if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 16)
-  target_compile_options(dd_trace_cpp-specs
+  target_compile_options(dd-trace-cpp-specs
     INTERFACE
     -fstrict-flex-arrays=3
   )
@@ -35,19 +35,19 @@ endif ()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release|RelWithDebInfo")
   # -ftrivial-auto-var-init can interfere with other tools
-  target_compile_options(dd_trace_cpp-specs
+  target_compile_options(dd-trace-cpp-specs
     INTERFACE
     -ftrivial-auto-var-init=zero
   )
 endif ()
 
 function(add_sanitizers)
-  target_compile_options(dd_trace_cpp-specs
+  target_compile_options(dd-trace-cpp-specs
     INTERFACE
       -fsanitize=address,undefined
   )
 
-  target_link_libraries(dd_trace_cpp-specs
+  target_link_libraries(dd-trace-cpp-specs
     INTERFACE
       -fsanitize=address,undefined
   )
@@ -59,7 +59,7 @@ if (DD_TRACE_ENABLE_COVERAGE)
     message(FATAL_ERROR "gcov not found. Cannot build with -DDD_TRACE_ENABLE_COVERAGE")
   endif ()
 
-  target_compile_options(dd_trace_cpp-specs
+  target_compile_options(dd-trace-cpp-specs
     INTERFACE
       -g
       -O0
@@ -67,7 +67,7 @@ if (DD_TRACE_ENABLE_COVERAGE)
       -ftest-coverage
   )
 
-  target_link_libraries(dd_trace_cpp-specs
+  target_link_libraries(dd-trace-cpp-specs
     INTERFACE
       -fprofile-arcs
   )
@@ -80,12 +80,12 @@ endif()
 if (DD_TRACE_BUILD_FUZZERS)
   add_sanitizers()
 
-  target_compile_options(dd_trace_cpp-specs
+  target_compile_options(dd-trace-cpp-specs
     INTERFACE
       -fsanitize=fuzzer
   )
 
-  target_link_libraries(dd_trace_cpp-specs
+  target_link_libraries(dd-trace-cpp-specs
     INTERFACE
       -fsanitize=fuzzer
   )

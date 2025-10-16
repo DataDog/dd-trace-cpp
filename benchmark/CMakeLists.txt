@@ -23,6 +23,6 @@ target_include_directories(dd_trace_cpp-benchmark
 target_link_libraries(dd_trace_cpp-benchmark 
   PRIVATE
     benchmark::benchmark
-    dd_trace::static
+    dd-trace-cpp::static
     nlohmann_json::nlohmann_json
 )

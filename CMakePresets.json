@@ -25,6 +25,7 @@
       "displayName": "Development",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "DD_TRACE_ENABLE_SANITIZE": "OFF",
         "DD_TRACE_BUILD_TESTING": "ON",
         "DD_TRACE_BUILD_EXAMPLES": "ON",

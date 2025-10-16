@@ -755,6 +755,19 @@ TEST_TRACER("span extraction") {
         {__LINE__, "invalid: non hex trace tag ID",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-xy", // traceparent
          "malformed_traceflags"}, // expected_error_tag_value
+
+        {
+            __LINE__,
+            "invalid: non supported character in trace version 1/x",
+            ".0-12345678901234567890123456789012-1234567890123456-01",
+            "invalid_version",
+        },
+        {
+            __LINE__,
+            "invalid: non supported character in trace version 2/x",
+            "0.-12345678901234567890123456789012-1234567890123456-01",
+            "invalid_version"
+        },
     }));
     // clang-format on
 

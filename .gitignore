@@ -1,6 +1,9 @@
 /bazel-*
 /.build/
+/build/
+/build-*/
 /.coverage/
+build/
 
 dist/
 out/
