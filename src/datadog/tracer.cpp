@@ -143,20 +143,27 @@ void Tracer::store_config() {
 
   auto defaults = config_manager_->span_defaults();
 
+  std::string container_id = "";
+  if (auto maybe_container_id = container::get_id()) {
+    container_id = maybe_container_id->value;
+  }
+
   std::string buffer;
   buffer.reserve(1024);
 
   // clang-format off
   msgpack::pack_map(
     buffer, 
-    "schema_version", [&](auto& buffer) { msgpack::pack_integer(buffer, std::uint64_t(1)); return Expected<void>{}; },
+    "schema_version", [&](auto& buffer) { msgpack::pack_integer(buffer, std::uint64_t(2)); return Expected<void>{}; },
     "runtime_id", [&](auto& buffer) { return msgpack::pack_string(buffer, runtime_id_.string()); },
     "tracer_version", [&](auto& buffer) { return msgpack::pack_string(buffer, signature_.library_version); },
     "tracer_language", [&](auto& buffer) { return msgpack::pack_string(buffer, signature_.library_language); },
     "hostname", [&](auto& buffer) { return msgpack::pack_string(buffer, hostname_.value_or("")); },
     "service_name", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->service); },
     "service_env", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->environment); },
-    "service_version", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->version); }
+    "service_version", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->version); },
+    "process_tags", [&](auto& buffer) { return msgpack::pack_string(buffer, ""); },
+    "container_id", [&](auto& buffer) { return msgpack::pack_string(buffer, container_id); }
   );
   // clang-format on
 

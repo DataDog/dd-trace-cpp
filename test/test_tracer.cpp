@@ -18,6 +18,7 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 #include <datadog/w3c_propagation.h>
+#include <stdio.h>
 
 #include <chrono>
 #include <ctime>
@@ -1844,7 +1845,9 @@ TEST_TRACER("APM tracing disabled") {
       auto finalized_config = finalize_config(config, clock);
       REQUIRE(finalized_config);
       Tracer tracer{*finalized_config};
-      { auto root1 = tracer.create_span(); }
+      {
+        auto root1 = tracer.create_span();
+      }
       REQUIRE(collector->chunks.size() == 1);
       REQUIRE(collector->chunks.front().size() == 1);
 
@@ -1923,7 +1926,9 @@ TEST_TRACER("APM tracing disabled") {
 
     // When APM Tracing is disabled, we allow one trace per second for service
     // liveness. To ensure consistency, consume the limiter slot.
-    { tracer.create_span(); }
+    {
+      tracer.create_span();
+    }
     collector->chunks.clear();
 
     // Case 1: extracted context with priority, but no `_dd.p.ts` → depends if
@@ -2034,3 +2039,48 @@ TEST_TRACER("APM tracing disabled") {
     }
   }
 }
+
+#if defined(__linux__) || defined(__unix__)
+TEST_TRACER("process discovery") {
+  auto find_memfd = [] -> std::optional<std::string> {
+    DIR* dir = opendir("/proc/self/fd");
+    if (!dir) return nullopt;
+
+    char path[PATH_MAX], target[PATH_MAX];
+
+    for (struct dirent* entry = readdir(dir); entry != nullptr;
+         entry = readdir(dir)) {
+      if (entry->d_type != DT_LNK) continue;
+
+      snprintf(path, sizeof(path), "/proc/self/fd/%s", entry->d_name);
+      auto len = readlink(path, target, sizeof(target) - 1);
+      if (len == -1) continue;
+      target[len] = '\0';
+
+      if (std::string_view(target).starts_with(
+              "memfd:datadog-tracer-info-" 6)) {
+        closedir(dir);
+        return entry->d_name;
+      }
+    }
+
+    return nullopt;
+  };
+
+  TracerConfig cfg;
+  auto finalized_config = finalize_config(cfg);
+  REQUIRE(finalized_config);
+
+  {
+    Tracer tracer{*finalized_config};
+
+    auto fd = find_memfd();
+    CHECK(fd);
+
+    // TODO: Read content
+  }
+
+  auto fd = find_memfd();
+  CHECK(!fd);
+}
+#endif
