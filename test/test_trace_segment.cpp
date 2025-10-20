@@ -236,9 +236,7 @@ TEST_CASE("TraceSegment finalization of spans") {
             {"x-datadog-sampling-priority", std::to_string(sampling_priority)},
         };
         MockDictReader reader{headers};
-        {
-          auto span = tracer.extract_span(reader);
-        }
+        { auto span = tracer.extract_span(reader); }
         REQUIRE(collector->span_count() == 1);
         REQUIRE(collector->first_span().numeric_tags.at(
                     tags::internal::sampling_priority) == sampling_priority);

@@ -499,9 +499,7 @@ TEST_SPAN("injection") {
     REQUIRE(writer.items.empty() == false);
 
     // Consume the span that MUST be kept for service liveness.
-    {
-      apm_disabled_tracer.create_span();
-    }
+    { apm_disabled_tracer.create_span(); }
 
     auto span = apm_disabled_tracer.create_span();
 
