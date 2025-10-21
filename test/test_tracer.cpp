@@ -995,11 +995,13 @@ TEST_TRACER("span extraction") {
             __LINE__,
             "origin, trace tags, parent, and extra fields",
             traceparent_drop,  // traceparent
-            "dd=o:France;p:00000000000d69ac;t.foo:thing1;t.bar:thing2;x:wow;y:"
+            "dd=o:France;p:00000000000d69ac;t.ksr:0.728;t.foo:thing1;t.bar:"
+            "thing2;x:wow;y:"
             "wow",     // tracestate
             0,         // expected_sampling_priority
             "France",  // expected_origin
             {
+                {"_dd.p.ksr", "0.728"},
                 {"_dd.p.foo", "thing1"},
                 {"_dd.p.bar", "thing2"},
             },                   // expected_trace_tags
@@ -2033,4 +2035,23 @@ TEST_TRACER("APM tracing disabled") {
       }
     }
   }
+}
+
+TEST_TRACER("_dd.p.ksr is NOT set when overriding the sampling decision") {
+  const auto collector = std::make_shared<MockCollector>();
+
+  TracerConfig config;
+  config.collector = collector;
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+
+  Tracer tracer{*finalized_config};
+
+  {
+    auto span = tracer.create_span();
+    span.trace_segment().override_sampling_priority(10);
+  }
+
+  auto c = collector->first_span();
+  CHECK(c.tags.count(tags::internal::ksr) == 0);
 }
