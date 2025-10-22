@@ -310,6 +310,7 @@ TEST_CASE("TraceSegment finalization of spans") {
       REQUIRE_THAT(span.tags, ContainsSubset(filtered));
       // "_dd.p.dm" will be added, because we made a sampling decision.
       REQUIRE(span.tags.count("_dd.p.dm") == 1);
+      REQUIRE(span.tags.count("_dd.p.ksr") == 1);
     }
 
     SECTION("rate tags") {
@@ -324,6 +325,7 @@ TEST_CASE("TraceSegment finalization of spans") {
         REQUIRE(collector->span_count() == 1);
         const auto& span = collector->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
+        REQUIRE(span.tags.at(tags::internal::ksr) == "1.000000");
       }
 
       SECTION(
@@ -343,7 +345,11 @@ TEST_CASE("TraceSegment finalization of spans") {
           auto span = tracer.create_span();
           (void)span;
         }
-        REQUIRE(collector_response->span_count() == 1);
+        {
+          REQUIRE(collector_response->span_count() == 1);
+          const auto& span = collector_response->first_span();
+          CHECK(span.tags.at(tags::internal::ksr) == "1.000000");
+        }
 
         collector_response->chunks.clear();
         // Second trace will use the rate from `collector->response`.
@@ -351,9 +357,12 @@ TEST_CASE("TraceSegment finalization of spans") {
           auto span = tracer.create_span();
           (void)span;
         }
-        REQUIRE(collector_response->span_count() == 1);
-        const auto& span = collector_response->first_span();
-        REQUIRE(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
+        {
+          REQUIRE(collector_response->span_count() == 1);
+          const auto& span = collector_response->first_span();
+          CHECK(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
+          CHECK(span.tags.at(tags::internal::ksr) == "1.000000");
+        }
       }
 
       SECTION("rules (implicit and explicit)") {
@@ -383,6 +392,7 @@ TEST_CASE("TraceSegment finalization of spans") {
         const auto& span = collector->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::rule_sample_rate) ==
                 sample_rate);
+        CHECK(span.tags.at(tags::internal::ksr) == std::to_string(sample_rate));
         if (sample_rate == 1.0) {
           REQUIRE(span.numeric_tags.at(
                       tags::internal::rule_limiter_sample_rate) == 1.0);

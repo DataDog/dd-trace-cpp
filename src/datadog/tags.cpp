@@ -29,10 +29,10 @@ const std::string trace_id_high = "_dd.p.tid";
 const std::string process_id = "process_id";
 const std::string language = "language";
 const std::string runtime_id = "runtime-id";
-const std::string sampling_decider = "_dd.is_sampling_decider";
 const std::string w3c_parent_id = "_dd.parent_id";
 const std::string trace_source = "_dd.p.ts";
 const std::string apm_enabled = "_dd.apm.enabled";
+const std::string ksr = "_dd.p.ksr";
 
 }  // namespace internal
 
