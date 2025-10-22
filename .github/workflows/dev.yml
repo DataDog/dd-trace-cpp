@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Configure
-        run: bin/with-toolchain ${{ matrix.toolchain }} cmake . -B .build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_TESTING=1  
+        run: bin/with-toolchain ${{ matrix.toolchain }} cmake . -B .build --preset ci-clang
       - name: Build
         run: cmake --build ${BUILD_DIR} -j -v
       - name: Test
@@ -129,7 +129,7 @@ jobs:
       - name: Build
         run: |
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }} 
-          cmake --preset=ci-windows -B build -DCMAKE_BUILD_TYPE=Debug .
+          cmake --preset=ci-msvc -B build -DCMAKE_BUILD_TYPE=Debug .
           cmake --build build -j $env:MAKE_JOB_COUNT -v
       - name: Test
         run: |
