@@ -10,7 +10,7 @@
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
         "BUILD_SHARED_LIBS": "OFF",
         "DD_TRACE_STATIC_CRT": "1",
-        "DD_TRACE_BUILD_TESTING": "1",
+        "DD_TRACE_BUILD_TESTING": "ON",
         "DD_TRACE_ENABLE_SANITIZE": "ON"
       }
     },
