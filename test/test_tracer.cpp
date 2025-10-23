@@ -1850,9 +1850,7 @@ TEST_TRACER("APM tracing disabled") {
       auto finalized_config = finalize_config(config, clock);
       REQUIRE(finalized_config);
       Tracer tracer{*finalized_config};
-      {
-        auto root1 = tracer.create_span();
-      }
+      { auto root1 = tracer.create_span(); }
       REQUIRE(collector->chunks.size() == 1);
       REQUIRE(collector->chunks.front().size() == 1);
 
@@ -1931,9 +1929,7 @@ TEST_TRACER("APM tracing disabled") {
 
     // When APM Tracing is disabled, we allow one trace per second for service
     // liveness. To ensure consistency, consume the limiter slot.
-    {
-      tracer.create_span();
-    }
+    { tracer.create_span(); }
     collector->chunks.clear();
 
     // Case 1: extracted context with priority, but no `_dd.p.ts` → depends if
