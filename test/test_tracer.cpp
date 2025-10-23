@@ -18,10 +18,11 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 #include <datadog/w3c_propagation.h>
+#if defined(__linux__) || defined(__unix__)
 #include <dirent.h>
-#include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
+#endif
 
 #include <chrono>
 #include <ctime>
