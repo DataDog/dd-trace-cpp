@@ -6,6 +6,19 @@
 #include <datadog/string_view.h>
 
 #include <string>
+#include <vector>
+
+// clang-format off
+#if defined(__x86_64__) || defined(_M_X64)
+#  define DD_SDK_CPU_ARCH "x86_64"
+#elif defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)
+#  define DD_SDK_CPU_ARCH "x86"
+#elif defined(__aarch64__) || defined(_M_ARM64)
+#  define DD_SDK_CPU_ARCH "arm64"
+#else
+#  define DD_SDK_CPU_ARCH "unknown"
+#endif
+// clang-format on
 
 namespace datadog {
 namespace tracing {
