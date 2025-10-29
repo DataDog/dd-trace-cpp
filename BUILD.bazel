@@ -85,7 +85,7 @@ cc_library(
       "src/datadog/w3c_propagation.h",
 ] + select({
     "@platforms//os:windows": [
-        "src/datadog/platform_util_win.cpp",
+        "src/datadog/platform_util_windows.cpp",
     ],
     "@platforms//os:linux": [
         "src/datadog/platform_util_unix.cpp",
