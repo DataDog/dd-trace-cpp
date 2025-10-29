@@ -184,7 +184,6 @@ target_sources(dd-trace-cpp-objects
     src/datadog/logger.cpp
     src/datadog/msgpack.cpp
     src/datadog/parse_util.cpp
-    src/datadog/platform_util.cpp
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp
     src/datadog/rate.cpp
@@ -211,6 +210,16 @@ target_sources(dd-trace-cpp-objects
     src/datadog/version.cpp
     src/datadog/w3c_propagation.cpp
 )
+
+if (WIN32)
+  target_sources(dd-trace-cpp-objects PRIVATE src/datadog/platform_util_windows.cpp)
+elseif (APPLE)
+  target_sources(dd-trace-cpp-objects PRIVATE src/datadog/platform_util_darwin.cpp)
+elseif (UNIX)
+  target_sources(dd-trace-cpp-objects PRIVATE src/datadog/platform_util_unix.cpp)
+else ()
+  target_sources(dd-trace-cpp-objects PRIVATE src/datadog/platform_util_unknown.cpp)
+endif ()
 
 target_include_directories(dd-trace-cpp-objects
   PRIVATE

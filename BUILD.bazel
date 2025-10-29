@@ -28,7 +28,6 @@ cc_library(
       "src/datadog/logger.cpp",
       "src/datadog/msgpack.cpp",
       "src/datadog/parse_util.cpp",
-      "src/datadog/platform_util.cpp",
       "src/datadog/propagation_style.cpp",
       "src/datadog/random.cpp",
       "src/datadog/rate.cpp",
@@ -84,7 +83,20 @@ cc_library(
       "src/datadog/threaded_event_scheduler.h",
       "src/datadog/trace_sampler.h",
       "src/datadog/w3c_propagation.h",
+] + select({
+    "@platforms//os:windows": [
+        "src/datadog/platform_util_win.cpp",
     ],
+    "@platforms//os:linux": [
+        "src/datadog/platform_util_unix.cpp",
+    ],
+    "@platforms//os:macos": [
+        "src/datadog/platform_util_darwin.cpp",
+    ],
+    "//conditions:default": [
+        "src/datadog/platform_util_unknown.cpp",
+    ],
+}),
     hdrs = [
       "include/datadog/baggage.h",
       "include/datadog/cerr_logger.h",
