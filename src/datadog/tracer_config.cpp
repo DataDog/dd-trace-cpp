@@ -413,6 +413,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     final_config.runtime_id = user_config.runtime_id;
   }
 
+  final_config.process_tags = user_config.process_tags;
+
   auto agent_finalized =
       finalize_config(user_config.agent, final_config.logger, clock);
   if (auto *error = agent_finalized.if_error()) {

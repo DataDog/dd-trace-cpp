@@ -3,10 +3,11 @@
 // This component provides platform-dependent miscellanea.
 
 #include <datadog/expected.h>
+#include <datadog/optional.h>
 #include <datadog/string_view.h>
 
+#include <filesystem>
 #include <string>
-#include <vector>
 
 // clang-format off
 #if defined(__x86_64__) || defined(_M_X64)
@@ -82,6 +83,8 @@ std::string get_hostname();
 int get_process_id();
 
 std::string get_process_name();
+
+Optional<std::filesystem::path> get_process_path();
 
 int at_fork_in_child(void (*on_fork)());
 

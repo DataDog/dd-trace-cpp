@@ -188,6 +188,13 @@ struct TracerConfig {
   // present. This is disabled by default.
   // This option is ignored if `resource_renaming_enabled` is not `true`.
   Optional<bool> resource_renaming_always_simplified_endpoint;
+
+  /// A mapping of process-specific tags used to uniquely identify processes.
+  ///
+  /// The `process_tags` map allows associating arbitrary string-based keys and
+  /// values with a process. These tags are consumed as fact for identifying
+  /// processes.
+  std::unordered_map<std::string, std::string> process_tags;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -229,6 +236,7 @@ class FinalizedTracerConfig final {
   std::shared_ptr<HTTPClient> http_client;
   bool tracing_enabled;
   HttpEndpointCalculationMode resource_renaming_mode;
+  std::unordered_map<std::string, std::string> process_tags;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
