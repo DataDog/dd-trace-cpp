@@ -1,3 +1,4 @@
+#include <libproc.h>
 #include <pthread.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
@@ -13,6 +14,8 @@
 
 #define DD_SDK_OS "Darwin"
 #define DD_SDK_KERNEL "Darwin"
+
+namespace fs = std::filesystem;
 
 namespace datadog {
 namespace tracing {
@@ -55,6 +58,15 @@ HostInfo get_host_info() {
 std::string get_hostname() { return get_host_info().hostname; }
 
 int get_process_id() { return ::getpid(); }
+
+Optional<std::filesystem::path> get_process_path() {
+  char pathbuf[PROC_PIDPATHINFO_MAXSIZE];
+  if (!proc_pidpath(::getpid(), pathbuf, sizeof(pathbuf))) {
+    return nullopt;
+  }
+
+  return fs::path(pathbuf);
+}
 
 std::string get_process_name() {
   const char* process_name = getprogname();
