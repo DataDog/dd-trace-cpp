@@ -178,6 +178,13 @@ struct TracerConfig {
   /// Overridden by the `DD_APM_TRACING_ENABLED` environment variable. Defaults
   /// to `true`.
   Optional<bool> tracing_enabled;
+
+  /// A mapping of process-specific tags used to uniquely identify processes.
+  ///
+  /// The `process_tags` map allows associating arbitrary string-based keys and
+  /// values with a process. These tags are consumed as fact for identifying
+  /// processes.
+  std::unordered_map<std::string, std::string> process_tags;
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -218,6 +225,7 @@ class FinalizedTracerConfig final {
   std::shared_ptr<EventScheduler> event_scheduler;
   std::shared_ptr<HTTPClient> http_client;
   bool tracing_enabled;
+  std::unordered_map<std::string, std::string> process_tags;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

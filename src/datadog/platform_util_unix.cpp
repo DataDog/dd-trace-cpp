@@ -20,6 +20,8 @@
 #define DD_SDK_OS "GNU/Linux"
 #define DD_SDK_KERNEL "Linux"
 
+namespace fs = std::filesystem;
+
 namespace datadog {
 namespace tracing {
 namespace {
@@ -78,6 +80,10 @@ HostInfo get_host_info() {
 std::string get_hostname() { return get_host_info().hostname; }
 
 int get_process_id() { return ::getpid(); }
+
+Optional<std::filesystem::path> get_process_path() {
+  return fs::path(program_invocation_name);
+}
 
 std::string get_process_name() { return program_invocation_short_name; }
 
