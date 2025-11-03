@@ -37,6 +37,7 @@
 #include "runtime_id.h"
 #include "sampling_decision.h"
 #include "sampling_priority.h"
+#include "tracer_config.h"
 
 namespace datadog {
 namespace telemetry {
@@ -79,6 +80,8 @@ class TraceSegment {
 
   std::shared_ptr<ConfigManager> config_manager_;
 
+  ResourceRenamingMode resource_renaming_mode_;
+
   bool tracing_enabled_;
 
  public:
@@ -97,6 +100,7 @@ class TraceSegment {
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
                std::unique_ptr<SpanData> local_root,
+               ResourceRenamingMode resource_renaming_mode,
                bool tracing_enabled = true);
 
   const SpanDefaults& defaults() const;

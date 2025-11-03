@@ -46,8 +46,8 @@ const telemetry::Distribution bytes_sent{"telemetry_api.bytes", "telemetry",
 
 /// The time it takes to send the payload sent to the endpoint in ms, tagged by
 /// the endpoint (`endpoint:agent`, `endpoint:agentless`).
-const telemetry::Distribution request_duration{"telemetry_api.ms", "telemetry",
-                                               true};
+[[maybe_unused]] const telemetry::Distribution request_duration{
+    "telemetry_api.ms", "telemetry", true};
 
 }  // namespace internal_metrics
 
@@ -109,6 +109,10 @@ std::string to_string(datadog::tracing::ConfigName name) {
       return "trace_baggage_max_items";
     case ConfigName::APM_TRACING_ENABLED:
       return "apm_tracing_enabled";
+    case ConfigName::TRACE_RESOURCE_RENAMING_ENABLED:
+      return "trace_resource_renaming_enabled";
+    case ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT:
+      return "trace_resource_renaming_always_simplified_endpoint";
   }
 
   std::abort();

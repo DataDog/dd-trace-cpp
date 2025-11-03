@@ -38,6 +38,9 @@ extern const std::string process_id;
 extern const std::string language;
 extern const std::string runtime_id;
 extern const std::string w3c_parent_id;
+extern const std::string http_endpoint;
+extern const std::string http_route;
+extern const std::string http_url;
 extern const std::string trace_source;  // _dd.p.ts
 extern const std::string apm_enabled;   // _dd.apm.enabled
 extern const std::string ksr;           // _dd.p.ksr
