@@ -178,6 +178,21 @@ struct TracerConfig {
   /// Overridden by the `DD_APM_TRACING_ENABLED` environment variable. Defaults
   /// to `true`.
   Optional<bool> tracing_enabled;
+
+  // Whether generation of http.endpoint is enabled. This is disabled by
+  // default.
+  Optional<bool> resource_renaming_enabled;
+
+  // Whether http.endpoint is always calculated, even when http.route is
+  // present. This is disabled by default.
+  // This option is ignored if `resource_renaming_enabled` is not `true`.
+  Optional<bool> resource_renaming_always_simplified_endpoint;
+};
+
+enum class ResourceRenamingMode : std::uint8_t {
+  DISABLED,
+  FALLBACK,  // only if http.route is not present
+  ALWAYS_CALCULATE,
 };
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
@@ -218,6 +233,7 @@ class FinalizedTracerConfig final {
   std::shared_ptr<EventScheduler> event_scheduler;
   std::shared_ptr<HTTPClient> http_client;
   bool tracing_enabled;
+  ResourceRenamingMode resource_renaming_mode;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

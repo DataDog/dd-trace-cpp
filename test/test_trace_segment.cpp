@@ -492,3 +492,113 @@ TEST_CASE("independent of Tracer") {
 
   tracer.reset();
 }
+
+TEST_CASE("http.endpoint population") {
+  TracerConfig config;
+  config.service = "testsvc";
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<MockLogger>();
+
+  SECTION("DISABLED -> never adds http.endpoint") {
+    // default is disabled
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized};
+    {
+      auto span = tracer.create_span();
+      span.set_tag(tags::internal::http_url, "http://example.com/users/12?x=y");
+    }
+    REQUIRE(collector->span_count() == 1);
+    const auto& span = collector->first_span();
+    REQUIRE(span.tags.count(tags::internal::http_endpoint) == 0);
+  }
+
+  SECTION("FALLBACK mode -> adds only when http.route is absent") {
+    config.resource_renaming_enabled = {true};
+    config.resource_renaming_always_simplified_endpoint = {false};
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->resource_renaming_mode ==
+            ResourceRenamingMode::FALLBACK);
+
+    SECTION("route absent -> endpoint added from url path") {
+      Tracer tracer{*finalized};
+      {
+        auto span = tracer.create_span();
+        span.set_tag(tags::internal::http_url,
+                     "http://example.com/users/12?x=y");
+      }
+      REQUIRE(collector->span_count() == 1);
+      const auto& span = collector->first_span();
+      REQUIRE(span.tags.count(tags::internal::http_endpoint) == 1);
+      CHECK(span.tags.at(tags::internal::http_endpoint) ==
+            "/users/{param:int}");
+    }
+
+    SECTION("route present -> endpoint not added") {
+      collector->chunks.clear();
+      Tracer tracer{*finalized};
+      {
+        auto span = tracer.create_span();
+        span.set_tag(tags::internal::http_url, "http://example.com/users/12");
+        span.set_tag(tags::internal::http_route, "/users/:id");
+      }
+      REQUIRE(collector->span_count() == 1);
+      const auto& span = collector->first_span();
+      REQUIRE(span.tags.count(tags::internal::http_endpoint) == 0);
+    }
+  }
+
+  SECTION("ALWAYS_CALCULATE -> adds even when http.route is present") {
+    config.resource_renaming_enabled = {true};
+    config.resource_renaming_always_simplified_endpoint = {true};
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    REQUIRE(finalized->resource_renaming_mode ==
+            ResourceRenamingMode::ALWAYS_CALCULATE);
+
+    Tracer tracer{*finalized};
+    {
+      auto span = tracer.create_span();
+      span.set_tag(tags::internal::http_url, "http://example.com/notes/99");
+      span.set_tag(tags::internal::http_route, "/notes/:id");
+    }
+    REQUIRE(collector->span_count() == 1);
+    const auto& span = collector->first_span();
+    REQUIRE(span.tags.count(tags::internal::http_endpoint) == 1);
+    CHECK(span.tags.at(tags::internal::http_endpoint) == "/notes/{param:int}");
+  }
+
+  SECTION("http.url absent -> never adds") {
+    config.resource_renaming_enabled = {true};
+    config.resource_renaming_always_simplified_endpoint = {true};
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized};
+    {
+      auto span = tracer.create_span();
+      // no http.url
+    }
+    REQUIRE(collector->span_count() == 1);
+    const auto& span = collector->first_span();
+    REQUIRE(span.tags.count(tags::internal::http_endpoint) == 0);
+  }
+
+  SECTION("pre-existing http.endpoint is preserved") {
+    config.resource_renaming_enabled = {true};
+    config.resource_renaming_always_simplified_endpoint = {true};
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized};
+    {
+      auto span = tracer.create_span();
+      span.set_tag(tags::internal::http_url, "http://example.com/widgets/123");
+      span.set_tag(tags::internal::http_endpoint, "/pre/set");
+    }
+    REQUIRE(collector->span_count() == 1);
+    const auto& span = collector->first_span();
+    REQUIRE(span.tags.count(tags::internal::http_endpoint) == 1);
+    CHECK(span.tags.at(tags::internal::http_endpoint) == "/pre/set");
+  }
+}
