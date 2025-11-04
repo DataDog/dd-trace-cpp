@@ -243,6 +243,56 @@ TEST_CASE("TraceSegment finalization of spans") {
       }
 
       SECTION(
+          "override extracted sampling priority with set_tag('manual.keep', "
+          "'1') -> local root sampling priority is USER_KEEP (2)") {
+        auto sampling_priority = GENERATE(-1, 0, 1, 2);
+        const std::unordered_map<std::string, std::string> headers{
+            {"x-datadog-trace-id", "123"},
+            {"x-datadog-parent-id", "456"},
+            {"x-datadog-sampling-priority", std::to_string(sampling_priority)},
+        };
+        MockDictReader reader{headers};
+        {
+          auto span = tracer.extract_span(reader);
+          REQUIRE(span);
+
+          span->set_tag(tags::manual_keep, "1");
+        }
+        REQUIRE(collector->span_count() == 1);
+        REQUIRE(collector->first_span().numeric_tags.at(
+                    tags::internal::sampling_priority) ==
+                int(SamplingPriority::USER_KEEP));
+        REQUIRE(
+            collector->first_span().tags.at(tags::internal::decision_maker) ==
+            "-" + std::to_string(int(SamplingMechanism::MANUAL)));
+      }
+
+      SECTION(
+          "override extracted sampling priority with set_tag('manual.keep', "
+          "'true') -> local root sampling priority is USER_KEEP (2)") {
+        auto sampling_priority = GENERATE(-1, 0, 1, 2);
+        const std::unordered_map<std::string, std::string> headers{
+            {"x-datadog-trace-id", "123"},
+            {"x-datadog-parent-id", "456"},
+            {"x-datadog-sampling-priority", std::to_string(sampling_priority)},
+        };
+        MockDictReader reader{headers};
+        {
+          auto span = tracer.extract_span(reader);
+          REQUIRE(span);
+
+          span->set_tag(tags::manual_keep, "true");
+        }
+        REQUIRE(collector->span_count() == 1);
+        REQUIRE(collector->first_span().numeric_tags.at(
+                    tags::internal::sampling_priority) ==
+                int(SamplingPriority::USER_KEEP));
+        REQUIRE(
+            collector->first_span().tags.at(tags::internal::decision_maker) ==
+            "-" + std::to_string(int(SamplingMechanism::MANUAL)));
+      }
+
+      SECTION(
           "override sampling priority  -> local root sampling priority same as "
           "override") {
         auto sampling_priority = GENERATE(-1, 0, 1, 2);

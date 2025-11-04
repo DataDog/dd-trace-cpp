@@ -1,5 +1,6 @@
 #include <datadog/dict_writer.h>
 #include <datadog/optional.h>
+#include <datadog/sampling_priority.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/string_view.h>
@@ -105,6 +106,15 @@ Optional<double> Span::lookup_metric(StringView name) const {
 }
 
 void Span::set_tag(StringView name, StringView value) {
+  // DATADOG BEHAVIOR: If the tag "manual.keep" is set to a truthy value,
+  // then update the sampling priority to USER_KEEP (2).
+  if (name == tags::manual_keep) {
+    if (value == "true" || value == "1") {
+      trace_segment_->override_sampling_priority(SamplingPriority::USER_KEEP);
+    }
+    return;
+  }
+
   data_->tags.insert_or_assign(std::string(name), std::string(value));
 }
 
