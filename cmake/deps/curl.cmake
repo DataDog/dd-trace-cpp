@@ -4,6 +4,7 @@ include(FetchContent)
 SET(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
 set(BUILD_LIBCURL_DOCS OFF CACHE BOOL "" FORCE)
 set(BUILD_MISC_DOCS OFF CACHE BOOL "" FORCE)
+set(CURL_DISABLE_TESTS ON CACHE BOOL "" FORCE)
 
 # Disable all protocols except HTTP
 SET(HTTP_ONLY ON CACHE BOOL "" FORCE)
@@ -31,6 +32,8 @@ FetchContent_Declare(
   URL "https://github.com/curl/curl/releases/download/curl-8_8_0/curl-8.8.0.tar.gz"
   URL_MD5 "2300048f61e6196678281a8612a873ef"
   FIND_PACKAGE_ARGS NAMES CURL
+  EXCLUDE_FROM_ALL
+  SYSTEM
 )
 
 FetchContent_MakeAvailable(CURL)
