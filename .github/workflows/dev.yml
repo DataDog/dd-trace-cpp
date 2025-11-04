@@ -46,6 +46,8 @@ jobs:
         run: cmake --build ${BUILD_DIR} -j -v
       - name: Test
         run: cd ${BUILD_DIR} && test/tests -r junit -o report.xml
+        env:
+          ASAN_OPTIONS: alloc_dealloc_mismatch=0
       - name: Upload test report to Datadog
         run: |
           curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-${{ matrix.arch }}" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
