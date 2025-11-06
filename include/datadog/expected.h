@@ -1,3 +1,4 @@
+
 #pragma once
 
 // This component provides a class template, `Expected<T>`, that is either an

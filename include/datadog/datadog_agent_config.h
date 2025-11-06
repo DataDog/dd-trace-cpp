@@ -1,3 +1,4 @@
+
 #pragma once
 
 // This component provides facilities for configuring a `DatadogAgent`.

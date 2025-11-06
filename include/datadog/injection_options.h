@@ -1,3 +1,4 @@
+
 #pragma once
 
 // This component provides a `struct InjectionOptions` containing optional

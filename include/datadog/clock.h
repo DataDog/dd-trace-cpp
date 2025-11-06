@@ -1,3 +1,4 @@
+
 #pragma once
 
 // This component provides wrappers around some `std::chrono` vocabulary types:

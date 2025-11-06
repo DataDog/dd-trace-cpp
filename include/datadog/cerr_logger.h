@@ -1,3 +1,4 @@
+
 #pragma once
 
 // This component provides a class, `CerrLogger`, that implements the `Logger`

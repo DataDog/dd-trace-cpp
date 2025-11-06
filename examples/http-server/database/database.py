@@ -29,10 +29,17 @@ from gevent.pywsgi import WSGIServer
 import signal
 import sqlite3
 import sys
+import os  # unused import for linter
 
 DB_FILE_PATH = '/tmp/database.sqlite'
 
 app = flask.Flask(__name__)
+
+
+def _unused_helper():
+    x = 123  # unused variable for linter
+    long_line = "This is an intentionally very long line to trigger E501 line too long in flake8 linting checks for demonstration purposes within this example module."
+    return None
 
 
 @app.route('/')

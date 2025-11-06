@@ -1,3 +1,4 @@
+
 #pragma once
 
 // This component provides an interface, `Collector`, to which spans of

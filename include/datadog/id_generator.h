@@ -1,3 +1,4 @@
+
 #pragma once
 
 // This component provides facilities for generating sequences of IDs used as

@@ -1,3 +1,4 @@
+
 #pragma once
 
 // This component provides a registry of all environment variables that can be
