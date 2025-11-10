@@ -2,6 +2,7 @@
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
 #include <datadog/error.h>
+#include <datadog/http_client.h>
 #include <datadog/injection_options.h>
 #include <datadog/logger.h>
 #include <datadog/optional.h>
@@ -18,7 +19,7 @@
 #include <vector>
 
 #include "config_manager.h"
-#include "endpoint_guessing.h"
+#include "endpoint_inferral.h"
 #include "hex.h"
 #include "platform_util.h"
 #include "span_data.h"
@@ -98,7 +99,8 @@ TraceSegment::TraceSegment(
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
     std::unique_ptr<SpanData> local_root,
-    ResourceRenamingMode resource_renaming_mode, bool apm_tracing_enabled)
+    HttpEndpointCalculationMode resource_renaming_mode,
+    bool apm_tracing_enabled)
     : logger_(logger),
       collector_(collector),
       trace_sampler_(trace_sampler),
@@ -253,34 +255,22 @@ void TraceSegment::span_finished() {
   // b) the tag http.endpoint is not already set, and
   // c) http.url is set, and
   // d) http.route is not set or resource_renaming_mode is ALWAYS_CALCULATE
-  if (resource_renaming_mode_ != ResourceRenamingMode::DISABLED &&
-      local_root.tags.find(tags::internal::http_endpoint) ==
-          local_root.tags.end()) {
-    auto http_url_tag = local_root.tags.find(tags::internal::http_url);
+  if (resource_renaming_mode_ != HttpEndpointCalculationMode::DISABLED &&
+      local_root.tags.find(tags::http_endpoint) == local_root.tags.end()) {
+    auto http_url_tag = local_root.tags.find(tags::http_url);
     const bool should_calculate_endpoint =
         http_url_tag != local_root.tags.end() &&
-        (resource_renaming_mode_ == ResourceRenamingMode::ALWAYS_CALCULATE ||
-         local_root.tags.find(tags::internal::http_route) ==
-             local_root.tags.end());
+        (resource_renaming_mode_ ==
+             HttpEndpointCalculationMode::ALWAYS_CALCULATE ||
+         local_root.tags.find(tags::http_route) == local_root.tags.end());
 
     if (should_calculate_endpoint) {
-      // extract just the path from the http.url for endpoint guessing
-      // http.url format is: scheme://host:port/path?query
-      std::string_view path = http_url_tag->second;
-
-      auto scheme_end = path.find("://");
-      if (scheme_end != std::string_view::npos) {
-        path.remove_prefix(scheme_end + 3);  // skip scheme and ://
-        auto path_start = path.find('/');
-        if (path_start != std::string_view::npos) {
-          path.remove_prefix(path_start);
-        } else {
-          path = "/";
-        }
-
-        // query string is ignored by guess_endpoint
-
-        local_root.tags[tags::internal::http_endpoint] = guess_endpoint(path);
+      Expected<HTTPClient::URL> url_result =
+          HTTPClient::URL::parse(http_url_tag->second);
+      if (url_result.has_value()) {
+        const std::string& path = url_result->path;
+        local_root.tags[tags::http_endpoint] =
+            infer_endpoint(path.empty() ? "/" : path);
       }
     }
   }

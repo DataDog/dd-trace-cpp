@@ -507,11 +507,11 @@ TEST_CASE("http.endpoint population") {
     Tracer tracer{*finalized};
     {
       auto span = tracer.create_span();
-      span.set_tag(tags::internal::http_url, "http://example.com/users/12?x=y");
+      span.set_tag(tags::http_url, "http://example.com/users/12?x=y");
     }
     REQUIRE(collector->span_count() == 1);
     const auto& span = collector->first_span();
-    REQUIRE(span.tags.count(tags::internal::http_endpoint) == 0);
+    REQUIRE(span.tags.count(tags::http_endpoint) == 0);
   }
 
   SECTION("FALLBACK mode -> adds only when http.route is absent") {
@@ -520,20 +520,18 @@ TEST_CASE("http.endpoint population") {
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->resource_renaming_mode ==
-            ResourceRenamingMode::FALLBACK);
+            HttpEndpointCalculationMode::FALLBACK);
 
     SECTION("route absent -> endpoint added from url path") {
       Tracer tracer{*finalized};
       {
         auto span = tracer.create_span();
-        span.set_tag(tags::internal::http_url,
-                     "http://example.com/users/12?x=y");
+        span.set_tag(tags::http_url, "http://example.com/users/12?x=y");
       }
       REQUIRE(collector->span_count() == 1);
       const auto& span = collector->first_span();
-      REQUIRE(span.tags.count(tags::internal::http_endpoint) == 1);
-      CHECK(span.tags.at(tags::internal::http_endpoint) ==
-            "/users/{param:int}");
+      REQUIRE(span.tags.count(tags::http_endpoint) == 1);
+      CHECK(span.tags.at(tags::http_endpoint) == "/users/{param:int}");
     }
 
     SECTION("route present -> endpoint not added") {
@@ -541,12 +539,12 @@ TEST_CASE("http.endpoint population") {
       Tracer tracer{*finalized};
       {
         auto span = tracer.create_span();
-        span.set_tag(tags::internal::http_url, "http://example.com/users/12");
-        span.set_tag(tags::internal::http_route, "/users/:id");
+        span.set_tag(tags::http_url, "http://example.com/users/12");
+        span.set_tag(tags::http_route, "/users/:id");
       }
       REQUIRE(collector->span_count() == 1);
       const auto& span = collector->first_span();
-      REQUIRE(span.tags.count(tags::internal::http_endpoint) == 0);
+      REQUIRE(span.tags.count(tags::http_endpoint) == 0);
     }
   }
 
@@ -556,18 +554,18 @@ TEST_CASE("http.endpoint population") {
     auto finalized = finalize_config(config);
     REQUIRE(finalized);
     REQUIRE(finalized->resource_renaming_mode ==
-            ResourceRenamingMode::ALWAYS_CALCULATE);
+            HttpEndpointCalculationMode::ALWAYS_CALCULATE);
 
     Tracer tracer{*finalized};
     {
       auto span = tracer.create_span();
-      span.set_tag(tags::internal::http_url, "http://example.com/notes/99");
-      span.set_tag(tags::internal::http_route, "/notes/:id");
+      span.set_tag(tags::http_url, "http://example.com/notes/99");
+      span.set_tag(tags::http_route, "/notes/:id");
     }
     REQUIRE(collector->span_count() == 1);
     const auto& span = collector->first_span();
-    REQUIRE(span.tags.count(tags::internal::http_endpoint) == 1);
-    CHECK(span.tags.at(tags::internal::http_endpoint) == "/notes/{param:int}");
+    REQUIRE(span.tags.count(tags::http_endpoint) == 1);
+    CHECK(span.tags.at(tags::http_endpoint) == "/notes/{param:int}");
   }
 
   SECTION("http.url absent -> never adds") {
@@ -582,7 +580,7 @@ TEST_CASE("http.endpoint population") {
     }
     REQUIRE(collector->span_count() == 1);
     const auto& span = collector->first_span();
-    REQUIRE(span.tags.count(tags::internal::http_endpoint) == 0);
+    REQUIRE(span.tags.count(tags::http_endpoint) == 0);
   }
 
   SECTION("pre-existing http.endpoint is preserved") {
@@ -593,12 +591,12 @@ TEST_CASE("http.endpoint population") {
     Tracer tracer{*finalized};
     {
       auto span = tracer.create_span();
-      span.set_tag(tags::internal::http_url, "http://example.com/widgets/123");
-      span.set_tag(tags::internal::http_endpoint, "/pre/set");
+      span.set_tag(tags::http_url, "http://example.com/widgets/123");
+      span.set_tag(tags::http_endpoint, "/pre/set");
     }
     REQUIRE(collector->span_count() == 1);
     const auto& span = collector->first_span();
-    REQUIRE(span.tags.count(tags::internal::http_endpoint) == 1);
-    CHECK(span.tags.at(tags::internal::http_endpoint) == "/pre/set");
+    REQUIRE(span.tags.count(tags::http_endpoint) == 1);
+    CHECK(span.tags.at(tags::http_endpoint) == "/pre/set");
   }
 }

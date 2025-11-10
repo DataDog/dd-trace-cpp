@@ -55,7 +55,7 @@ class Tracer {
   bool baggage_injection_enabled_;
   bool baggage_extraction_enabled_;
   bool tracing_enabled_;
-  ResourceRenamingMode resource_renaming_mode_;
+  HttpEndpointCalculationMode resource_renaming_mode_;
 
  public:
   // Create a tracer configured using the specified `config`, and optionally:

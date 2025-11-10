@@ -26,6 +26,7 @@ class HTTPClient {
     std::string scheme;     // http, https, or unix
     std::string authority;  // domain:port or /path/to/socket
     std::string path;       // resource, e.g. /v0.4/traces
+    std::string query;      // query string without '?'
 
     static Expected<HTTPClient::URL> parse(StringView input);
   };

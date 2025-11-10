@@ -1,4 +1,4 @@
-#include "endpoint_guessing.h"
+#include "endpoint_inferral.h"
 
 #include <cstdint>
 
@@ -8,14 +8,14 @@ namespace {
 
 constexpr size_t MAX_COMPONENTS = 8;
 
-inline constexpr bool is_digit(char c) noexcept { return c >= '0' && c <= '9'; }
-inline constexpr bool is_hex_alpha(char c) noexcept {
+inline constexpr bool is_digit(char c) { return c >= '0' && c <= '9'; }
+inline constexpr bool is_hex_alpha(char c) {
   return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
-inline constexpr bool is_delim(char c) noexcept {
+inline constexpr bool is_delim(char c) {
   return c == '.' || c == '_' || c == '-';
 }
-inline constexpr bool is_str_special(char c) noexcept {
+inline constexpr bool is_str_special(char c) {
   return c == '%' || c == '&' || c == '\'' || c == '(' || c == ')' ||
          c == '*' || c == '+' || c == ',' || c == ':' || c == '=' || c == '@';
 }
@@ -38,7 +38,7 @@ enum component_type : std::uint8_t {
   is_str = 1 << 4,
 };
 
-std::string_view to_string(component_type type) noexcept {
+StringView to_string(component_type type) {
   switch (type) {
     case component_type::is_int:
       return "{param:int}";
@@ -50,16 +50,17 @@ std::string_view to_string(component_type type) noexcept {
       return "{param:hex_id}";
     case component_type::is_str:
       return "{param:str}";
-    default:
+    case component_type::none:
+      // should not be reached
       return "";
   }
+  // should never reach here
+  return "";
 }
 
-inline uint8_t bool2mask(bool x) noexcept {
-  return static_cast<uint8_t>(-int{x});  // 0 -> 0x00, 1 -> 0xFF
-}
+inline uint8_t bool2mask(bool x) { return x ? 0xFF : 0x00; }
 
-component_type component_replacement(std::string_view path) noexcept {
+component_type component_replacement(StringView path) noexcept {
   // viable_components is a bitset of the component types not yet excluded
   std::uint8_t viable_components = 0x1F;  // (is_str << 1) - 1
   bool found_special_char = false;
@@ -121,31 +122,26 @@ component_type component_replacement(std::string_view path) noexcept {
 }
 }  // namespace
 
-std::string guess_endpoint(std::string_view orig_path) {
-  auto path = orig_path;
-
-  // remove the query string if any
-  auto query_pos = path.find('?');
-  if (query_pos != std::string_view::npos) {
-    path = path.substr(0, query_pos);
-  }
-
+std::string infer_endpoint(StringView path) {
+  // Expects a clean path without query string (e.g., "/api/users/123")
   if (path.empty() || path.front() != '/') {
     return "/";
   }
 
   std::string result{};
   size_t component_count = 0;
+  bool final_slash = true;
 
-  path.remove_prefix(1);
+  path.remove_prefix(1);  // drop the leading '/'
   while (!path.empty()) {
     auto slash_pos = path.find('/');
 
-    std::string_view component = path.substr(0, slash_pos);
+    StringView component = path.substr(0, slash_pos);
 
-    // remove current component from the path
-    if (slash_pos == std::string_view::npos) {
-      path = std::string_view{};
+    // remove current component from the path (for the next iteration)
+    if (slash_pos == StringView::npos) {
+      path = StringView{};
+      final_slash = false;
     } else {
       path.remove_prefix(slash_pos + 1);
     }
@@ -171,6 +167,10 @@ std::string guess_endpoint(std::string_view orig_path) {
 
   if (result.empty()) {
     return "/";
+  }
+
+  if (final_slash) {
+    result.append("/");
   }
 
   return result;
