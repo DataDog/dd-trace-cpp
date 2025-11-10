@@ -486,12 +486,14 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
             to_string(resource_renaming_always_simplified_endpoint), origin);
 
     if (!resource_renaming_enabled) {
-      final_config.resource_renaming_mode = ResourceRenamingMode::DISABLED;
+      final_config.resource_renaming_mode =
+          HttpEndpointCalculationMode::DISABLED;
     } else if (resource_renaming_always_simplified_endpoint) {
       final_config.resource_renaming_mode =
-          ResourceRenamingMode::ALWAYS_CALCULATE;
+          HttpEndpointCalculationMode::ALWAYS_CALCULATE;
     } else {
-      final_config.resource_renaming_mode = ResourceRenamingMode::FALLBACK;
+      final_config.resource_renaming_mode =
+          HttpEndpointCalculationMode::FALLBACK;
     }
   }
 

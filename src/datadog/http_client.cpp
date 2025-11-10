@@ -61,7 +61,7 @@ Expected<HTTPClient::URL> HTTPClient::URL::parse(StringView input) {
                    std::move(message)};
     }
     return HTTPClient::URL{std::string(scheme), std::string(authority_and_path),
-                           ""};
+                           "", ""};
   }
 
   // The scheme is either "http" or "https".  This means that the part after
@@ -70,12 +70,24 @@ Expected<HTTPClient::URL> HTTPClient::URL::parse(StringView input) {
   // the Datadog Agent service, and so they will not have a resource
   // location.  Still, let's parse it properly.
   const auto after_authority = authority_and_path.find('/');
+
+  std::string path;
+  std::string query;
+  if (after_authority != StringView::npos) {
+    StringView path_and_query = authority_and_path.substr(after_authority);
+    const auto query_pos = path_and_query.find('?');
+    if (query_pos != StringView::npos) {
+      path = std::string(path_and_query.substr(0, query_pos));
+      query = std::string(path_and_query.substr(query_pos + 1));
+    } else {
+      path = std::string(path_and_query);
+    }
+  }
+
   return HTTPClient::URL{
       std::string(scheme),
       std::string(authority_and_path.substr(0, after_authority)),
-      (after_authority == StringView::npos)
-          ? ""
-          : std::string(authority_and_path.substr(after_authority))};
+      std::move(path), std::move(query)};
 }
 
 }  // namespace tracing

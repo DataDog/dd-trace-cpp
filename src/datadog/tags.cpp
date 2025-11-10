@@ -10,6 +10,9 @@ const std::string span_type = "span.type";
 const std::string operation_name = "operation";
 const std::string resource_name = "resource.name";
 const std::string version = "version";
+const std::string http_endpoint = "http.endpoint";
+const std::string http_route = "http.route";
+const std::string http_url = "http.url";
 
 namespace internal {
 
@@ -30,9 +33,6 @@ const std::string process_id = "process_id";
 const std::string language = "language";
 const std::string runtime_id = "runtime-id";
 const std::string w3c_parent_id = "_dd.parent_id";
-const std::string http_endpoint = "http.endpoint";
-const std::string http_route = "http.route";
-const std::string http_url = "http.url";
 const std::string trace_source = "_dd.p.ts";
 const std::string apm_enabled = "_dd.apm.enabled";
 const std::string ksr = "_dd.p.ksr";

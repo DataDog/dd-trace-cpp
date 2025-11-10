@@ -187,7 +187,7 @@ CURL_TEST("parse response headers and body") {
     // verify that the received response headers are as expected.
     Optional<Error> post_error;
     std::exception_ptr exception;
-    const HTTPClient::URL url = {"http", "whatever", ""};
+    const HTTPClient::URL url = {"http", "whatever", "", ""};
     const auto result = client->post(
         url, ignore, "whatever",
         [&](int status, const DictReader &headers, std::string body) {
@@ -236,7 +236,7 @@ CURL_TEST("bad multi-handle means error mode") {
   const auto client = std::make_shared<Curl>(logger, clock, library);
   REQUIRE(logger->first_error().code == Error::CURL_HTTP_CLIENT_SETUP_FAILED);
 
-  const HTTPClient::URL url = {"http", "whatever", ""};
+  const HTTPClient::URL url = {"http", "whatever", "", ""};
   const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
   const auto result =
       client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
@@ -258,7 +258,7 @@ CURL_TEST("bad std::thread means error mode") {
   REQUIRE(logger->first_error().code == Error::CURL_HTTP_CLIENT_SETUP_FAILED);
 
   const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
-  const HTTPClient::URL url = {"http", "whatever", ""};
+  const HTTPClient::URL url = {"http", "whatever", "", ""};
   const auto result =
       client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
   REQUIRE_FALSE(result);
@@ -278,7 +278,7 @@ CURL_TEST("fail to allocate request handle") {
   MockCurlLibrary library;
   const auto client = std::make_shared<Curl>(logger, clock, library);
 
-  const HTTPClient::URL url = {"http", "whatever", ""};
+  const HTTPClient::URL url = {"http", "whatever", "", ""};
   const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
   const auto result =
       client->post(url, ignore, "dummy body", ignore, ignore, dummy_deadline);
@@ -421,7 +421,7 @@ CURL_TEST("handles are always cleaned up") {
   SECTION("when the response is delivered") {
     Optional<Error> post_error;
     std::exception_ptr exception;
-    const HTTPClient::URL url = {"http", "whatever", ""};
+    const HTTPClient::URL url = {"http", "whatever", "", ""};
     const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
     const auto result = client->post(
         url, ignore, "whatever",
@@ -446,7 +446,7 @@ CURL_TEST("handles are always cleaned up") {
 
   SECTION("when an error occurs") {
     Optional<Error> post_error;
-    const HTTPClient::URL url = {"http", "whatever", ""};
+    const HTTPClient::URL url = {"http", "whatever", "", ""};
     const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
     library.message_result_ = CURLE_COULDNT_CONNECT;  // any error would do
     const auto result = client->post(
@@ -459,7 +459,7 @@ CURL_TEST("handles are always cleaned up") {
   }
 
   SECTION("when we shut down while a request is in flight") {
-    const HTTPClient::URL url = {"http", "whatever", ""};
+    const HTTPClient::URL url = {"http", "whatever", "", ""};
     const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
     library.delay_message_ = true;
     const auto result =
@@ -479,7 +479,7 @@ CURL_TEST("post() deadline exceeded before request start") {
   const auto clock = default_clock;
   Curl client{std::make_shared<NullLogger>(), clock};
 
-  const HTTPClient::URL url = {"http", "whatever", ""};
+  const HTTPClient::URL url = {"http", "whatever", "", ""};
   const std::string body;
   const auto deadline = clock().tick - std::chrono::milliseconds(1);
   Optional<Error> error_delivered;

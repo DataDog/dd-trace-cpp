@@ -15,6 +15,7 @@
 #include "clock.h"
 #include "datadog_agent_config.h"
 #include "expected.h"
+#include "http_endpoint_calculation_mode.h"
 #include "propagation_style.h"
 #include "runtime_id.h"
 #include "span_defaults.h"
@@ -189,12 +190,6 @@ struct TracerConfig {
   Optional<bool> resource_renaming_always_simplified_endpoint;
 };
 
-enum class ResourceRenamingMode : std::uint8_t {
-  DISABLED,
-  FALLBACK,  // only if http.route is not present
-  ALWAYS_CALCULATE,
-};
-
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
 // a valid `TracerConfig` and accompanying environment.
 // `FinalizedTracerConfig` must be obtained by calling `finalize_config`.
@@ -233,7 +228,7 @@ class FinalizedTracerConfig final {
   std::shared_ptr<EventScheduler> event_scheduler;
   std::shared_ptr<HTTPClient> http_client;
   bool tracing_enabled;
-  ResourceRenamingMode resource_renaming_mode;
+  HttpEndpointCalculationMode resource_renaming_mode;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any
