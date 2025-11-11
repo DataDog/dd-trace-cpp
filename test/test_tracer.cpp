@@ -2066,6 +2066,7 @@ TEST_TRACER("process discovery") {
       }
     }
 
+    closedir(dir);
     return nullopt;
   };
 
