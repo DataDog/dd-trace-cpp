@@ -75,7 +75,14 @@ Expected<HTTPClient::URL> HTTPClient::URL::parse(StringView input) {
   std::string query;
   if (after_authority != StringView::npos) {
     StringView path_and_query = authority_and_path.substr(after_authority);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overread"
+#endif
     const auto query_pos = path_and_query.find('?');
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     if (query_pos != StringView::npos) {
       path = std::string(path_and_query.substr(0, query_pos));
       query = std::string(path_and_query.substr(query_pos + 1));
