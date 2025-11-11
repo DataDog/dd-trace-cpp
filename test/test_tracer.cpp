@@ -18,6 +18,11 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 #include <datadog/w3c_propagation.h>
+#if defined(__linux__) || defined(__unix__)
+#include <dirent.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
 
 #include <chrono>
 #include <ctime>
@@ -2037,6 +2042,51 @@ TEST_TRACER("APM tracing disabled") {
   }
 }
 
+#if defined(__linux__) || defined(__unix__)
+TEST_TRACER("process discovery") {
+  auto find_memfd = []() -> std::optional<std::string> {
+    DIR* dir = opendir("/proc/self/fd");
+    if (dir == nullptr) return nullopt;
+
+    char path[PATH_MAX];
+    char target[PATH_MAX];
+
+    for (struct dirent* entry = readdir(dir); entry != nullptr;
+         entry = readdir(dir)) {
+      if (entry->d_type != DT_LNK) continue;
+
+      snprintf(path, sizeof(path), "/proc/self/fd/%s", entry->d_name);
+      auto len = readlink(path, target, sizeof(target) - 1);
+      if (len == -1) continue;
+      target[len] = '\0';
+
+      if (starts_with(target, "/memfd:datadog-tracer-info-")) {
+        closedir(dir);
+        return path;
+      }
+    }
+
+    closedir(dir);
+    return nullopt;
+  };
+
+  TracerConfig cfg;
+  auto finalized_config = finalize_config(cfg);
+  REQUIRE(finalized_config);
+
+  {
+    Tracer tracer{*finalized_config};
+
+    auto fd = find_memfd();
+    CHECK(fd);
+
+    // TODO: Read content
+  }
+
+  auto fd = find_memfd();
+  CHECK(!fd);
+}
+#endif
 TEST_TRACER("_dd.p.ksr is NOT set when overriding the sampling decision") {
   const auto collector = std::make_shared<MockCollector>();
 
