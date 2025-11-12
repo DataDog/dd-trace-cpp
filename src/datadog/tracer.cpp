@@ -59,7 +59,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
       baggage_extraction_enabled_(false),
-      tracing_enabled_(config.tracing_enabled) {
+      tracing_enabled_(config.tracing_enabled),
+      resource_renaming_mode_(config.resource_renaming_mode) {
   telemetry::init(config.telemetry, signature_, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {
@@ -197,7 +198,7 @@ Span Tracer::create_span(const SpanConfig& config) {
       nullopt /* origin */, tags_header_max_size_, std::move(trace_tags),
       nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data),
-      tracing_enabled_);
+      resource_renaming_mode_, tracing_enabled_);
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};
@@ -424,7 +425,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       std::move(sampling_decision),
       std::move(merged_context.additional_w3c_tracestate),
       std::move(merged_context.additional_datadog_w3c_tracestate),
-      std::move(span_data), tracing_enabled_);
+      std::move(span_data), resource_renaming_mode_, tracing_enabled_);
   Span span{span_data_ptr, segment,
             [generator = generator_]() { return generator->span_id(); },
             clock_};

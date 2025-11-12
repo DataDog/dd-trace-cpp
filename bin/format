@@ -2,8 +2,12 @@
 
 set -e
 
+# Determine the script directory and repository root
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+
 # Go to the repository root directory.
-cd "$(dirname "$0")"/..
+cd "$REPO_ROOT"
 
 # clang-format's behavior changes between versions, even given the same
 # configuration.
@@ -41,16 +45,16 @@ if [ "$(docker image ls --quiet $image | wc -l)" -eq 0 ]; then
     esac
 fi
 
-mount_path=/mnt/host
+mount_path=/mnt/repo
 
-# File paths passed to the dockerized clang-format need to be resolved and
-# prefixed with the bind mount path.
+# File paths passed to the dockerized clang-format need to be relative to
+# the repository root and prefixed with the bind mount path.
 #
 # Non-path arguments (flags) are left alone.
 process_arg() {
   case "$1" in
     -*) printf '%s\0' "$1" ;;
-    *) printf '%s/%s\0' "$mount_path" "$(realpath "$1")" ;;
+    *) printf '%s/%s\0' "$mount_path" "$1" ;;
   esac
 }
 
@@ -65,7 +69,7 @@ docker_clang_format() {
       --volume /etc/passwd:/etc/passwd:ro \
       --volume /etc/group:/etc/group:ro \
       --user "$(id -u):$(id -g)" \
-      --mount "type=bind,source=/,destination=$mount_path" \
+      --mount "type=bind,source=$REPO_ROOT,destination=$mount_path" \
       "$image" \
       clang-format $formatter_options
 }

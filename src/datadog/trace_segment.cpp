@@ -2,6 +2,7 @@
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
 #include <datadog/error.h>
+#include <datadog/http_client.h>
 #include <datadog/injection_options.h>
 #include <datadog/logger.h>
 #include <datadog/optional.h>
@@ -18,6 +19,7 @@
 #include <vector>
 
 #include "config_manager.h"
+#include "endpoint_inferral.h"
 #include "hex.h"
 #include "platform_util.h"
 #include "span_data.h"
@@ -96,7 +98,9 @@ TraceSegment::TraceSegment(
     Optional<SamplingDecision> sampling_decision,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
-    std::unique_ptr<SpanData> local_root, bool apm_tracing_enabled)
+    std::unique_ptr<SpanData> local_root,
+    HttpEndpointCalculationMode resource_renaming_mode,
+    bool apm_tracing_enabled)
     : logger_(logger),
       collector_(collector),
       trace_sampler_(trace_sampler),
@@ -114,6 +118,7 @@ TraceSegment::TraceSegment(
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)),
       config_manager_(config_manager),
+      resource_renaming_mode_(resource_renaming_mode),
       tracing_enabled_(apm_tracing_enabled) {
   assert(logger_);
   assert(collector_);
@@ -228,7 +233,7 @@ void TraceSegment::span_finished() {
   }
 
   // RFC seems to only mandate that this be set if the trace is kept.
-  // However, system-tests expect this to be always be set.
+  // However, system-tests expect this to always be set.
   // Add it all the time; can't hurt
   if (!tracing_enabled_) {
     local_root.numeric_tags[tags::internal::apm_enabled] = 0;
@@ -243,6 +248,31 @@ void TraceSegment::span_finished() {
     span.numeric_tags[tags::internal::process_id] = Cache::process_id;
     span.tags[tags::internal::language] = "cpp";
     span.tags[tags::internal::runtime_id] = runtime_id_.string();
+  }
+
+  // calculate http.endpoint if:
+  // a) the feature is not disabled, and
+  // b) the tag http.endpoint is not already set, and
+  // c) http.url is set, and
+  // d) http.route is not set or resource_renaming_mode is ALWAYS_CALCULATE
+  if (resource_renaming_mode_ != HttpEndpointCalculationMode::DISABLED &&
+      local_root.tags.find(tags::http_endpoint) == local_root.tags.end()) {
+    auto http_url_tag = local_root.tags.find(tags::http_url);
+    const bool should_calculate_endpoint =
+        http_url_tag != local_root.tags.end() &&
+        (resource_renaming_mode_ ==
+             HttpEndpointCalculationMode::ALWAYS_CALCULATE ||
+         local_root.tags.find(tags::http_route) == local_root.tags.end());
+
+    if (should_calculate_endpoint) {
+      Expected<HTTPClient::URL> url_result =
+          HTTPClient::URL::parse(http_url_tag->second);
+      if (url_result.has_value()) {
+        const std::string& path = url_result->path;
+        local_root.tags[tags::http_endpoint] =
+            infer_endpoint(path.empty() ? "/" : path);
+      }
+    }
   }
 
   if (config_manager_->report_traces()) {
