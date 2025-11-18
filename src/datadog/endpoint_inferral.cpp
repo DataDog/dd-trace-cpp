@@ -61,8 +61,6 @@ StringView to_string(component_type type) {
   return "";
 }
 
-inline uint8_t bool2mask(bool x) { return x ? 0xFF : 0x00; }
-
 component_type component_replacement(StringView path) noexcept {
   // viable_components is a bitset of the component types not yet excluded
   std::uint8_t viable_components = all_components;
@@ -108,11 +106,14 @@ component_type component_replacement(StringView path) noexcept {
   }
 
   // is_str requires a special char or a size >= 20
-  viable_components &= ~component_type::is_str |
-                       bool2mask(found_special_char || (path.size() >= 20));
+  if (!found_special_char && path.size() < 20) {
+    viable_components &= ~component_type::is_str;
+  }
+
   // hex, and hex_id require a digit
-  viable_components &= ~(component_type::is_hex | component_type::is_hex_id) |
-                       bool2mask(found_digit);
+  if (!found_digit) {
+    viable_components &= ~(component_type::is_hex | component_type::is_hex_id);
+  }
 
   if (viable_components == 0) {
     return component_type::none;
