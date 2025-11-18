@@ -86,24 +86,25 @@ component_type component_replacement(StringView path) noexcept {
 
   for (std::size_t i = 0; i < path.size(); ++i) {
     char c = path[i];
-    found_special_char = found_special_char || is_str_special(c);
-    found_digit = found_digit || is_digit(c);
 
-    std::uint8_t digit_mask =
-        bool2mask(is_digit(c)) &
-        (component_type::is_int | component_type::is_int_id |
-         component_type::is_hex | component_type::is_hex_id);
-
-    std::uint8_t hex_alpha_mask =
-        bool2mask(is_hex_alpha(c)) &
-        (component_type::is_hex | component_type::is_hex_id);
-
-    std::uint8_t delimiter_mask =
-        bool2mask(is_delim(c)) &
-        (component_type::is_int_id | component_type::is_hex_id);
-
-    viable_components &=
-        (digit_mask | hex_alpha_mask | delimiter_mask | component_type::is_str);
+    if (is_str_special(c)) {
+      found_special_char = true;
+      viable_components &=
+          ~(component_type::is_int | component_type::is_int_id |
+            component_type::is_hex | component_type::is_hex_id);
+    } else if (is_hex_alpha(c)) {
+      viable_components &=
+          ~(component_type::is_int | component_type::is_int_id);
+    } else if (is_delim(c)) {
+      viable_components &= ~(component_type::is_int | component_type::is_hex);
+    } else if (is_digit(c)) {
+      found_digit = true;
+    } else {
+      // other character
+      viable_components &=
+          ~(component_type::is_int | component_type::is_int_id |
+            component_type::is_hex | component_type::is_hex_id);
+    }
   }
 
   // is_str requires a special char or a size >= 20
