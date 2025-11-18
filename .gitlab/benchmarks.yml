@@ -45,7 +45,6 @@ check-big-regressions:
     - if: $CI_COMMIT_BRANCH == "main"
       interruptible: false
     - interruptible: true
-  allow_failure: false
   tags: ["arch:amd64"]
   image: $BENCHMARKS_CI_IMAGE
   script: |
