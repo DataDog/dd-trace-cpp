@@ -32,15 +32,15 @@ TEST_ENDPOINT("hex and hex_id replacement") {
   CHECK(infer_endpoint("/x/ab_cd-9") == "/x/{param:hex_id}");
 }
 
-TEST_ENDPOINT("str replacement by special or length") {
-  CHECK(infer_endpoint("/x/a%z") == "/x/{param:str}");
+TEST_ENDPOINT("long sequences of more than 20 chars yield str") {
   std::string longseg(20, 'a');
   std::string path = std::string("/x/") + longseg;
   CHECK(infer_endpoint(path) == "/x/{param:str}");
 }
 
 TEST_ENDPOINT("other specials yield str") {
-  const char specials[] = {'&', '\'', '(', ')', '*', '+', ',', ':', '=', '@'};
+  const char specials[] = {'%', '&', '\'', '(', ')', '*',
+                           '+', ',', ':',  '=', '@'};
   for (char c : specials) {
     std::string s = "/x/a";
     s.push_back(c);

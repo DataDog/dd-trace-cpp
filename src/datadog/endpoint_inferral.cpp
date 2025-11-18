@@ -37,6 +37,9 @@ enum component_type : std::uint8_t {
   is_hex_id = 1 << 3,
   is_str = 1 << 4,
 };
+static constexpr auto all_components =
+    is_int | is_int_id | is_hex | is_hex_id | is_str;
+static_assert(all_components == (is_str << 1) - 1);
 
 StringView to_string(component_type type) {
   switch (type) {
@@ -62,7 +65,7 @@ inline uint8_t bool2mask(bool x) { return x ? 0xFF : 0x00; }
 
 component_type component_replacement(StringView path) noexcept {
   // viable_components is a bitset of the component types not yet excluded
-  std::uint8_t viable_components = 0x1F;  // (is_str << 1) - 1
+  std::uint8_t viable_components = all_components;
   bool found_special_char = false;
   bool found_digit = false;
 
@@ -114,6 +117,7 @@ component_type component_replacement(StringView path) noexcept {
     return component_type::none;
   }
 
+  // Get least significant set bit to determine component w/ highest precedence
   // c++20: use std::countr_zero
   std::uint8_t lsb = static_cast<std::uint8_t>(
       viable_components &

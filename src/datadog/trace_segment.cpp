@@ -81,6 +81,33 @@ void inject_trace_tags(
   }
 }
 
+void maybe_calculate_http_endpoint(HttpEndpointCalculationMode renaming_mode,
+                                   SpanData& local_root) {
+  // calculate http.endpoint if:
+  // a) the feature is not disabled, and
+  // b) the tag http.endpoint is not already set, and
+  // c) http.url is set, and
+  // d) http.route is not set or resource_renaming_mode is ALWAYS_CALCULATE
+  if (renaming_mode == HttpEndpointCalculationMode::DISABLED ||
+      local_root.tags.find(tags::http_endpoint) != local_root.tags.end()) {
+    return;
+  }
+  auto http_url_tag = local_root.tags.find(tags::http_url);
+  const bool should_calculate_endpoint =
+      http_url_tag != local_root.tags.end() &&
+      (renaming_mode == HttpEndpointCalculationMode::ALWAYS_CALCULATE ||
+       local_root.tags.find(tags::http_route) == local_root.tags.end());
+
+  if (should_calculate_endpoint) {
+    Expected<HTTPClient::URL> url_result =
+        HTTPClient::URL::parse(http_url_tag->second);
+    if (url_result.has_value()) {
+      const std::string& path = url_result->path;
+      local_root.tags[tags::http_endpoint] =
+          infer_endpoint(path.empty() ? "/" : path);
+    }
+  }
+}
 }  // namespace
 
 TraceSegment::TraceSegment(
@@ -250,30 +277,7 @@ void TraceSegment::span_finished() {
     span.tags[tags::internal::runtime_id] = runtime_id_.string();
   }
 
-  // calculate http.endpoint if:
-  // a) the feature is not disabled, and
-  // b) the tag http.endpoint is not already set, and
-  // c) http.url is set, and
-  // d) http.route is not set or resource_renaming_mode is ALWAYS_CALCULATE
-  if (resource_renaming_mode_ != HttpEndpointCalculationMode::DISABLED &&
-      local_root.tags.find(tags::http_endpoint) == local_root.tags.end()) {
-    auto http_url_tag = local_root.tags.find(tags::http_url);
-    const bool should_calculate_endpoint =
-        http_url_tag != local_root.tags.end() &&
-        (resource_renaming_mode_ ==
-             HttpEndpointCalculationMode::ALWAYS_CALCULATE ||
-         local_root.tags.find(tags::http_route) == local_root.tags.end());
-
-    if (should_calculate_endpoint) {
-      Expected<HTTPClient::URL> url_result =
-          HTTPClient::URL::parse(http_url_tag->second);
-      if (url_result.has_value()) {
-        const std::string& path = url_result->path;
-        local_root.tags[tags::http_endpoint] =
-            infer_endpoint(path.empty() ? "/" : path);
-      }
-    }
-  }
+  maybe_calculate_http_endpoint(resource_renaming_mode_, local_root);
 
   if (config_manager_->report_traces()) {
     telemetry::distribution::add(metrics::tracer::trace_chunk_size,
