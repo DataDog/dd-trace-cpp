@@ -21,7 +21,7 @@ std::tuple<std::string, std::string> get_windows_info() {
   // application manifest, which is the lowest version supported by the
   // application. Use `RtlGetVersion` to obtain the accurate OS version
   // regardless of the manifest.
-  using RtlGetVersion = auto(*)(LPOSVERSIONINFOEXW)->NTSTATUS;
+  using RtlGetVersion = auto (*)(LPOSVERSIONINFOEXW)->NTSTATUS;
 
   RtlGetVersion func =
       (RtlGetVersion)GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
@@ -111,7 +111,7 @@ std::string get_process_name() {
 #else
   std::string path = std::string(exe_name);
 #endif
-  return path;
+  return path.substr(path.find_last_of("/\\") + 1);
 }
 
 int at_fork_in_child(void (*on_fork)()) {
