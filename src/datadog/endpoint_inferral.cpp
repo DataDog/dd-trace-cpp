@@ -1,0 +1,185 @@
+#include "endpoint_inferral.h"
+
+#include <cstdint>
+
+namespace datadog::tracing {
+
+namespace {
+
+constexpr size_t MAX_COMPONENTS = 8;
+
+inline constexpr bool is_digit(char c) { return c >= '0' && c <= '9'; }
+inline constexpr bool is_hex_alpha(char c) {
+  return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+inline constexpr bool is_delim(char c) {
+  return c == '.' || c == '_' || c == '-';
+}
+inline constexpr bool is_str_special(char c) {
+  return c == '%' || c == '&' || c == '\'' || c == '(' || c == ')' ||
+         c == '*' || c == '+' || c == ',' || c == ':' || c == '=' || c == '@';
+}
+
+/*
+clang-format off
+{param:int}     [1-9][0-9]+                   len≥2, digits only, first 1–9
+{param:int_id}  (?=.*[0-9])[0-9._-]{3,}       len≥3, [0-9._-], must contain digit
+{param:hex}     (?=.*[0-9])[A-Fa-f0-9]{6,}    len≥6, hex digits, must contain decimal digit
+{param:hex_id}  (?=.*[0-9])[A-Fa-f0-9._-]{6,} len≥6, hex+._-, must contain decimal digit
+{param:str}     .{20,}|.*[%&'()*+,:=@].*      any chars, valid if len≥20 or contains special
+clang-format on
+*/
+enum component_type : std::uint8_t {
+  none = 0,
+  is_int = 1 << 0,
+  is_int_id = 1 << 1,
+  is_hex = 1 << 2,
+  is_hex_id = 1 << 3,
+  is_str = 1 << 4,
+};
+static constexpr auto all_components =
+    is_int | is_int_id | is_hex | is_hex_id | is_str;
+static_assert(all_components == (is_str << 1) - 1);
+
+StringView to_string(component_type type) {
+  switch (type) {
+    case component_type::is_int:
+      return "{param:int}";
+    case component_type::is_int_id:
+      return "{param:int_id}";
+    case component_type::is_hex:
+      return "{param:hex}";
+    case component_type::is_hex_id:
+      return "{param:hex_id}";
+    case component_type::is_str:
+      return "{param:str}";
+    case component_type::none:
+      // should not be reached
+      return "";
+  }
+  // should never reach here
+  return "";
+}
+
+component_type component_replacement(StringView path) noexcept {
+  // viable_components is a bitset of the component types not yet excluded
+  std::uint8_t viable_components = all_components;
+  bool found_special_char = false;
+  bool found_digit = false;
+
+  if (path.size() < 2) {
+    viable_components &= ~(component_type::is_int | component_type::is_int_id |
+                           component_type::is_hex | component_type::is_hex_id);
+  } else if (path.size() < 3) {
+    viable_components &= ~(component_type::is_int_id | component_type::is_hex |
+                           component_type::is_hex_id);
+  } else if (path.size() < 6) {
+    viable_components &= ~(component_type::is_hex | component_type::is_hex_id);
+  }
+
+  // is_int does not allow a leading 0
+  if (!path.empty() && path[0] == '0') {
+    viable_components &= ~component_type::is_int;
+  }
+
+  for (std::size_t i = 0; i < path.size(); ++i) {
+    char c = path[i];
+
+    if (is_str_special(c)) {
+      found_special_char = true;
+      viable_components &=
+          ~(component_type::is_int | component_type::is_int_id |
+            component_type::is_hex | component_type::is_hex_id);
+    } else if (is_hex_alpha(c)) {
+      viable_components &=
+          ~(component_type::is_int | component_type::is_int_id);
+    } else if (is_delim(c)) {
+      viable_components &= ~(component_type::is_int | component_type::is_hex);
+    } else if (is_digit(c)) {
+      found_digit = true;
+    } else {
+      // other character
+      viable_components &=
+          ~(component_type::is_int | component_type::is_int_id |
+            component_type::is_hex | component_type::is_hex_id);
+    }
+  }
+
+  // is_str requires a special char or a size >= 20
+  if (!found_special_char && path.size() < 20) {
+    viable_components &= ~component_type::is_str;
+  }
+
+  // hex, and hex_id require a digit
+  if (!found_digit) {
+    viable_components &= ~(component_type::is_hex | component_type::is_hex_id);
+  }
+
+  if (viable_components == 0) {
+    return component_type::none;
+  }
+
+  // Get least significant set bit to determine component w/ highest precedence
+  // c++20: use std::countr_zero
+  std::uint8_t lsb = static_cast<std::uint8_t>(
+      viable_components &
+      static_cast<std::uint8_t>(-static_cast<int8_t>(viable_components)));
+  return static_cast<component_type>(lsb);
+}
+}  // namespace
+
+std::string infer_endpoint(StringView path) {
+  // Expects a clean path without query string (e.g., "/api/users/123")
+  if (path.empty() || path.front() != '/') {
+    return "/";
+  }
+
+  std::string result{};
+  size_t component_count = 0;
+  bool final_slash = true;
+
+  path.remove_prefix(1);  // drop the leading '/'
+  while (!path.empty()) {
+    auto slash_pos = path.find('/');
+
+    StringView component = path.substr(0, slash_pos);
+
+    // remove current component from the path (for the next iteration)
+    if (slash_pos == StringView::npos) {
+      path = StringView{};
+      final_slash = false;
+    } else {
+      path.remove_prefix(slash_pos + 1);
+    }
+
+    if (component.empty()) {
+      continue;
+    }
+
+    result.append("/");
+
+    // replace the literal component with the appropriate placeholder
+    // (if it matches one of the patterns)
+    auto type = component_replacement(component);
+    if (type == component_type::none) {
+      result.append(component);
+    } else {
+      result.append(to_string(type));
+    }
+    if (++component_count >= MAX_COMPONENTS) {
+      break;
+    }
+  }
+
+  if (result.empty()) {
+    return "/";
+  }
+
+  if (final_slash) {
+    result.append("/");
+  }
+
+  return result;
+}
+
+}  // namespace datadog::tracing

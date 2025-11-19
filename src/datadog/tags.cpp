@@ -10,6 +10,9 @@ const std::string span_type = "span.type";
 const std::string operation_name = "operation";
 const std::string resource_name = "resource.name";
 const std::string version = "version";
+const std::string http_endpoint = "http.endpoint";
+const std::string http_route = "http.route";
+const std::string http_url = "http.url";
 
 namespace internal {
 

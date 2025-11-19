@@ -28,6 +28,8 @@ enum class ConfigName : char {
   TRACE_BAGGAGE_MAX_BYTES,
   TRACE_BAGGAGE_MAX_ITEMS,
   APM_TRACING_ENABLED,
+  TRACE_RESOURCE_RENAMING_ENABLED,
+  TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
 };
 
 // Represents metadata for configuration parameters

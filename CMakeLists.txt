@@ -173,6 +173,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/collector_response.cpp
     src/datadog/datadog_agent_config.cpp
     src/datadog/datadog_agent.cpp
+    src/datadog/endpoint_inferral.cpp
     src/datadog/environment.cpp
     src/datadog/error.cpp
     src/datadog/extraction_util.cpp

@@ -19,6 +19,9 @@ extern const std::string span_type;
 extern const std::string operation_name;
 extern const std::string resource_name;
 extern const std::string version;
+extern const std::string http_endpoint;
+extern const std::string http_route;
+extern const std::string http_url;
 
 namespace internal {
 extern const std::string propagation_error;

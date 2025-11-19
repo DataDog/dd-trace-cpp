@@ -133,6 +133,16 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     env_cfg.tracing_enabled = !falsy(*apm_enabled_env);
   }
 
+  if (auto resource_renaming_enabled_env =
+          lookup(environment::DD_TRACE_RESOURCE_RENAMING_ENABLED)) {
+    env_cfg.resource_renaming_enabled = !falsy(*resource_renaming_enabled_env);
+  }
+  if (auto resource_renaming_always_simplified_endpoint_env = lookup(
+          environment::DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT)) {
+    env_cfg.resource_renaming_always_simplified_endpoint =
+        !falsy(*resource_renaming_always_simplified_endpoint_env);
+  }
+
   // Baggage
   if (auto baggage_items_env =
           lookup(environment::DD_TRACE_BAGGAGE_MAX_ITEMS)) {
@@ -452,6 +462,40 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.metadata[ConfigName::APM_TRACING_ENABLED] =
       ConfigMetadata(ConfigName::APM_TRACING_ENABLED,
                      to_string(final_config.tracing_enabled), origin);
+
+  {
+    // Resource Renaming Enabled
+    bool resource_renaming_enabled;
+    std::tie(origin, resource_renaming_enabled) =
+        pick(env_config->resource_renaming_enabled,
+             user_config.resource_renaming_enabled, false);
+
+    final_config.metadata[ConfigName::TRACE_RESOURCE_RENAMING_ENABLED] =
+        ConfigMetadata(ConfigName::TRACE_RESOURCE_RENAMING_ENABLED,
+                       to_string(resource_renaming_enabled), origin);
+
+    // Resource Renaming Always Simplified Endpoint
+    bool resource_renaming_always_simplified_endpoint;
+    std::tie(origin, resource_renaming_always_simplified_endpoint) =
+        pick(env_config->resource_renaming_always_simplified_endpoint,
+             user_config.resource_renaming_always_simplified_endpoint, false);
+    final_config.metadata
+        [ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT] =
+        ConfigMetadata(
+            ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
+            to_string(resource_renaming_always_simplified_endpoint), origin);
+
+    if (!resource_renaming_enabled) {
+      final_config.resource_renaming_mode =
+          HttpEndpointCalculationMode::DISABLED;
+    } else if (resource_renaming_always_simplified_endpoint) {
+      final_config.resource_renaming_mode =
+          HttpEndpointCalculationMode::ALWAYS_CALCULATE;
+    } else {
+      final_config.resource_renaming_mode =
+          HttpEndpointCalculationMode::FALLBACK;
+    }
+  }
 
   // Whether APM tracing is enabled. This affects whether the
   // "Datadog-Client-Computed-Stats: yes" header is sent with trace requests.
