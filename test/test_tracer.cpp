@@ -2087,6 +2087,7 @@ TEST_TRACER("process discovery") {
   CHECK(!fd);
 }
 #endif
+
 TEST_TRACER("_dd.p.ksr is NOT set when overriding the sampling decision") {
   const auto collector = std::make_shared<MockCollector>();
 
