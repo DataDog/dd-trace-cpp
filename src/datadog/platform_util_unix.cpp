@@ -1,4 +1,3 @@
-<<<<<<<< HEAD:src/datadog/platform_util_unix.cpp
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -283,12 +282,3 @@ Optional<ContainerID> get_id() {
 
 }  // namespace tracing
 }  // namespace datadog
-========
-#ifdef _MSC_VER
-#include "platform_util_windows.cpp"
-#elif defined(__APPLE__) || defined(__FreeBSD__)
-#include "platform_util_darwin.cpp"
-#else
-#include "platform_util_unix.cpp"
-#endif
->>>>>>>> de34fe8 (chore: split platform code per translation unit):src/datadog/platform_util.cpp
