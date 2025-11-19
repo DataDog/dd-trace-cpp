@@ -11,6 +11,8 @@
 
 #include "platform_util.h"
 
+using namespace std::literals;
+
 namespace datadog {
 namespace tracing {
 namespace {
@@ -100,6 +102,25 @@ std::string get_hostname() { return get_host_info().hostname; }
 
 int get_process_id() { return GetCurrentProcessId(); }
 
+Optional<std::filesystem::path> get_process_path() {
+  const char* cmdline = GetCommandLineA();
+  if (cmdline == NULL) return nullopt;
+
+  StringView cmdline_sv{cmdline};
+  auto end = cmdline_sv.find_first_of(" \t"sv);
+  if (end == StringView::npos) {
+    return cmdline;
+  }
+
+  if (cmdline_sv[end - 1] == '"') {
+    --end;
+  }
+
+  size_t beg = cmdline_sv[0] == '"' ? 1 : 0;
+
+  return cmdline_sv.substr(beg, end - beg);
+}
+
 std::string get_process_name() {
   TCHAR exe_name[MAX_PATH];
   if (GetModuleFileName(NULL, exe_name, MAX_PATH) <= 0) {
@@ -164,11 +185,12 @@ Optional<std::string> find_container_id(std::istream& source) {
   source.clear();
   source.seekg(0);
 
-  // Perform a second pass using a regular expression for matching container IDs
-  // in a Fargate environment. This two-step approach is used because STL
+  // Perform a second pass using a regular expression for matching container
+  // IDs in a Fargate environment. This two-step approach is used because STL
   // `regex` is relatively slow, so we avoid using it unless necessary.
   static const std::string uuid_regex_str =
-      "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
+      "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{"
+      "12}"
       "|(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$)";
   static const std::string container_regex_str = "[0-9a-f]{64}";
   static const std::string task_regex_str = "[0-9a-f]{32}-\\d+";

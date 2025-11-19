@@ -107,7 +107,7 @@ class Tracer {
   std::string config() const;
 
  private:
-  void store_config();
+  void store_config(const std::unordered_map<std::string, std::string>&);
 };
 
 }  // namespace tracing

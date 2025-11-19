@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
 
 #include "config_manager.h"
 #include "datadog_agent.h"
@@ -29,6 +30,8 @@
 #include "telemetry_metrics.h"
 #include "trace_sampler.h"
 #include "w3c_propagation.h"
+
+namespace fs = std::filesystem;
 
 namespace datadog {
 namespace tracing {
@@ -100,7 +103,18 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     });
   }
 
-  store_config();
+  std::unordered_map<std::string, std::string> process_tags(
+      config.process_tags);
+  process_tags.emplace("entrypoint.name", get_process_name());
+  process_tags.emplace("entrypoint.type", "executable");
+  process_tags.emplace("entrypoint.workdir",
+                       fs::current_path().filename().string());
+  if (auto maybe_process_path = get_process_path();
+      maybe_process_path.has_value()) {
+    process_tags.emplace("entrypoint.basedir",
+                         maybe_process_path->parent_path().filename().string());
+  }
+  store_config(process_tags);
 }
 
 std::string Tracer::config() const {
@@ -130,7 +144,8 @@ std::string Tracer::config() const {
   return config.dump();
 }
 
-void Tracer::store_config() {
+void Tracer::store_config(
+    const std::unordered_map<std::string, std::string>& process_tags) {
   auto maybe_file =
       InMemoryFile::make(std::string("datadog-tracer-info-") + short_uuid());
   if (auto error = maybe_file.if_error()) {
@@ -163,7 +178,7 @@ void Tracer::store_config() {
     "service_name", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->service); },
     "service_env", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->environment); },
     "service_version", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->version); },
-    "process_tags", [&](auto& buffer) { return msgpack::pack_string(buffer, ""); },
+    "process_tags", [&](auto& buffer) { return msgpack::pack_string(buffer, join_tags(process_tags)); },
     "container_id", [&](auto& buffer) { return msgpack::pack_string(buffer, container_id); }
   );
   // clang-format on
