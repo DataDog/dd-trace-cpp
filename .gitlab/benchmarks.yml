@@ -3,7 +3,6 @@ variables:
 
 benchmarks:
   stage: benchmarks
-  when: on_success
   tags: ["runner:apm-k8s-tweaked-metal"]
   image: $BENCHMARKS_CI_IMAGE
   rules:
@@ -40,7 +39,6 @@ benchmarks:
 check-big-regressions:
   stage: benchmarks-report
   needs: [ benchmarks ]
-  when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       interruptible: false
