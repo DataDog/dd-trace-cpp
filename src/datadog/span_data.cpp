@@ -36,7 +36,11 @@ Optional<StringView> SpanData::version() const {
 }
 
 void SpanData::apply_config(const SpanDefaults& defaults,
-                            const SpanConfig& config, const Clock& clock) {
+                            const SpanConfig& config) {
+  if (config.start) {
+    start = *config.start;
+  }
+
   std::string version;
   if (config.service) {
     service = *config.service;
@@ -66,11 +70,6 @@ void SpanData::apply_config(const SpanDefaults& defaults,
 
   resource = config.resource.value_or(name);
   service_type = config.service_type.value_or(defaults.service_type);
-  if (config.start) {
-    start = *config.start;
-  } else {
-    start = clock();
-  }
 }
 
 Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
