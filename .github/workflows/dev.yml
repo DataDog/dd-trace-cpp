@@ -7,7 +7,7 @@ jobs:
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-arm64
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Check format
         run: bin/check-format
       - name: Shellcheck
@@ -39,7 +39,7 @@ jobs:
       BUILD_DIR: .build
       DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Configure
         run: bin/with-toolchain ${{ matrix.toolchain }} cmake . -B .build --preset ci-clang
       - name: Build
@@ -72,7 +72,7 @@ jobs:
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-${{matrix.docker-arch}}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Build
         run: bin/with-toolchain ${{ matrix.toolchain }} bazelisk --bazelrc=${{ matrix.bazelrc }} build dd_trace_cpp
 
@@ -86,7 +86,7 @@ jobs:
       matrix:
         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Install Dependency Manager (scoop)
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -120,7 +120,7 @@ jobs:
     env:
       DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Install Dependency Manager (scoop)
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -155,7 +155,7 @@ jobs:
     env:
       DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - run: bin/test --coverage --verbose
       - name: Report Datadog coverage
         run: |
