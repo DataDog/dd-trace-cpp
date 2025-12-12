@@ -5,6 +5,14 @@
 
 version: 2
 updates:
+  - package-ecosystem: "bazel"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      bazel-packages:
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
