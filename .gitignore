@@ -9,3 +9,6 @@ dist/
 out/
 MODULE.bazel.lock
 .vscode
+.cache/
+.cursor/
+.DS_Store
