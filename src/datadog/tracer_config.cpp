@@ -8,13 +8,13 @@
 #include <unordered_map>
 #include <vector>
 
+#include "datadog/optional.h"
 #include "datadog_agent.h"
 #include "json.hpp"
 #include "null_logger.h"
 #include "parse_util.h"
 #include "platform_util.h"
 #include "string_util.h"
-#include "tags.h"
 #include "threaded_event_scheduler.h"
 
 namespace datadog {
@@ -284,81 +284,81 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.clock = clock;
   final_config.logger = logger;
 
-  ConfigMetadata::Origin origin;
+  std::unordered_map<ConfigName, std::vector<ConfigMetadata>>
+      all_sources_configs;
 
-  std::tie(origin, final_config.defaults.service) =
-      pick(env_config->service, user_config.service, "");
+  // DD_SERVICE
+  final_config.defaults.service = pick(
+      env_config->service, user_config.service, &all_sources_configs,
+      &final_config.metadata, ConfigName::SERVICE_NAME, get_process_name());
 
-  if (final_config.defaults.service.empty()) {
-    final_config.defaults.service = get_process_name();
-  }
-
-  final_config.metadata[ConfigName::SERVICE_NAME] = ConfigMetadata(
-      ConfigName::SERVICE_NAME, final_config.defaults.service, origin);
-
+  // Service type
   final_config.defaults.service_type =
       value_or(env_config->service_type, user_config.service_type, "web");
 
   // DD_ENV
-  std::tie(origin, final_config.defaults.environment) =
-      pick(env_config->environment, user_config.environment, "");
-  final_config.metadata[ConfigName::SERVICE_ENV] = ConfigMetadata(
-      ConfigName::SERVICE_ENV, final_config.defaults.environment, origin);
+  final_config.defaults.environment = pick(
+      env_config->environment, user_config.environment, &all_sources_configs,
+      &final_config.metadata, ConfigName::SERVICE_ENV);
 
   // DD_VERSION
-  std::tie(origin, final_config.defaults.version) =
-      pick(env_config->version, user_config.version, "");
-  final_config.metadata[ConfigName::SERVICE_VERSION] = ConfigMetadata(
-      ConfigName::SERVICE_VERSION, final_config.defaults.version, origin);
+  final_config.defaults.version =
+      pick(env_config->version, user_config.version, &all_sources_configs,
+           &final_config.metadata, ConfigName::SERVICE_VERSION);
 
+  // Span name
   final_config.defaults.name = value_or(env_config->name, user_config.name, "");
 
   // DD_TAGS
-  std::tie(origin, final_config.defaults.tags) =
-      pick(env_config->tags, user_config.tags,
-           std::unordered_map<std::string, std::string>{});
-  final_config.metadata[ConfigName::TAGS] = ConfigMetadata(
-      ConfigName::TAGS, join_tags(final_config.defaults.tags), origin);
+  final_config.defaults.tags =
+      pick(env_config->tags, user_config.tags, &all_sources_configs,
+           &final_config.metadata, ConfigName::TAGS,
+           std::unordered_map<std::string, std::string>{},
+           [](const auto &tags) { return join_tags(tags); });
 
   // Extraction Styles
   const std::vector<PropagationStyle> default_propagation_styles{
       PropagationStyle::DATADOG, PropagationStyle::W3C,
       PropagationStyle::BAGGAGE};
 
-  std::tie(origin, final_config.extraction_styles) =
+  final_config.extraction_styles =
       pick(env_config->extraction_styles, user_config.extraction_styles,
-           default_propagation_styles);
+           &all_sources_configs, &final_config.metadata,
+           ConfigName::EXTRACTION_STYLES, default_propagation_styles,
+           [](const std::vector<PropagationStyle> &styles) {
+             return join_propagation_styles(styles);
+           });
+
   if (final_config.extraction_styles.empty()) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
                  "At least one extraction style must be specified."};
   }
-  final_config.metadata[ConfigName::EXTRACTION_STYLES] = ConfigMetadata(
-      ConfigName::EXTRACTION_STYLES,
-      join_propagation_styles(final_config.extraction_styles), origin);
 
   // Injection Styles
-  std::tie(origin, final_config.injection_styles) =
+  final_config.injection_styles =
       pick(env_config->injection_styles, user_config.injection_styles,
-           default_propagation_styles);
+           &all_sources_configs, &final_config.metadata,
+           ConfigName::INJECTION_STYLES, default_propagation_styles,
+           [](const std::vector<PropagationStyle> &styles) {
+             return join_propagation_styles(styles);
+           });
+
   if (final_config.injection_styles.empty()) {
     return Error{Error::MISSING_SPAN_INJECTION_STYLE,
                  "At least one injection style must be specified."};
   }
-  final_config.metadata[ConfigName::INJECTION_STYLES] = ConfigMetadata(
-      ConfigName::INJECTION_STYLES,
-      join_propagation_styles(final_config.injection_styles), origin);
 
   // Startup Logs
-  std::tie(origin, final_config.log_on_startup) =
-      pick(env_config->log_on_startup, user_config.log_on_startup, true);
-  final_config.metadata[ConfigName::STARTUP_LOGS] = ConfigMetadata(
-      ConfigName::STARTUP_LOGS, to_string(final_config.log_on_startup), origin);
+  final_config.log_on_startup = pick(
+      env_config->log_on_startup, user_config.log_on_startup,
+      &all_sources_configs, &final_config.metadata, ConfigName::STARTUP_LOGS,
+      true, [](const bool &b) { return to_string(b); });
 
   // Report traces
-  std::tie(origin, final_config.report_traces) =
-      pick(env_config->report_traces, user_config.report_traces, true);
-  final_config.metadata[ConfigName::REPORT_TRACES] = ConfigMetadata(
-      ConfigName::REPORT_TRACES, to_string(final_config.report_traces), origin);
+  final_config.report_traces = pick(
+      env_config->report_traces, user_config.report_traces,
+      &all_sources_configs, &final_config.metadata, ConfigName::REPORT_TRACES,
+      true, [](const bool &b) { return to_string(b); });
 
   // Report hostname
   final_config.report_hostname =
@@ -369,12 +369,11 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       env_config->max_tags_header_size, user_config.max_tags_header_size, 512);
 
   // 128b Trace IDs
-  std::tie(origin, final_config.generate_128bit_trace_ids) =
+  final_config.generate_128bit_trace_ids =
       pick(env_config->generate_128bit_trace_ids,
-           user_config.generate_128bit_trace_ids, true);
-  final_config.metadata[ConfigName::GENEREATE_128BIT_TRACE_IDS] =
-      ConfigMetadata(ConfigName::GENEREATE_128BIT_TRACE_IDS,
-                     to_string(final_config.generate_128bit_trace_ids), origin);
+           user_config.generate_128bit_trace_ids, &all_sources_configs,
+           &final_config.metadata, ConfigName::GENEREATE_128BIT_TRACE_IDS, true,
+           [](const bool &b) { return to_string(b); });
 
   // Integration name & version
   final_config.integration_name = value_or(
@@ -383,18 +382,19 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       value_or(env_config->integration_version, user_config.integration_version,
                tracer_version);
 
-  // Baggage
-  std::tie(origin, final_config.baggage_opts.max_items) =
-      pick(env_config->baggage_max_items, user_config.baggage_max_items, 64);
-  final_config.metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS] = ConfigMetadata(
-      ConfigName::TRACE_BAGGAGE_MAX_ITEMS,
-      std::to_string(final_config.baggage_opts.max_items), origin);
+  // Baggage - max items
+  final_config.baggage_opts.max_items =
+      pick(env_config->baggage_max_items, user_config.baggage_max_items,
+           &all_sources_configs, &final_config.metadata,
+           ConfigName::TRACE_BAGGAGE_MAX_ITEMS, 64UL,
+           [](const size_t &i) { return std::to_string(i); });
 
-  std::tie(origin, final_config.baggage_opts.max_bytes) =
-      pick(env_config->baggage_max_bytes, user_config.baggage_max_bytes, 8192);
-  final_config.metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES] = ConfigMetadata(
-      ConfigName::TRACE_BAGGAGE_MAX_BYTES,
-      std::to_string(final_config.baggage_opts.max_bytes), origin);
+  // Baggage - max bytes
+  final_config.baggage_opts.max_bytes =
+      pick(env_config->baggage_max_bytes, user_config.baggage_max_bytes,
+           &all_sources_configs, &final_config.metadata,
+           ConfigName::TRACE_BAGGAGE_MAX_BYTES, 8192UL,
+           [](const size_t &i) { return std::to_string(i); });
 
   if (final_config.baggage_opts.max_items <= 0 ||
       final_config.baggage_opts.max_bytes < 3) {
@@ -453,39 +453,33 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     final_config.telemetry = std::move(*telemetry_final_config);
     final_config.telemetry.products.emplace_back(telemetry::Product{
         telemetry::Product::Name::tracing, true, tracer_version, nullopt,
-        nullopt, final_config.metadata});
+        nullopt, all_sources_configs});
   } else {
     return std::move(telemetry_final_config.error());
   }
 
   // APM Tracing Enabled
-  std::tie(origin, final_config.tracing_enabled) =
-      pick(env_config->tracing_enabled, user_config.tracing_enabled, true);
-  final_config.metadata[ConfigName::APM_TRACING_ENABLED] =
-      ConfigMetadata(ConfigName::APM_TRACING_ENABLED,
-                     to_string(final_config.tracing_enabled), origin);
+  final_config.tracing_enabled =
+      pick(env_config->tracing_enabled, user_config.tracing_enabled,
+           &all_sources_configs, &final_config.metadata,
+           ConfigName::APM_TRACING_ENABLED, true,
+           [](const bool &b) { return to_string(b); });
 
   {
     // Resource Renaming Enabled
-    bool resource_renaming_enabled;
-    std::tie(origin, resource_renaming_enabled) =
-        pick(env_config->resource_renaming_enabled,
-             user_config.resource_renaming_enabled, false);
-
-    final_config.metadata[ConfigName::TRACE_RESOURCE_RENAMING_ENABLED] =
-        ConfigMetadata(ConfigName::TRACE_RESOURCE_RENAMING_ENABLED,
-                       to_string(resource_renaming_enabled), origin);
+    const bool resource_renaming_enabled = pick(
+        env_config->resource_renaming_enabled,
+        user_config.resource_renaming_enabled, &all_sources_configs,
+        &final_config.metadata, ConfigName::TRACE_RESOURCE_RENAMING_ENABLED,
+        false, [](const bool &b) { return to_string(b); });
 
     // Resource Renaming Always Simplified Endpoint
-    bool resource_renaming_always_simplified_endpoint;
-    std::tie(origin, resource_renaming_always_simplified_endpoint) =
+    const bool resource_renaming_always_simplified_endpoint =
         pick(env_config->resource_renaming_always_simplified_endpoint,
-             user_config.resource_renaming_always_simplified_endpoint, false);
-    final_config.metadata
-        [ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT] =
-        ConfigMetadata(
-            ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
-            to_string(resource_renaming_always_simplified_endpoint), origin);
+             user_config.resource_renaming_always_simplified_endpoint,
+             &all_sources_configs, &final_config.metadata,
+             ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
+             false, [](const bool &b) { return to_string(b); });
 
     if (!resource_renaming_enabled) {
       final_config.resource_renaming_mode =

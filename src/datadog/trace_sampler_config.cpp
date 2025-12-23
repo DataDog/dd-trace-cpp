@@ -225,10 +225,12 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
-  const auto [origin, max_per_second] =
-      pick(env_config->max_per_second, config.max_per_second, 100);
-  result.metadata[ConfigName::TRACE_SAMPLING_LIMIT] = ConfigMetadata(
-      ConfigName::TRACE_SAMPLING_LIMIT, std::to_string(max_per_second), origin);
+  std::unordered_map<ConfigName, std::vector<ConfigMetadata>>
+      telemetry_configs_tmp;
+  double max_per_second = pick(
+      env_config->max_per_second, config.max_per_second, &telemetry_configs_tmp,
+      &result.metadata, ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
+      [](const double &d) { return std::to_string(d); });
 
   const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
   if (!(max_per_second > 0) ||
