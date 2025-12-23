@@ -191,11 +191,16 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
       product.name = Product::Name::tracing;
       product.enabled = true;
       product.version = tracer_version;
-      product.configurations = std::unordered_map<ConfigName, ConfigMetadata>{
-          {ConfigName::SERVICE_NAME,
-           ConfigMetadata(ConfigName::SERVICE_NAME, "foo",
-                          ConfigMetadata::Origin::CODE)},
-      };
+      product.configurations =
+          std::unordered_map<ConfigName, std::vector<ConfigMetadata>>{
+              {ConfigName::SERVICE_NAME,
+               {ConfigMetadata(ConfigName::SERVICE_NAME, "default-service",
+                               ConfigMetadata::Origin::DEFAULT),
+                ConfigMetadata(ConfigName::SERVICE_NAME, "code-service",
+                               ConfigMetadata::Origin::CODE),
+                ConfigMetadata(ConfigName::SERVICE_NAME, "env-service",
+                               ConfigMetadata::Origin::ENVIRONMENT_VARIABLE)}},
+          };
 
       Configuration cfg;
       cfg.products.emplace_back(std::move(product));
@@ -218,18 +223,38 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
 
       auto cfg_payload = app_started_payload["payload"]["configuration"];
       REQUIRE(cfg_payload.is_array());
-      REQUIRE(cfg_payload.size() == 1);
+      REQUIRE(cfg_payload.size() == 3);
 
+      // Each configuration source is sent with an incrementing seq_id
       // clang-format off
-      const auto expected_conf = nlohmann::json({
-        {"name", "service"},
-        {"value", "foo"},
-        {"seq_id", 1},
-        {"origin", "code"},
-      });
+      const std::unordered_map<std::string, nlohmann::json> expected_configs{
+        {"default-service", nlohmann::json({
+          {"name", "service"},
+          {"value", "default-service"},
+          {"seq_id", 1},
+          {"origin", "default"},
+        })},
+        {"code-service", nlohmann::json({
+          {"name", "service"},
+          {"value", "code-service"},
+          {"seq_id", 2},
+          {"origin", "code"},
+        })},
+        {"env-service", nlohmann::json({
+          {"name", "service"},
+          {"value", "env-service"},
+          {"seq_id", 3},
+          {"origin", "env_var"},
+        })},
+      };
       // clang-format on
 
-      CHECK(cfg_payload[0] == expected_conf);
+      // Verify all three configuration sources are present
+      for (const auto& conf : cfg_payload) {
+        auto value = conf["value"].get<std::string>();
+        REQUIRE(expected_configs.count(value) == 1);
+        CHECK(conf == expected_configs.at(value));
+      }
 
       SECTION("generates a configuration change event") {
         SECTION("empty configuration do not generate a valid payload") {
@@ -268,7 +293,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
                   nlohmann::json{
                       {"name", "service"},
                       {"value", "increase seq_id"},
-                      {"seq_id", 2},
+                      {"seq_id",
+                       4},  // seq_id 4 (after DEFAULT=1, CODE=2, ENV=3)
                       {"origin", "env_var"},
                   },
               },
