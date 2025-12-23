@@ -227,7 +227,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   std::unordered_map<ConfigName, std::vector<ConfigMetadata>>
       telemetry_configs_tmp;
-  double max_per_second = pick(
+  double max_per_second = resolve_and_record_config(
       env_config->max_per_second, config.max_per_second, &telemetry_configs_tmp,
       &result.metadata, ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
       [](const double &d) { return std::to_string(d); });

@@ -62,21 +62,43 @@ struct ConfigMetadata {
       : name(n), value(std::move(v)), origin(orig), error(std::move(err)) {}
 };
 
-// Return the chosen configuration value, in order of precedence: `from_env`,
-// `from_user`, and `fallback`.
-// This overload directly populates both telemetry_configs[config_name] and
-// metadata[config_name] using the stringified value, with all values found,
-// from lowest to highest precedence. Returns the chosen value directly.
+// Returns the final configuration value using the following
+// precedence order: environment > user code > default, and populates two maps:
+// 1. `telemetry_configs`: Records ALL configuration sources that were provided,
+//    ordered from lowest to highest precedence.
+// 2. `metadata`: Records ONLY the winning configuration value (highest
+// precedence). Template Parameters:
+//   Value: The type of the configuration value
+//   Stringifier: Optional function type to convert Value to string
+//                (defaults to std::nullptr_t, which uses string construction)
+//   DefaultValue: Type of the fallback value (defaults to std::nullptr_t)
 //
-// The fallback parameter is optional and defaults to nullptr.
+// Parameters:
+//   from_env: Optional value from environment variables (highest precedence)
+//   from_user: Optional value from user code (middle precedence)
+//   telemetry_configs: Output map that will be populated with all config
+//                      sources found for this config_name, in precedence order
+//   metadata: Output map that will be populated with the winning config value
+//             for this config_name
+//   config_name: The configuration parameter name identifier
+//   fallback: Optional default value (lowest precedence). Pass nullptr to
+//             indicate no default.
+//   to_string_fn: Optional custom function to convert Value to string.
+//                 Required for non-string types. For string-like types, uses
+//                 default string construction if not provided.
+//
+// Returns:
+//   The chosen configuration value based on precedence, or Value{} if no value
+//   was provided.
 template <typename Value, typename Stringifier = std::nullptr_t,
           typename DefaultValue = std::nullptr_t>
-Value pick(const Optional<Value>& from_env, const Optional<Value>& from_user,
-           std::unordered_map<ConfigName, std::vector<ConfigMetadata>>*
-               telemetry_configs,
-           std::unordered_map<ConfigName, ConfigMetadata>* metadata,
-           ConfigName config_name, DefaultValue fallback = nullptr,
-           Stringifier to_string_fn = nullptr) {
+Value resolve_and_record_config(
+    const Optional<Value>& from_env, const Optional<Value>& from_user,
+    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>*
+        telemetry_configs,
+    std::unordered_map<ConfigName, ConfigMetadata>* metadata,
+    ConfigName config_name, DefaultValue fallback = nullptr,
+    Stringifier to_string_fn = nullptr) {
   auto stringify = [&](const Value& v) -> std::string {
     if constexpr (!std::is_same_v<Stringifier, std::nullptr_t>) {
       return to_string_fn(v);  // use provided function

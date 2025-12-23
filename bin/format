@@ -64,7 +64,6 @@ docker_clang_format() {
         process_arg "$arg"
     done | xargs -0 \
       docker run \
-      --platform linux/amd64 \
       --interactive \
       --rm \
       --volume /etc/passwd:/etc/passwd:ro \
