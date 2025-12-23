@@ -587,11 +587,12 @@ std::string Telemetry::app_started_payload() {
 
   for (const auto& product : config_.products) {
     auto& configurations = product.configurations;
-    for (const auto& [_, config_metadata] : configurations) {
+    for (const auto& [_, config_metadatas] : configurations) {
       // if (config_metadata.value.empty()) continue;
-
-      configuration_json.emplace_back(
-          generate_configuration_field(config_metadata));
+      for (const auto& config_metadata : config_metadatas) {
+        configuration_json.emplace_back(
+            generate_configuration_field(config_metadata));
+      }
     }
 
     /// NOTE(@dmehala): Telemetry API is tightly related to APM tracing and
