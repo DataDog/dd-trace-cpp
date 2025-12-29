@@ -5,6 +5,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace datadog::telemetry {
 
@@ -30,7 +31,7 @@ struct Product final {
   /// Optional error message related to the product status.
   tracing::Optional<std::string> error_message;
   /// Map of configuration settings for the product.
-  std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>
+  std::unordered_map<tracing::ConfigName, std::vector<tracing::ConfigMetadata>>
       configurations;
 };
 
