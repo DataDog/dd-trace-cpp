@@ -421,7 +421,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     return std::move(*error);
   }
 
-  if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
+  if (auto trace_sampler_config =
+          finalize_config(user_config.trace_sampler, &all_sources_configs)) {
     final_config.metadata.merge(trace_sampler_config->metadata);
     final_config.trace_sampler = std::move(*trace_sampler_config);
   } else {
