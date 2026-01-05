@@ -1463,3 +1463,73 @@ TRACER_CONFIG_TEST("baggage") {
           false);
   }
 }
+
+TRACER_CONFIG_TEST("telemetry products contain configuration precedence") {
+  // Verifies that finalize_config produces telemetry products with
+  // configurations in the correct precedence order. Each configuration source
+  // (DEFAULT, CODE, ENVIRONMENT_VARIABLE) is tracked separately and will
+  // receive sequential seq_id values (1, 2, 3, etc.) when sent to telemetry.
+
+  SECTION("all three sources: DEFAULT -> CODE -> ENVIRONMENT_VARIABLE") {
+    TracerConfig config;
+    config.service = "code-service";
+    EnvGuard env{"DD_SERVICE", "env-service"};
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    const auto& configs = finalized->telemetry.products[0].configurations.at(
+        ConfigName::SERVICE_NAME);
+
+    // All three sources in order (will receive seq_id 1, 2, 3)
+    REQUIRE(configs.size() == 3);
+    CHECK(configs[0].origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(configs[1].origin == ConfigMetadata::Origin::CODE);
+    CHECK(configs[1].value == "code-service");
+    CHECK(configs[2].origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(configs[2].value == "env-service");
+
+    // Metadata contains final value (highest precedence)
+    CHECK(finalized->metadata.at(ConfigName::SERVICE_NAME).value ==
+          "env-service");
+  }
+
+  SECTION("two sources: CODE -> ENVIRONMENT_VARIABLE (no default)") {
+    TracerConfig config;
+    config.service = "test";
+    config.environment = "dev";
+    EnvGuard env{"DD_ENV", "prod"};
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    const auto& configs = finalized->telemetry.products[0].configurations.at(
+        ConfigName::SERVICE_ENV);
+
+    // Two sources (will receive seq_id 1, 2)
+    REQUIRE(configs.size() == 2);
+    CHECK(configs[0].origin == ConfigMetadata::Origin::CODE);
+    CHECK(configs[0].value == "dev");
+    CHECK(configs[1].origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(configs[1].value == "prod");
+
+    CHECK(finalized->metadata.at(ConfigName::SERVICE_ENV).value == "prod");
+  }
+
+  SECTION("single source: CODE only") {
+    TracerConfig config;
+    config.service = "test";
+    config.version = "1.2.3";
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    const auto& configs = finalized->telemetry.products[0].configurations.at(
+        ConfigName::SERVICE_VERSION);
+
+    // Single source (will receive seq_id 1)
+    REQUIRE(configs.size() == 1);
+    CHECK(configs[0].origin == ConfigMetadata::Origin::CODE);
+    CHECK(configs[0].value == "1.2.3");
+  }
+}
