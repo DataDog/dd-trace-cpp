@@ -121,13 +121,13 @@ int main(int argc, char* argv[]) {
              handler.on_stats_flush(req, res);
            });
   svr.Post("/trace/span/manual_drop",
-          [&handler](const httplib::Request& req, httplib::Response& res) {
-            handler.on_set_metric(req, res);
-          });
+           [&handler](const httplib::Request& req, httplib::Response& res) {
+             handler.on_manual_drop(req, res);
+           });
   svr.Post("/trace/span/manual_keep",
-          [&handler](const httplib::Request& req, httplib::Response& res) {
-            handler.on_set_metric(req, res);
-          });
+           [&handler](const httplib::Request& req, httplib::Response& res) {
+             handler.on_manual_keep(req, res);
+           });
 
   // Not implemented
   svr.Post("/trace/span/set_metric",

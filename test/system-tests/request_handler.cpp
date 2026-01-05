@@ -227,8 +227,8 @@ void RequestHandler::on_set_metric(const httplib::Request& req,
 
   auto span_it = active_spans_.find(*span_id);
   if (span_it == active_spans_.cend()) {
-    const auto msg =
-      "on_set_metric: span not found for id " + std::to_string(*span_id);
+    const auto msg = "on_set_metric: span not found for id " +
+                     std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
   }
 
@@ -250,19 +250,20 @@ void RequestHandler::on_manual_keep(const httplib::Request& req,
 
   auto span_it = active_spans_.find(*span_id);
   if (span_it == active_spans_.cend()) {
-    const auto msg =
-        "on_manual_keep: span not found for id " + std::to_string(*span_id);
+    const auto msg = "on_manual_keep: span not found for id " +
+                     std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
   }
 
   auto& span = span_it->second;
-  span.trace_segment().override_sampling_priority(datadog::tracing::SamplingPriority::USER_KEEP);
+  span.trace_segment().override_sampling_priority(
+      datadog::tracing::SamplingPriority::USER_KEEP);
 
   res.status = 200;
 }
 
 void RequestHandler::on_manual_drop(const httplib::Request& req,
-  httplib::Response& res) {
+                                    httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);
 
   auto span_id = utils::get_if_exists<uint64_t>(request_json, "span_id");
@@ -272,13 +273,14 @@ void RequestHandler::on_manual_drop(const httplib::Request& req,
 
   auto span_it = active_spans_.find(*span_id);
   if (span_it == active_spans_.cend()) {
-    const auto msg =
-      "on_manual_drop: span not found for id " + std::to_string(*span_id);
+    const auto msg = "on_manual_drop: span not found for id " +
+                     std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
   }
 
   auto& span = span_it->second;
-  span.trace_segment().override_sampling_priority(datadog::tracing::SamplingPriority::USER_DROP);
+  span.trace_segment().override_sampling_priority(
+      datadog::tracing::SamplingPriority::USER_DROP);
 
   res.status = 200;
 }
