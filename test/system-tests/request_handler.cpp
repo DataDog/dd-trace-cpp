@@ -1,7 +1,9 @@
 #include "request_handler.h"
 
 #include <datadog/optional.h>
+#include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
+#include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
