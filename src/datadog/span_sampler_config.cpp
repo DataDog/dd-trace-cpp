@@ -221,7 +221,9 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
 SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(
-    const SpanSamplerConfig &user_config, Logger &logger) {
+    const SpanSamplerConfig &user_config, Logger &logger,
+    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>
+        *telemetry_configs) {
   Expected<SpanSamplerConfig> env_config = load_span_sampler_env_config(logger);
   if (auto error = env_config.if_error()) {
     return *error;
@@ -229,18 +231,22 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
 
   FinalizedSpanSamplerConfig result;
 
-  std::vector<SpanSamplerConfig::Rule> rules;
+  // Convert to Optional for resolve_and_record_config
+  Optional<std::vector<SpanSamplerConfig::Rule>> env_rules;
   if (!env_config->rules.empty()) {
-    rules = env_config->rules;
-    result.metadata[ConfigName::SPAN_SAMPLING_RULES] =
-        ConfigMetadata(ConfigName::SPAN_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
-  } else if (!user_config.rules.empty()) {
-    rules = user_config.rules;
-    result.metadata[ConfigName::SPAN_SAMPLING_RULES] =
-        ConfigMetadata(ConfigName::SPAN_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::CODE);
+    env_rules = env_config->rules;
   }
+  Optional<std::vector<SpanSamplerConfig::Rule>> user_rules;
+  if (!user_config.rules.empty()) {
+    user_rules = user_config.rules;
+  }
+
+  std::vector<SpanSamplerConfig::Rule> rules = resolve_and_record_config(
+      env_rules, user_rules, telemetry_configs, &result.metadata,
+      ConfigName::SPAN_SAMPLING_RULES, nullptr,
+      [](const std::vector<SpanSamplerConfig::Rule> &r) {
+        return to_string(r);
+      });
 
   for (const auto &rule : rules) {
     auto maybe_rate = Rate::from(rule.sample_rate);
