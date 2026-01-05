@@ -429,8 +429,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     return std::move(trace_sampler_config.error());
   }
 
-  if (auto span_sampler_config =
-          finalize_config(user_config.span_sampler, *logger)) {
+  if (auto span_sampler_config = finalize_config(
+          user_config.span_sampler, *logger, &all_sources_configs)) {
     final_config.metadata.merge(span_sampler_config->metadata);
     final_config.span_sampler = std::move(*span_sampler_config);
   } else {
