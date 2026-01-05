@@ -42,7 +42,9 @@ struct TraceSamplerConfig {
 
 class FinalizedTraceSamplerConfig {
   friend Expected<FinalizedTraceSamplerConfig> finalize_config(
-      const TraceSamplerConfig& config);
+      const TraceSamplerConfig& config,
+      std::unordered_map<ConfigName, std::vector<ConfigMetadata>>*
+          telemetry_configs);
   friend class FinalizedTracerConfig;
 
   FinalizedTraceSamplerConfig() = default;
@@ -58,7 +60,9 @@ class FinalizedTraceSamplerConfig {
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig& config);
+    const TraceSamplerConfig& config,
+    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>*
+        telemetry_configs);
 
 }  // namespace tracing
 }  // namespace datadog
