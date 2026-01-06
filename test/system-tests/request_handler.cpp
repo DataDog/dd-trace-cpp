@@ -1,7 +1,9 @@
 #include "request_handler.h"
 
 #include <datadog/optional.h>
+#include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
+#include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -216,25 +218,71 @@ void RequestHandler::on_set_meta(const httplib::Request& req,
   res.status = 200;
 }
 
-void RequestHandler::on_set_metric(const httplib::Request& /* req */,
+void RequestHandler::on_set_metric(const httplib::Request& req,
                                    httplib::Response& res) {
-  const auto request_json = nlohmann::json::parse(res.body);
+  const auto request_json = nlohmann::json::parse(req.body);
 
   auto span_id = utils::get_if_exists<uint64_t>(request_json, "span_id");
   if (!span_id) {
-    VALIDATION_ERROR(res, "on_set_meta: missing `span_id` field.");
+    VALIDATION_ERROR(res, "on_set_metric: missing `span_id` field.");
   }
 
   auto span_it = active_spans_.find(*span_id);
   if (span_it == active_spans_.cend()) {
     const auto msg =
-        "on_set_meta: span not found for id " + std::to_string(*span_id);
+        "on_set_metric: span not found for id " + std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
   }
 
   auto& span = span_it->second;
   span.set_metric(request_json.at("key").get<std::string_view>(),
                   request_json.at("value").get<double>());
+
+  res.status = 200;
+}
+
+void RequestHandler::on_manual_keep(const httplib::Request& req,
+                                    httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+
+  auto span_id = utils::get_if_exists<uint64_t>(request_json, "span_id");
+  if (!span_id) {
+    VALIDATION_ERROR(res, "on_manual_keep: missing `span_id` field.");
+  }
+
+  auto span_it = active_spans_.find(*span_id);
+  if (span_it == active_spans_.cend()) {
+    const auto msg =
+        "on_manual_keep: span not found for id " + std::to_string(*span_id);
+    VALIDATION_ERROR(res, msg);
+  }
+
+  auto& span = span_it->second;
+  span.trace_segment().override_sampling_priority(
+      datadog::tracing::SamplingPriority::USER_KEEP);
+
+  res.status = 200;
+}
+
+void RequestHandler::on_manual_drop(const httplib::Request& req,
+                                    httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+
+  auto span_id = utils::get_if_exists<uint64_t>(request_json, "span_id");
+  if (!span_id) {
+    VALIDATION_ERROR(res, "on_manual_drop: missing `span_id` field.");
+  }
+
+  auto span_it = active_spans_.find(*span_id);
+  if (span_it == active_spans_.cend()) {
+    const auto msg =
+        "on_manual_drop: span not found for id " + std::to_string(*span_id);
+    VALIDATION_ERROR(res, msg);
+  }
+
+  auto& span = span_it->second;
+  span.trace_segment().override_sampling_priority(
+      datadog::tracing::SamplingPriority::USER_DROP);
 
   res.status = 200;
 }
