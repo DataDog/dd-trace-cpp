@@ -221,28 +221,25 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
 SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(
-    const SpanSamplerConfig &user_config, Logger &logger,
-    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>
-        *telemetry_configs) {
+    const SpanSamplerConfig &user_config, Logger &logger) {
   Expected<SpanSamplerConfig> env_config = load_span_sampler_env_config(logger);
   if (auto error = env_config.if_error()) {
     return *error;
   }
 
   FinalizedSpanSamplerConfig result;
-
   // Convert to Optional for resolve_and_record_config
   Optional<std::vector<SpanSamplerConfig::Rule>> env_rules;
+  Optional<std::vector<SpanSamplerConfig::Rule>> user_rules;
   if (!env_config->rules.empty()) {
     env_rules = env_config->rules;
   }
-  Optional<std::vector<SpanSamplerConfig::Rule>> user_rules;
   if (!user_config.rules.empty()) {
     user_rules = user_config.rules;
   }
 
   std::vector<SpanSamplerConfig::Rule> rules = resolve_and_record_config(
-      env_rules, user_rules, telemetry_configs, &result.metadata,
+      env_rules, user_rules, &result.telemetry_configs, &result.metadata,
       ConfigName::SPAN_SAMPLING_RULES, nullptr,
       [](const std::vector<SpanSamplerConfig::Rule> &r) {
         return to_string(r);
@@ -282,7 +279,6 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
     finalized.max_per_second = rule.max_per_second;
     result.rules.push_back(std::move(finalized));
   }
-
   return result;
 }
 

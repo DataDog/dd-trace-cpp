@@ -42,9 +42,7 @@ struct TraceSamplerConfig {
 
 class FinalizedTraceSamplerConfig {
   friend Expected<FinalizedTraceSamplerConfig> finalize_config(
-      const TraceSamplerConfig& config,
-      std::unordered_map<ConfigName, std::vector<ConfigMetadata>>*
-          telemetry_configs);
+      const TraceSamplerConfig& config);
   friend class FinalizedTracerConfig;
 
   FinalizedTraceSamplerConfig() = default;
@@ -53,6 +51,7 @@ class FinalizedTraceSamplerConfig {
   double max_per_second;
   std::vector<TraceSamplerRule> rules;
   std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::unordered_map<ConfigName, std::vector<ConfigMetadata>> telemetry_configs;
 
  public:
   /// Returns the trace sampler configuration when APM Tracing is disabled.
@@ -60,9 +59,7 @@ class FinalizedTraceSamplerConfig {
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig& config,
-    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>*
-        telemetry_configs);
+    const TraceSamplerConfig& config);
 
 }  // namespace tracing
 }  // namespace datadog
