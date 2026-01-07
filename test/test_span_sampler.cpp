@@ -271,6 +271,24 @@ TEST_CASE("span rule sample rate") {
   config.trace_sampler.sample_rate = 0.0;  // drop the trace
   auto finalized = finalize_config(config);
   REQUIRE(finalized);
+
+  // metadata should be populated right - check the full JSON representation
+  auto expected_rules = "[{\"name\":\"*\",\"resource\":\"*\",\"sample_rate\":" +
+                        to_string(test_case.span_rule_rate, 1) +
+                        ",\"service\":\"testsvc\",\"tags\":{}}]";
+  REQUIRE(finalized->metadata[ConfigName::SPAN_SAMPLING_RULES].value ==
+          expected_rules);
+
+  auto tracing_product = finalized->telemetry.products[0];
+
+  // Verify the tracing product has the span sampling rules in telemetry configs
+  const auto& span_rules_configs =
+      tracing_product.configurations.at(ConfigName::SPAN_SAMPLING_RULES);
+  REQUIRE(span_rules_configs.size() ==
+          1);  // Only CODE origin since rules were set in code
+  REQUIRE(span_rules_configs[0].value == expected_rules);
+  REQUIRE(span_rules_configs[0].origin == ConfigMetadata::Origin::CODE);
+
   Tracer tracer{*finalized};
   {
     auto span = tracer.create_span();
