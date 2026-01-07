@@ -150,9 +150,7 @@ std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig &config,
-    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>
-        *telemetry_configs) {
+    const TraceSamplerConfig &config) {
   Expected<TraceSamplerConfig> env_config = load_trace_sampler_env_config();
   if (auto error = env_config.if_error()) {
     return *error;
@@ -194,7 +192,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   }
 
   Optional<double> sample_rate = resolve_and_record_config(
-      env_config->sample_rate, config.sample_rate, telemetry_configs,
+      env_config->sample_rate, config.sample_rate, &result.telemetry_configs,
       &result.metadata, ConfigName::TRACE_SAMPLING_RATE, 1.0,
       [](const double &d) { return to_string(d, 1); });
 
@@ -216,8 +214,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   }
 
   double max_per_second = resolve_and_record_config(
-      env_config->max_per_second, config.max_per_second, telemetry_configs,
-      &result.metadata, ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
+      env_config->max_per_second, config.max_per_second,
+      &result.telemetry_configs, &result.metadata,
+      ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
       [](const double &d) { return std::to_string(d); });
 
   const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
