@@ -196,10 +196,11 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       &result.metadata, ConfigName::TRACE_SAMPLING_RATE, 1.0,
       [](const double &d) { return to_string(d, 1); });
 
+  bool is_sample_rate_provided = env_config->sample_rate || config.sample_rate;
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
   // appended to the end of `rules`. First, though, we have to make sure the
   // sample rate is valid.
-  if (sample_rate && (env_config->sample_rate || config.sample_rate)) {
+  if (sample_rate && is_sample_rate_provided) {
     auto maybe_rate = Rate::from(*sample_rate);
     if (auto *error = maybe_rate.if_error()) {
       return error->with_prefix(
