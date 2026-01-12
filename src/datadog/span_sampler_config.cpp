@@ -228,7 +228,6 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   }
 
   FinalizedSpanSamplerConfig result;
-  // Convert to Optional for resolve_and_record_config
   Optional<std::vector<SpanSamplerConfig::Rule>> env_rules;
   Optional<std::vector<SpanSamplerConfig::Rule>> user_rules;
   if (!env_config->rules.empty()) {
