@@ -49,7 +49,7 @@ class FinalizedSpanSamplerConfig {
   };
 
   std::vector<Rule> rules;
-  std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::unordered_map<ConfigName, std::vector<ConfigMetadata>> metadata;
 };
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,

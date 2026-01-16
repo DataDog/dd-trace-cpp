@@ -287,12 +287,18 @@ namespace rc = datadog::remote_config;
 
 ConfigManager::ConfigManager(const FinalizedTracerConfig& config)
     : clock_(config.clock),
-      default_metadata_(config.metadata),
       trace_sampler_(
           std::make_shared<TraceSampler>(config.trace_sampler, clock_)),
       rules_(config.trace_sampler.rules),
       span_defaults_(std::make_shared<SpanDefaults>(config.defaults)),
-      report_traces_(config.report_traces) {}
+      report_traces_(config.report_traces) {
+  // Extract winning value (last entry) from each config's metadata history
+  for (const auto& [name, metadata_vec] : config.metadata) {
+    if (!metadata_vec.empty()) {
+      default_metadata_[name] = metadata_vec.back();
+    }
+  }
+}
 
 rc::Products ConfigManager::get_products() { return rc::product::APM_TRACING; }
 

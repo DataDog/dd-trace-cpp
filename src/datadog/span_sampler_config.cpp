@@ -228,19 +228,20 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   }
 
   FinalizedSpanSamplerConfig result;
-
-  std::vector<SpanSamplerConfig::Rule> rules;
+  Optional<std::vector<SpanSamplerConfig::Rule>> env_rules;
+  Optional<std::vector<SpanSamplerConfig::Rule>> user_rules;
   if (!env_config->rules.empty()) {
-    rules = env_config->rules;
-    result.metadata[ConfigName::SPAN_SAMPLING_RULES] =
-        ConfigMetadata(ConfigName::SPAN_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
-  } else if (!user_config.rules.empty()) {
-    rules = user_config.rules;
-    result.metadata[ConfigName::SPAN_SAMPLING_RULES] =
-        ConfigMetadata(ConfigName::SPAN_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::CODE);
+    env_rules = env_config->rules;
   }
+  if (!user_config.rules.empty()) {
+    user_rules = user_config.rules;
+  }
+
+  std::vector<SpanSamplerConfig::Rule> rules = resolve_and_record_config(
+      env_rules, user_rules, &result.metadata, ConfigName::SPAN_SAMPLING_RULES,
+      nullptr, [](const std::vector<SpanSamplerConfig::Rule> &r) {
+        return to_string(r);
+      });
 
   for (const auto &rule : rules) {
     auto maybe_rate = Rate::from(rule.sample_rate);
@@ -276,7 +277,6 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
     finalized.max_per_second = rule.max_per_second;
     result.rules.push_back(std::move(finalized));
   }
-
   return result;
 }
 

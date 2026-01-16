@@ -73,6 +73,22 @@ TEST_CASE("trace sampling rule sample rate") {
 
   auto finalized = finalize_config(config);
   REQUIRE(finalized);
+
+  // metadata should be populated right
+  REQUIRE(
+      finalized->metadata.at(ConfigName::TRACE_SAMPLING_RATE).back().value ==
+      to_string(test_case.sample_rate, 1));
+
+  auto tracing_product = finalized->telemetry.products[0];
+  // Verify the tracing product has the telemetry configs
+  const auto& rate_configs =
+      tracing_product.configurations.at(ConfigName::TRACE_SAMPLING_RATE);
+  REQUIRE(rate_configs.size() == 2);
+  REQUIRE(rate_configs[0].value == to_string(1, 1));
+  REQUIRE(rate_configs[0].origin == ConfigMetadata::Origin::DEFAULT);
+  REQUIRE(rate_configs[1].value == to_string(test_case.sample_rate, 1));
+  REQUIRE(rate_configs[1].origin == ConfigMetadata::Origin::CODE);
+
   Tracer tracer{*finalized};
 
   for (std::size_t i = 0; i < num_iterations; ++i) {
