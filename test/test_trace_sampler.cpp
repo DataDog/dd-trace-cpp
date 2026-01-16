@@ -75,8 +75,9 @@ TEST_CASE("trace sampling rule sample rate") {
   REQUIRE(finalized);
 
   // metadata should be populated right
-  REQUIRE(finalized->metadata[ConfigName::TRACE_SAMPLING_RATE].value ==
-          to_string(test_case.sample_rate, 1));
+  REQUIRE(
+      finalized->metadata.at(ConfigName::TRACE_SAMPLING_RATE).back().value ==
+      to_string(test_case.sample_rate, 1));
 
   auto tracing_product = finalized->telemetry.products[0];
   // Verify the tracing product has the telemetry configs

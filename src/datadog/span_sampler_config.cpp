@@ -238,9 +238,8 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   }
 
   std::vector<SpanSamplerConfig::Rule> rules = resolve_and_record_config(
-      env_rules, user_rules, &result.telemetry_configs, &result.metadata,
-      ConfigName::SPAN_SAMPLING_RULES, nullptr,
-      [](const std::vector<SpanSamplerConfig::Rule> &r) {
+      env_rules, user_rules, &result.metadata, ConfigName::SPAN_SAMPLING_RULES,
+      nullptr, [](const std::vector<SpanSamplerConfig::Rule> &r) {
         return to_string(r);
       });
 

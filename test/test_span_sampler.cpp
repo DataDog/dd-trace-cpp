@@ -276,8 +276,9 @@ TEST_CASE("span rule sample rate") {
   auto expected_rules = "[{\"name\":\"*\",\"resource\":\"*\",\"sample_rate\":" +
                         to_string(test_case.span_rule_rate, 1) +
                         ",\"service\":\"testsvc\",\"tags\":{}}]";
-  REQUIRE(finalized->metadata[ConfigName::SPAN_SAMPLING_RULES].value ==
-          expected_rules);
+  REQUIRE(
+      finalized->metadata.at(ConfigName::SPAN_SAMPLING_RULES).back().value ==
+      expected_rules);
 
   auto tracing_product = finalized->telemetry.products[0];
 

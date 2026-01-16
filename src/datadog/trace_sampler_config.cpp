@@ -162,14 +162,14 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   if (!env_config->rules.empty()) {
     rules = std::move(env_config->rules);
-    result.metadata[ConfigName::TRACE_SAMPLING_RULES] =
+    result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE)};
   } else if (!config.rules.empty()) {
     rules = std::move(config.rules);
-    result.metadata[ConfigName::TRACE_SAMPLING_RULES] =
+    result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::CODE);
+                       ConfigMetadata::Origin::CODE)};
   }
 
   for (const auto &rule : rules) {
@@ -192,8 +192,8 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   }
 
   Optional<double> sample_rate = resolve_and_record_config(
-      env_config->sample_rate, config.sample_rate, &result.telemetry_configs,
-      &result.metadata, ConfigName::TRACE_SAMPLING_RATE, 1.0,
+      env_config->sample_rate, config.sample_rate, &result.metadata,
+      ConfigName::TRACE_SAMPLING_RATE, 1.0,
       [](const double &d) { return to_string(d, 1); });
 
   bool is_sample_rate_provided = env_config->sample_rate || config.sample_rate;
@@ -215,8 +215,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   }
 
   double max_per_second = resolve_and_record_config(
-      env_config->max_per_second, config.max_per_second,
-      &result.telemetry_configs, &result.metadata,
+      env_config->max_per_second, config.max_per_second, &result.metadata,
       ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
       [](const double &d) { return std::to_string(d); });
 
