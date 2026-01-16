@@ -142,8 +142,8 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
     return std::move(*error);
   }
   result.url = *parsed_url;
-  result.metadata[ConfigName::AGENT_URL] =
-      ConfigMetadata(ConfigName::AGENT_URL, url, origin);
+  result.metadata[ConfigName::AGENT_URL] = {
+      ConfigMetadata(ConfigName::AGENT_URL, url, origin)};
 
   // Starting Datadog Agent 7.62.0, the admission controller inject a unique
   // identifier through `DD_EXTERNAL_ENV`. This uid is used for origin
