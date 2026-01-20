@@ -170,3 +170,27 @@ jobs:
           disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
+
+  build-system-tests-artifact:
+    runs-on: ubuntu-22.04
+    steps:
+      - run: mkdir binaries 
+      - run: echo "https://github.com/DataDog/dd-trace-cpp@main" > binaries/cpp-load-from-git
+      - name: Save artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: system_tests_binaries
+          path: ./binaries/**/*
+
+  system-tests:
+    needs: build-system-tests-artifact
+    uses: DataDog/system-tests/.github/workflows/system-tests.yml@main
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+    with:
+      library: cpp
+      binaries_artifact: system_tests_binaries
+      parametric_job_count: 8  # dedicated parameter to speed up parametric job
+      scenarios: PARAMETRIC
