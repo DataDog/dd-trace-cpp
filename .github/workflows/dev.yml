@@ -175,7 +175,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - run: mkdir binaries 
-      - run: echo "https://github.com/DataDog/dd-trace-cpp@main" > binaries/cpp-load-from-git
+      - run: echo "https://github.com/DataDog/dd-trace-cpp@${{ github.head_ref || github.ref_name }}" > binaries/cpp-load-from-git
       - name: Save artifact
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
