@@ -13,21 +13,6 @@ jobs:
       contents: read
       packages: write
 
-  system-tests:
-    uses: DataDog/system-tests/.github/workflows/system-tests.yml@main
-    secrets: inherit
-    permissions:
-      contents: read
-      packages: write
-    with:
-      library: cpp
-      binaries_artifact: binaries
-      desired_execution_time: 300  # 5 minutes
-      scenarios: PARAMETRIC
-      skip_empty_scenarios: true
-      _system_tests_dev_mode: true
-      display_summary: true
-
   # Ensure the main job is run to completion
   check-system-tests:
     needs: system-tests
