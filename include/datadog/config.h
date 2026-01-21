@@ -63,11 +63,12 @@ struct ConfigMetadata {
 };
 
 // Returns the final configuration value using the following
-// precedence order: environment > user code > default, and populates two maps:
-// 1. `telemetry_configs`: Records ALL configuration sources that were provided,
-//    ordered from lowest to highest precedence.
-// 2. `metadata`: Records ONLY the winning configuration value (highest
-// precedence). Template Parameters:
+// precedence order: environment > user code > default, and populates metadata:
+// `metadata`: Records ALL configuration sources that were provided,
+//    ordered from lowest to highest precedence. The last entry has the highest
+//    precedence and is the winning value.
+//
+// Template Parameters:
 //   Value: The type of the configuration value
 //   Stringifier: Optional function type to convert Value to string
 //                (defaults to std::nullptr_t, which uses string construction)
@@ -76,10 +77,8 @@ struct ConfigMetadata {
 // Parameters:
 //   from_env: Optional value from environment variables (highest precedence)
 //   from_user: Optional value from user code (middle precedence)
-//   telemetry_configs: Output map that will be populated with all config
-//                      sources found for this config_name, in precedence order
-//   metadata: Output map that will be populated with the winning config value
-//             for this config_name
+//   metadata: Output map that will be populated with all config sources found
+//             for this config_name, in precedence order (last = highest)
 //   config_name: The configuration parameter name identifier
 //   fallback: Optional default value (lowest precedence). Pass nullptr to
 //             indicate no default.
@@ -94,9 +93,7 @@ template <typename Value, typename Stringifier = std::nullptr_t,
           typename DefaultValue = std::nullptr_t>
 Value resolve_and_record_config(
     const Optional<Value>& from_env, const Optional<Value>& from_user,
-    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>*
-        telemetry_configs,
-    std::unordered_map<ConfigName, ConfigMetadata>* metadata,
+    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>* metadata,
     ConfigName config_name, DefaultValue fallback = nullptr,
     Stringifier to_string_fn = nullptr) {
   auto stringify = [&](const Value& v) -> std::string {
@@ -111,13 +108,12 @@ Value resolve_and_record_config(
     }
   };
 
-  std::vector<ConfigMetadata> telemetry_entries;
+  std::vector<ConfigMetadata> metadata_entries;
   Optional<Value> chosen_value;
 
   auto add_entry = [&](ConfigMetadata::Origin origin, const Value& val) {
     std::string val_str = stringify(val);
-    telemetry_entries.emplace_back(
-        ConfigMetadata{config_name, val_str, origin});
+    metadata_entries.emplace_back(ConfigMetadata{config_name, val_str, origin});
     chosen_value = val;
   };
 
@@ -134,9 +130,8 @@ Value resolve_and_record_config(
     add_entry(ConfigMetadata::Origin::ENVIRONMENT_VARIABLE, *from_env);
   }
 
-  (*telemetry_configs)[config_name] = std::move(telemetry_entries);
-  if (!(*telemetry_configs)[config_name].empty()) {
-    (*metadata)[config_name] = (*telemetry_configs)[config_name].back();
+  if (!metadata_entries.empty()) {
+    (*metadata)[config_name] = std::move(metadata_entries);
   }
 
   return chosen_value.value_or(Value{});

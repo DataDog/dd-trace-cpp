@@ -162,14 +162,14 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   if (!env_config->rules.empty()) {
     rules = std::move(env_config->rules);
-    result.metadata[ConfigName::TRACE_SAMPLING_RULES] =
+    result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE)};
   } else if (!config.rules.empty()) {
     rules = std::move(config.rules);
-    result.metadata[ConfigName::TRACE_SAMPLING_RULES] =
+    result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::CODE);
+                       ConfigMetadata::Origin::CODE)};
   }
 
   for (const auto &rule : rules) {
@@ -191,27 +191,16 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
-  Optional<double> sample_rate;
-  if (env_config->sample_rate) {
-    sample_rate = env_config->sample_rate;
-    result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
-        ConfigName::TRACE_SAMPLING_RATE, to_string(*sample_rate, 1),
-        ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
-  } else if (config.sample_rate) {
-    sample_rate = config.sample_rate;
-    result.metadata[ConfigName::TRACE_SAMPLING_RATE] = ConfigMetadata(
-        ConfigName::TRACE_SAMPLING_RATE, to_string(*sample_rate, 1),
-        ConfigMetadata::Origin::CODE);
-  } else {
-    result.metadata[ConfigName::TRACE_SAMPLING_RATE] =
-        ConfigMetadata(ConfigName::TRACE_SAMPLING_RATE, "1.0",
-                       ConfigMetadata::Origin::DEFAULT);
-  }
+  Optional<double> sample_rate = resolve_and_record_config(
+      env_config->sample_rate, config.sample_rate, &result.metadata,
+      ConfigName::TRACE_SAMPLING_RATE, 1.0,
+      [](const double &d) { return to_string(d, 1); });
 
+  bool is_sample_rate_provided = env_config->sample_rate || config.sample_rate;
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
   // appended to the end of `rules`. First, though, we have to make sure the
   // sample rate is valid.
-  if (sample_rate) {
+  if (sample_rate && is_sample_rate_provided) {
     auto maybe_rate = Rate::from(*sample_rate);
     if (auto *error = maybe_rate.if_error()) {
       return error->with_prefix(
@@ -225,11 +214,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
-  std::unordered_map<ConfigName, std::vector<ConfigMetadata>>
-      telemetry_configs_tmp;
   double max_per_second = resolve_and_record_config(
-      env_config->max_per_second, config.max_per_second, &telemetry_configs_tmp,
-      &result.metadata, ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
+      env_config->max_per_second, config.max_per_second, &result.metadata,
+      ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
       [](const double &d) { return std::to_string(d); });
 
   const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};

@@ -1372,10 +1372,12 @@ TRACER_CONFIG_TEST("baggage") {
             1);
     REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_BYTES) ==
             1);
-    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS].origin ==
-          ConfigMetadata::Origin::DEFAULT);
-    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES].origin ==
-          ConfigMetadata::Origin::DEFAULT);
+    CHECK(finalized->metadata.at(ConfigName::TRACE_BAGGAGE_MAX_ITEMS)
+              .back()
+              .origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(finalized->metadata.at(ConfigName::TRACE_BAGGAGE_MAX_BYTES)
+              .back()
+              .origin == ConfigMetadata::Origin::DEFAULT);
   }
 
   SECTION("value overriden by environment variables") {
@@ -1410,10 +1412,12 @@ TRACER_CONFIG_TEST("baggage") {
             1);
     REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_BYTES) ==
             1);
-    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS].origin ==
-          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
-    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES].origin ==
-          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(finalized->metadata.at(ConfigName::TRACE_BAGGAGE_MAX_ITEMS)
+              .back()
+              .origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(finalized->metadata.at(ConfigName::TRACE_BAGGAGE_MAX_BYTES)
+              .back()
+              .origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
   }
 
   SECTION("value overriden by code") {
@@ -1434,10 +1438,12 @@ TRACER_CONFIG_TEST("baggage") {
             1);
     REQUIRE(finalized->metadata.count(ConfigName::TRACE_BAGGAGE_MAX_BYTES) ==
             1);
-    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_ITEMS].origin ==
-          ConfigMetadata::Origin::CODE);
-    CHECK(finalized->metadata[ConfigName::TRACE_BAGGAGE_MAX_BYTES].origin ==
-          ConfigMetadata::Origin::CODE);
+    CHECK(finalized->metadata.at(ConfigName::TRACE_BAGGAGE_MAX_ITEMS)
+              .back()
+              .origin == ConfigMetadata::Origin::CODE);
+    CHECK(finalized->metadata.at(ConfigName::TRACE_BAGGAGE_MAX_BYTES)
+              .back()
+              .origin == ConfigMetadata::Origin::CODE);
   }
 
   SECTION("disabled when `max_bytes` <= 3") {
@@ -1490,7 +1496,7 @@ TRACER_CONFIG_TEST("telemetry products contain configuration precedence") {
     CHECK(configs[2].value == "env-service");
 
     // Metadata contains final value (highest precedence)
-    CHECK(finalized->metadata.at(ConfigName::SERVICE_NAME).value ==
+    CHECK(finalized->metadata.at(ConfigName::SERVICE_NAME).back().value ==
           "env-service");
   }
 
@@ -1513,7 +1519,8 @@ TRACER_CONFIG_TEST("telemetry products contain configuration precedence") {
     CHECK(configs[1].origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
     CHECK(configs[1].value == "prod");
 
-    CHECK(finalized->metadata.at(ConfigName::SERVICE_ENV).value == "prod");
+    CHECK(finalized->metadata.at(ConfigName::SERVICE_ENV).back().value ==
+          "prod");
   }
 
   SECTION("single source: CODE only") {

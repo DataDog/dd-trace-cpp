@@ -50,7 +50,7 @@ class FinalizedTraceSamplerConfig {
  public:
   double max_per_second;
   std::vector<TraceSamplerRule> rules;
-  std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::unordered_map<ConfigName, std::vector<ConfigMetadata>> metadata;
 
  public:
   /// Returns the trace sampler configuration when APM Tracing is disabled.

@@ -229,7 +229,7 @@ class FinalizedTracerConfig final {
   std::string integration_name;
   std::string integration_version;
   bool report_traces;
-  std::unordered_map<ConfigName, ConfigMetadata> metadata;
+  std::unordered_map<ConfigName, std::vector<ConfigMetadata>> metadata;
   Baggage::Options baggage_opts;
   HTTPClient::URL agent_url;
   std::shared_ptr<EventScheduler> event_scheduler;
