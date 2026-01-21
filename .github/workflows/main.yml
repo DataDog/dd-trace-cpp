@@ -13,14 +13,6 @@ jobs:
       contents: read
       packages: write
 
-  # Ensure the main job is run to completion
-  check-system-tests:
-    needs: system-tests
-    name: Check system tests success
-    runs-on: ubuntu-latest
-    steps:
-    - run: exit 0
-
   fuzz-testing:
     needs: call-dev-workflow
     runs-on: ubuntu-22.04-arm
