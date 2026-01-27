@@ -39,10 +39,8 @@ struct SpanData {
 
   // Modify the properties of this object to honor the specified `config` and
   // `defaults`.  The properties of `config`, if set, override the properties of
-  // `defaults`. Use the specified `clock` to provide a start none of none is
-  // specified in `config`.
-  void apply_config(const SpanDefaults& defaults, const SpanConfig& config,
-                    const Clock& clock);
+  // `defaults`.
+  void apply_config(const SpanDefaults& defaults, const SpanConfig& config);
 };
 
 // Append to the specified `destination` the MessagePack representation of the
