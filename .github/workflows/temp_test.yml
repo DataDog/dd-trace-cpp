@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron:  '*/2 * * * *'
+    - cron:  '0 * * * *'
 
 jobs:
   call-dev-workflow:
