@@ -14,3 +14,33 @@ jobs:
     permissions:
       contents: read
       packages: write
+
+  fuzz-testing:
+    needs: call-dev-workflow
+    runs-on: ubuntu-22.04-arm
+    container:
+      image: datadog/docker-library:dd-trace-cpp-ci-23768e9-arm64
+    env:
+      DURATION_SEC: 300 # 5min
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - name: Configure
+        run: bin/with-toolchain llvm cmake . -B .build -DCMAKE_BUILD_TYPE=Debug -DDD_TRACE_BUILD_FUZZERS=1 -DDD_TRACE_ENABLE_SANITIZE=1 -DDD_TRACE_TRANSPORT=none
+      - name: Build
+        run: cmake --build .build -j --target dd_trace_cpp-fuzzers
+      - name: Run W3C propagation fuzzer
+        uses: ./.github/actions/fuzzer
+        with:
+          binary: ./.build/fuzz/w3c-propagation/w3c-propagation-fuzz
+          duration_seconds: ${DURATION_SEC}
+      - name: Run Base64 fuzzer
+        uses: ./.github/actions/fuzzer
+        with:
+          binary: ./.build/fuzz/base64/base64-fuzz
+          duration_seconds: ${DURATION_SEC}
+      - name: Run Remote Configuration fuzzer
+        uses: ./.github/actions/fuzzer
+        with:
+          binary: ./.build/fuzz/remote-configuration/remote-config-fuzz
+          duration_seconds: ${DURATION_SEC}
+
