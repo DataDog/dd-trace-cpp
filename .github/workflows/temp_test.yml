@@ -8,7 +8,9 @@ on:
     - cron:  '*/2 * * * *'
 
 jobs:
-  hello:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo world
+  call-dev-workflow:
+    uses: ./.github/workflows/dev.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
