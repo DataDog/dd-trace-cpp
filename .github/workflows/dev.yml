@@ -185,6 +185,8 @@ jobs:
   system-tests:
     needs: build-system-tests-artifact
     uses: DataDog/system-tests/.github/workflows/system-tests.yml@main
+    environment:
+      name: dev
     secrets:
       TEST_OPTIMIZATION_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     permissions:
