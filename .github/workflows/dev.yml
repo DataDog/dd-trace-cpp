@@ -185,7 +185,10 @@ jobs:
   system-tests:
     needs: build-system-tests-artifact
     uses: DataDog/system-tests/.github/workflows/system-tests.yml@main
-    secrets: inherit
+    environment:
+      name: dev
+    secrets:
+      TEST_OPTIMIZATION_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     permissions:
       contents: read
       packages: write
@@ -194,3 +197,4 @@ jobs:
       binaries_artifact: system_tests_binaries
       parametric_job_count: 8  # dedicated parameter to speed up parametric job
       scenarios: PARAMETRIC
+      push_to_test_optimization: true
