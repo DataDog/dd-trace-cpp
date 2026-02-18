@@ -45,8 +45,10 @@ std::optional<nlohmann::json> find_payload(const nlohmann::json& messages,
 struct FakeEventScheduler : public EventScheduler {
   size_t count_tasks = 0;
   std::function<void()> heartbeat_callback = nullptr;
+  std::function<void()> extended_heartbeat_callback = nullptr;
   std::function<void()> metrics_callback = nullptr;
   Optional<std::chrono::steady_clock::duration> heartbeat_interval;
+  Optional<std::chrono::steady_clock::duration> extended_heartbeat_interval;
   Optional<std::chrono::steady_clock::duration> metrics_interval;
   bool cancelled = false;
 
@@ -57,6 +59,9 @@ struct FakeEventScheduler : public EventScheduler {
       heartbeat_callback = callback;
       heartbeat_interval = interval;
     } else if (count_tasks == 1) {
+      extended_heartbeat_callback = callback;
+      extended_heartbeat_interval = interval;
+    } else if (count_tasks == 2) {
       metrics_callback = callback;
       metrics_interval = interval;
     }
@@ -67,6 +72,11 @@ struct FakeEventScheduler : public EventScheduler {
   void trigger_heartbeat() {
     assert(heartbeat_callback != nullptr);
     heartbeat_callback();
+  }
+
+  void trigger_extended_heartbeat() {
+    assert(extended_heartbeat_callback != nullptr);
+    extended_heartbeat_callback();
   }
 
   void trigger_metrics_capture() {
@@ -389,6 +399,54 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     REQUIRE(message_batch["payload"].size() >= 1);
 
     REQUIRE(find_payload(message_batch["payload"], "app-heartbeat"));
+  }
+
+  SECTION("generates an extended heartbeat message") {
+    client->clear();
+
+    Configuration cfg;
+    cfg.extended_heartbeat_interval_seconds = 1;
+    Product product;
+    product.name = Product::Name::tracing;
+    product.enabled = true;
+    product.version = tracer_version;
+    product.configurations =
+        std::unordered_map<ConfigName, std::vector<ConfigMetadata>>{
+            {ConfigName::SERVICE_NAME,
+             {ConfigMetadata(ConfigName::SERVICE_NAME, "test-service",
+                             ConfigMetadata::Origin::CODE)}},
+        };
+    cfg.products.emplace_back(std::move(product));
+
+    auto final_cfg = finalize_config(cfg);
+    REQUIRE(final_cfg);
+
+    Telemetry telemetry_extended{*final_cfg, tracer_signature, logger, client,
+                                  scheduler, *url, clock};
+
+    client->clear();
+    auto extended_heartbeat_message =
+        telemetry_extended.app_extended_heartbeat_payload();
+    auto extended_heartbeat =
+        nlohmann::json::parse(extended_heartbeat_message);
+
+    REQUIRE(is_valid_telemetry_payload(extended_heartbeat) == true);
+    REQUIRE(extended_heartbeat["request_type"] == "app-extended-heartbeat");
+    REQUIRE(extended_heartbeat["payload"].contains("configuration"));
+    REQUIRE(extended_heartbeat["payload"].contains("dependencies"));
+    REQUIRE(extended_heartbeat["payload"].contains("integrations"));
+
+    REQUIRE(extended_heartbeat["payload"]["configuration"].is_array());
+    REQUIRE(extended_heartbeat["payload"]["dependencies"].is_array());
+    REQUIRE(extended_heartbeat["payload"]["integrations"].is_array());
+
+    CHECK(!extended_heartbeat["payload"].contains("products"));
+    CHECK(!extended_heartbeat["payload"].contains("install_signature"));
+
+    auto cfg_payload = extended_heartbeat["payload"]["configuration"];
+    REQUIRE(cfg_payload.size() == 1);
+    CHECK(cfg_payload[0]["name"] == "service");
+    CHECK(cfg_payload[0]["value"] == "test-service");
   }
 
   SECTION("metrics reporting") {
@@ -903,7 +961,10 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
     CHECK(scheduler->metrics_interval == 500ms);
 
     CHECK(scheduler->heartbeat_callback != nullptr);
-    CHECK(scheduler->metrics_interval != 30s);
+    CHECK(scheduler->heartbeat_interval == 30s);
+
+    CHECK(scheduler->extended_heartbeat_callback != nullptr);
+    CHECK(scheduler->extended_heartbeat_interval == 86400s);
   }
 
   SECTION("disabling logs reporting do not collect logs") {

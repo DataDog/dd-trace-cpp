@@ -48,6 +48,16 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
     env_cfg.heartbeat_interval_seconds = *maybe_value;
   }
 
+  if (auto extended_heartbeat_interval_seconds =
+          lookup(environment::DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL)) {
+    auto maybe_value = parse_double(*extended_heartbeat_interval_seconds);
+    if (auto error = maybe_value.if_error()) {
+      return *error;
+    }
+
+    env_cfg.extended_heartbeat_interval_seconds = *maybe_value;
+  }
+
   return env_cfg;
 }
 
@@ -111,6 +121,19 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
   result.heartbeat_interval =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::duration<double>(heartbeat_interval.second));
+
+  // extended_heartbeat_interval_seconds
+  auto extended_heartbeat_interval =
+      pick(env_config->extended_heartbeat_interval_seconds,
+           user_config.extended_heartbeat_interval_seconds, 86400);
+  if (extended_heartbeat_interval.second <= 0.) {
+    return Error{Error::Code::OUT_OF_RANGE_INTEGER,
+                 "Telemetry extended heartbeat polling interval must be a "
+                 "positive value"};
+  }
+  result.extended_heartbeat_interval =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::duration<double>(extended_heartbeat_interval.second));
 
   // integration_name
   std::tie(origin, result.integration_name) =
