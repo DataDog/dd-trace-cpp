@@ -223,6 +223,12 @@ void Telemetry::schedule_tasks() {
       config_.heartbeat_interval,
       [this]() { send_payload("app-heartbeat", heartbeat_and_telemetry()); }));
 
+  tasks_.emplace_back(scheduler_->schedule_recurring_event(
+      config_.extended_heartbeat_interval, [this]() {
+        send_payload("app-extended-heartbeat",
+                     app_extended_heartbeat_payload());
+      }));
+
   if (config_.report_metrics) {
     tasks_.emplace_back(scheduler_->schedule_recurring_event(
         config_.metrics_interval, [this]() mutable { capture_metrics(); }));
@@ -676,6 +682,40 @@ std::string Telemetry::app_started_payload() {
   }
 
   return batch.dump();
+}
+
+std::string Telemetry::app_extended_heartbeat_payload() {
+  auto configuration_json = nlohmann::json::array();
+
+  for (const auto& product : config_.products) {
+    auto& configurations = product.configurations;
+    for (const auto& [_, config_metadatas] : configurations) {
+      for (const auto& config_metadata : config_metadatas) {
+        configuration_json.emplace_back(
+            generate_configuration_field(config_metadata));
+      }
+    }
+  }
+
+  auto dependencies_json = nlohmann::json::array();
+
+  auto integrations_json = nlohmann::json::array();
+  if (!config_.integration_name.empty()) {
+    integrations_json.emplace_back(nlohmann::json{
+        {"name", config_.integration_name},
+        {"version", config_.integration_version},
+        {"enabled", true},
+    });
+  }
+
+  auto telemetry_body = generate_telemetry_body("app-extended-heartbeat");
+  telemetry_body["payload"] = nlohmann::json{
+      {"configuration", configuration_json},
+      {"dependencies", dependencies_json},
+      {"integrations", integrations_json},
+  };
+
+  return telemetry_body.dump();
 }
 
 nlohmann::json Telemetry::generate_telemetry_body(std::string request_type) {

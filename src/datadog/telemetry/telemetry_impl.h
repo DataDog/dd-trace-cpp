@@ -152,6 +152,10 @@ class Telemetry final {
   // Constructs a messsage-batch containing `app-heartbeat`, and if metrics
   // have been modified, a `generate-metrics` message.
   std::string heartbeat_and_telemetry();
+  // Constructs an `app-extended-heartbeat` message containing configuration,
+  // dependencies, and integrations (reuses app-started payload logic but
+  // excludes products and install_signature).
+  std::string app_extended_heartbeat_payload();
   // Constructs a message-batch containing `app-closing`, and if metrics have
   // been modified, a `generate-metrics` message.
   std::string app_closing_payload();

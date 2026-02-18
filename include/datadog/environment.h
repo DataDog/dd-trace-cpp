@@ -51,6 +51,7 @@ namespace environment {
   MACRO(DD_VERSION)                                            \
   MACRO(DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)           \
   MACRO(DD_TELEMETRY_HEARTBEAT_INTERVAL)                       \
+  MACRO(DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL)              \
   MACRO(DD_TELEMETRY_METRICS_ENABLED)                          \
   MACRO(DD_TELEMETRY_METRICS_INTERVAL_SECONDS)                 \
   MACRO(DD_TELEMETRY_DEBUG)                                    \
