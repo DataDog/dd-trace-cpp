@@ -53,12 +53,12 @@ The library has been tested and is compatible on the following CPU architecture,
 ### Requirements
 `dd-trace-cpp` requires a [supported](#platform-support) C++17 compiler.
 
-A recent version of CMake is required (`3.24`), which might not be in your
+A recent version of CMake is required (`3.28`), which might not be in your
 system's package manager. [bin/install-cmake](bin/install-cmake) is an installer
-for a recent CMake.
+for a recent CMake, on Linux.
 
 ### Building
-Build this library from source using [CMake][1].
+Build this library from source using [CMake](https://cmake.org).
 
 ```shell
 git clone 'https://github.com/datadog/dd-trace-cpp'
@@ -67,7 +67,7 @@ cmake -B build .
 cmake --build build -j
 ```
 
-By default CMake will generate both static and shared libraries. To build either on of them use
+By default CMake will generate both static and shared libraries. To build only one of them use
 either `BUILD_SHARED_LIBS` or `BUILD_STATIC_LIBS`. Example:
 
 ```shell
@@ -76,14 +76,11 @@ cmake -B build -DBUILD_SHARED_LIBS=1 .
 
 ### Installation
 Installation places a shared library and public headers into the appropriate system directories
-(`/usr/local/[...]`), or to a specified installation prefix.
+(`/usr/local/[...]`), or to a specified installation prefix. Example:
 
 ```shell
-cmake --install
-
-# Here is how to install dd-trace-cpp into `.install/` within the source
-# repository.
-# cmake --install build --prefix=.install
+# Install dd-trace-cpp into `.install/` within the source repository.
+cmake --install build --prefix=.install
 ```
 
 ### Optional: Linking to the shared library
@@ -111,18 +108,15 @@ Pass `-DDD_TRACE_BUILD_TESTING=1` to `cmake` to include the unit tests in the bu
 
 The resulting unit test executable is `test/tests` within the build directory.
 ```shell
-cmake -Bbuild -DDD_TRACE_BUILD_TESTING=1 ..
+cmake -Bbuild -DDD_TRACE_BUILD_TESTING=1 .
 cmake --build build -j
 ./build/test/tests
 ```
 
 Alternatively, [bin/test](bin/test) is provided for convenience.
 
-Code coverage reports are available [here][2].
+Code coverage reports are available on [CodeCov](https://app.codecov.io/gh/DataDog/dd-trace-cpp).
 
 Contributing
 ------------
 See the [contributing guidelines](CONTRIBUTING.md) and the [maintainer docs](doc/maintainers.md) for information on the overall structure of the repository.
-
-[1]: https://cmake.org/
-[2]: https://datadog.github.io/dd-trace-cpp-coverage
