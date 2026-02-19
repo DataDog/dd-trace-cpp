@@ -9,13 +9,11 @@ BINARY="$SCRIPT_DIR/.supported-configurations"
 
 compiler=${CXX:-c++}
 
-if [ ! -x "$BINARY" ] || [ "$SOURCE" -nt "$BINARY" ]; then
+(
   # `CXX` may contain wrappers/flags (e.g. "ccache c++").
-  (
-    # shellcheck disable=SC2086
-    set -- $compiler
-    "$@" -std=c++17 -O2 -I"$REPO_ROOT/src/datadog" "$SOURCE" -o "$BINARY"
-  )
-fi
+  # shellcheck disable=SC2086
+  set -- $compiler
+  "$@" -std=c++17 -O2 -I"$REPO_ROOT/src/datadog" "$SOURCE" -o "$BINARY"
+)
 
 exec "$BINARY" "$@"
