@@ -3,6 +3,10 @@ stages:
   - benchmarks
   - benchmarks-report
 
+workflow:
+  rules:
+    - when: always
+
 validate_supported_configurations_local_file:
   extends: .validate_supported_configurations_local_file
   variables:
