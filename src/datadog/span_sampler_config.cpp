@@ -12,6 +12,9 @@
 
 namespace datadog {
 namespace tracing {
+
+namespace env = environment;
+
 namespace {
 
 std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
@@ -146,21 +149,20 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
 Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
   SpanSamplerConfig env_config;
 
-  auto rules_env = lookup(environment::DD_SPAN_SAMPLING_RULES);
+  auto rules_env = env::lookup<env::DD_SPAN_SAMPLING_RULES>();
   if (rules_env) {
     auto maybe_rules =
-        parse_rules(*rules_env, name(environment::DD_SPAN_SAMPLING_RULES));
+        parse_rules(*rules_env, name(env::DD_SPAN_SAMPLING_RULES));
     if (auto *error = maybe_rules.if_error()) {
       return std::move(*error);
     }
     env_config.rules = std::move(*maybe_rules);
   }
 
-  if (auto file_env = lookup(environment::DD_SPAN_SAMPLING_RULES_FILE)) {
+  if (auto file_env = env::lookup<env::DD_SPAN_SAMPLING_RULES_FILE>()) {
     if (rules_env) {
-      const auto rules_file_name =
-          name(environment::DD_SPAN_SAMPLING_RULES_FILE);
-      const auto rules_name = name(environment::DD_SPAN_SAMPLING_RULES);
+      const auto rules_file_name = name(env::DD_SPAN_SAMPLING_RULES_FILE);
+      const auto rules_name = name(env::DD_SPAN_SAMPLING_RULES);
       std::string message;
       append(message, rules_file_name);
       message += " is overridden by ";
@@ -181,7 +183,7 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
         message += " file \"";
         message += span_rules_file;
         message += "\" specified as value of environment variable ";
-        append(message, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
+        append(message, name(env::DD_SPAN_SAMPLING_RULES_FILE));
 
         return Error{Error::SPAN_SAMPLING_RULES_FILE_IO, std::move(message)};
       };
@@ -197,12 +199,12 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
         return file_error("read");
       }
 
-      auto maybe_rules = parse_rules(
-          rules_stream.str(), name(environment::DD_SPAN_SAMPLING_RULES_FILE));
+      auto maybe_rules = parse_rules(rules_stream.str(),
+                                     name(env::DD_SPAN_SAMPLING_RULES_FILE));
       if (auto *error = maybe_rules.if_error()) {
         std::string prefix;
         prefix += "With ";
-        append(prefix, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
+        append(prefix, name(env::DD_SPAN_SAMPLING_RULES_FILE));
         prefix += '=';
         append(prefix, *file_env);
         prefix += ": ";

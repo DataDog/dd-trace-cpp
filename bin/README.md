@@ -1,5 +1,6 @@
 Scripts
 =======
+
 This directory contains scripts that are useful during development.
 
 - [bazel-build](bazel-build) builds the library using [Bazel][1] via [bazelisk][2].
@@ -8,6 +9,12 @@ This directory contains scripts that are useful during development.
 - [check](check) performs some of the checks that [continuous
   integration](../.circleci) performs. It's convenient to run this script before
   pushing changes.
+- [check-environment-variables](check-environment-variables) validates that
+  all `DD_`/`OTEL_` environment variables used by the codebase are allowlisted
+  in
+  [include/datadog/environment_registry.h](../include/datadog/environment_registry.h)
+  (the source of truth used by
+  [include/datadog/environment.h](../include/datadog/environment.h)).
 - [check-format](check-format) verifies that the source code is formatted as
   [format](format) prefers.
 - [check-version](check-version) accepts a version string as a command line
@@ -16,6 +23,15 @@ This directory contains scripts that are useful during development.
 - [cmake-build](cmake-build) builds the library using [CMake][3].
 - [format](format) formats all of the C++ source code using
   [clang-format-14][4].
+- [generate-supported-configurations](generate-supported-configurations)
+  regenerates
+  [metadata/supported-configurations.json](../metadata/supported-configurations.json)
+  from
+  [include/datadog/environment_registry.h](../include/datadog/environment_registry.h).
+  This script (and [check-environment-variables](check-environment-variables))
+  compiles and executes
+  [supported-configurations.cpp](supported-configurations.cpp) via
+  [supported-configurations](supported-configurations).
 - [hasher-example](hasher-example) builds the library, including the [command
   line example](../examples/hasher) program, and then runs the example.
 - [http-server-example](http-server-example) runs the docker compose based [HTTP

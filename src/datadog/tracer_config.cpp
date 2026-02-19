@@ -19,6 +19,9 @@
 
 namespace datadog {
 namespace tracing {
+
+namespace env = environment;
+
 namespace {
 
 Expected<std::vector<PropagationStyle>> parse_propagation_styles(
@@ -65,12 +68,35 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
   return styles;
 }
 
+std::string json_quoted(StringView text) {
+  std::string unquoted;
+  assign(unquoted, text);
+  return nlohmann::json(std::move(unquoted)).dump();
+}
+
+Optional<StringView> lookup_propagation_env(environment::Variable variable) {
+  switch (variable) {
+    case environment::DD_TRACE_PROPAGATION_STYLE:
+      return env::lookup<env::DD_TRACE_PROPAGATION_STYLE>();
+    case environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT:
+      return env::lookup<env::DD_TRACE_PROPAGATION_STYLE_EXTRACT>();
+    case environment::DD_PROPAGATION_STYLE_EXTRACT:
+      return env::lookup<env::DD_PROPAGATION_STYLE_EXTRACT>();
+    case environment::DD_TRACE_PROPAGATION_STYLE_INJECT:
+      return env::lookup<env::DD_TRACE_PROPAGATION_STYLE_INJECT>();
+    case environment::DD_PROPAGATION_STYLE_INJECT:
+      return env::lookup<env::DD_PROPAGATION_STYLE_INJECT>();
+    default:
+      return {};
+  }
+}
+
 // Return a `std::vector<PropagationStyle>` parsed from the specified `env_var`.
-// If `env_var` is not in the environment, return `nullopt`. If an error occurs,
-// throw an `Error`.
+// If `env_var` is not in the environment, return `nullopt`.
+// If parsing fails, log and ignore the environment variable.
 Optional<std::vector<PropagationStyle>> styles_from_env(
-    environment::Variable env_var) {
-  const auto styles_env = lookup(env_var);
+    environment::Variable env_var, Logger &logger) {
+  const auto styles_env = lookup_propagation_env(env_var);
   if (!styles_env) {
     return {};
   }
@@ -81,87 +107,79 @@ Optional<std::vector<PropagationStyle>> styles_from_env(
     prefix += "Unable to parse ";
     append(prefix, name(env_var));
     prefix += " environment variable: ";
-    throw error->with_prefix(prefix);
+    logger.log_error(error->with_prefix(prefix));
+    return {};
   }
   return *styles;
-}
-
-std::string json_quoted(StringView text) {
-  std::string unquoted;
-  assign(unquoted, text);
-  return nlohmann::json(std::move(unquoted)).dump();
 }
 
 Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   TracerConfig env_cfg;
 
-  if (auto service_env = lookup(environment::DD_SERVICE)) {
+  if (auto service_env = env::lookup<env::DD_SERVICE>()) {
     env_cfg.service = std::string{*service_env};
   }
 
-  if (auto environment_env = lookup(environment::DD_ENV)) {
+  if (auto environment_env = env::lookup<env::DD_ENV>()) {
     env_cfg.environment = std::string{*environment_env};
   }
-  if (auto version_env = lookup(environment::DD_VERSION)) {
+  if (auto version_env = env::lookup<env::DD_VERSION>()) {
     env_cfg.version = std::string{*version_env};
   }
 
-  if (auto tags_env = lookup(environment::DD_TAGS)) {
+  if (auto tags_env = env::lookup<env::DD_TAGS>()) {
     auto tags = parse_tags(*tags_env);
     if (auto *error = tags.if_error()) {
       std::string prefix;
       prefix += "Unable to parse ";
-      append(prefix, name(environment::DD_TAGS));
+      append(prefix, name(env::DD_TAGS));
       prefix += " environment variable: ";
-      return error->with_prefix(prefix);
+      logger.log_error(error->with_prefix(prefix));
+    } else {
+      env_cfg.tags = std::move(*tags);
     }
-    env_cfg.tags = std::move(*tags);
   }
 
-  if (auto startup_env = lookup(environment::DD_TRACE_STARTUP_LOGS)) {
-    env_cfg.log_on_startup = !falsy(*startup_env);
+  if (auto startup_env = env::lookup<env::DD_TRACE_STARTUP_LOGS>()) {
+    env_cfg.log_on_startup = *startup_env;
   }
-  if (auto enabled_env = lookup(environment::DD_TRACE_ENABLED)) {
-    env_cfg.report_traces = !falsy(*enabled_env);
+  if (auto enabled_env = env::lookup<env::DD_TRACE_ENABLED>()) {
+    env_cfg.report_traces = *enabled_env;
   }
   if (auto enabled_env =
-          lookup(environment::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED)) {
-    env_cfg.generate_128bit_trace_ids = !falsy(*enabled_env);
+          env::lookup<env::DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED>()) {
+    env_cfg.generate_128bit_trace_ids = *enabled_env;
   }
 
-  if (auto apm_enabled_env = lookup(environment::DD_APM_TRACING_ENABLED)) {
-    env_cfg.tracing_enabled = !falsy(*apm_enabled_env);
+  if (auto apm_enabled_env = env::lookup<env::DD_APM_TRACING_ENABLED>()) {
+    env_cfg.tracing_enabled = *apm_enabled_env;
   }
 
   if (auto resource_renaming_enabled_env =
-          lookup(environment::DD_TRACE_RESOURCE_RENAMING_ENABLED)) {
-    env_cfg.resource_renaming_enabled = !falsy(*resource_renaming_enabled_env);
+          env::lookup<env::DD_TRACE_RESOURCE_RENAMING_ENABLED>()) {
+    env_cfg.resource_renaming_enabled = *resource_renaming_enabled_env;
   }
-  if (auto resource_renaming_always_simplified_endpoint_env = lookup(
-          environment::DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT)) {
+  if (auto resource_renaming_always_simplified_endpoint_env = env::lookup<
+          env::DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT>()) {
     env_cfg.resource_renaming_always_simplified_endpoint =
-        !falsy(*resource_renaming_always_simplified_endpoint_env);
+        *resource_renaming_always_simplified_endpoint_env;
   }
 
   // Baggage
-  if (auto baggage_items_env =
-          lookup(environment::DD_TRACE_BAGGAGE_MAX_ITEMS)) {
-    auto maybe_value = parse_uint64(*baggage_items_env, 10);
-    if (auto *error = maybe_value.if_error()) {
-      return *error;
-    }
-
-    env_cfg.baggage_max_items = std::move(*maybe_value);
+  const auto baggage_items_env = env::lookup<env::DD_TRACE_BAGGAGE_MAX_ITEMS>();
+  if (auto *error = baggage_items_env.if_error()) {
+    logger.log_error(error->with_prefix(
+        "Unable to parse DD_TRACE_BAGGAGE_MAX_ITEMS environment variable: "));
+  } else if (*baggage_items_env) {
+    env_cfg.baggage_max_items = std::move(**baggage_items_env);
   }
 
-  if (auto baggage_bytes_env =
-          lookup(environment::DD_TRACE_BAGGAGE_MAX_BYTES)) {
-    auto maybe_value = parse_uint64(*baggage_bytes_env, 10);
-    if (auto *error = maybe_value.if_error()) {
-      return *error;
-    }
-
-    env_cfg.baggage_max_bytes = std::move(*maybe_value);
+  const auto baggage_bytes_env = env::lookup<env::DD_TRACE_BAGGAGE_MAX_BYTES>();
+  if (auto *error = baggage_bytes_env.if_error()) {
+    logger.log_error(error->with_prefix(
+        "Unable to parse DD_TRACE_BAGGAGE_MAX_BYTES environment variable: "));
+  } else if (*baggage_bytes_env) {
+    env_cfg.baggage_max_bytes = std::move(**baggage_bytes_env);
   }
 
   // PropagationStyle
@@ -217,11 +235,11 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   };
 
   for (const auto &[var, var_override] : questionable_combinations) {
-    const auto value = lookup(var);
+    const auto value = lookup_propagation_env(var);
     if (!value) {
       continue;
     }
-    const auto value_override = lookup(var_override);
+    const auto value_override = lookup_propagation_env(var_override);
     if (!value_override) {
       continue;
     }
@@ -234,31 +252,27 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
         warn_message(var_name, *value, var_name_override, *value_override)});
   }
 
-  try {
-    const auto global_styles =
-        styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE);
+  const auto global_styles =
+      styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE, logger);
 
-    if (auto trace_extraction_styles =
-            styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT)) {
-      env_cfg.extraction_styles = std::move(*trace_extraction_styles);
-    } else if (auto extraction_styles =
-                   styles_from_env(environment::DD_PROPAGATION_STYLE_EXTRACT)) {
-      env_cfg.extraction_styles = std::move(*extraction_styles);
-    } else {
-      env_cfg.extraction_styles = global_styles;
-    }
+  if (auto trace_extraction_styles = styles_from_env(
+          environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT, logger)) {
+    env_cfg.extraction_styles = std::move(*trace_extraction_styles);
+  } else if (auto extraction_styles = styles_from_env(
+                 environment::DD_PROPAGATION_STYLE_EXTRACT, logger)) {
+    env_cfg.extraction_styles = std::move(*extraction_styles);
+  } else {
+    env_cfg.extraction_styles = global_styles;
+  }
 
-    if (auto trace_injection_styles =
-            styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE_INJECT)) {
-      env_cfg.injection_styles = std::move(*trace_injection_styles);
-    } else if (auto injection_styles =
-                   styles_from_env(environment::DD_PROPAGATION_STYLE_INJECT)) {
-      env_cfg.injection_styles = std::move(*injection_styles);
-    } else {
-      env_cfg.injection_styles = global_styles;
-    }
-  } catch (Error &error) {
-    return std::move(error);
+  if (auto trace_injection_styles = styles_from_env(
+          environment::DD_TRACE_PROPAGATION_STYLE_INJECT, logger)) {
+    env_cfg.injection_styles = std::move(*trace_injection_styles);
+  } else if (auto injection_styles = styles_from_env(
+                 environment::DD_PROPAGATION_STYLE_INJECT, logger)) {
+    env_cfg.injection_styles = std::move(*injection_styles);
+  } else {
+    env_cfg.injection_styles = global_styles;
   }
 
   return env_cfg;

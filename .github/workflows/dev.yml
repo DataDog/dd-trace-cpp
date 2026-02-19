@@ -12,6 +12,19 @@ jobs:
         run: bin/check-format
       - name: Shellcheck
         run: find bin/ -executable -type f -print0 | xargs -0 shellcheck
+      - name: Verify environment variable allowlist
+        run: bin/check-environment-variables
+      - name: Verify supported configurations metadata
+        run: |
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+          cp metadata/supported-configurations.json "$tmp_dir/supported-configurations.json"
+          bin/generate-supported-configurations
+          if ! diff -q "$tmp_dir/supported-configurations.json" metadata/supported-configurations.json >/dev/null 2>&1; then
+            echo "ERROR: metadata/supported-configurations.json got out of sync with implemented configurations. Please run bin/generate-supported-configurations locally."
+            diff -u "$tmp_dir/supported-configurations.json" metadata/supported-configurations.json || true
+            exit 1
+          fi
 
   build-linux-cmake:
     strategy:
