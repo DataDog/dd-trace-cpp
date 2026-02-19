@@ -3,6 +3,9 @@ stages:
   - benchmarks
   - benchmarks-report
 
+variables:
+  SKIP_SHARED_PIPELINE: "true"
+
 workflow:
   auto_cancel:
     on_new_commit: interruptible
