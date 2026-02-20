@@ -75,11 +75,7 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
   }
 
   // debug
-  if (auto enabled_debug_env = env::lookup<env::DD_TELEMETRY_DEBUG>()) {
-    result.debug = *enabled_debug_env;
-  } else {
-    result.debug = false;
-  }
+  result.debug = env::lookup<env::DD_TELEMETRY_DEBUG>().value_or(false);
 
   // metrics_interval_seconds
   auto metrics_interval = pick(env_config->metrics_interval_seconds,

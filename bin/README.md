@@ -26,8 +26,14 @@ This directory contains scripts that are useful during development.
 - [generate-supported-configurations](generate-supported-configurations)
   regenerates
   [metadata/supported-configurations.json](../metadata/supported-configurations.json)
-  from
-  [include/datadog/environment_registry.h](../include/datadog/environment_registry.h).
+  using
+  [include/datadog/environment_registry.h](../include/datadog/environment_registry.h)
+  as the source of truth.
+  To add a new supported environment variable:
+  1. update
+     [include/datadog/environment_registry.h](../include/datadog/environment_registry.h),
+  2. run [generate-supported-configurations](generate-supported-configurations),
+  3. run [check-environment-variables](check-environment-variables).
   This script (and [check-environment-variables](check-environment-variables))
   compiles and executes
   [supported-configurations.cpp](supported-configurations.cpp) via

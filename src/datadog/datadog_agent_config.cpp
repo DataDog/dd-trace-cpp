@@ -16,7 +16,7 @@ namespace tracing {
 
 namespace env = environment;
 
-Expected<DatadogAgentConfig> load_datadog_agent_env_config(Logger& logger) {
+DatadogAgentConfig load_datadog_agent_env_config(Logger& logger) {
   DatadogAgentConfig env_config;
 
   if (auto rc_enabled = env::lookup<env::DD_REMOTE_CONFIGURATION_ENABLED>()) {
@@ -60,11 +60,7 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config(Logger& logger) {
 Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& user_config,
     const std::shared_ptr<Logger>& logger, const Clock& clock) {
-  Expected<DatadogAgentConfig> env_config =
-      load_datadog_agent_env_config(*logger);
-  if (auto error = env_config.if_error()) {
-    return *error;
-  }
+  DatadogAgentConfig env_config = load_datadog_agent_env_config(*logger);
 
   FinalizedDatadogAgentConfig result;
 
@@ -93,7 +89,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
       user_config.remote_configuration_listeners;
 
   if (auto flush_interval_milliseconds =
-          value_or(env_config->flush_interval_milliseconds,
+          value_or(env_config.flush_interval_milliseconds,
                    user_config.flush_interval_milliseconds, 2000);
       flush_interval_milliseconds > 0) {
     result.flush_interval =
@@ -105,7 +101,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   if (auto request_timeout_milliseconds =
-          value_or(env_config->request_timeout_milliseconds,
+          value_or(env_config.request_timeout_milliseconds,
                    user_config.request_timeout_milliseconds, 2000);
       request_timeout_milliseconds > 0) {
     result.request_timeout =
@@ -117,7 +113,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   if (auto shutdown_timeout_milliseconds =
-          value_or(env_config->shutdown_timeout_milliseconds,
+          value_or(env_config.shutdown_timeout_milliseconds,
                    user_config.shutdown_timeout_milliseconds, 2000);
       shutdown_timeout_milliseconds > 0) {
     result.shutdown_timeout =
@@ -129,7 +125,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   if (double rc_poll_interval_seconds =
-          value_or(env_config->remote_configuration_poll_interval_seconds,
+          value_or(env_config.remote_configuration_poll_interval_seconds,
                    user_config.remote_configuration_poll_interval_seconds, 5.0);
       rc_poll_interval_seconds >= 0.0) {
     result.remote_configuration_poll_interval =
@@ -142,11 +138,11 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   result.remote_configuration_enabled =
-      value_or(env_config->remote_configuration_enabled,
+      value_or(env_config.remote_configuration_enabled,
                user_config.remote_configuration_enabled, true);
 
   const auto [origin, url] =
-      pick(env_config->url, user_config.url, "http://localhost:8126");
+      pick(env_config.url, user_config.url, "http://localhost:8126");
   auto parsed_url = HTTPClient::URL::parse(url);
   if (auto* error = parsed_url.if_error()) {
     return std::move(*error);

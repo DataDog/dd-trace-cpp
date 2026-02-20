@@ -1,6 +1,11 @@
 #pragma once
 
 // Central registry for supported environment variables.
+// All configurations must be registered here.
+//
+// This registry is the single source of truth for:
+//   - env variable name allowlist (`include/datadog/environment.h`)
+//   - generated metadata (`metadata/supported-configurations.json`)
 //
 // Each entry has:
 //   - NAME:    environment variable symbol (e.g. DD_SERVICE)
@@ -12,10 +17,6 @@
 //       The runtime default is resolved in C++ configuration finalization
 //       logic. The description is emitted as the "default" field in
 //       metadata/supported-configurations.json.
-//
-// This registry is the single source of truth for:
-//   - env variable name allowlist (`include/datadog/environment.h`)
-//   - generated metadata (`metadata/supported-configurations.json`)
 
 #define DD_ENVIRONMENT_VARIABLES(MACRO, DATA)                                 \
   MACRO(DATA, DD_AGENT_HOST, STRING, "localhost")                             \
