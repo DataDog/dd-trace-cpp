@@ -39,7 +39,7 @@ jobs:
           - runner: ubuntu-22.04
             arch: x64
             docker-arch: amd64
-    needs: format
+    needs: format-and-verify-configurations
     runs-on: ${{ matrix.runner }}
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-${{matrix.docker-arch}}
@@ -67,7 +67,7 @@ jobs:
           datadog-ci junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp .build/report.xml
 
   build-linux-bazel:
-    needs: format
+    needs: format-and-verify-configurations
     strategy:
       fail-fast: false
       matrix:
@@ -90,7 +90,7 @@ jobs:
         run: bin/with-toolchain ${{ matrix.toolchain }} bazelisk --bazelrc=${{ matrix.bazelrc }} build dd_trace_cpp
 
   build-windows-bazel:
-    needs: format
+    needs: format-and-verify-configurations
     runs-on: windows-2022
     defaults:
       run:
@@ -111,7 +111,7 @@ jobs:
         run: bazelisk.exe --bazelrc=${{ matrix.bazelrc }} build dd_trace_cpp
 
   build-windows-cmake:
-    needs: format
+    needs: format-and-verify-configurations
     strategy:
       fail-fast: false
       matrix:
