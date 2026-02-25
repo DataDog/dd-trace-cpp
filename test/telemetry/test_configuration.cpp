@@ -130,6 +130,13 @@ TELEMETRY_CONFIGURATION_TEST("validation") {
       auto final_cfg = telemetry::finalize_config();
       REQUIRE(!final_cfg);
     }
+
+    SECTION("environment variable parse error") {
+      ddtest::EnvGuard env("DD_TELEMETRY_METRICS_INTERVAL_SECONDS", "nope");
+      auto final_cfg = telemetry::finalize_config();
+      REQUIRE(!final_cfg);
+      REQUIRE(final_cfg.error().code == tracing::Error::INVALID_DOUBLE);
+    }
   }
 
   SECTION("heartbeat interval validation") {
@@ -145,6 +152,13 @@ TELEMETRY_CONFIGURATION_TEST("validation") {
       ddtest::EnvGuard env("DD_TELEMETRY_METRICS_INTERVAL_SECONDS", "-42");
       auto final_cfg = telemetry::finalize_config();
       REQUIRE(!final_cfg);
+    }
+
+    SECTION("environment variable parse error") {
+      ddtest::EnvGuard env("DD_TELEMETRY_HEARTBEAT_INTERVAL", "bogus");
+      auto final_cfg = telemetry::finalize_config();
+      REQUIRE(!final_cfg);
+      REQUIRE(final_cfg.error().code == tracing::Error::INVALID_DOUBLE);
     }
   }
 }

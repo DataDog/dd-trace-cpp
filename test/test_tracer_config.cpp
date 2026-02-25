@@ -499,6 +499,7 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
         Optional<std::string> env_url;
         std::string expected_scheme;
         std::string expected_authority;
+        Optional<Error::Code> expected_error = nullopt;
       };
 
       auto test_case = GENERATE(values<TestCase>({
@@ -508,11 +509,8 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
            "dd-agent:8080"},
           {"override port with default host", nullopt, "8080", nullopt, "http",
            "localhost:8080"},
-          // A bogus port number will cause an error in the TCPClient, not
-          // during configuration.  For the purposes of configuration, any
-          // value is accepted.
-          {"we don't parse port", nullopt, "bogus", nullopt, "http",
-           "localhost:bogus"},
+          {"invalid port", nullopt, "bogus", nullopt, "", "",
+           Error::INVALID_INTEGER},
           {"URL", nullopt, nullopt, "http://dd-agent:8080", "http",
            "dd-agent:8080"},
           {"URL overrides scheme", nullopt, nullopt, "https://dd-agent:8080",
@@ -540,12 +538,17 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
       }
 
       auto finalized = finalize_config(config);
-      REQUIRE(finalized);
-      const auto* const agent =
-          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-      REQUIRE(agent);
-      REQUIRE(agent->url.scheme == test_case.expected_scheme);
-      REQUIRE(agent->url.authority == test_case.expected_authority);
+      if (test_case.expected_error) {
+        REQUIRE(!finalized);
+        REQUIRE(finalized.error().code == *test_case.expected_error);
+      } else {
+        REQUIRE(finalized);
+        const auto* const agent =
+            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+        REQUIRE(agent);
+        REQUIRE(agent->url.scheme == test_case.expected_scheme);
+        REQUIRE(agent->url.authority == test_case.expected_authority);
+      }
     }
   }
 

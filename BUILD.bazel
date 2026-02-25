@@ -109,6 +109,7 @@ cc_library(
         "include/datadog/dict_reader.h",
         "include/datadog/dict_writer.h",
         "include/datadog/environment.h",
+        "include/datadog/environment_registry.h",
         "include/datadog/error.h",
         "include/datadog/event_scheduler.h",
         "include/datadog/expected.h",

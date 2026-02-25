@@ -7,25 +7,27 @@
 
 #include "json.hpp"
 #include "json_serializer.h"
-#include "parse_util.h"
 #include "string_util.h"
 #include "tags.h"
 
 namespace datadog {
 namespace tracing {
+
+namespace env = environment;
+
 namespace {
 
 Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
   TraceSamplerConfig env_config;
 
-  if (auto rules_env = lookup(environment::DD_TRACE_SAMPLING_RULES)) {
+  if (auto rules_env = env::lookup<env::DD_TRACE_SAMPLING_RULES>()) {
     nlohmann::json json_rules;
     try {
       json_rules = nlohmann::json::parse(*rules_env);
     } catch (const nlohmann::json::parse_error &error) {
       std::string message;
       message += "Unable to parse JSON from ";
-      append(message, name(environment::DD_TRACE_SAMPLING_RULES));
+      append(message, name(env::DD_TRACE_SAMPLING_RULES));
       message += " value ";
       append(message, *rules_env);
       message += ": ";
@@ -38,7 +40,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
     if (type != "array") {
       std::string message;
       message += "Trace sampling rules must be an array, but ";
-      append(message, name(environment::DD_TRACE_SAMPLING_RULES));
+      append(message, name(env::DD_TRACE_SAMPLING_RULES));
       message += " has JSON type \"";
       message += type;
       message += "\": ";
@@ -54,7 +56,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
       if (auto *error = matcher.if_error()) {
         std::string prefix;
         prefix += "Unable to create a rule from ";
-        append(prefix, name(environment::DD_TRACE_SAMPLING_RULES));
+        append(prefix, name(env::DD_TRACE_SAMPLING_RULES));
         prefix += " value ";
         append(prefix, *rules_env);
         prefix += ": ";
@@ -69,7 +71,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
         if (type != "number") {
           std::string message;
           message += "Unable to parse a rule from ";
-          append(message, name(environment::DD_TRACE_SAMPLING_RULES));
+          append(message, name(env::DD_TRACE_SAMPLING_RULES));
           message += " value ";
           append(message, *rules_env);
           message += ".  The \"sample_rate\" property of the rule ";
@@ -96,7 +98,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
         message += " in trace sampling rule ";
         message += json_rule.dump();
         message += ".  Error occurred while parsing ";
-        append(message, name(environment::DD_TRACE_SAMPLING_RULES));
+        append(message, name(env::DD_TRACE_SAMPLING_RULES));
         message += ": ";
         append(message, *rules_env);
         return Error{Error::TRACE_SAMPLING_RULES_UNKNOWN_PROPERTY,
@@ -107,28 +109,26 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
     }
   }
 
-  if (auto sample_rate_env = lookup(environment::DD_TRACE_SAMPLE_RATE)) {
-    auto maybe_sample_rate = parse_double(*sample_rate_env);
-    if (auto *error = maybe_sample_rate.if_error()) {
-      std::string prefix;
-      prefix += "While parsing ";
-      append(prefix, name(environment::DD_TRACE_SAMPLE_RATE));
-      prefix += ": ";
-      return error->with_prefix(prefix);
-    }
-    env_config.sample_rate = *maybe_sample_rate;
+  const auto sample_rate_env = env::lookup<env::DD_TRACE_SAMPLE_RATE>();
+  if (auto *error = sample_rate_env.if_error()) {
+    std::string prefix;
+    prefix += "While parsing ";
+    append(prefix, name(env::DD_TRACE_SAMPLE_RATE));
+    prefix += ": ";
+    return error->with_prefix(prefix);
+  } else if (*sample_rate_env) {
+    env_config.sample_rate = **sample_rate_env;
   }
 
-  if (auto limit_env = lookup(environment::DD_TRACE_RATE_LIMIT)) {
-    auto maybe_max_per_second = parse_double(*limit_env);
-    if (auto *error = maybe_max_per_second.if_error()) {
-      std::string prefix;
-      prefix += "While parsing ";
-      append(prefix, name(environment::DD_TRACE_RATE_LIMIT));
-      prefix += ": ";
-      return error->with_prefix(prefix);
-    }
-    env_config.max_per_second = *maybe_max_per_second;
+  const auto limit_env = env::lookup<env::DD_TRACE_RATE_LIMIT>();
+  if (auto *error = limit_env.if_error()) {
+    std::string prefix;
+    prefix += "While parsing ";
+    append(prefix, name(env::DD_TRACE_RATE_LIMIT));
+    prefix += ": ";
+    return error->with_prefix(prefix);
+  } else if (*limit_env) {
+    env_config.max_per_second = **limit_env;
   }
 
   return env_config;

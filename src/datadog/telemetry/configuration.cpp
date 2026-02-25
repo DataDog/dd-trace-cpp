@@ -3,11 +3,11 @@
 #include <datadog/telemetry/configuration.h>
 #include <datadog/version.h>
 
-#include "parse_util.h"
-
 using namespace datadog::tracing;
 
 namespace datadog::telemetry {
+
+namespace env = tracing::environment;
 
 namespace {
 
@@ -15,37 +15,33 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
   Configuration env_cfg;
 
   if (auto enabled_env =
-          lookup(environment::DD_INSTRUMENTATION_TELEMETRY_ENABLED)) {
-    env_cfg.enabled = !falsy(*enabled_env);
+          env::lookup<env::DD_INSTRUMENTATION_TELEMETRY_ENABLED>()) {
+    env_cfg.enabled = *enabled_env;
   }
 
-  if (auto metrics_enabled =
-          lookup(environment::DD_TELEMETRY_METRICS_ENABLED)) {
-    env_cfg.report_metrics = !falsy(*metrics_enabled);
+  if (auto metrics_enabled = env::lookup<env::DD_TELEMETRY_METRICS_ENABLED>()) {
+    env_cfg.report_metrics = *metrics_enabled;
   }
 
   if (auto logs_enabled =
-          lookup(environment::DD_TELEMETRY_LOG_COLLECTION_ENABLED)) {
-    env_cfg.report_logs = !falsy(*logs_enabled);
+          env::lookup<env::DD_TELEMETRY_LOG_COLLECTION_ENABLED>()) {
+    env_cfg.report_logs = *logs_enabled;
   }
 
-  if (auto metrics_interval_seconds =
-          lookup(environment::DD_TELEMETRY_METRICS_INTERVAL_SECONDS)) {
-    auto maybe_value = parse_double(*metrics_interval_seconds);
-    if (auto error = maybe_value.if_error()) {
-      return *error;
-    }
-    env_cfg.metrics_interval_seconds = *maybe_value;
+  auto metrics_interval_seconds =
+      env::lookup<env::DD_TELEMETRY_METRICS_INTERVAL_SECONDS>();
+  if (auto error = metrics_interval_seconds.if_error()) {
+    return *error;
+  } else if (*metrics_interval_seconds) {
+    env_cfg.metrics_interval_seconds = **metrics_interval_seconds;
   }
 
-  if (auto heartbeat_interval_seconds =
-          lookup(environment::DD_TELEMETRY_HEARTBEAT_INTERVAL)) {
-    auto maybe_value = parse_double(*heartbeat_interval_seconds);
-    if (auto error = maybe_value.if_error()) {
-      return *error;
-    }
-
-    env_cfg.heartbeat_interval_seconds = *maybe_value;
+  auto heartbeat_interval_seconds =
+      env::lookup<env::DD_TELEMETRY_HEARTBEAT_INTERVAL>();
+  if (auto error = heartbeat_interval_seconds.if_error()) {
+    return *error;
+  } else if (*heartbeat_interval_seconds) {
+    env_cfg.heartbeat_interval_seconds = **heartbeat_interval_seconds;
   }
 
   return env_cfg;
@@ -83,11 +79,7 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
   }
 
   // debug
-  if (auto enabled_debug_env = lookup(environment::DD_TELEMETRY_DEBUG)) {
-    result.debug = !falsy(*enabled_debug_env);
-  } else {
-    result.debug = false;
-  }
+  result.debug = env::lookup<env::DD_TELEMETRY_DEBUG>().value_or(false);
 
   // metrics_interval_seconds
   auto metrics_interval = pick(env_config->metrics_interval_seconds,
@@ -126,15 +118,13 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
   result.products = user_config.products;
 
   // onboarding data
-  if (auto install_id = lookup(environment::DD_INSTRUMENTATION_INSTALL_ID)) {
+  if (auto install_id = env::lookup<env::DD_INSTRUMENTATION_INSTALL_ID>()) {
     result.install_id = std::string(*install_id);
   }
-  if (auto install_type =
-          lookup(environment::DD_INSTRUMENTATION_INSTALL_TYPE)) {
+  if (auto install_type = env::lookup<env::DD_INSTRUMENTATION_INSTALL_TYPE>()) {
     result.install_type = std::string(*install_type);
   }
-  if (auto install_time =
-          lookup(environment::DD_INSTRUMENTATION_INSTALL_TIME)) {
+  if (auto install_time = env::lookup<env::DD_INSTRUMENTATION_INSTALL_TIME>()) {
     result.install_time = std::string(*install_time);
   }
 
