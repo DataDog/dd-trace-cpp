@@ -497,9 +497,9 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
         Optional<std::string> env_host;
         Optional<std::string> env_port;
         Optional<std::string> env_url;
-        Optional<Error::Code> expected_error = nullopt;
         std::string expected_scheme;
         std::string expected_authority;
+        Optional<Error::Code> expected_error = nullopt;
       };
 
       auto test_case = GENERATE(values<TestCase>({
@@ -509,8 +509,8 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
            "dd-agent:8080"},
           {"override port with default host", nullopt, "8080", nullopt, "http",
            "localhost:8080"},
-          {"invalid port", nullopt, "bogus", nullopt, Error::INVALID_INTEGER,
-           "", ""},
+          {"invalid port", nullopt, "bogus", nullopt, "", "",
+           Error::INVALID_INTEGER},
           {"URL", nullopt, nullopt, "http://dd-agent:8080", "http",
            "dd-agent:8080"},
           {"URL overrides scheme", nullopt, nullopt, "https://dd-agent:8080",
