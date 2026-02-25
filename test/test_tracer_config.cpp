@@ -438,16 +438,12 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
                 std::chrono::seconds(15));
       }
 
-      SECTION("ill-formatted environment variable falls back to default") {
+      SECTION("ill-formated environment variable is an error") {
         const EnvGuard env_guard{"DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS",
                                  "ddog"};
         auto finalized = finalize_config(config);
-        REQUIRE(finalized);
-        const auto* const agent =
-            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-        REQUIRE(agent);
-        REQUIRE(agent->remote_configuration_poll_interval ==
-                std::chrono::seconds(5));
+        REQUIRE(!finalized);
+        REQUIRE(finalized.error().code == Error::INVALID_DOUBLE);
       }
     }
   }
@@ -501,6 +497,7 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
         Optional<std::string> env_host;
         Optional<std::string> env_port;
         Optional<std::string> env_url;
+        Optional<Error::Code> expected_error = nullopt;
         std::string expected_scheme;
         std::string expected_authority;
       };
@@ -512,10 +509,8 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
            "dd-agent:8080"},
           {"override port with default host", nullopt, "8080", nullopt, "http",
            "localhost:8080"},
-          // A bogus port value is ignored during configuration parsing and
-          // defaults are used.
-          {"we don't parse port", nullopt, "bogus", nullopt, "http",
-           "localhost:8126"},
+          {"invalid port", nullopt, "bogus", nullopt, Error::INVALID_INTEGER,
+           "", ""},
           {"URL", nullopt, nullopt, "http://dd-agent:8080", "http",
            "dd-agent:8080"},
           {"URL overrides scheme", nullopt, nullopt, "https://dd-agent:8080",
@@ -543,12 +538,17 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
       }
 
       auto finalized = finalize_config(config);
-      REQUIRE(finalized);
-      const auto* const agent =
-          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
-      REQUIRE(agent);
-      REQUIRE(agent->url.scheme == test_case.expected_scheme);
-      REQUIRE(agent->url.authority == test_case.expected_authority);
+      if (test_case.expected_error) {
+        REQUIRE(!finalized);
+        REQUIRE(finalized.error().code == *test_case.expected_error);
+      } else {
+        REQUIRE(finalized);
+        const auto* const agent =
+            std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+        REQUIRE(agent);
+        REQUIRE(agent->url.scheme == test_case.expected_scheme);
+        REQUIRE(agent->url.authority == test_case.expected_authority);
+      }
     }
   }
 
@@ -649,44 +649,38 @@ TRACER_CONFIG_TEST("TracerConfig::trace_sampler") {
       REQUIRE(finalized->trace_sampler.rules.front().rate == 0.5);
     }
 
-    SECTION("invalid values either fallback or fail range checks") {
+    SECTION("has to have a valid value") {
       struct TestCase {
         std::string name;
         std::string env_value;
-        Optional<Error::Code> expected_error;
-        bool allow_success = false;
+        std::vector<Error::Code> allowed_errors;
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"nonsense", "nonsense", nullopt},
-          {"trailing space", "0.23   ", nullopt},
-          {"out of range of double", "123e9999999999", nullopt},
+          {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
+          {"trailing space", "0.23   ", {Error::INVALID_DOUBLE}},
+          {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
           // Some C++ standard libraries parse "nan" and "inf" as the
           // corresponding special floating point values. Other standard
           // libraries consider "nan" and "inf" invalid.
-          // If parsing fails, the value is ignored. If parsing succeeds, range
-          // checks still apply.
-          {"NaN", "NaN", Error::RATE_OUT_OF_RANGE, true},
-          {"nan", "nan", Error::RATE_OUT_OF_RANGE, true},
-          {"inf", "inf", Error::RATE_OUT_OF_RANGE, true},
-          {"Inf", "Inf", Error::RATE_OUT_OF_RANGE, true},
-          {"below range", "-0.1", Error::RATE_OUT_OF_RANGE},
-          {"above range", "1.1", Error::RATE_OUT_OF_RANGE},
+          // So, either the double will fail to parse, or parsing will succeed
+          // but the resulting value will be outside of the inclusive range
+          // [0.0, 1.0] of the `Rate` type.
+          {"NaN", "NaN", {Error::INVALID_DOUBLE, Error::RATE_OUT_OF_RANGE}},
+          {"nan", "nan", {Error::INVALID_DOUBLE, Error::RATE_OUT_OF_RANGE}},
+          {"inf", "inf", {Error::INVALID_DOUBLE, Error::RATE_OUT_OF_RANGE}},
+          {"Inf", "Inf", {Error::INVALID_DOUBLE, Error::RATE_OUT_OF_RANGE}},
+          {"below range", "-0.1", {Error::RATE_OUT_OF_RANGE}},
+          {"above range", "1.1", {Error::RATE_OUT_OF_RANGE}},
       }));
 
       CAPTURE(test_case.name);
 
       const EnvGuard guard{"DD_TRACE_SAMPLE_RATE", test_case.env_value};
       auto finalized = finalize_config(config);
-      if (test_case.expected_error) {
-        if (finalized) {
-          REQUIRE(test_case.allow_success);
-        } else {
-          REQUIRE(finalized.error().code == *test_case.expected_error);
-        }
-      } else {
-        REQUIRE(finalized);
-      }
+      REQUIRE(!finalized);
+      REQUIRE_THAT(test_case.allowed_errors,
+                   Catch::Matchers::VectorContains(finalized.error().code));
     }
   }
 
@@ -720,44 +714,48 @@ TRACER_CONFIG_TEST("TracerConfig::trace_sampler") {
       REQUIRE(finalized->trace_sampler.max_per_second == 120);
     }
 
-    SECTION("invalid values either fallback or fail range checks") {
+    SECTION("has to have a valid value") {
       struct TestCase {
         std::string name;
         std::string env_value;
-        Optional<Error::Code> expected_error;
-        bool allow_success = false;
+        std::vector<Error::Code> allowed_errors;
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"nonsense", "nonsense", nullopt},
-          {"trailing space", "23   ", nullopt},
-          {"out of range of double", "123e9999999999", nullopt},
+          {"nonsense", "nonsense", {Error::INVALID_DOUBLE}},
+          {"trailing space", "23   ", {Error::INVALID_DOUBLE}},
+          {"out of range of double", "123e9999999999", {Error::INVALID_DOUBLE}},
           // Some C++ standard libraries parse "nan" and "inf" as the
           // corresponding special floating point values. Other standard
           // libraries consider "nan" and "inf" invalid.
-          // If parsing fails, the value is ignored. If parsing succeeds, range
-          // checks still apply.
-          {"NaN", "NaN", Error::MAX_PER_SECOND_OUT_OF_RANGE, true},
-          {"nan", "nan", Error::MAX_PER_SECOND_OUT_OF_RANGE, true},
-          {"inf", "inf", Error::MAX_PER_SECOND_OUT_OF_RANGE, true},
-          {"Inf", "Inf", Error::MAX_PER_SECOND_OUT_OF_RANGE, true},
-          {"below range", "-0.1", Error::MAX_PER_SECOND_OUT_OF_RANGE},
-          {"zero (also below range)", "0", Error::MAX_PER_SECOND_OUT_OF_RANGE},
+          // So, either the double will fail to parse, or parsing will succeed
+          // but the resulting value will be outside of the exclusive range
+          // (0.0, Inf) allowed.
+          {"NaN",
+           "NaN",
+           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"nan",
+           "nan",
+           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"inf",
+           "inf",
+           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"Inf",
+           "Inf",
+           {Error::INVALID_DOUBLE, Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"below range", "-0.1", {Error::MAX_PER_SECOND_OUT_OF_RANGE}},
+          {"zero (also below range)",
+           "0",
+           {Error::MAX_PER_SECOND_OUT_OF_RANGE}},
       }));
 
       CAPTURE(test_case.name);
 
       const EnvGuard guard{"DD_TRACE_RATE_LIMIT", test_case.env_value};
       auto finalized = finalize_config(config);
-      if (test_case.expected_error) {
-        if (finalized) {
-          REQUIRE(test_case.allow_success);
-        } else {
-          REQUIRE(finalized.error().code == *test_case.expected_error);
-        }
-      } else {
-        REQUIRE(finalized);
-      }
+      REQUIRE(!finalized);
+      REQUIRE_THAT(test_case.allowed_errors,
+                   Catch::Matchers::VectorContains(finalized.error().code));
     }
   }
 
@@ -1185,11 +1183,8 @@ TRACER_CONFIG_TEST("TracerConfig propagation styles") {
                              test_case.env_value};
         auto finalized = finalize_config(config);
         if (test_case.expected_error) {
-          REQUIRE(finalized);
-          const std::vector<PropagationStyle> default_styles = {
-              PropagationStyle::DATADOG, PropagationStyle::W3C,
-              PropagationStyle::BAGGAGE};
-          REQUIRE(finalized->injection_styles == default_styles);
+          REQUIRE(!finalized);
+          REQUIRE(finalized.error().code == *test_case.expected_error);
         } else {
           REQUIRE(finalized);
           REQUIRE(finalized->injection_styles == test_case.expected_styles);
@@ -1245,11 +1240,8 @@ TRACER_CONFIG_TEST("TracerConfig propagation styles") {
       SECTION("parsing failure") {
         const EnvGuard guard{"DD_PROPAGATION_STYLE_EXTRACT", "b3,,datadog"};
         auto finalized = finalize_config(config);
-        REQUIRE(finalized);
-        const std::vector<PropagationStyle> default_styles = {
-            PropagationStyle::DATADOG, PropagationStyle::W3C,
-            PropagationStyle::BAGGAGE};
-        REQUIRE(finalized->extraction_styles == default_styles);
+        REQUIRE(!finalized);
+        REQUIRE(finalized.error().code == Error::UNKNOWN_PROPAGATION_STYLE);
       }
     }
   }
@@ -1392,18 +1384,16 @@ TRACER_CONFIG_TEST("baggage") {
   }
 
   SECTION("value overriden by environment variables") {
-    SECTION("invalid BAGGAGE_MAX_ITEMS is ignored") {
+    SECTION("invalid BAGGAGE_MAX_ITEMS is reported") {
       EnvGuard guard{"DD_TRACE_BAGGAGE_MAX_ITEMS", "ten"};
       auto finalized = finalize_config(config);
-      REQUIRE(finalized);
-      CHECK(finalized->baggage_opts.max_items == 64);
+      CHECK(!finalized);
     }
 
-    SECTION("invalid BAGGAGE_MAX_BYTES is ignored") {
+    SECTION("invalid BAGGAGE_MAX_BYTES is reported") {
       EnvGuard guard{"DD_TRACE_BAGGAGE_MAX_BYTES", "2kib"};
       auto finalized = finalize_config(config);
-      REQUIRE(finalized);
-      CHECK(finalized->baggage_opts.max_bytes == 8192);
+      CHECK(!finalized);
     }
 
     EnvGuard guard{"DD_TRACE_BAGGAGE_MAX_ITEMS", "128"};

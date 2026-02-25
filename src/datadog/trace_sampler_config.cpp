@@ -17,7 +17,7 @@ namespace env = environment;
 
 namespace {
 
-Expected<TraceSamplerConfig> load_trace_sampler_env_config(Logger &logger) {
+Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
   TraceSamplerConfig env_config;
 
   if (auto rules_env = env::lookup<env::DD_TRACE_SAMPLING_RULES>()) {
@@ -111,16 +111,22 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config(Logger &logger) {
 
   const auto sample_rate_env = env::lookup<env::DD_TRACE_SAMPLE_RATE>();
   if (auto *error = sample_rate_env.if_error()) {
-    logger.log_error(
-        error->with_prefix("Unable to parse DD_TRACE_SAMPLE_RATE: "));
+    std::string prefix;
+    prefix += "While parsing ";
+    append(prefix, name(env::DD_TRACE_SAMPLE_RATE));
+    prefix += ": ";
+    return error->with_prefix(prefix);
   } else if (*sample_rate_env) {
     env_config.sample_rate = **sample_rate_env;
   }
 
   const auto limit_env = env::lookup<env::DD_TRACE_RATE_LIMIT>();
   if (auto *error = limit_env.if_error()) {
-    logger.log_error(
-        error->with_prefix("Unable to parse DD_TRACE_RATE_LIMIT: "));
+    std::string prefix;
+    prefix += "While parsing ";
+    append(prefix, name(env::DD_TRACE_RATE_LIMIT));
+    prefix += ": ";
+    return error->with_prefix(prefix);
   } else if (*limit_env) {
     env_config.max_per_second = **limit_env;
   }
@@ -144,9 +150,8 @@ std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig &config, Logger &logger) {
-  Expected<TraceSamplerConfig> env_config =
-      load_trace_sampler_env_config(logger);
+    const TraceSamplerConfig &config) {
+  Expected<TraceSamplerConfig> env_config = load_trace_sampler_env_config();
   if (auto error = env_config.if_error()) {
     return *error;
   }

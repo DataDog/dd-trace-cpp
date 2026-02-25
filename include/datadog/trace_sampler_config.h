@@ -12,7 +12,6 @@
 
 #include "config.h"
 #include "expected.h"
-#include "logger.h"
 #include "optional.h"
 #include "rate.h"
 #include "sampling_mechanism.h"
@@ -43,7 +42,7 @@ struct TraceSamplerConfig {
 
 class FinalizedTraceSamplerConfig {
   friend Expected<FinalizedTraceSamplerConfig> finalize_config(
-      const TraceSamplerConfig& config, Logger& logger);
+      const TraceSamplerConfig& config);
   friend class FinalizedTracerConfig;
 
   FinalizedTraceSamplerConfig() = default;
@@ -59,7 +58,7 @@ class FinalizedTraceSamplerConfig {
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig& config, Logger& logger);
+    const TraceSamplerConfig& config);
 
 }  // namespace tracing
 }  // namespace datadog

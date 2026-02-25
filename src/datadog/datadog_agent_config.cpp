@@ -16,7 +16,7 @@ namespace tracing {
 
 namespace env = environment;
 
-DatadogAgentConfig load_datadog_agent_env_config(Logger& logger) {
+Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
   DatadogAgentConfig env_config;
 
   if (auto rc_enabled = env::lookup<env::DD_REMOTE_CONFIGURATION_ENABLED>()) {
@@ -26,8 +26,8 @@ DatadogAgentConfig load_datadog_agent_env_config(Logger& logger) {
   auto raw_rc_poll_interval_value =
       env::lookup<env::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS>();
   if (auto error = raw_rc_poll_interval_value.if_error()) {
-    logger.log_error(error->with_prefix(
-        "DatadogAgent: Remote Configuration poll interval error "));
+    return error->with_prefix(
+        "DatadogAgent: Remote Configuration poll interval error ");
   } else if (*raw_rc_poll_interval_value) {
     env_config.remote_configuration_poll_interval_seconds =
         **raw_rc_poll_interval_value;
@@ -37,8 +37,7 @@ DatadogAgentConfig load_datadog_agent_env_config(Logger& logger) {
   Optional<std::uint64_t> env_port = nullopt;
   const auto raw_env_port = env::lookup<env::DD_TRACE_AGENT_PORT>();
   if (auto* error = raw_env_port.if_error()) {
-    logger.log_error(
-        error->with_prefix("DatadogAgent: Agent port parsing error "));
+    return error->with_prefix("DatadogAgent: Agent port parsing error ");
   } else {
     env_port = *raw_env_port;
   }
@@ -60,7 +59,10 @@ DatadogAgentConfig load_datadog_agent_env_config(Logger& logger) {
 Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& user_config,
     const std::shared_ptr<Logger>& logger, const Clock& clock) {
-  DatadogAgentConfig env_config = load_datadog_agent_env_config(*logger);
+  Expected<DatadogAgentConfig> env_config = load_datadog_agent_env_config();
+  if (auto error = env_config.if_error()) {
+    return *error;
+  }
 
   FinalizedDatadogAgentConfig result;
 
@@ -89,7 +91,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
       user_config.remote_configuration_listeners;
 
   if (auto flush_interval_milliseconds =
-          value_or(env_config.flush_interval_milliseconds,
+          value_or(env_config->flush_interval_milliseconds,
                    user_config.flush_interval_milliseconds, 2000);
       flush_interval_milliseconds > 0) {
     result.flush_interval =
@@ -101,7 +103,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   if (auto request_timeout_milliseconds =
-          value_or(env_config.request_timeout_milliseconds,
+          value_or(env_config->request_timeout_milliseconds,
                    user_config.request_timeout_milliseconds, 2000);
       request_timeout_milliseconds > 0) {
     result.request_timeout =
@@ -113,7 +115,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   if (auto shutdown_timeout_milliseconds =
-          value_or(env_config.shutdown_timeout_milliseconds,
+          value_or(env_config->shutdown_timeout_milliseconds,
                    user_config.shutdown_timeout_milliseconds, 2000);
       shutdown_timeout_milliseconds > 0) {
     result.shutdown_timeout =
@@ -125,7 +127,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   if (double rc_poll_interval_seconds =
-          value_or(env_config.remote_configuration_poll_interval_seconds,
+          value_or(env_config->remote_configuration_poll_interval_seconds,
                    user_config.remote_configuration_poll_interval_seconds, 5.0);
       rc_poll_interval_seconds >= 0.0) {
     result.remote_configuration_poll_interval =
@@ -138,11 +140,11 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   }
 
   result.remote_configuration_enabled =
-      value_or(env_config.remote_configuration_enabled,
+      value_or(env_config->remote_configuration_enabled,
                user_config.remote_configuration_enabled, true);
 
   const auto [origin, url] =
-      pick(env_config.url, user_config.url, "http://localhost:8126");
+      pick(env_config->url, user_config.url, "http://localhost:8126");
   auto parsed_url = HTTPClient::URL::parse(url);
   if (auto* error = parsed_url.if_error()) {
     return std::move(*error);

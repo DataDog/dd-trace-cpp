@@ -92,10 +92,10 @@ Optional<StringView> lookup_propagation_env(environment::Variable variable) {
 }
 
 // Return a `std::vector<PropagationStyle>` parsed from the specified `env_var`.
-// If `env_var` is not in the environment, return `nullopt`.
-// If parsing fails, log and ignore the environment variable.
+// If `env_var` is not in the environment, return `nullopt`. If an error occurs,
+// throw an `Error`.
 Optional<std::vector<PropagationStyle>> styles_from_env(
-    environment::Variable env_var, Logger &logger) {
+    environment::Variable env_var) {
   const auto styles_env = lookup_propagation_env(env_var);
   if (!styles_env) {
     return {};
@@ -107,8 +107,7 @@ Optional<std::vector<PropagationStyle>> styles_from_env(
     prefix += "Unable to parse ";
     append(prefix, name(env_var));
     prefix += " environment variable: ";
-    logger.log_error(error->with_prefix(prefix));
-    return {};
+    throw error->with_prefix(prefix);
   }
   return *styles;
 }
@@ -134,10 +133,9 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
       prefix += "Unable to parse ";
       append(prefix, name(env::DD_TAGS));
       prefix += " environment variable: ";
-      logger.log_error(error->with_prefix(prefix));
-    } else {
-      env_cfg.tags = std::move(*tags);
+      return error->with_prefix(prefix);
     }
+    env_cfg.tags = std::move(*tags);
   }
 
   if (auto startup_env = env::lookup<env::DD_TRACE_STARTUP_LOGS>()) {
@@ -168,16 +166,14 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   // Baggage
   const auto baggage_items_env = env::lookup<env::DD_TRACE_BAGGAGE_MAX_ITEMS>();
   if (auto *error = baggage_items_env.if_error()) {
-    logger.log_error(error->with_prefix(
-        "Unable to parse DD_TRACE_BAGGAGE_MAX_ITEMS environment variable: "));
+    return *error;
   } else if (*baggage_items_env) {
     env_cfg.baggage_max_items = std::move(**baggage_items_env);
   }
 
   const auto baggage_bytes_env = env::lookup<env::DD_TRACE_BAGGAGE_MAX_BYTES>();
   if (auto *error = baggage_bytes_env.if_error()) {
-    logger.log_error(error->with_prefix(
-        "Unable to parse DD_TRACE_BAGGAGE_MAX_BYTES environment variable: "));
+    return *error;
   } else if (*baggage_bytes_env) {
     env_cfg.baggage_max_bytes = std::move(**baggage_bytes_env);
   }
@@ -252,27 +248,31 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
         warn_message(var_name, *value, var_name_override, *value_override)});
   }
 
-  const auto global_styles =
-      styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE, logger);
+  try {
+    const auto global_styles =
+        styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE);
 
-  if (auto trace_extraction_styles = styles_from_env(
-          environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT, logger)) {
-    env_cfg.extraction_styles = std::move(*trace_extraction_styles);
-  } else if (auto extraction_styles = styles_from_env(
-                 environment::DD_PROPAGATION_STYLE_EXTRACT, logger)) {
-    env_cfg.extraction_styles = std::move(*extraction_styles);
-  } else {
-    env_cfg.extraction_styles = global_styles;
-  }
+    if (auto trace_extraction_styles =
+            styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT)) {
+      env_cfg.extraction_styles = std::move(*trace_extraction_styles);
+    } else if (auto extraction_styles =
+                   styles_from_env(environment::DD_PROPAGATION_STYLE_EXTRACT)) {
+      env_cfg.extraction_styles = std::move(*extraction_styles);
+    } else {
+      env_cfg.extraction_styles = global_styles;
+    }
 
-  if (auto trace_injection_styles = styles_from_env(
-          environment::DD_TRACE_PROPAGATION_STYLE_INJECT, logger)) {
-    env_cfg.injection_styles = std::move(*trace_injection_styles);
-  } else if (auto injection_styles = styles_from_env(
-                 environment::DD_PROPAGATION_STYLE_INJECT, logger)) {
-    env_cfg.injection_styles = std::move(*injection_styles);
-  } else {
-    env_cfg.injection_styles = global_styles;
+    if (auto trace_injection_styles =
+            styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE_INJECT)) {
+      env_cfg.injection_styles = std::move(*trace_injection_styles);
+    } else if (auto injection_styles =
+                   styles_from_env(environment::DD_PROPAGATION_STYLE_INJECT)) {
+      env_cfg.injection_styles = std::move(*injection_styles);
+    } else {
+      env_cfg.injection_styles = global_styles;
+    }
+  } catch (Error &error) {
+    return std::move(error);
   }
 
   return env_cfg;
@@ -429,8 +429,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     return std::move(*error);
   }
 
-  if (auto trace_sampler_config =
-          finalize_config(user_config.trace_sampler, *logger)) {
+  if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
     // Merge metadata vectors
     for (auto &[key, values] : trace_sampler_config->metadata) {
       auto &dest = final_config.metadata[key];

@@ -30,13 +30,17 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
 
   auto metrics_interval_seconds =
       env::lookup<env::DD_TELEMETRY_METRICS_INTERVAL_SECONDS>();
-  if (!metrics_interval_seconds.if_error() && *metrics_interval_seconds) {
+  if (auto error = metrics_interval_seconds.if_error()) {
+    return *error;
+  } else if (*metrics_interval_seconds) {
     env_cfg.metrics_interval_seconds = **metrics_interval_seconds;
   }
 
   auto heartbeat_interval_seconds =
       env::lookup<env::DD_TELEMETRY_HEARTBEAT_INTERVAL>();
-  if (!heartbeat_interval_seconds.if_error() && *heartbeat_interval_seconds) {
+  if (auto error = heartbeat_interval_seconds.if_error()) {
+    return *error;
+  } else if (*heartbeat_interval_seconds) {
     env_cfg.heartbeat_interval_seconds = **heartbeat_interval_seconds;
   }
 
