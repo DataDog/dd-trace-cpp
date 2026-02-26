@@ -1,54 +1,46 @@
 #include <datadog/datadog_agent_config.h>
 #include <datadog/environment.h>
-#include <datadog/logger.h>
 
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
-#include <string>
 
 #include "default_http_client.h"
+#include "parse_util.h"
 #include "platform_util.h"
 #include "threaded_event_scheduler.h"
 
 namespace datadog {
 namespace tracing {
 
-namespace env = environment;
-
 Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
   DatadogAgentConfig env_config;
 
-  if (auto rc_enabled = env::lookup<env::DD_REMOTE_CONFIGURATION_ENABLED>()) {
-    env_config.remote_configuration_enabled = *rc_enabled;
+  if (auto rc_enabled = lookup(environment::DD_REMOTE_CONFIGURATION_ENABLED)) {
+    env_config.remote_configuration_enabled = !falsy(*rc_enabled);
   }
 
-  auto raw_rc_poll_interval_value =
-      env::lookup<env::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS>();
-  if (auto error = raw_rc_poll_interval_value.if_error()) {
-    return error->with_prefix(
-        "DatadogAgent: Remote Configuration poll interval error ");
-  } else if (*raw_rc_poll_interval_value) {
-    env_config.remote_configuration_poll_interval_seconds =
-        **raw_rc_poll_interval_value;
+  if (auto raw_rc_poll_interval_value =
+          lookup(environment::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS)) {
+    auto res = parse_double(*raw_rc_poll_interval_value);
+    if (auto error = res.if_error()) {
+      return error->with_prefix(
+          "DatadogAgent: Remote Configuration poll interval error ");
+    }
+
+    env_config.remote_configuration_poll_interval_seconds = *res;
   }
 
-  const auto env_host = env::lookup<env::DD_AGENT_HOST>();
-  Optional<std::uint64_t> env_port = nullopt;
-  const auto raw_env_port = env::lookup<env::DD_TRACE_AGENT_PORT>();
-  if (auto* error = raw_env_port.if_error()) {
-    return error->with_prefix("DatadogAgent: Agent port parsing error ");
-  } else {
-    env_port = *raw_env_port;
-  }
+  auto env_host = lookup(environment::DD_AGENT_HOST);
+  auto env_port = lookup(environment::DD_TRACE_AGENT_PORT);
 
-  if (auto url_env = env::lookup<env::DD_TRACE_AGENT_URL>()) {
+  if (auto url_env = lookup(environment::DD_TRACE_AGENT_URL)) {
     env_config.url = std::string{*url_env};
   } else if (env_host || env_port) {
     std::string configured_url = "http://";
     append(configured_url, env_host.value_or("localhost"));
     configured_url += ':';
-    configured_url += std::to_string(env_port.value_or(8126));
+    append(configured_url, env_port.value_or("8126"));
 
     env_config.url = std::move(configured_url);
   }
@@ -156,7 +148,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   // Starting Datadog Agent 7.62.0, the admission controller inject a unique
   // identifier through `DD_EXTERNAL_ENV`. This uid is used for origin
   // detection.
-  if (auto external_env = env::lookup<env::DD_EXTERNAL_ENV>()) {
+  if (auto external_env = lookup(environment::DD_EXTERNAL_ENV)) {
     result.admission_controller_uid = std::string(*external_env);
   }
 

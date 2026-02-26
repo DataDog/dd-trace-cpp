@@ -9,145 +9,106 @@
 // `name` returns the name of a specified `Variable`.
 //
 // `lookup` retrieves the value of `Variable` in the environment.
-
-#include <datadog/environment_registry.h>
-#include <datadog/expected.h>
 #include <datadog/optional.h>
 #include <datadog/string_view.h>
 
-#include <cstdint>
-#include <cstdlib>
+#include <string>
 
 namespace datadog {
 namespace tracing {
 namespace environment {
 
-enum class VariableType {
-  STRING,
-  BOOLEAN,
-  INT,
-  DECIMAL,
-  ARRAY,
-  MAP,
-};
+// Central registry for supported environment variables.
+// All configurations must be registered here.
+//
+// This registry is the single source of truth for:
+//   - env variable name allowlist (`include/datadog/environment.h`)
+//   - generated metadata (`metadata/supported-configurations.json`)
+//
+// Each entry has:
+//   - NAME:    environment variable symbol (e.g. DD_SERVICE)
+//   - TYPE:    STRING | BOOLEAN | INT | DECIMAL | ARRAY | MAP
+//   - DEFAULT: literal default value or a marker token
+//
+// Marker tokens:
+//   - ENV_DEFAULT_RESOLVED_IN_CODE("...description...")
+//       The runtime default is resolved in C++ configuration finalization
+//       logic. The description is emitted as the "default" field in
+//       metadata/supported-configurations.json.
+#define DD_LIST_ENVIRONMENT_VARIABLES(MACRO)                                   \
+  MACRO(DD_AGENT_HOST, STRING, "localhost")                                    \
+  MACRO(DD_ENV, STRING, "")                                                    \
+  MACRO(DD_INSTRUMENTATION_TELEMETRY_ENABLED, BOOLEAN, true)                   \
+  MACRO(DD_PROPAGATION_STYLE_EXTRACT, ARRAY, "datadog,tracecontext,baggage")   \
+  MACRO(DD_PROPAGATION_STYLE_INJECT, ARRAY, "datadog,tracecontext,baggage")    \
+  MACRO(DD_REMOTE_CONFIGURATION_ENABLED, BOOLEAN, true)                        \
+  MACRO(DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS, DECIMAL, 5.0)                  \
+  MACRO(DD_SERVICE, STRING,                                                    \
+        ENV_DEFAULT_RESOLVED_IN_CODE("Defaults to process name when unset."))  \
+  MACRO(DD_SPAN_SAMPLING_RULES, ARRAY, "[]")                                   \
+  MACRO(DD_SPAN_SAMPLING_RULES_FILE, STRING, "")                               \
+  MACRO(DD_TRACE_PROPAGATION_STYLE_EXTRACT, ARRAY,                             \
+        "datadog,tracecontext,baggage")                                        \
+  MACRO(DD_TRACE_PROPAGATION_STYLE_INJECT, ARRAY,                              \
+        "datadog,tracecontext,baggage")                                        \
+  MACRO(DD_TRACE_PROPAGATION_STYLE, ARRAY, "datadog,tracecontext,baggage")     \
+  MACRO(DD_TAGS, MAP, "")                                                      \
+  MACRO(DD_TRACE_AGENT_PORT, INT, 8126)                                        \
+  MACRO(DD_TRACE_AGENT_URL, STRING,                                            \
+        ENV_DEFAULT_RESOLVED_IN_CODE(                                          \
+            "If unset, built from DD_AGENT_HOST and DD_TRACE_AGENT_PORT, "     \
+            "then defaults to http://localhost:8126."))                        \
+  MACRO(DD_TRACE_DEBUG, BOOLEAN, false)                                        \
+  MACRO(DD_TRACE_ENABLED, BOOLEAN, true)                                       \
+  MACRO(DD_TRACE_RATE_LIMIT, DECIMAL, 100.0)                                   \
+  MACRO(DD_TRACE_REPORT_HOSTNAME, BOOLEAN, false)                              \
+  MACRO(DD_TRACE_SAMPLE_RATE, DECIMAL, 1.0)                                    \
+  MACRO(DD_TRACE_SAMPLING_RULES, ARRAY, "[]")                                  \
+  MACRO(DD_TRACE_STARTUP_LOGS, BOOLEAN, true)                                  \
+  MACRO(DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH, INT, 512)                        \
+  MACRO(DD_VERSION, STRING, "")                                                \
+  MACRO(DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED, BOOLEAN, true)            \
+  MACRO(DD_TELEMETRY_HEARTBEAT_INTERVAL, DECIMAL, 10)                          \
+  MACRO(DD_TELEMETRY_METRICS_ENABLED, BOOLEAN, true)                           \
+  MACRO(DD_TELEMETRY_METRICS_INTERVAL_SECONDS, DECIMAL, 60)                    \
+  MACRO(DD_TELEMETRY_DEBUG, BOOLEAN, false)                                    \
+  MACRO(DD_TRACE_BAGGAGE_MAX_ITEMS, INT, 64)                                   \
+  MACRO(DD_TRACE_BAGGAGE_MAX_BYTES, INT, 8192)                                 \
+  MACRO(DD_TELEMETRY_LOG_COLLECTION_ENABLED, BOOLEAN, true)                    \
+  MACRO(DD_INSTRUMENTATION_INSTALL_ID, STRING, "")                             \
+  MACRO(DD_INSTRUMENTATION_INSTALL_TYPE, STRING, "")                           \
+  MACRO(DD_INSTRUMENTATION_INSTALL_TIME, STRING, "")                           \
+  MACRO(DD_APM_TRACING_ENABLED, BOOLEAN, true)                                 \
+  MACRO(DD_TRACE_RESOURCE_RENAMING_ENABLED, BOOLEAN, false)                    \
+  MACRO(DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT, BOOLEAN, false) \
+  MACRO(DD_EXTERNAL_ENV, STRING, "")
 
-struct VariableSpec {
-  StringView name;
-  VariableType type;
-};
+#define ENV_DEFAULT_RESOLVED_IN_CODE(X) X
+#define WITH_COMMA(ARG, TYPE, DEFAULT_VALUE) ARG,
 
-#define VARIABLE_ENUM_VALUE(DATA, NAME, TYPE, DEFAULT_VALUE) NAME,
-
-enum Variable { DD_ENVIRONMENT_VARIABLES(VARIABLE_ENUM_VALUE, ~) };
+enum Variable { DD_LIST_ENVIRONMENT_VARIABLES(WITH_COMMA) };
 
 // Quoting a macro argument requires this two-step.
 #define QUOTED_IMPL(ARG) #ARG
 #define QUOTED(ARG) QUOTED_IMPL(ARG)
 
-#define VARIABLE_SPEC_WITH_COMMA(DATA, NAME, TYPE, DEFAULT_VALUE) \
-  VariableSpec{StringView{QUOTED(NAME)}, VariableType::TYPE},
+#define QUOTED_WITH_COMMA(ARG, TYPE, DEFAULT_VALUE) \
+  WITH_COMMA(QUOTED(ARG), TYPE, DEFAULT_VALUE)
 
-inline const VariableSpec variable_specs[] = {
-    DD_ENVIRONMENT_VARIABLES(VARIABLE_SPEC_WITH_COMMA, ~)};
+inline const char *const variable_names[] = {
+    DD_LIST_ENVIRONMENT_VARIABLES(QUOTED_WITH_COMMA)};
 
-template <VariableType type>
-struct LookupResultByType;
-
-template <>
-struct LookupResultByType<VariableType::STRING> {
-  using type = Optional<StringView>;
-};
-
-template <>
-struct LookupResultByType<VariableType::BOOLEAN> {
-  using type = Optional<bool>;
-};
-
-template <>
-struct LookupResultByType<VariableType::INT> {
-  using type = Expected<Optional<std::uint64_t>>;
-};
-
-template <>
-struct LookupResultByType<VariableType::DECIMAL> {
-  using type = Expected<Optional<double>>;
-};
-
-template <>
-struct LookupResultByType<VariableType::ARRAY> {
-  using type = Optional<StringView>;
-};
-
-template <>
-struct LookupResultByType<VariableType::MAP> {
-  using type = Optional<StringView>;
-};
-
-template <Variable variable>
-struct VariableTraits;
-
-#define VARIABLE_TRAITS_VALUE(DATA, NAME, TYPE, DEFAULT_VALUE)              \
-  template <>                                                               \
-  struct VariableTraits<NAME> {                                             \
-    static constexpr VariableType variable_type = VariableType::TYPE;       \
-    static constexpr const char *name() { return QUOTED(NAME); }            \
-    using lookup_result = typename LookupResultByType<variable_type>::type; \
-  };
-
-DD_ENVIRONMENT_VARIABLES(VARIABLE_TRAITS_VALUE, ~)
-
-template <Variable variable>
-using LookupResult = typename VariableTraits<variable>::lookup_result;
-
-namespace detail {
-template <VariableType>
-inline constexpr bool unsupported_variable_type_v = false;
-
-template <Variable variable>
-Optional<StringView> lookup_raw() {
-  const char *value = std::getenv(VariableTraits<variable>::name());
-  if (!value) {
-    return nullopt;
-  }
-  return StringView{value};
-}
-
-Optional<bool> lookup_bool_from_raw(Optional<StringView> value);
-Expected<Optional<std::uint64_t>> lookup_uint64_from_raw(
-    Optional<StringView> value);
-Expected<Optional<double>> lookup_double_from_raw(Optional<StringView> value);
-}  // namespace detail
-
-template <Variable variable>
-LookupResult<variable> lookup() {
-  constexpr VariableType type = VariableTraits<variable>::variable_type;
-  const auto raw = detail::lookup_raw<variable>();
-  if constexpr (type == VariableType::STRING || type == VariableType::ARRAY ||
-                type == VariableType::MAP) {
-    return raw;
-  } else if constexpr (type == VariableType::BOOLEAN) {
-    return detail::lookup_bool_from_raw(raw);
-  } else if constexpr (type == VariableType::INT) {
-    return detail::lookup_uint64_from_raw(raw);
-  } else if constexpr (type == VariableType::DECIMAL) {
-    return detail::lookup_double_from_raw(raw);
-  } else {
-    static_assert(detail::unsupported_variable_type_v<type>,
-                  "Unsupported environment variable type");
-  }
-}
-
-#undef VARIABLE_SPEC_WITH_COMMA
-#undef VARIABLE_TRAITS_VALUE
 #undef QUOTED
 #undef QUOTED_IMPL
-#undef VARIABLE_ENUM_VALUE
-
-// Return the metadata for the specified environment `variable`.
-const VariableSpec &spec(Variable variable);
+#undef WITH_COMMA
+#undef ENV_DEFAULT_RESOLVED_IN_CODE
 
 // Return the name of the specified environment `variable`.
 StringView name(Variable variable);
+
+// Return the value of the specified environment `variable`, or return
+// `nullopt` if that variable is not set in the environment.
+Optional<StringView> lookup(Variable variable);
 
 std::string to_json();
 

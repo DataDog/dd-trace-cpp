@@ -1,0 +1,19 @@
+#!/bin/sh
+# TODO
+set -eu
+
+if grep -R -n \
+    --include='*.c' \
+    --include='*.cc' \
+    --include='*.cpp' \
+    --include='*.cxx' \
+    --include='*.h' \
+    --include='*.hpp' \
+    --exclude='environment.cpp' \
+    'std::getenv' include src; then
+    echo "Check failed: std::getenv usage detected."
+    exit 1
+else
+    echo "Check passed: no std::getenv usage found."
+    exit 0
+fi

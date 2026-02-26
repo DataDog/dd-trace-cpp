@@ -3,59 +3,30 @@
 #include <cstdlib>
 
 #include "json.hpp"
-#include "parse_util.h"
 
 namespace datadog {
 namespace tracing {
 namespace environment {
 
-namespace detail {
-Optional<bool> lookup_bool_from_raw(Optional<StringView> value) {
-  if (value) {
-    return !falsy(*value);
-  }
-  return nullopt;
-}
+StringView name(Variable variable) { return variable_names[variable]; }
 
-Expected<Optional<std::uint64_t>> lookup_uint64_from_raw(
-    Optional<StringView> value) {
+Optional<StringView> lookup(Variable variable) {
+  const char *name = variable_names[variable];
+  const char *value = std::getenv(name);
   if (!value) {
-    return Optional<std::uint64_t>{};
+    return nullopt;
   }
-  auto parsed = parse_uint64(*value, 10);
-  if (auto *error = parsed.if_error()) {
-    return *error;
-  }
-  return Optional<std::uint64_t>{*parsed};
+  return StringView{value};
 }
-
-Expected<Optional<double>> lookup_double_from_raw(Optional<StringView> value) {
-  if (!value) {
-    return Optional<double>{};
-  }
-  auto parsed = parse_double(*value);
-  if (auto *error = parsed.if_error()) {
-    return *error;
-  }
-  return Optional<double>{*parsed};
-}
-}  // namespace detail
-
-const VariableSpec &spec(Variable variable) { return variable_specs[variable]; }
-
-StringView name(Variable variable) { return spec(variable).name; }
 
 std::string to_json() {
   auto result = nlohmann::json::object({});
 
-#define ADD_ENV_TO_JSON_IF_SET(DATA, NAME, TYPE, DEFAULT_VALUE)        \
-  if (const char *value = std::getenv(VariableTraits<NAME>::name())) { \
-    result[VariableTraits<NAME>::name()] = value;                      \
+  for (const char *name : variable_names) {
+    if (const char *value = std::getenv(name)) {
+      result[name] = value;
+    }
   }
-
-  DD_ENVIRONMENT_VARIABLES(ADD_ENV_TO_JSON_IF_SET, ~)
-
-#undef ADD_ENV_TO_JSON_IF_SET
 
   return result.dump();
 }

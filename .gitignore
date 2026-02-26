@@ -12,4 +12,3 @@ MODULE.bazel.lock
 .cache/
 .cursor/
 .DS_Store
-bin/.supported-configurations
