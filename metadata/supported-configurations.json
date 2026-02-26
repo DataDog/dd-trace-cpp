@@ -1,0 +1,286 @@
+{
+  "deprecations": {},
+  "supportedConfigurations": {
+    "DD_AGENT_HOST": [
+      {
+        "default": "localhost",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_APM_TRACING_ENABLED": [
+      {
+        "default": "true",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_ENV": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_EXTERNAL_ENV": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_INSTRUMENTATION_INSTALL_ID": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_INSTRUMENTATION_INSTALL_TIME": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_INSTRUMENTATION_INSTALL_TYPE": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_INSTRUMENTATION_TELEMETRY_ENABLED": [
+      {
+        "default": "true",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_PROPAGATION_STYLE_EXTRACT": [
+      {
+        "default": "datadog,tracecontext,baggage",
+        "implementation": "A",
+        "type": "array"
+      }
+    ],
+    "DD_PROPAGATION_STYLE_INJECT": [
+      {
+        "default": "datadog,tracecontext,baggage",
+        "implementation": "A",
+        "type": "array"
+      }
+    ],
+    "DD_REMOTE_CONFIGURATION_ENABLED": [
+      {
+        "default": "true",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS": [
+      {
+        "default": "5.0",
+        "implementation": "A",
+        "type": "decimal"
+      }
+    ],
+    "DD_SERVICE": [
+      {
+        "default": "Defaults to process name when unset.",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_SPAN_SAMPLING_RULES": [
+      {
+        "default": "[]",
+        "implementation": "A",
+        "type": "array"
+      }
+    ],
+    "DD_SPAN_SAMPLING_RULES_FILE": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_TAGS": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "map"
+      }
+    ],
+    "DD_TELEMETRY_DEBUG": [
+      {
+        "default": "false",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TELEMETRY_HEARTBEAT_INTERVAL": [
+      {
+        "default": "10",
+        "implementation": "A",
+        "type": "decimal"
+      }
+    ],
+    "DD_TELEMETRY_LOG_COLLECTION_ENABLED": [
+      {
+        "default": "true",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TELEMETRY_METRICS_ENABLED": [
+      {
+        "default": "true",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TELEMETRY_METRICS_INTERVAL_SECONDS": [
+      {
+        "default": "60",
+        "implementation": "A",
+        "type": "decimal"
+      }
+    ],
+    "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED": [
+      {
+        "default": "true",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TRACE_AGENT_PORT": [
+      {
+        "default": "8126",
+        "implementation": "A",
+        "type": "int"
+      }
+    ],
+    "DD_TRACE_AGENT_URL": [
+      {
+        "default": "If unset, built from DD_AGENT_HOST and DD_TRACE_AGENT_PORT, then defaults to http://localhost:8126.",
+        "implementation": "A",
+        "type": "string"
+      }
+    ],
+    "DD_TRACE_BAGGAGE_MAX_BYTES": [
+      {
+        "default": "8192",
+        "implementation": "A",
+        "type": "int"
+      }
+    ],
+    "DD_TRACE_BAGGAGE_MAX_ITEMS": [
+      {
+        "default": "64",
+        "implementation": "A",
+        "type": "int"
+      }
+    ],
+    "DD_TRACE_DEBUG": [
+      {
+        "default": "false",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TRACE_ENABLED": [
+      {
+        "default": "true",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TRACE_PROPAGATION_STYLE": [
+      {
+        "default": "datadog,tracecontext,baggage",
+        "implementation": "A",
+        "type": "array"
+      }
+    ],
+    "DD_TRACE_PROPAGATION_STYLE_EXTRACT": [
+      {
+        "default": "datadog,tracecontext,baggage",
+        "implementation": "A",
+        "type": "array"
+      }
+    ],
+    "DD_TRACE_PROPAGATION_STYLE_INJECT": [
+      {
+        "default": "datadog,tracecontext,baggage",
+        "implementation": "A",
+        "type": "array"
+      }
+    ],
+    "DD_TRACE_RATE_LIMIT": [
+      {
+        "default": "100.0",
+        "implementation": "A",
+        "type": "decimal"
+      }
+    ],
+    "DD_TRACE_REPORT_HOSTNAME": [
+      {
+        "default": "false",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT": [
+      {
+        "default": "false",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TRACE_RESOURCE_RENAMING_ENABLED": [
+      {
+        "default": "false",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TRACE_SAMPLE_RATE": [
+      {
+        "default": "1.0",
+        "implementation": "A",
+        "type": "decimal"
+      }
+    ],
+    "DD_TRACE_SAMPLING_RULES": [
+      {
+        "default": "[]",
+        "implementation": "A",
+        "type": "array"
+      }
+    ],
+    "DD_TRACE_STARTUP_LOGS": [
+      {
+        "default": "true",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
+    "DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH": [
+      {
+        "default": "512",
+        "implementation": "A",
+        "type": "int"
+      }
+    ],
+    "DD_VERSION": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "string"
+      }
+    ]
+  },
+  "version": "2"
+}
