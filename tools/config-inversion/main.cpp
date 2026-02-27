@@ -21,31 +21,27 @@ nlohmann::json build_configuration() {
   nlohmann::json j;
   j["version"] = "2";
 
-  auto supported_configurations = nlohmann::json::array();
+  auto supported_configurations = nlohmann::json::object();
 
 #define QUOTED_IMPL(ARG) #ARG
 #define QUOTED(ARG) QUOTED_IMPL(ARG)
 
 #define ENV_DEFAULT_RESOLVED_IN_CODE(X) ""
 
-#define X(NAME, TYPE, DEFAULT_VALUE)               \
-  do {                                             \
-    auto obj = nlohmann::json::object();           \
-    obj["default"] = to_string_any(DEFAULT_VALUE); \
-    obj["implementation"] = "A";                   \
-    obj["type"] = QUOTED(TYPE);                    \
-    supported_configurations.emplace_back(         \
-        nlohmann::json{{QUOTED(NAME), {obj}}});    \
+#define X(NAME, TYPE, DEFAULT_VALUE)                                       \
+  do {                                                                     \
+    auto obj = nlohmann::json::object();                                   \
+    obj["default"] = to_string_any(DEFAULT_VALUE);                         \
+    obj["implementation"] = "A";                                           \
+    obj["type"] = QUOTED(TYPE);                                            \
+    supported_configurations[QUOTED(NAME)] = nlohmann::json::array({obj}); \
   } while (0);
 
   DD_LIST_ENVIRONMENT_VARIABLES(X)
 #undef X
 #undef ENV_DEFAULT_RESOLVED_IN_CODE
 
-  auto deprecated_configurations = nlohmann::json::array();
-
   j["supportedConfigurations"] = supported_configurations;
-  j["deprecations"] = deprecated_configurations;
 
   return j;
 }
