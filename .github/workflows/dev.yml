@@ -9,7 +9,7 @@ jobs:
     env:
       BUILD_DIR: .build
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Check format
         run: bin/check-format
       - name: Shellcheck
@@ -57,7 +57,7 @@ jobs:
       BUILD_DIR: .build
       DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Configure
         run: bin/with-toolchain ${{ matrix.toolchain }} cmake . -B .build --preset ci-clang
       - name: Build
@@ -90,7 +90,7 @@ jobs:
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-${{matrix.docker-arch}}
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Build
         run: bin/with-toolchain ${{ matrix.toolchain }} bazelisk --bazelrc=${{ matrix.bazelrc }} build dd_trace_cpp
 
@@ -104,7 +104,7 @@ jobs:
       matrix:
         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install Dependency Manager (scoop)
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -138,7 +138,7 @@ jobs:
     env:
       DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install Dependency Manager (scoop)
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -173,7 +173,7 @@ jobs:
     env:
       DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - run: bin/test --coverage --verbose
       - name: Report Datadog coverage
         run: |
@@ -195,7 +195,7 @@ jobs:
       - run: mkdir binaries 
       - run: echo "https://github.com/DataDog/dd-trace-cpp@${{ github.head_ref || github.ref_name }}" > binaries/cpp-load-from-git
       - name: Save artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: system_tests_binaries
           path: ./binaries/**/*
