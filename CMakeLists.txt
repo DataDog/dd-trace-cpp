@@ -18,6 +18,7 @@ project(
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_STATIC_LIBS "Build static libraries" ON)
+option(BUILD_C_BINDING "Build C binding" OFF)
 
 if (WIN32)
   option(DD_TRACE_STATIC_CRT "Build dd-trace-cpp with static CRT with MSVC" OFF)
@@ -382,3 +383,7 @@ install(
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
 )
+
+if (BUILD_C_BINDING)
+  add_subdirectory(binding/c)
+endif ()
