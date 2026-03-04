@@ -105,6 +105,10 @@ if (DD_TRACE_BUILD_TOOLS)
   add_subdirectory(tools/config-inversion)
 endif ()
 
+if (BUILD_C_BINDING)
+  add_subdirectory(binding/c)
+endif ()
+
 add_library(dd-trace-cpp-objects OBJECT)
 add_library(dd-trace-cpp::obj ALIAS dd-trace-cpp-objects)
 
@@ -295,11 +299,11 @@ if (BUILD_SHARED_LIBS)
   )
 
   install(
-    TARGETS dd-trace-cpp-shared 
+    TARGETS dd-trace-cpp-shared
     EXPORT dd-trace-cpp-targets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
 endif ()
 
@@ -351,7 +355,7 @@ if (BUILD_STATIC_LIBS)
     EXPORT dd-trace-cpp-targets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
 endif ()
 
@@ -383,7 +387,3 @@ install(
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
 )
-
-if (BUILD_C_BINDING)
-  add_subdirectory(binding/c)
-endif ()

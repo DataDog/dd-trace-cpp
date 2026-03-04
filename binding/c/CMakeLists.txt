@@ -1,8 +1,6 @@
 add_library(dd_trace_c SHARED)
 add_library(dd-trace-cpp::c_binding ALIAS dd_trace_c)
 
-add_dependencies(dd_trace_c dd-trace-cpp::obj)
-
 target_compile_definitions(dd_trace_c PRIVATE DDOG_TRACE_C_BUILDING)
 
 target_sources(dd_trace_c
@@ -11,9 +9,7 @@ target_sources(dd_trace_c
     src/tracer.cpp
 )
 
-if(DD_TRACE_TRANSPORT STREQUAL "curl")
-  add_dependencies(dd_trace_c CURL::libcurl_shared)
-
+if (DD_TRACE_TRANSPORT STREQUAL "curl")
   target_sources(dd_trace_c
     PRIVATE
       ${CMAKE_SOURCE_DIR}/src/datadog/curl.cpp
@@ -24,12 +20,12 @@ if(DD_TRACE_TRANSPORT STREQUAL "curl")
     PRIVATE
       CURL::libcurl_shared
   )
-else()
+else ()
   target_sources(dd_trace_c
     PRIVATE
       ${CMAKE_SOURCE_DIR}/src/datadog/default_http_client_null.cpp
   )
-endif()
+endif ()
 
 target_include_directories(dd_trace_c
   PUBLIC
@@ -40,9 +36,8 @@ target_include_directories(dd_trace_c
 )
 
 target_link_libraries(dd_trace_c
-  PUBLIC
-    dd-trace-cpp::obj
   PRIVATE
+    dd-trace-cpp::obj
     dd-trace-cpp::specs
 )
 
@@ -50,7 +45,7 @@ install(TARGETS dd_trace_c
   EXPORT dd-trace-cpp-targets
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 install(
@@ -72,9 +67,10 @@ if (DD_TRACE_BUILD_TESTING)
       ${CMAKE_SOURCE_DIR}/src
       ${CMAKE_SOURCE_DIR}/src/datadog
       ${CMAKE_SOURCE_DIR}/include
-      ${CMAKE_SOURCE_DIR}/include/datadog
       ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
+
+  target_compile_features(test_c_binding PRIVATE cxx_std_17)
 
   target_compile_definitions(test_c_binding
     PUBLIC
@@ -84,9 +80,7 @@ if (DD_TRACE_BUILD_TESTING)
   target_link_libraries(test_c_binding
     PRIVATE
       dd_trace_c
-      dd-trace-cpp::static
-      dd-trace-cpp::specs
   )
 
   catch_discover_tests(test_c_binding)
-endif()
+endif ()

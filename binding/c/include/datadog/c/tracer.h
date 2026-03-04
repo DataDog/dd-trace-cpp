@@ -1,5 +1,6 @@
-#ifndef DDOG_TRACE_C_TRACER_H
-#define DDOG_TRACE_C_TRACER_H
+#pragma once
+
+#include <stddef.h>
 
 #if defined(_WIN32)
 #if defined(DDOG_TRACE_C_BUILDING)
@@ -34,23 +35,23 @@ typedef const char* (*ddog_trace_context_read_callback)(const char* key);
 typedef void (*ddog_trace_context_write_callback)(const char* key,
                                                   const char* value);
 
-enum ddog_trace_tracer_option {
+typedef enum {
   DDOG_TRACE_OPT_SERVICE_NAME = 0,
   DDOG_TRACE_OPT_ENV = 1,
   DDOG_TRACE_OPT_VERSION = 2,
   DDOG_TRACE_OPT_AGENT_URL = 3,
   DDOG_TRACE_OPT_INTEGRATION_NAME = 4,
   DDOG_TRACE_OPT_INTEGRATION_VERSION = 5
-};
+} ddog_trace_tracer_option;
 
-typedef void ddog_trace_conf_t;
-typedef void ddog_trace_tracer_t;
-typedef void ddog_trace_span_t;
+typedef struct ddog_trace_conf_s ddog_trace_conf_t;
+typedef struct ddog_trace_tracer_s ddog_trace_tracer_t;
+typedef struct ddog_trace_span_s ddog_trace_span_t;
 
 // Creates a tracer configuration instance.
 //
 // @return Configuration handle, or NULL on allocation failure
-DDOG_TRACE_C_API ddog_trace_conf_t* ddog_trace_tracer_conf_new();
+DDOG_TRACE_C_API ddog_trace_conf_t* ddog_trace_tracer_conf_new(void);
 
 // Release a tracer configuration. Safe to call with NULL.
 //
@@ -63,7 +64,7 @@ DDOG_TRACE_C_API void ddog_trace_tracer_conf_free(ddog_trace_conf_t* handle);
 // @param option  Configuration option
 // @param value   Configuration value
 DDOG_TRACE_C_API void ddog_trace_tracer_conf_set(
-    ddog_trace_conf_t* handle, enum ddog_trace_tracer_option option,
+    ddog_trace_conf_t* handle, ddog_trace_tracer_option option,
     const char* value);
 
 // Creates a tracer instance.
@@ -163,7 +164,7 @@ DDOG_TRACE_C_API void ddog_trace_span_finish(ddog_trace_span_t* span_handle);
 // @param buffer_size  Size of the buffer
 // @return             Number of characters written, or -1 on error
 DDOG_TRACE_C_API int ddog_trace_span_get_trace_id(
-    ddog_trace_span_t* span_handle, char* buffer, int buffer_size);
+    ddog_trace_span_t* span_handle, char* buffer, size_t buffer_size);
 
 // Get the span ID as a zero-padded hex string.
 //
@@ -171,8 +172,8 @@ DDOG_TRACE_C_API int ddog_trace_span_get_trace_id(
 // @param buffer       Output buffer (at least 17 bytes)
 // @param buffer_size  Size of the buffer
 // @return             Number of characters written (16), or -1 on error
-DDOG_TRACE_C_API int ddog_trace_span_get_span_id(ddog_trace_span_t* span_handle,
-                                                 char* buffer, int buffer_size);
+DDOG_TRACE_C_API int ddog_trace_span_get_span_id(
+    ddog_trace_span_t* span_handle, char* buffer, size_t buffer_size);
 
 // Set the resource name on a span. No-op if any argument is NULL.
 //
@@ -232,6 +233,4 @@ DDOG_TRACE_C_API ddog_trace_span_t* ddog_trace_span_create_child_with_options(
 
 #if defined(__cplusplus)
 }
-#endif
-
 #endif
