@@ -69,7 +69,7 @@ jobs:
       - name: Add final_status property
         if: success() || failure()
         run: |
-          which xsltproc || sudo apt-get install -y xsltproc
+          which xsltproc || apt-get install -y xsltproc
           xml_file=".build/report.xml"
           echo "Fixing $xml_file"
           tmp_file="$(mktemp)"
