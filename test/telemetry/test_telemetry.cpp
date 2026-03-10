@@ -46,11 +46,17 @@ struct FakeEventScheduler : public EventScheduler {
   size_t count_tasks = 0;
   std::function<void()> heartbeat_callback = nullptr;
   std::function<void()> metrics_callback = nullptr;
+  std::function<void()> extended_heartbeat_callback = nullptr;
   Optional<std::chrono::steady_clock::duration> heartbeat_interval;
   Optional<std::chrono::steady_clock::duration> metrics_interval;
+  Optional<std::chrono::steady_clock::duration> extended_heartbeat_interval;
   bool cancelled = false;
 
   // NOTE: White box testing. This is a limitation of the event scheduler API.
+  // Task ordering from Telemetry::schedule_tasks():
+  //   0: heartbeat (always)
+  //   1: metrics capture (only when report_metrics=true)
+  //   1 or 2: extended heartbeat (always; index depends on report_metrics)
   Cancel schedule_recurring_event(std::chrono::steady_clock::duration interval,
                                   std::function<void()> callback) override {
     if (count_tasks == 0) {
@@ -59,6 +65,9 @@ struct FakeEventScheduler : public EventScheduler {
     } else if (count_tasks == 1) {
       metrics_callback = callback;
       metrics_interval = interval;
+    } else if (count_tasks == 2) {
+      extended_heartbeat_callback = callback;
+      extended_heartbeat_interval = interval;
     }
     count_tasks++;
     return [this]() { cancelled = true; };
@@ -72,6 +81,11 @@ struct FakeEventScheduler : public EventScheduler {
   void trigger_metrics_capture() {
     assert(metrics_callback != nullptr);
     metrics_callback();
+  }
+
+  void trigger_extended_heartbeat() {
+    assert(extended_heartbeat_callback != nullptr);
+    extended_heartbeat_callback();
   }
 
   std::string config() const override {
@@ -858,6 +872,75 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
   }
 }
 
+TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry extended heartbeat") {
+  auto logger = std::make_shared<MockLogger>();
+  auto client = std::make_shared<MockHTTPClient>();
+  auto scheduler = std::make_shared<FakeEventScheduler>();
+
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
+
+  auto url = HTTPClient::URL::parse("http://localhost:8000");
+
+  SECTION("sends full configuration state") {
+    Product product;
+    product.name = Product::Name::tracing;
+    product.enabled = true;
+    product.version = tracer_version;
+    product.configurations = {
+        {ConfigName::SERVICE_NAME,
+         {ConfigMetadata(ConfigName::SERVICE_NAME, "default-service",
+                         ConfigMetadata::Origin::DEFAULT),
+          ConfigMetadata(ConfigName::SERVICE_NAME, "env-service",
+                         ConfigMetadata::Origin::ENVIRONMENT_VARIABLE)}},
+        {ConfigName::REPORT_TRACES,
+         {ConfigMetadata(ConfigName::REPORT_TRACES, "true",
+                         ConfigMetadata::Origin::DEFAULT)}},
+    };
+
+    Configuration cfg;
+    cfg.products.emplace_back(std::move(product));
+
+    Telemetry telemetry{*finalize_config(cfg), tracer_signature, logger, client,
+                        scheduler,           *url};
+
+    // Simulate a remote config update changing SERVICE_NAME and REPORT_TRACES
+    const std::vector<ConfigMetadata> rc_update{
+        {ConfigName::SERVICE_NAME, "rc-service",
+         ConfigMetadata::Origin::REMOTE_CONFIG},
+    };
+    telemetry.capture_configuration_change(rc_update);
+
+    client->clear();
+    scheduler->trigger_extended_heartbeat();
+
+    auto payload = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(payload));
+    REQUIRE(payload["request_type"] == "message-batch");
+
+    auto extended_hb =
+        find_payload(payload["payload"], "app-extended-heartbeat");
+    REQUIRE(extended_hb.has_value());
+
+    auto configuration = (*extended_hb)["payload"]["configuration"];
+    REQUIRE(configuration.is_array());
+
+    // Full state: SERVICE_NAME should reflect the remote config override
+    bool found_service_name = false;
+    for (const auto& entry : configuration) {
+      if (entry["name"] == "service") {
+        found_service_name = true;
+        CHECK(entry["value"] == "rc-service");
+        CHECK(entry["origin"] == "remote_config");
+      }
+    }
+    CHECK(found_service_name);
+  }
+
+}
+
 TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
   // Cases:
   //  - when `report_metrics` is set to false. No metrics are reported.
@@ -885,25 +968,32 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
 
     Telemetry telemetry(*final_cfg, tracer_signature, logger, client, scheduler,
                         *url);
-    CHECK(scheduler->metrics_callback == nullptr);
-    CHECK(scheduler->metrics_interval == nullopt);
+    // When report_metrics=false, only 2 tasks are registered:
+    //   0: heartbeat, 1: extended_heartbeat (no metrics capture task).
+    CHECK(scheduler->count_tasks == 2);
+    CHECK(scheduler->extended_heartbeat_callback == nullptr);
   }
 
   SECTION("intervals are respected") {
     Configuration cfg;
     cfg.metrics_interval_seconds = .5;
     cfg.heartbeat_interval_seconds = 30;
+    cfg.extended_heartbeat_interval_seconds = 3600;
 
     auto final_cfg = finalize_config(cfg);
     REQUIRE(final_cfg);
 
     Telemetry telemetry(*final_cfg, tracer_signature, logger, client, scheduler,
                         *url);
+    CHECK(scheduler->heartbeat_callback != nullptr);
+    CHECK(scheduler->heartbeat_interval == 30s);
+
     CHECK(scheduler->metrics_callback != nullptr);
     CHECK(scheduler->metrics_interval == 500ms);
 
-    CHECK(scheduler->heartbeat_callback != nullptr);
-    CHECK(scheduler->metrics_interval != 30s);
+    CHECK(scheduler->extended_heartbeat_callback != nullptr);
+    CHECK(scheduler->extended_heartbeat_interval ==
+          std::chrono::milliseconds(3600000));
   }
 
   SECTION("disabling logs reporting do not collect logs") {

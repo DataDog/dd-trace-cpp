@@ -198,6 +198,39 @@ nlohmann::json encode_distributions(
   return j;
 }
 
+nlohmann::json encode_configuration_field(const ConfigMetadata& config_metadata,
+                                          std::size_t seq_id) {
+  auto j = nlohmann::json{{"name", to_string(config_metadata.name)},
+                          {"value", config_metadata.value},
+                          {"seq_id", seq_id}};
+
+  switch (config_metadata.origin) {
+    case ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
+      j["origin"] = "env_var";
+      break;
+    case ConfigMetadata::Origin::CODE:
+      j["origin"] = "code";
+      break;
+    case ConfigMetadata::Origin::REMOTE_CONFIG:
+      j["origin"] = "remote_config";
+      break;
+    case ConfigMetadata::Origin::DEFAULT:
+      j["origin"] = "default";
+      break;
+  }
+
+  if (config_metadata.error) {
+    // clang-format off
+    j["error"] = {
+      {"code", config_metadata.error->code},
+      {"message", config_metadata.error->message}
+    };
+    // clang-format on
+  }
+
+  return j;
+}
+
 }  // namespace
 
 Telemetry::Telemetry(FinalizedConfiguration config,
@@ -214,6 +247,16 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
       host_info_(get_host_info()) {
+  // Initialize current_configuration_ from the product configurations provided
+  // at startup. Each config name maps to a vector ordered by precedence
+  // (lowest to highest), so we take the last entry as the effective value.
+  for (const auto& product : config_.products) {
+    for (const auto& [config_name, config_metadatas] : product.configurations) {
+      if (!config_metadatas.empty()) {
+        current_configuration_[config_name] = config_metadatas.back();
+      }
+    }
+  }
   app_started();
   schedule_tasks();
 }
@@ -227,6 +270,12 @@ void Telemetry::schedule_tasks() {
     tasks_.emplace_back(scheduler_->schedule_recurring_event(
         config_.metrics_interval, [this]() mutable { capture_metrics(); }));
   }
+
+  tasks_.emplace_back(scheduler_->schedule_recurring_event(
+      config_.extended_heartbeat_interval,
+      [this]() {
+        send_payload("app-extended-heartbeat", extended_heartbeat_payload());
+      }));
 }
 
 Telemetry::~Telemetry() {
@@ -249,6 +298,7 @@ Telemetry::Telemetry(Telemetry&& rhs)
       rates_(std::move(rhs.rates_)),
       rates_snapshot_(std::move(rhs.rates_snapshot_)),
       distributions_(std::move(rhs.distributions_)),
+      current_configuration_(std::move(rhs.current_configuration_)),
       seq_id_(rhs.seq_id_),
       config_seq_ids_(rhs.config_seq_ids_),
       host_info_(rhs.host_info_) {
@@ -274,6 +324,7 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
     std::swap(distributions_, rhs.distributions_);
     std::swap(seq_id_, rhs.seq_id_);
     std::swap(config_seq_ids_, rhs.config_seq_ids_);
+    std::swap(current_configuration_, rhs.current_configuration_);
     std::swap(host_info_, rhs.host_info_);
     schedule_tasks();
   }
@@ -425,13 +476,13 @@ void Telemetry::send_payload(StringView request_type, std::string payload) {
 void Telemetry::send_configuration_change() {
   if (configuration_snapshot_.empty()) return;
 
-  std::vector<ConfigMetadata> current_configuration;
-  std::swap(current_configuration, configuration_snapshot_);
+  std::vector<ConfigMetadata> pending;
+  std::swap(pending, configuration_snapshot_);
 
   auto configuration_json = nlohmann::json::array();
-  for (const auto& config_metadata : current_configuration) {
+  for (const auto& config_metadata : pending) {
     configuration_json.emplace_back(
-        generate_configuration_field(config_metadata));
+        report_new_config_field(config_metadata));
   }
 
   auto telemetry_body =
@@ -591,7 +642,7 @@ std::string Telemetry::app_started_payload() {
       // if (config_metadata.value.empty()) continue;
       for (const auto& config_metadata : config_metadatas) {
         configuration_json.emplace_back(
-            generate_configuration_field(config_metadata));
+            report_new_config_field(config_metadata));
       }
     }
 
@@ -678,6 +729,36 @@ std::string Telemetry::app_started_payload() {
   return batch.dump();
 }
 
+std::string Telemetry::extended_heartbeat_payload() {
+  auto configuration_json = nlohmann::json::array();
+  for (const auto& [_, config_metadata] : current_configuration_) {
+    // Use the current seq_id without incrementing — this is a snapshot
+    // refresh, not a new change event.
+    auto seq_id = config_seq_ids_[config_metadata.name];
+    configuration_json.emplace_back(
+        encode_configuration_field(config_metadata, seq_id));
+  }
+
+  auto payload = nlohmann::json{{"configuration", configuration_json}};
+
+  if (!config_.integration_name.empty()) {
+    payload["integrations"] = nlohmann::json::array({
+        nlohmann::json{{"name", config_.integration_name},
+                       {"version", config_.integration_version},
+                       {"enabled", true}},
+    });
+  }
+
+  auto extended_heartbeat = nlohmann::json{
+      {"request_type", "app-extended-heartbeat"},
+      {"payload", std::move(payload)},
+  };
+
+  auto batch = generate_telemetry_body("message-batch");
+  batch["payload"] = nlohmann::json::array({std::move(extended_heartbeat)});
+  return batch.dump();
+}
+
 nlohmann::json Telemetry::generate_telemetry_body(std::string request_type) {
   std::time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
                                 clock_().wall.time_since_epoch())
@@ -711,49 +792,21 @@ nlohmann::json Telemetry::generate_telemetry_body(std::string request_type) {
   });
 }
 
-nlohmann::json Telemetry::generate_configuration_field(
+nlohmann::json Telemetry::report_new_config_field(
     const ConfigMetadata& config_metadata) {
   // NOTE(@dmehala): `seq_id` should start at 1 so that the go backend can
   // detect between non set fields.
   config_seq_ids_[config_metadata.name] += 1;
-  auto seq_id = config_seq_ids_[config_metadata.name];
-
-  auto j = nlohmann::json{{"name", to_string(config_metadata.name)},
-                          {"value", config_metadata.value},
-                          {"seq_id", seq_id}};
-
-  switch (config_metadata.origin) {
-    case ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
-      j["origin"] = "env_var";
-      break;
-    case ConfigMetadata::Origin::CODE:
-      j["origin"] = "code";
-      break;
-    case ConfigMetadata::Origin::REMOTE_CONFIG:
-      j["origin"] = "remote_config";
-      break;
-    case ConfigMetadata::Origin::DEFAULT:
-      j["origin"] = "default";
-      break;
-  }
-
-  if (config_metadata.error) {
-    // clang-format off
-      j["error"] = {
-        {"code", config_metadata.error->code},
-        {"message", config_metadata.error->message}
-      };
-    // clang-format on
-  }
-
-  return j;
+  return encode_configuration_field(config_metadata,
+                                    config_seq_ids_[config_metadata.name]);
 }
 
 void Telemetry::capture_configuration_change(
     const std::vector<tracing::ConfigMetadata>& new_configuration) {
-  configuration_snapshot_.insert(configuration_snapshot_.begin(),
-                                 new_configuration.begin(),
-                                 new_configuration.end());
+  for (const auto& config : new_configuration) {
+    configuration_snapshot_.push_back(config);
+    current_configuration_[config.name] = config;
+  }
 }
 
 void Telemetry::capture_metrics() {
