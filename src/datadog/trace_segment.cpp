@@ -11,9 +11,9 @@
 #include <datadog/telemetry/telemetry.h>
 #include <datadog/trace_segment.h>
 
+#include <array>
 #include <cassert>
 #include <charconv>
-#include <cstdio>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -34,12 +34,6 @@
 namespace datadog {
 namespace tracing {
 namespace {
-
-std::string format_rate(double rate) {
-  char buf[32];
-  std::snprintf(buf, sizeof(buf), "%.6g", rate);
-  return std::string(buf);
-}
 
 struct Cache {
   static int process_id;
@@ -333,8 +327,12 @@ void TraceSegment::make_sampling_decision_if_null() {
   // configuration from the agent yet, so ksr would be meaningless.
   if (sampling_decision_->mechanism &&
       *sampling_decision_->mechanism != int(SamplingMechanism::DEFAULT)) {
-    trace_tags_.emplace_back(tags::internal::ksr,
-                             format_rate(*sampling_decision_->configured_rate));
+    std::array<char, 8> buf;
+    const auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(),
+                                         *sampling_decision_->configured_rate,
+                                         std::chars_format::general, 6);
+    assert(ec == std::errc());
+    trace_tags_.emplace_back(tags::internal::ksr, std::string(buf.data(), ptr));
   }
 }
 
