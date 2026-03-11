@@ -18,7 +18,7 @@ project(
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_STATIC_LIBS "Build static libraries" ON)
-option(BUILD_C_BINDING "Build C binding" OFF)
+option(DD_TRACE_BUILD_C_BINDING "Build C binding" OFF)
 
 if (WIN32)
   option(DD_TRACE_STATIC_CRT "Build dd-trace-cpp with static CRT with MSVC" OFF)
@@ -105,7 +105,7 @@ if (DD_TRACE_BUILD_TOOLS)
   add_subdirectory(tools/config-inversion)
 endif ()
 
-if (BUILD_C_BINDING)
+if (DD_TRACE_BUILD_C_BINDING)
   add_subdirectory(binding/c)
 endif ()
 

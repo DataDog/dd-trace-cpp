@@ -1,7 +1,7 @@
-add_library(dd_trace_c SHARED)
+add_library(dd_trace_c)
 add_library(dd-trace-cpp::c_binding ALIAS dd_trace_c)
 
-target_compile_definitions(dd_trace_c PRIVATE DDOG_TRACE_C_BUILDING)
+target_compile_definitions(dd_trace_c PRIVATE DD_TRACE_C_BUILDING)
 
 target_sources(dd_trace_c
   PRIVATE
@@ -54,33 +54,13 @@ install(
 )
 
 if (DD_TRACE_BUILD_TESTING)
-  add_executable(test_c_binding
-    test/test_c_binding.cpp
-    ${CMAKE_SOURCE_DIR}/test/test.cpp
-    ${CMAKE_SOURCE_DIR}/test/mocks/collectors.cpp
-    ${CMAKE_SOURCE_DIR}/test/mocks/loggers.cpp
+  target_sources(tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/test_c_binding.cpp
   )
 
-  target_include_directories(test_c_binding
-    PRIVATE
-      ${CMAKE_SOURCE_DIR}/test
-      ${CMAKE_SOURCE_DIR}/src
-      ${CMAKE_SOURCE_DIR}/src/datadog
-      ${CMAKE_SOURCE_DIR}/include
-      ${CMAKE_CURRENT_SOURCE_DIR}/include
+  target_include_directories(tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
 
-  target_compile_features(test_c_binding PRIVATE cxx_std_17)
-
-  target_compile_definitions(test_c_binding
-    PUBLIC
-      CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS
-  )
-
-  target_link_libraries(test_c_binding
-    PRIVATE
-      dd_trace_c
-  )
-
-  catch_discover_tests(test_c_binding)
+  target_link_libraries(tests PRIVATE dd_trace_c)
 endif ()
