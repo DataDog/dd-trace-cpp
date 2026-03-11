@@ -328,8 +328,14 @@ void TraceSegment::make_sampling_decision_if_null() {
 
   update_decision_maker_trace_tag();
 
-  trace_tags_.emplace_back(tags::internal::ksr,
-                           format_rate(*sampling_decision_->configured_rate));
+  // Only set ksr when the sampling mechanism is explicit (agent rate, rule, or
+  // remote rule).  The DEFAULT mechanism means we haven't received any
+  // configuration from the agent yet, so ksr would be meaningless.
+  if (sampling_decision_->mechanism &&
+      *sampling_decision_->mechanism != int(SamplingMechanism::DEFAULT)) {
+    trace_tags_.emplace_back(tags::internal::ksr,
+                             format_rate(*sampling_decision_->configured_rate));
+  }
 }
 
 void TraceSegment::update_decision_maker_trace_tag() {
