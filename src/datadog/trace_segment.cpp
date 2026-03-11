@@ -328,9 +328,8 @@ void TraceSegment::make_sampling_decision_if_null() {
 
   update_decision_maker_trace_tag();
 
-  trace_tags_.emplace_back(
-      tags::internal::ksr,
-      format_rate(*sampling_decision_->configured_rate));
+  trace_tags_.emplace_back(tags::internal::ksr,
+                           format_rate(*sampling_decision_->configured_rate));
 }
 
 void TraceSegment::update_decision_maker_trace_tag() {
