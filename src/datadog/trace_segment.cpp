@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <cstdio>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -33,6 +34,12 @@
 namespace datadog {
 namespace tracing {
 namespace {
+
+std::string format_rate(double rate) {
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%.6g", rate);
+  return std::string(buf);
+}
 
 struct Cache {
   static int process_id;
@@ -323,7 +330,7 @@ void TraceSegment::make_sampling_decision_if_null() {
 
   trace_tags_.emplace_back(
       tags::internal::ksr,
-      std::to_string(*sampling_decision_->configured_rate));
+      format_rate(*sampling_decision_->configured_rate));
 }
 
 void TraceSegment::update_decision_maker_trace_tag() {

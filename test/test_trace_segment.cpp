@@ -7,7 +7,9 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <cstdio>
 #include <regex>
+#include <string>
 #include <vector>
 
 #include "matchers.h"
@@ -325,7 +327,7 @@ TEST_CASE("TraceSegment finalization of spans") {
         REQUIRE(collector->span_count() == 1);
         const auto& span = collector->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
-        REQUIRE(span.tags.at(tags::internal::ksr) == "1.000000");
+        REQUIRE(span.tags.at(tags::internal::ksr) == "1");
       }
 
       SECTION(
@@ -348,7 +350,7 @@ TEST_CASE("TraceSegment finalization of spans") {
         {
           REQUIRE(collector_response->span_count() == 1);
           const auto& span = collector_response->first_span();
-          CHECK(span.tags.at(tags::internal::ksr) == "1.000000");
+          CHECK(span.tags.at(tags::internal::ksr) == "1");
         }
 
         collector_response->chunks.clear();
@@ -361,7 +363,7 @@ TEST_CASE("TraceSegment finalization of spans") {
           REQUIRE(collector_response->span_count() == 1);
           const auto& span = collector_response->first_span();
           CHECK(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
-          CHECK(span.tags.at(tags::internal::ksr) == "1.000000");
+          CHECK(span.tags.at(tags::internal::ksr) == "1");
         }
       }
 
@@ -392,7 +394,11 @@ TEST_CASE("TraceSegment finalization of spans") {
         const auto& span = collector->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::rule_sample_rate) ==
                 sample_rate);
-        CHECK(span.tags.at(tags::internal::ksr) == std::to_string(sample_rate));
+        {
+          char buf[32];
+          std::snprintf(buf, sizeof(buf), "%.6g", sample_rate);
+          CHECK(span.tags.at(tags::internal::ksr) == std::string(buf));
+        }
         if (sample_rate == 1.0) {
           REQUIRE(span.numeric_tags.at(
                       tags::internal::rule_limiter_sample_rate) == 1.0);
