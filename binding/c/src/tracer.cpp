@@ -44,24 +44,30 @@ class ContextWriter : public dd::DictWriter {
   }
 };
 
-dd::SpanConfig make_span_config(const dd_span_options_t *options) {
+dd::SpanConfig make_span_config(dd_span_options_t options) {
   dd::SpanConfig span_config;
-  if (options == nullptr) {
-    return span_config;
+  if (options.name != nullptr) {
+    span_config.name = options.name;
   }
-  if (options->name != nullptr) {
-    span_config.name = options->name;
+  if (options.resource != nullptr) {
+    span_config.resource = options.resource;
   }
-  if (options->resource != nullptr) {
-    span_config.resource = options->resource;
+  if (options.service != nullptr) {
+    span_config.service = options.service;
   }
-  if (options->service != nullptr) {
-    span_config.service = options->service;
+  if (options.service_type != nullptr) {
+    span_config.service_type = options.service_type;
+  }
+  if (options.environment != nullptr) {
+    span_config.environment = options.environment;
+  }
+  if (options.version != nullptr) {
+    span_config.version = options.version;
   }
   return span_config;
 }
 
-void set_error(dd_error_t *error, int code, const char *message) {
+void set_error(dd_error_t *error, dd_error_code code, const char *message) {
   if (error == nullptr) {
     return;
   }
@@ -90,7 +96,7 @@ void dd_tracer_conf_free(dd_conf_t *handle) {
 }
 
 void dd_tracer_conf_set(dd_conf_t *handle, dd_tracer_option option,
-                        void *value) {
+                        const void *value) {
   if (handle == nullptr || value == nullptr) {
     return;
   }
@@ -121,21 +127,22 @@ void dd_tracer_conf_set(dd_conf_t *handle, dd_tracer_option option,
 
 dd_tracer_t *dd_tracer_new(const dd_conf_t *conf_handle, dd_error_t *error) {
   if (conf_handle == nullptr) {
-    set_error(error, 1, "conf_handle is NULL");
+    set_error(error, DD_ERROR_NULL_ARGUMENT, "conf_handle is NULL");
     return nullptr;
   }
 
   const auto *config = reinterpret_cast<const dd::TracerConfig *>(conf_handle);
   const auto validated_config = dd::finalize_config(*config);
   if (!validated_config) {
-    set_error(error, 2, validated_config.error().message.c_str());
+    set_error(error, DD_ERROR_INVALID_CONFIG,
+              validated_config.error().message.c_str());
     return nullptr;
   }
 
   try {
     return reinterpret_cast<dd_tracer_t *>(new dd::Tracer{*validated_config});
   } catch (...) {
-    set_error(error, 3, "failed to allocate tracer");
+    set_error(error, DD_ERROR_ALLOCATION_FAILURE, "failed to allocate tracer");
     return nullptr;
   }
 }
@@ -148,9 +155,8 @@ void dd_tracer_free(dd_tracer_t *tracer_handle) {
 }
 
 dd_span_t *dd_tracer_create_span(dd_tracer_t *tracer_handle,
-                                 const dd_span_options_t *options) {
-  if (tracer_handle == nullptr || options == nullptr ||
-      options->name == nullptr) {
+                                 dd_span_options_t options) {
+  if (tracer_handle == nullptr || options.name == nullptr) {
     return nullptr;
   }
 
@@ -167,9 +173,9 @@ dd_span_t *dd_tracer_create_span(dd_tracer_t *tracer_handle,
 
 dd_span_t *dd_tracer_extract_or_create_span(
     dd_tracer_t *tracer_handle, dd_context_read_callback on_context_read,
-    const dd_span_options_t *options) {
+    dd_span_options_t options) {
   if (tracer_handle == nullptr || on_context_read == nullptr ||
-      options == nullptr || options->name == nullptr) {
+      options.name == nullptr) {
     return nullptr;
   }
 
@@ -227,9 +233,8 @@ void dd_span_inject(dd_span_t *span_handle,
 }
 
 dd_span_t *dd_span_create_child(dd_span_t *span_handle,
-                                const dd_span_options_t *options) {
-  if (span_handle == nullptr || options == nullptr ||
-      options->name == nullptr) {
+                                dd_span_options_t options) {
+  if (span_handle == nullptr || options.name == nullptr) {
     return nullptr;
   }
 

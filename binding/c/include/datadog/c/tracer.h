@@ -48,12 +48,24 @@ typedef struct {
   const char* name;
   const char* resource;
   const char* service;
+  const char* service_type;
+  const char* environment;
+  const char* version;
 } dd_span_options_t;
 
-// Error details populated on failure. Caller provides the struct,
-// callee fills it in. Pass NULL to ignore errors.
+// Error codes returned by the C binding.
+typedef enum {
+  DD_ERROR_OK = 0,
+  DD_ERROR_NULL_ARGUMENT = 1,
+  DD_ERROR_INVALID_CONFIG = 2,
+  DD_ERROR_ALLOCATION_FAILURE = 3
+} dd_error_code;
+
+// Error details populated on failure. The caller must allocate this struct
+// and pass a pointer to it. The callee fills in the code and message fields.
+// Pass NULL to ignore errors.
 typedef struct {
-  int code;
+  dd_error_code code;
   char message[256];
 } dd_error_t;
 
@@ -77,13 +89,15 @@ DD_TRACE_C_API void dd_tracer_conf_free(dd_conf_t* handle);
 // @param option  Configuration option
 // @param value   Configuration value (interpretation depends on option)
 DD_TRACE_C_API void dd_tracer_conf_set(dd_conf_t* handle,
-                                       dd_tracer_option option, void* value);
+                                       dd_tracer_option option,
+                                       const void* value);
 
 // Creates a tracer instance. The configuration handle may be freed with
 // dd_tracer_conf_free after this call returns.
 //
 // @param conf_handle Configuration handle (not modified)
-// @param error       Optional error output (may be NULL)
+// @param error       If non-NULL, filled with error details on failure.
+//                    The caller must allocate the dd_error_t struct.
 //
 // @return Tracer handle, or NULL on error
 DD_TRACE_C_API dd_tracer_t* dd_tracer_new(const dd_conf_t* conf_handle,
@@ -100,8 +114,8 @@ DD_TRACE_C_API void dd_tracer_free(dd_tracer_t* tracer_handle);
 // @param options       Span options (name must not be NULL)
 //
 // @return Span handle, or NULL on error
-DD_TRACE_C_API dd_span_t* dd_tracer_create_span(
-    dd_tracer_t* tracer_handle, const dd_span_options_t* options);
+DD_TRACE_C_API dd_span_t* dd_tracer_create_span(dd_tracer_t* tracer_handle,
+                                                dd_span_options_t options);
 
 // Extract trace context from incoming headers, or create a new root span
 // if extraction fails. Never returns an error span; on extraction failure
@@ -114,7 +128,7 @@ DD_TRACE_C_API dd_span_t* dd_tracer_create_span(
 // @return Span handle, or NULL if arguments are invalid
 DD_TRACE_C_API dd_span_t* dd_tracer_extract_or_create_span(
     dd_tracer_t* tracer_handle, dd_context_read_callback on_context_read,
-    const dd_span_options_t* options);
+    dd_span_options_t options);
 
 // Release a span instance. Safe to call with NULL.
 // If the span has not been finished with dd_span_finish, it is
@@ -158,8 +172,8 @@ DD_TRACE_C_API void dd_span_inject(dd_span_t* span_handle,
 // @param options     Span options (name must not be NULL)
 //
 // @return Child span handle, or NULL
-DD_TRACE_C_API dd_span_t* dd_span_create_child(
-    dd_span_t* span_handle, const dd_span_options_t* options);
+DD_TRACE_C_API dd_span_t* dd_span_create_child(dd_span_t* span_handle,
+                                               dd_span_options_t options);
 
 // Finish a span by recording its end time. No-op if span_handle is NULL.
 // After finishing, the span should be freed with dd_span_free.

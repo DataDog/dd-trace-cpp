@@ -13,5 +13,5 @@ cmake --build build -j
 ## Running Tests
 
 ```sh
-./build/binding/c/test_c_binding
+./build/test/tests "[c_binding]"
 ```

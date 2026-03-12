@@ -35,7 +35,7 @@ struct TestTracer {
 
 TestTracer make_tracer() {
   auto *conf = dd_tracer_conf_new();
-  dd_tracer_conf_set(conf, DD_OPT_SERVICE_NAME, (void *)"test-service");
+  dd_tracer_conf_set(conf, DD_OPT_SERVICE_NAME, "test-service");
 
   // Inject mocks before const handoff to dd_tracer_new.
   auto *cfg = reinterpret_cast<dd::TracerConfig *>(conf);
@@ -56,12 +56,12 @@ TEST_CASE("tracer lifecycle", "[c_binding]") {
   auto *conf = dd_tracer_conf_new();
   REQUIRE(conf != nullptr);
 
-  dd_tracer_conf_set(conf, DD_OPT_SERVICE_NAME, (void *)"my-service");
-  dd_tracer_conf_set(conf, DD_OPT_ENV, (void *)"staging");
-  dd_tracer_conf_set(conf, DD_OPT_VERSION, (void *)"1.0.0");
-  dd_tracer_conf_set(conf, DD_OPT_AGENT_URL, (void *)"http://foo:8080");
-  dd_tracer_conf_set(conf, DD_OPT_INTEGRATION_NAME, (void *)"my-integration");
-  dd_tracer_conf_set(conf, DD_OPT_INTEGRATION_VERSION, (void *)"2.0.0");
+  dd_tracer_conf_set(conf, DD_OPT_SERVICE_NAME, "my-service");
+  dd_tracer_conf_set(conf, DD_OPT_ENV, "staging");
+  dd_tracer_conf_set(conf, DD_OPT_VERSION, "1.0.0");
+  dd_tracer_conf_set(conf, DD_OPT_AGENT_URL, "http://foo:8080");
+  dd_tracer_conf_set(conf, DD_OPT_INTEGRATION_NAME, "my-integration");
+  dd_tracer_conf_set(conf, DD_OPT_INTEGRATION_VERSION, "2.0.0");
 
   // Inject mocks so dd_tracer_new succeeds without a real agent.
   auto *cfg = reinterpret_cast<dd::TracerConfig *>(conf);
@@ -76,15 +76,13 @@ TEST_CASE("tracer lifecycle", "[c_binding]") {
 }
 
 TEST_CASE("tracer new propagates error", "[c_binding]") {
-  // Create config without injecting mocks — dd_tracer_new should fail
-  // and populate the error struct.
   auto *conf = dd_tracer_conf_new();
-  dd_tracer_conf_set(conf, DD_OPT_AGENT_URL, (void *)"not://valid");
+  dd_tracer_conf_set(conf, DD_OPT_AGENT_URL, "not://valid");
 
   dd_error_t err = {};
   auto *tracer = dd_tracer_new(conf, &err);
   CHECK(tracer == nullptr);
-  CHECK(err.code != 0);
+  CHECK(err.code == DD_ERROR_INVALID_CONFIG);
   CHECK(err.message[0] != '\0');
 
   dd_tracer_conf_free(conf);
@@ -93,8 +91,7 @@ TEST_CASE("tracer new propagates error", "[c_binding]") {
 TEST_CASE("span create, tag, finish, free", "[c_binding]") {
   auto ctx = make_tracer();
 
-  dd_span_options_t opts = {.name = "test.op"};
-  auto *span = dd_tracer_create_span(ctx.tracer, &opts);
+  auto *span = dd_tracer_create_span(ctx.tracer, {.name = "test.op"});
   REQUIRE(span != nullptr);
 
   dd_span_set_tag(span, "http.method", "GET");
@@ -117,9 +114,8 @@ TEST_CASE("span create, tag, finish, free", "[c_binding]") {
 TEST_CASE("create span with resource", "[c_binding]") {
   auto ctx = make_tracer();
 
-  dd_span_options_t opts = {.name = "web.request",
-                            .resource = "GET /api/users"};
-  auto *span = dd_tracer_create_span(ctx.tracer, &opts);
+  auto *span = dd_tracer_create_span(
+      ctx.tracer, {.name = "web.request", .resource = "GET /api/users"});
   REQUIRE(span != nullptr);
 
   dd_span_finish(span);
@@ -132,8 +128,7 @@ TEST_CASE("create span with resource", "[c_binding]") {
 TEST_CASE("span free without finish auto-finishes", "[c_binding]") {
   auto ctx = make_tracer();
 
-  dd_span_options_t opts = {.name = "auto.finish"};
-  auto *span = dd_tracer_create_span(ctx.tracer, &opts);
+  auto *span = dd_tracer_create_span(ctx.tracer, {.name = "auto.finish"});
   REQUIRE(span != nullptr);
 
   dd_span_set_tag(span, "key", "value");
@@ -149,8 +144,7 @@ TEST_CASE("span free without finish auto-finishes", "[c_binding]") {
 TEST_CASE("inject then extract preserves trace ID", "[c_binding]") {
   auto ctx = make_tracer();
 
-  dd_span_options_t opts_1 = {.name = "producer"};
-  auto *span_1 = dd_tracer_create_span(ctx.tracer, &opts_1);
+  auto *span_1 = dd_tracer_create_span(ctx.tracer, {.name = "producer"});
   g_headers.clear();
   dd_span_inject(span_1, test_header_writer);
   CHECK(!g_headers.empty());
@@ -158,10 +152,9 @@ TEST_CASE("inject then extract preserves trace ID", "[c_binding]") {
   char trace_id_1[trace_id_buf_size] = {};
   dd_span_get_trace_id(span_1, trace_id_1, sizeof(trace_id_1));
 
-  dd_span_options_t opts_2 = {.name = "consumer",
-                              .resource = "GET /downstream"};
-  auto *span_2 =
-      dd_tracer_extract_or_create_span(ctx.tracer, test_header_reader, &opts_2);
+  auto *span_2 = dd_tracer_extract_or_create_span(
+      ctx.tracer, test_header_reader,
+      {.name = "consumer", .resource = "GET /downstream"});
   REQUIRE(span_2 != nullptr);
 
   char trace_id_2[trace_id_buf_size] = {};
@@ -178,12 +171,10 @@ TEST_CASE("inject then extract preserves trace ID", "[c_binding]") {
 TEST_CASE("child span shares trace ID", "[c_binding]") {
   auto ctx = make_tracer();
 
-  dd_span_options_t parent_opts = {.name = "parent.op"};
-  auto *parent = dd_tracer_create_span(ctx.tracer, &parent_opts);
+  auto *parent = dd_tracer_create_span(ctx.tracer, {.name = "parent.op"});
   REQUIRE(parent != nullptr);
 
-  dd_span_options_t child_opts = {.name = "child.op"};
-  auto *child = dd_span_create_child(parent, &child_opts);
+  auto *child = dd_span_create_child(parent, {.name = "child.op"});
   REQUIRE(child != nullptr);
 
   char parent_trace[trace_id_buf_size] = {};
@@ -204,16 +195,18 @@ TEST_CASE("child span shares trace ID", "[c_binding]") {
   dd_span_free(parent);
 }
 
-TEST_CASE("child span with service and resource", "[c_binding]") {
+TEST_CASE("child span with all options", "[c_binding]") {
   auto ctx = make_tracer();
 
-  dd_span_options_t parent_opts = {.name = "parent.op"};
-  auto *parent = dd_tracer_create_span(ctx.tracer, &parent_opts);
+  auto *parent = dd_tracer_create_span(ctx.tracer, {.name = "parent.op"});
   REQUIRE(parent != nullptr);
 
-  dd_span_options_t child_opts = {
-      .name = "db.query", .resource = "SELECT *", .service = "postgres"};
-  auto *child = dd_span_create_child(parent, &child_opts);
+  auto *child = dd_span_create_child(parent, {.name = "db.query",
+                                              .resource = "SELECT *",
+                                              .service = "postgres",
+                                              .service_type = "sql",
+                                              .environment = "staging",
+                                              .version = "2.0"});
   REQUIRE(child != nullptr);
 
   dd_span_finish(child);
@@ -229,12 +222,12 @@ TEST_CASE("child span with service and resource", "[c_binding]") {
   CHECK(child_sd.name == "db.query");
   CHECK(child_sd.resource == "SELECT *");
   CHECK(child_sd.service == "postgres");
+  CHECK(child_sd.service_type == "sql");
 }
 
 TEST_CASE("tracer new with invalid config and null error", "[c_binding]") {
-  // Invalid config + NULL error pointer should not crash.
   auto *conf = dd_tracer_conf_new();
-  dd_tracer_conf_set(conf, DD_OPT_AGENT_URL, (void *)"not://valid");
+  dd_tracer_conf_set(conf, DD_OPT_AGENT_URL, "not://valid");
 
   auto *tracer = dd_tracer_new(conf, nullptr);
   CHECK(tracer == nullptr);
@@ -243,18 +236,16 @@ TEST_CASE("tracer new with invalid config and null error", "[c_binding]") {
 }
 
 TEST_CASE("null arguments do not crash", "[c_binding]") {
-  // Functions that return handles should return nullptr.
   CHECK(dd_tracer_new(nullptr, nullptr) == nullptr);
-  CHECK(dd_tracer_create_span(nullptr, nullptr) == nullptr);
-  CHECK(dd_span_create_child(nullptr, nullptr) == nullptr);
+  CHECK(dd_tracer_create_span(nullptr, {.name = "x"}) == nullptr);
+  CHECK(dd_span_create_child(nullptr, {.name = "x"}) == nullptr);
 
   char buf[trace_id_buf_size] = {};
   CHECK(dd_span_get_trace_id(nullptr, buf, sizeof(buf)) == -1);
   CHECK(dd_span_get_span_id(nullptr, buf, sizeof(buf)) == -1);
 
-  // Void functions with null handles should simply not crash.
   dd_tracer_conf_free(nullptr);
-  dd_tracer_conf_set(nullptr, DD_OPT_SERVICE_NAME, (void *)"x");
+  dd_tracer_conf_set(nullptr, DD_OPT_SERVICE_NAME, "x");
   dd_tracer_free(nullptr);
   dd_span_free(nullptr);
   dd_span_set_tag(nullptr, "k", "v");
