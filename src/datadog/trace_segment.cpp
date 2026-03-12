@@ -332,7 +332,7 @@ void TraceSegment::make_sampling_decision_if_null() {
                                          *sampling_decision_->configured_rate,
                                          std::chars_format::general, 6);
     if (ec == std::errc()) {
-        std::string error{"stirng conversion failed: "};
+        std::string error{"string conversion failed: "};
         error += std::make_error_code(ec).message();
         logger_->log_error(error);
         return;
