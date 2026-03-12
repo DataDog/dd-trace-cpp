@@ -155,7 +155,7 @@ jobs:
           Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
           Join-Path (Resolve-Path ~).Path "scoop\shims" >> $Env:GITHUB_PATH
       - name: Install Dependencies
-        run: scoop install main/cmake@4.0.1 main/ninja main/libxslt
+        run: scoop install main/cmake@4.0.1 main/ninja main/saxon-he
       - name: Build
         run: |
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }} 
@@ -170,7 +170,12 @@ jobs:
         run: |
           $xml_file = "report.xml"
           $tmp_file = [System.IO.Path]::GetTempFileName()
-          xsltproc --output $tmp_file ".github/workflows/add_final_status.xsl" $xml_file
+          saxon -s:$xml_file -xsl:".github/workflows/add_final_status.xsl" -o:$tmp_file
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "XSLT transformation failed"
+          }
+
           Move-Item -Force $tmp_file $xml_file
       - name: Upload test report to Datadog
         if: success() || failure()
