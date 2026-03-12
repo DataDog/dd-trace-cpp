@@ -331,7 +331,12 @@ void TraceSegment::make_sampling_decision_if_null() {
     const auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(),
                                          *sampling_decision_->configured_rate,
                                          std::chars_format::general, 6);
-    assert(ec == std::errc());
+    if (ec == std::errc()) {
+        std::string error{"stirng conversion failed: "};
+        error += std::make_error_code(ec).message();
+        logger_->log_error(error);
+        return;
+    }
     trace_tags_.emplace_back(tags::internal::ksr, std::string(buf.data(), ptr));
   }
 }
