@@ -3,6 +3,8 @@ Example Usage
 This directory contains two example projects that illustrate how dd-trace-cpp
 can be used to add Datadog tracing to a C++ application.
 
+- [baggage](baggage) demonstrates how to parse and validate baggage header
+  strings.
 - [hasher](hasher) is a command-line tool that creates a complete trace
   involving only one service.
 - [http-server](http-server) is an ensemble of services, including two C++
