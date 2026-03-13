@@ -76,7 +76,7 @@ cmake -B build -DBUILD_SHARED_LIBS=1 .
 
 ### Installation
 Installation places a shared library and public headers into the appropriate system directories
-(`/usr/local/[...]`), or to a specified installation prefix. Example:
+(`/usr/local/[…]`), or to a specified installation prefix. Example:
 
 ```shell
 # Install dd-trace-cpp into `.install/` within the source repository.
@@ -108,15 +108,17 @@ Pass `-DDD_TRACE_BUILD_TESTING=1` to `cmake` to include the unit tests in the bu
 
 The resulting unit test executable is `test/tests` within the build directory.
 ```shell
-cmake -Bbuild -DDD_TRACE_BUILD_TESTING=1 .
+cmake -B build -DDD_TRACE_BUILD_TESTING=1 .
 cmake --build build -j
 ./build/test/tests
 ```
 
 Alternatively, [bin/test](bin/test) is provided for convenience.
 
-Code coverage reports are available on [CodeCov](https://app.codecov.io/gh/DataDog/dd-trace-cpp).
+Code coverage reports, run on pull requests, are available
+[in Datadog](https://app.datadoghq.com/ci/code-coverage/github.com%2Fdatadog%2Fdd-trace-cpp/pull-requests).
 
 Contributing
 ------------
-See the [contributing guidelines](CONTRIBUTING.md) and the [maintainer docs](doc/maintainers.md) for information on the overall structure of the repository.
+See the [contributing guidelines](CONTRIBUTING.md) and the [maintainer docs](doc/maintainers.md)
+for information on the overall structure of the repository.
