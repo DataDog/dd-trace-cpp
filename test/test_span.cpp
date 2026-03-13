@@ -784,8 +784,8 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-parent-id", "1"},
            {"x-datadog-origin", "France"},
        },
-       // The "s:-1" and "t.ksr:0.000000" comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;o:France;t.ksr:0.000000"},
+       // The "s:-1" and "t.ksr:0" comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;o:France;t.ksr:0"},
 
       {__LINE__,
        "trace tags",
@@ -794,8 +794,8 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-parent-id", "1"},
            {"x-datadog-tags", "_dd.p.foo=x,_dd.p.bar=y,ignored=wrong_prefix"},
        },
-       // The "s:-1" and "t.ksr:0.000000"  comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;t.foo:x;t.bar:y;t.ksr:0.000000"},
+       // The "s:-1" and "t.ksr:0"  comes from the 0% sample rate.
+       "dd=s:-1;p:$parent_id;t.foo:x;t.bar:y;t.ksr:0"},
 
       {__LINE__,
        "extra fields",
@@ -825,7 +825,7 @@ TEST_SPAN("injecting W3C tracestate header") {
           },
           // The "s:-1" comes from the 0% sample rate.
           "dd=s:-1;p:$parent_id;o:France_ is a country~nation_ so is "
-          "______.;t.ksr:0.000000",
+          "______.;t.ksr:0",
       },
 
       {__LINE__,
@@ -836,7 +836,7 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-tags", "_dd.p.a;d台北x =foo,_dd.p.ok=bar"},
        },
        // The "s:-1" comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;t.a_d______x_:foo;t.ok:bar;t.ksr:0.000000"},
+       "dd=s:-1;p:$parent_id;t.a_d______x_:foo;t.ok:bar;t.ksr:0"},
 
       {__LINE__,
        "replace invalid characters in trace tag value",
@@ -847,7 +847,7 @@ TEST_SPAN("injecting W3C tracestate header") {
        },
        // The "s:-1" comes from the 0% sample rate.
        "dd=s:-1;p:$parent_id;t.wacky:hello fr_d_ how are "
-       "_________?;t.ksr:0.000000"},
+       "_________?;t.ksr:0"},
 
       {__LINE__,
        "replace equal signs with tildes in trace tag value",
@@ -857,7 +857,7 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-tags", "_dd.p.base64_thingy=d2Fra2EhIHdhaw=="},
        },
        // The "s:-1" comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;t.base64_thingy:d2Fra2EhIHdhaw~~;t.ksr:0.000000"},
+       "dd=s:-1;p:$parent_id;t.base64_thingy:d2Fra2EhIHdhaw~~;t.ksr:0"},
 
       {__LINE__,
        "oversized origin truncates it and subsequent fields",

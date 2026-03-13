@@ -11,6 +11,7 @@
 #include <datadog/telemetry/telemetry.h>
 #include <datadog/trace_segment.h>
 
+#include <array>
 #include <cassert>
 #include <charconv>
 #include <string>
@@ -321,9 +322,23 @@ void TraceSegment::make_sampling_decision_if_null() {
 
   update_decision_maker_trace_tag();
 
-  trace_tags_.emplace_back(
-      tags::internal::ksr,
-      std::to_string(*sampling_decision_->configured_rate));
+  // Only set ksr when the sampling mechanism is explicit (agent rate, rule, or
+  // remote rule).  The DEFAULT mechanism means we haven't received any
+  // configuration from the agent yet, so ksr would be meaningless.
+  if (sampling_decision_->mechanism &&
+      *sampling_decision_->mechanism != int(SamplingMechanism::DEFAULT)) {
+    std::array<char, 8> buf;
+    const auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(),
+                                         *sampling_decision_->configured_rate,
+                                         std::chars_format::general, 6);
+    if (ec != std::errc()) {
+      std::string error{"string conversion failed: "};
+      error += std::make_error_code(ec).message();
+      logger_->log_error(error);
+      return;
+    }
+    trace_tags_.emplace_back(tags::internal::ksr, std::string(buf.data(), ptr));
+  }
 }
 
 void TraceSegment::update_decision_maker_trace_tag() {

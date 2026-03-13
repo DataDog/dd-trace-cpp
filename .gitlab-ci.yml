@@ -1,5 +1,35 @@
 stages:
+  - config-validation
   - benchmarks
   - benchmarks-report
 
-include: ".gitlab/benchmarks.yml"
+variables:
+  SKIP_SHARED_PIPELINE: "true"
+
+include:
+  - local: ".gitlab/config-registry.yml"
+  - local: ".gitlab/benchmarks.yml"
+
+
+# Config Registry CI Jobs
+validate_supported_configurations_v2_local_file:
+  stage: config-validation
+  image: registry.ddbuild.io/ci/libdatadog-build/packaging:82290795
+  tags: ["runner:apm-k8s-tweaked-metal"]
+  rules:
+    - when: on_success
+  extends: .validate_supported_configurations_v2_local_file
+  variables:
+    LOCAL_JSON_PATH: "supported-configurations.json"
+    BACKFILLED: false
+
+update_central_configurations_version_range_v2:
+  stage: config-validation
+  image: registry.ddbuild.io/ci/libdatadog-build/packaging:82290795
+  tags: ["runner:apm-k8s-tweaked-metal"]
+  extends: .update_central_configurations_version_range_v2
+  variables:
+    LOCAL_REPO_NAME: "dd-trace-cpp"
+    LOCAL_JSON_PATH: "supported-configurations.json"
+    LANGUAGE_NAME: "cpp"
+    MULTIPLE_RELEASE_LINES: "false"

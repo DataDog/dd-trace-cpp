@@ -2,16 +2,34 @@ name: "Development"
 on: [pull_request, workflow_dispatch, workflow_call]
 
 jobs:
-  format:
+  verify:
     runs-on: ubuntu-22.04-arm
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-arm64
+    env:
+      BUILD_DIR: .build
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - name: Check format
         run: bin/check-format
       - name: Shellcheck
         run: find bin/ -executable -type f -print0 | xargs -0 shellcheck
+      - name: Verify getenv usage
+        run: bin/check-environment-variables
+      - name: Configure
+        run: bin/with-toolchain llvm cmake . -B ${BUILD_DIR} --preset ci-clang
+      - name: Build
+        run: cmake --build ${BUILD_DIR} -j --target config-inversion -v
+      - name: Verify supported configurations metadata
+        run: |
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+          ./${BUILD_DIR}/tools/config-inversion/config-inversion --output-file "${tmp_dir}/ci-supported-configurations.json"
+          if ! diff -q "$tmp_dir/ci-supported-configurations.json" "supported-configurations.json" >/dev/null 2>&1; then
+            echo "ERROR: supported-configurations.json got out of sync with implemented configurations. Please run `./config-inversion --output-file supported-configurations.json` locally."
+            diff -u "$tmp_dir/supported-configurations.json" supported-configurations.json || true
+            exit 1
+          fi
 
   build-linux-cmake:
     strategy:
@@ -26,7 +44,7 @@ jobs:
           - runner: ubuntu-22.04
             arch: x64
             docker-arch: amd64
-    needs: format
+    needs: verify
     runs-on: ${{ matrix.runner }}
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-${{matrix.docker-arch}}
@@ -48,13 +66,23 @@ jobs:
         run: cd ${BUILD_DIR} && test/tests -r junit -o report.xml
         env:
           ASAN_OPTIONS: alloc_dealloc_mismatch=0
+      - name: Add final_status property
+        if: success() || failure()
+        run: |
+          which xsltproc || (apt-get update && apt-get install -y xsltproc)
+          xml_file=".build/report.xml"
+          echo "Fixing $xml_file"
+          tmp_file="$(mktemp)"
+          xsltproc --output "$tmp_file" ".github/workflows/add_final_status.xsl" "$xml_file"
+          mv "$tmp_file" "$xml_file"
       - name: Upload test report to Datadog
+        if: success() || failure()
         run: |
           curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-${{ matrix.arch }}" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
           datadog-ci junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp .build/report.xml
 
   build-linux-bazel:
-    needs: format
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -77,7 +105,7 @@ jobs:
         run: bin/with-toolchain ${{ matrix.toolchain }} bazelisk --bazelrc=${{ matrix.bazelrc }} build dd_trace_cpp
 
   build-windows-bazel:
-    needs: format
+    needs: verify
     runs-on: windows-2022
     defaults:
       run:
@@ -98,7 +126,7 @@ jobs:
         run: bazelisk.exe --bazelrc=${{ matrix.bazelrc }} build dd_trace_cpp
 
   build-windows-cmake:
-    needs: format
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -137,10 +165,25 @@ jobs:
         run: |
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }}
           .\build\test\tests.exe -r junit -o report.xml
+      - name: Add final_status property
+        if: success() || failure()
+        run: |
+          $xmlFile = "report.xml"
+          $xslFile = ".github/workflows/add_final_status.xsl"
+          $tmpFile = [System.IO.Path]::GetTempFileName()
+          
+          echo "Fixing $xmlFile"
+
+          $transform = New-Object System.Xml.Xsl.XslCompiledTransform
+          $transform.Load($xslFile)
+          $transform.Transform($xmlFile, $tmpFile)
+
+          Move-Item -Force $tmpFile $xmlFile
       - name: Upload test report to Datadog
+        if: success() || failure()
         run: |
           Invoke-WebRequest -Uri "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_win-x64" -OutFile "datadog-ci.exe"
-          ./datadog-ci.exe junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp  report.xml
+          ./datadog-ci.exe junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp report.xml
 
   coverage:
     needs: build-linux-cmake 
