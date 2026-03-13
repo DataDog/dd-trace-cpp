@@ -172,6 +172,8 @@ jobs:
           $xslFile = ".github/workflows/add_final_status.xsl"
           $tmpFile = [System.IO.Path]::GetTempFileName()
           
+          echo "Fixing $xmlFile"
+
           $transform = New-Object System.Xml.Xsl.XslCompiledTransform
           $transform.Load($xslFile)
           $transform.Transform($xmlFile, $tmpFile)
