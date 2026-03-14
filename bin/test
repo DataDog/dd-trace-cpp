@@ -60,7 +60,7 @@ if [ "$coverage_flags" != '' ]; then
     # Use the faster JSON Perl module, JSON:XS, to speed things up.
     lcov --quiet --capture --directory .build --output-file .coverage/raw.info --rc geninfo_json_module=JSON::XS
     # Filter out system headers and test drivers.
-    lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp'
+    lcov --quiet --remove .coverage/raw.info -o .coverage/filtered.info '/usr/*' "$(pwd)/test/*" '*json.hpp' '*/common/hash.*'
 
     echo 'Done.'
 fi
