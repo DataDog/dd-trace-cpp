@@ -2,20 +2,21 @@ Scripts
 =======
 This directory contains scripts that are useful during development.
 
-- [bazel-build](bazel-build) builds the library using [Bazel][1] via [bazelisk][2].
+- [bazel-build](bazel-build) builds the library using
+  [Bazel](https://bazel.build) via [bazelisk](https://github.com/bazelbuild/bazelisk).
 - [benchmark](benchmark) builds the library and its [benchmark](../benchmark),
   and runs the benchmark.
 - [check](check) performs some of the checks that [continuous
-  integration](../.circleci) performs. It's convenient to run this script before
-  pushing changes.
+  integration](../github/workflows) performs. It's convenient to run this script
+  before pushing changes.
 - [check-format](check-format) verifies that the source code is formatted as
   [format](format) prefers.
 - [check-version](check-version) accepts a version string as a command line
   argument (e.g. "v1.2.3") and checks whether the version within the source code
   matches. This is a good check to perform before publishing a source release.
-- [cmake-build](cmake-build) builds the library using [CMake][3].
+- [cmake-build](cmake-build) builds the library using [CMake](https://cmake.org).
 - [format](format) formats all of the C++ source code using
-  [clang-format-14][4].
+  [clang-format-14]( https://releases.llvm.org/14.0.0/tools/clang/docs/ClangFormat.html).
 - [hasher-example](hasher-example) builds the library, including the [command
   line example](../examples/hasher) program, and then runs the example.
 - [http-server-example](http-server-example) runs the docker compose based [HTTP
@@ -33,8 +34,3 @@ This directory contains scripts that are useful during development.
   `CXX` environment variables based on its first argument, which is either "gnu"
   (to use the gcc/g++ toolchain) or "llvm" (to use the clang/clang++ toolchain).
   For example: `with-toolchain llvm cmake -DDD_TRACE_BUILD_TESTING=1 ..`.
-
-[1]: https://bazel.build/
-[2]: https://github.com/bazelbuild/bazelisk
-[3]: https://cmake.org/
-[4]: https://releases.llvm.org/14.0.0/tools/clang/docs/ClangFormat.html

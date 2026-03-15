@@ -1,5 +1,4 @@
-# This is the image used to build and test the library in CircleCI.
-# See .circleci/ for more information.
+# This is the image used to build and test the library in CI.
 
 from ubuntu:22.04
 
@@ -37,4 +36,3 @@ copy bin/install-lcov /tmp/install-lcov
 run chmod +x /tmp/install-lcov && /tmp/install-lcov && rm /tmp/install-lcov
 
 run curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/main/install.sh | bash
-
