@@ -57,7 +57,13 @@ class Telemetry final {
       distributions_;
 
   /// Configuration
+  // Pending configuration changes to be sent in the next
+  // `app-client-configuration-change` event.
   std::vector<tracing::ConfigMetadata> configuration_snapshot_;
+  // Full current configuration state (initialized from app-started, updated on
+  // every configuration change). Used for `app-extended-heartbeat`.
+  std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>
+      current_configuration_;
 
   std::mutex log_mutex_;
   std::vector<telemetry::LogMessage> logs_;
@@ -143,7 +149,7 @@ class Telemetry final {
            tracing::Optional<std::string> stacktrace = tracing::nullopt);
 
   nlohmann::json generate_telemetry_body(std::string request_type);
-  nlohmann::json generate_configuration_field(
+  nlohmann::json report_new_config_field(
       const tracing::ConfigMetadata& config_metadata);
 
   // Constructs an `app-started` message using information provided when
@@ -155,6 +161,9 @@ class Telemetry final {
   // Constructs a message-batch containing `app-closing`, and if metrics have
   // been modified, a `generate-metrics` message.
   std::string app_closing_payload();
+  // Constructs a message-batch containing `app-extended-heartbeat` with the
+  // full current configuration state.
+  std::string extended_heartbeat_payload();
 };
 
 }  // namespace datadog::telemetry
