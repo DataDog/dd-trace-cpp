@@ -115,9 +115,6 @@ cmake --build build -j
 
 Alternatively, [bin/test](bin/test) is provided for convenience.
 
-Code coverage reports, run on pull requests, are available
-[in Datadog](https://app.datadoghq.com/ci/code-coverage/github.com%2Fdatadog%2Fdd-trace-cpp/pull-requests).
-
 Contributing
 ------------
 See the [contributing guidelines](CONTRIBUTING.md) and the [maintainer docs](doc/maintainers.md)

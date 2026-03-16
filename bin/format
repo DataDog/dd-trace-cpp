@@ -67,6 +67,7 @@ docker_clang_format() {
     # shellcheck disable=SC2086
     find_sources | while IFS= read -r arg; do
         process_arg "$arg"
+    # The --platform option forces linux/amd64 because silkeh/clang:14 is only available on this platform.
     done | xargs -0 \
       docker run \
       --platform linux/amd64 \
