@@ -61,9 +61,7 @@ typedef enum {
   DD_ERROR_ALLOCATION_FAILURE = 3
 } dd_error_code;
 
-// Error details populated on failure. The caller must allocate this struct
-// and pass a pointer to it. The callee fills in the code and message fields.
-// Pass NULL to ignore errors.
+// Error details populated on failure.
 typedef struct {
   dd_error_code code;
   char message[256];
