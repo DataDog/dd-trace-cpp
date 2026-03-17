@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Run some of the checks that are performed by CircleCI.
+# Run some of the checks that are performed by the CI.
 # This is convenient to run before committing.
 
 set -e

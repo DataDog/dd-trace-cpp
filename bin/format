@@ -33,6 +33,11 @@ if ! >/dev/null command -v docker; then
     exit 1
 fi
 
+if ! docker info >/dev/null 2>&1; then
+    >&2 echo "Docker is not running. Please start Docker."
+    exit 1
+fi
+
 # If they haven't downloaded the clang docker image before, then prompt the
 # user before telling docker to download it (it's large).
 image=silkeh/clang:$version
@@ -62,8 +67,10 @@ docker_clang_format() {
     # shellcheck disable=SC2086
     find_sources | while IFS= read -r arg; do
         process_arg "$arg"
+    # The --platform option forces linux/amd64 because silkeh/clang:14 is only available on this platform.
     done | xargs -0 \
       docker run \
+      --platform linux/amd64 \
       --interactive \
       --rm \
       --volume /etc/passwd:/etc/passwd:ro \

@@ -630,28 +630,6 @@ approaches:
 - Add a `Logger::log_debug` function that optionally prints fine-grained tracing
   information to the log, in violation of constraint (1).
 
-Operations
-----------
-TODO
-
-### Testing
-TODO
-
-### Code Coverage
-TODO
-
-### Benchmarks
-TODO
-
-### Continuous Integration
-TODO
-
-### Releases
-TODO
-
-### Support
-TODO
-
 [1]: https://github.com/DataDog/dd-opentracing-cpp
 [2]: https://github.com/open-telemetry/opentelemetry-cpp
 [3]: ../include/datadog/span.h
