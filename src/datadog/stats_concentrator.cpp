@@ -208,7 +208,8 @@ StatsConcentrator::StatsConcentrator(
     const std::shared_ptr<HTTPClient>& http_client,
     const HTTPClient::URL& agent_url, const std::shared_ptr<Logger>& logger,
     std::string hostname, std::string env, std::string version,
-    std::string service, std::string lang)
+    std::string service, std::string lang, std::string tracer_version,
+    std::string runtime_id)
     : http_client_(http_client),
       stats_endpoint_(stats_endpoint(agent_url)),
       logger_(logger),
@@ -216,7 +217,9 @@ StatsConcentrator::StatsConcentrator(
       env_(std::move(env)),
       version_(std::move(version)),
       service_(std::move(service)),
-      lang_(std::move(lang)) {}
+      lang_(std::move(lang)),
+      tracer_version_(std::move(tracer_version)),
+      runtime_id_(std::move(runtime_id)) {}
 
 void StatsConcentrator::add(const SpanData& span) {
   if (!is_stats_eligible(span)) {
@@ -485,7 +488,7 @@ std::vector<std::string> StatsConcentrator::extract_peer_tags(
 }
 
 std::string StatsConcentrator::encode_payload(
-    const std::vector<StatsBucket>& buckets) const {
+    const std::vector<StatsBucket>& buckets) {
   std::string payload;
 
   // The /v0.6/stats payload is a msgpack map:
@@ -494,6 +497,10 @@ std::string StatsConcentrator::encode_payload(
   //   "Env": string,
   //   "Version": string,
   //   "Lang": string,
+  //   "TracerVersion": string,
+  //   "RuntimeID": string,
+  //   "Sequence": uint64,
+  //   "Service": string,
   //   "Stats": [
   //     {
   //       "Start": uint64 (bucket start in ns),
@@ -524,8 +531,8 @@ std::string StatsConcentrator::encode_payload(
   // }
 
   // clang-format off
-  // Top-level map with 5 keys.
-  msgpack::pack_map(payload, 5);
+  // Top-level map with 9 keys.
+  msgpack::pack_map(payload, 9);
 
   msgpack::pack_string(payload, "Hostname");
   msgpack::pack_string(payload, hostname_);
@@ -538,6 +545,18 @@ std::string StatsConcentrator::encode_payload(
 
   msgpack::pack_string(payload, "Lang");
   msgpack::pack_string(payload, lang_);
+
+  msgpack::pack_string(payload, "TracerVersion");
+  msgpack::pack_string(payload, tracer_version_);
+
+  msgpack::pack_string(payload, "RuntimeID");
+  msgpack::pack_string(payload, runtime_id_);
+
+  msgpack::pack_string(payload, "Sequence");
+  msgpack::pack_integer(payload, sequence_++);
+
+  msgpack::pack_string(payload, "Service");
+  msgpack::pack_string(payload, service_);
 
   msgpack::pack_string(payload, "Stats");
   msgpack::pack_array(payload, buckets.size());

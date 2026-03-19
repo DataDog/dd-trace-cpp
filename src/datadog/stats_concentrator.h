@@ -123,7 +123,9 @@ class StatsConcentrator {
                     const HTTPClient::URL& agent_url,
                     const std::shared_ptr<Logger>& logger, std::string hostname,
                     std::string env, std::string version, std::string service,
-                    std::string lang = "cpp");
+                    std::string lang = "cpp",
+                    std::string tracer_version = "",
+                    std::string runtime_id = "");
 
   // Add the specified `span` to the concentrator.  The span must be eligible
   // (the caller should check `is_stats_eligible` first, though this method
@@ -142,7 +144,8 @@ class StatsConcentrator {
   std::size_t bucket_count() const;
 
   // Encode the specified `buckets` into msgpack for POST /v0.6/stats.
-  std::string encode_payload(const std::vector<StatsBucket>& buckets) const;
+  // NOTE: not const because it increments the sequence counter.
+  std::string encode_payload(const std::vector<StatsBucket>& buckets);
 
  private:
   // Return the bucket start time (aligned to 10-second boundary) for the
@@ -169,6 +172,9 @@ class StatsConcentrator {
   std::string version_;
   std::string service_;
   std::string lang_;
+  std::string tracer_version_;
+  std::string runtime_id_;
+  std::uint64_t sequence_ = 0;
 
   // Buckets keyed by their aligned start timestamp (nanoseconds).
   std::unordered_map<std::uint64_t, StatsBucket> buckets_;

@@ -176,7 +176,10 @@ DatadogAgent::DatadogAgent(
     stats_concentrator_ = std::make_unique<StatsConcentrator>(
         config.http_client, config.url, logger,
         /*hostname=*/"", /*env=*/"", /*version=*/"",
-        /*service=*/"", /*lang=*/"cpp");
+        /*service=*/std::string(tracer_signature.default_service),
+        /*lang=*/"cpp",
+        /*tracer_version=*/tracer_signature.library_version,
+        /*runtime_id=*/tracer_signature.runtime_id.string());
   }
 
   // Origin Detection headers are not necessary when Unix Domain Socket (UDS)

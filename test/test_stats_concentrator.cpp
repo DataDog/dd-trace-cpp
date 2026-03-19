@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include <datadog/json.hpp>
+
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "span_data.h"
@@ -342,4 +344,97 @@ STATS_TEST("StatsAggregationKey hash: different keys different hash") {
   StatsAggregationKeyHash hasher;
   // This could theoretically collide, but with these inputs it should not.
   CHECK(hasher(a) != hasher(b));
+}
+
+STATS_TEST("encode_payload includes TracerVersion, RuntimeID, Sequence, Service") {
+  auto http_client = std::make_shared<MockHTTPClient>();
+  auto logger = std::make_shared<MockLogger>();
+  HTTPClient::URL agent_url;
+  agent_url.scheme = "http";
+  agent_url.authority = "localhost:8126";
+  agent_url.path = "";
+
+  StatsConcentrator concentrator(http_client, agent_url, logger, "host1",
+                                 "prod", "1.0", "my-service", "cpp",
+                                 "v2.0.1", "abc-123-runtime-id");
+
+  StatsBucket bucket;
+  bucket.start_ns = 1704067200000000000ULL;
+  bucket.duration_ns = 10000000000ULL;
+
+  StatsAggregationKey key;
+  key.service = "svc";
+  key.name = "web.request";
+  key.resource = "/api/test";
+  key.type = "web";
+  key.is_trace_root = Trilean::TRUE;
+
+  StatsGroupData group;
+  group.hits = 1;
+  group.duration = 1000000;
+
+  bucket.groups[key] = std::move(group);
+
+  std::vector<StatsBucket> buckets = {std::move(bucket)};
+  std::string payload = concentrator.encode_payload(buckets);
+
+  auto j = nlohmann::json::from_msgpack(payload);
+
+  CHECK(j["Hostname"] == "host1");
+  CHECK(j["Env"] == "prod");
+  CHECK(j["Version"] == "1.0");
+  CHECK(j["Lang"] == "cpp");
+  CHECK(j["TracerVersion"] == "v2.0.1");
+  CHECK(j["RuntimeID"] == "abc-123-runtime-id");
+  CHECK(j["Sequence"] == 0);
+  CHECK(j["Service"] == "my-service");
+  CHECK(j["Stats"].is_array());
+  CHECK(j["Stats"].size() == 1);
+}
+
+STATS_TEST("encode_payload Sequence increments on each call") {
+  auto http_client = std::make_shared<MockHTTPClient>();
+  auto logger = std::make_shared<MockLogger>();
+  HTTPClient::URL agent_url;
+  agent_url.scheme = "http";
+  agent_url.authority = "localhost:8126";
+  agent_url.path = "";
+
+  StatsConcentrator concentrator(http_client, agent_url, logger, "host1",
+                                 "prod", "1.0", "my-service", "cpp",
+                                 "v2.0.1", "abc-123-runtime-id");
+
+  StatsBucket bucket;
+  bucket.start_ns = 1704067200000000000ULL;
+  bucket.duration_ns = 10000000000ULL;
+
+  StatsAggregationKey key;
+  key.service = "svc";
+  key.name = "web.request";
+  key.resource = "/api/test";
+  key.type = "web";
+  key.is_trace_root = Trilean::TRUE;
+
+  StatsGroupData group;
+  group.hits = 1;
+  group.duration = 1000000;
+
+  bucket.groups[key] = std::move(group);
+
+  std::vector<StatsBucket> buckets = {bucket};
+
+  // First call: Sequence should be 0.
+  std::string payload1 = concentrator.encode_payload(buckets);
+  auto j1 = nlohmann::json::from_msgpack(payload1);
+  CHECK(j1["Sequence"] == 0);
+
+  // Second call: Sequence should be 1.
+  std::string payload2 = concentrator.encode_payload(buckets);
+  auto j2 = nlohmann::json::from_msgpack(payload2);
+  CHECK(j2["Sequence"] == 1);
+
+  // Third call: Sequence should be 2.
+  std::string payload3 = concentrator.encode_payload(buckets);
+  auto j3 = nlohmann::json::from_msgpack(payload3);
+  CHECK(j3["Sequence"] == 2);
 }
