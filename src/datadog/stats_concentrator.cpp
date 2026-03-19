@@ -47,14 +47,10 @@ constexpr StringView grpc_tag_candidates[] = {
 // Peer tag keys to extract for client/producer/consumer spans.
 // This list matches the Go agent standard.
 constexpr StringView peer_tag_keys[] = {
-    "_dd.base_service",
-    "peer.service",
-    "peer.hostname",
-    "out.host",
-    "db.instance",
-    "db.system",
-    "messaging.destination",
-    "network.destination.name",
+    "_dd.base_service",      "peer.service",
+    "peer.hostname",         "out.host",
+    "db.instance",           "db.system",
+    "messaging.destination", "network.destination.name",
 };
 
 // Span kinds that make a span eligible for stats.

@@ -1,9 +1,8 @@
 #include <chrono>
+#include <datadog/json.hpp>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <datadog/json.hpp>
 
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
@@ -346,7 +345,8 @@ STATS_TEST("StatsAggregationKey hash: different keys different hash") {
   CHECK(hasher(a) != hasher(b));
 }
 
-STATS_TEST("encode_payload includes TracerVersion, RuntimeID, Sequence, Service") {
+STATS_TEST(
+    "encode_payload includes TracerVersion, RuntimeID, Sequence, Service") {
   auto http_client = std::make_shared<MockHTTPClient>();
   auto logger = std::make_shared<MockLogger>();
   HTTPClient::URL agent_url;
@@ -355,8 +355,8 @@ STATS_TEST("encode_payload includes TracerVersion, RuntimeID, Sequence, Service"
   agent_url.path = "";
 
   StatsConcentrator concentrator(http_client, agent_url, logger, "host1",
-                                 "prod", "1.0", "my-service", "cpp",
-                                 "v2.0.1", "abc-123-runtime-id");
+                                 "prod", "1.0", "my-service", "cpp", "v2.0.1",
+                                 "abc-123-runtime-id");
 
   StatsBucket bucket;
   bucket.start_ns = 1704067200000000000ULL;
@@ -401,8 +401,8 @@ STATS_TEST("encode_payload Sequence increments on each call") {
   agent_url.path = "";
 
   StatsConcentrator concentrator(http_client, agent_url, logger, "host1",
-                                 "prod", "1.0", "my-service", "cpp",
-                                 "v2.0.1", "abc-123-runtime-id");
+                                 "prod", "1.0", "my-service", "cpp", "v2.0.1",
+                                 "abc-123-runtime-id");
 
   StatsBucket bucket;
   bucket.start_ns = 1704067200000000000ULL;

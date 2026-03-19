@@ -77,7 +77,8 @@ struct StatsGroupData {
   std::uint64_t duration = 0;  // total duration in nanoseconds
   DDSketch ok_sketch{0.01, 2048};
   DDSketch error_sketch{0.01, 2048};
-  std::vector<std::string> peer_tags_serialized;  // array of "key:value" strings for payload
+  std::vector<std::string>
+      peer_tags_serialized;  // array of "key:value" strings for payload
 };
 
 // A single 10-second time bucket.
@@ -123,8 +124,7 @@ class StatsConcentrator {
                     const HTTPClient::URL& agent_url,
                     const std::shared_ptr<Logger>& logger, std::string hostname,
                     std::string env, std::string version, std::string service,
-                    std::string lang = "cpp",
-                    std::string tracer_version = "",
+                    std::string lang = "cpp", std::string tracer_version = "",
                     std::string runtime_id = "");
 
   // Add the specified `span` to the concentrator.  The span must be eligible
