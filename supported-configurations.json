@@ -266,6 +266,13 @@
         "type": "BOOLEAN"
       }
     ],
+    "DD_TRACE_STATS_COMPUTATION_ENABLED": [
+      {
+        "default": "0",
+        "implementation": "A",
+        "type": "BOOLEAN"
+      }
+    ],
     "DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH": [
       {
         "default": "512",
