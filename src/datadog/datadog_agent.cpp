@@ -19,6 +19,7 @@
 #include "msgpack.h"
 #include "platform_util.h"
 #include "span_data.h"
+#include "stats_concentrator.h"
 #include "telemetry_metrics.h"
 #include "trace_sampler.h"
 
@@ -169,6 +170,13 @@ DatadogAgent::DatadogAgent(
                    tracer_signature.library_version);
   if (config.stats_computation_enabled) {
     headers_.emplace("Datadog-Client-Computed-Stats", "yes");
+    headers_.emplace("Datadog-Client-Computed-Top-Level", "yes");
+
+    // Create the stats concentrator for Client-Side Stats Computation.
+    stats_concentrator_ = std::make_unique<StatsConcentrator>(
+        config.http_client, config.url, logger,
+        /*hostname=*/"", /*env=*/"", /*version=*/"",
+        /*service=*/"", /*lang=*/"cpp");
   }
 
   // Origin Detection headers are not necessary when Unix Domain Socket (UDS)
@@ -209,12 +217,26 @@ DatadogAgent::~DatadogAgent() {
 
   flush();
 
+  // Flush any remaining stats at shutdown.
+  if (stats_concentrator_) {
+    stats_concentrator_->flush_all();
+  }
+
   http_client_->drain(deadline);
 }
 
 Expected<void> DatadogAgent::send(
     std::vector<std::unique_ptr<SpanData>>&& spans,
     const std::shared_ptr<TraceSampler>& response_handler) {
+  // Feed eligible spans to the stats concentrator (if enabled).
+  if (stats_concentrator_) {
+    for (const auto& span_ptr : spans) {
+      if (span_ptr) {
+        stats_concentrator_->add(*span_ptr);
+      }
+    }
+  }
+
   std::lock_guard<std::mutex> lock(mutex_);
   trace_chunks_.push_back(TraceChunk{std::move(spans), response_handler});
   return nullopt;
@@ -367,6 +389,11 @@ void DatadogAgent::flush() {
                                   {"type:network"});
     logger_->log_error(
         error->with_prefix("Unexpected error submitting traces: "));
+  }
+
+  // Also flush stats if Client-Side Stats is enabled.
+  if (stats_concentrator_) {
+    stats_concentrator_->flush(clock_());
   }
 }
 

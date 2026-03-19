@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "remote_config/remote_config.h"
+#include "stats_concentrator.h"
 
 namespace datadog {
 namespace tracing {
@@ -51,6 +52,10 @@ class DatadogAgent : public Collector {
   remote_config::Manager remote_config_;
 
   std::unordered_map<std::string, std::string> headers_;
+
+  // Client-Side Stats Computation: when enabled, this concentrator aggregates
+  // span metrics and flushes them to the Agent via POST /v0.6/stats.
+  std::unique_ptr<StatsConcentrator> stats_concentrator_;
 
   void flush();
 

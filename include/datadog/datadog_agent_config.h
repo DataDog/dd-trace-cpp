@@ -65,6 +65,16 @@ struct DatadogAgentConfig {
   // How often, in seconds, to query the Datadog Agent for remote configuration
   // updates.
   Optional<double> remote_configuration_poll_interval_seconds;
+
+  // Whether the tracer should compute trace stats locally instead of relying
+  // on the Datadog Agent.  When enabled, the tracer aggregates span metrics
+  // (hits, errors, duration distributions) and sends them to the Agent via
+  // POST /v0.6/stats.  The Agent can then drop priority-0 traces without
+  // losing service-level metrics.
+  //
+  // Overridden by the DD_TRACE_STATS_COMPUTATION_ENABLED environment variable.
+  // Default: false.
+  Optional<bool> stats_computation_enabled;
 };
 
 class FinalizedDatadogAgentConfig {

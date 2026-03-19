@@ -152,8 +152,15 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
     result.admission_controller_uid = std::string(*external_env);
   }
 
-  // Not supported yet but required for APM tracing disablement.
-  result.stats_computation_enabled = false;
+  // Client-Side Stats Computation.  Default: false.
+  // Overridden by DD_TRACE_STATS_COMPUTATION_ENABLED env var.
+  if (auto stats_env =
+          lookup(environment::DD_TRACE_STATS_COMPUTATION_ENABLED)) {
+    result.stats_computation_enabled = !falsy(*stats_env);
+  } else {
+    result.stats_computation_enabled =
+        user_config.stats_computation_enabled.value_or(false);
+  }
 
   return result;
 }
