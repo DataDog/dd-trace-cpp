@@ -45,25 +45,16 @@ constexpr StringView grpc_tag_candidates[] = {
 };
 
 // Peer tag keys to extract for client/producer/consumer spans.
+// This list matches the Go agent standard.
 constexpr StringView peer_tag_keys[] = {
+    "_dd.base_service",
     "peer.service",
+    "peer.hostname",
+    "out.host",
     "db.instance",
     "db.system",
-    "peer.hostname",
-    "net.peer.name",
-    "server.address",
-    "network.destination.name",
     "messaging.destination",
-    "messaging.destination.name",
-    "messaging.kafka.bootstrap.servers",
-    "rpc.service",
-    "aws.queue.name",
-    "aws.s3.bucket",
-    "aws.sqs.queue_name",
-    "aws.kinesis.stream",
-    "aws.dynamodb.table",
-    "topicname",
-    "out.host",
+    "network.destination.name",
 };
 
 // Span kinds that make a span eligible for stats.
@@ -144,7 +135,7 @@ std::size_t StatsAggregationKeyHash::operator()(
   hash_combine(seed, hasher(key.resource));
   hash_combine(seed, hasher(key.type));
   hash_combine(seed, uint_hasher(key.http_status_code));
-  hash_combine(seed, uint_hasher(key.grpc_status_code));
+  hash_combine(seed, hasher(key.grpc_status_code));
   hash_combine(seed, hasher(key.span_kind));
   hash_combine(seed, bool_hasher(key.synthetics));
   hash_combine(seed, uint_hasher(static_cast<uint32_t>(key.is_trace_root)));
@@ -181,21 +172,22 @@ bool is_stats_eligible(const SpanData& span) {
   return false;
 }
 
-std::uint32_t extract_grpc_status_code(const SpanData& span) {
+std::string extract_grpc_status_code(const SpanData& span) {
   for (const auto& tag_name : grpc_tag_candidates) {
     // Check string tags first.
     auto str_val = lookup_tag(span.tags, tag_name);
     if (str_val) {
+      // Validate it parses as a number, then return the string form.
       uint32_t code = parse_status_code(*str_val);
-      if (code > 0) return code;
+      if (code > 0) return std::to_string(code);
     }
     // Check numeric tags.
     auto num_val = lookup_numeric_tag(span.numeric_tags, tag_name);
     if (num_val) {
-      return static_cast<uint32_t>(*num_val);
+      return std::to_string(static_cast<uint32_t>(*num_val));
     }
   }
-  return 0;
+  return "";
 }
 
 std::uint32_t extract_http_status_code(const SpanData& span) {
@@ -244,7 +236,7 @@ void StatsConcentrator::add(const SpanData& span) {
   uint64_t bucket_start = align_timestamp(end_ns);
 
   auto key = make_key(span);
-  std::string peer_tags = extract_peer_tags(span);
+  std::vector<std::string> peer_tags = extract_peer_tags(span);
 
   std::lock_guard<std::mutex> lock(mutex_);
 
@@ -430,7 +422,16 @@ StatsAggregationKey StatsConcentrator::make_key(const SpanData& span) {
   // is_trace_root: TRUE if parent_id == 0, FALSE otherwise.
   key.is_trace_root = (span.parent_id == 0) ? Trilean::TRUE : Trilean::FALSE;
 
-  key.peer_tags_hash = extract_peer_tags(span);
+  // Build a hash string from peer tags for use as an aggregation key dimension.
+  {
+    auto ptags = extract_peer_tags(span);
+    std::string hash_str;
+    for (std::size_t i = 0; i < ptags.size(); ++i) {
+      if (i > 0) hash_str += ',';
+      hash_str += ptags[i];
+    }
+    key.peer_tags_hash = std::move(hash_str);
+  }
 
   auto http_method = lookup_tag(span.tags, tag_http_method);
   if (http_method) {
@@ -445,7 +446,8 @@ StatsAggregationKey StatsConcentrator::make_key(const SpanData& span) {
   return key;
 }
 
-std::string StatsConcentrator::extract_peer_tags(const SpanData& span) {
+std::vector<std::string> StatsConcentrator::extract_peer_tags(
+    const SpanData& span) {
   auto kind = lookup_tag(span.tags, tag_span_kind);
   bool should_extract = false;
 
@@ -462,32 +464,24 @@ std::string StatsConcentrator::extract_peer_tags(const SpanData& span) {
   }
 
   if (!should_extract) {
-    return "";
+    return {};
   }
 
-  // Build a sorted, comma-separated list of peer_tag=value pairs.
-  std::vector<std::pair<std::string, std::string>> pairs;
+  // Build a sorted array of "key:value" peer tag strings.
+  std::vector<std::string> tags;
   for (const auto& tag_key : peer_tag_keys) {
     auto val = lookup_tag(span.tags, tag_key);
     if (val) {
-      pairs.emplace_back(std::string(tag_key), std::string(*val));
+      std::string entry;
+      entry += std::string(tag_key);
+      entry += ':';
+      entry += std::string(*val);
+      tags.push_back(std::move(entry));
     }
   }
 
-  if (pairs.empty()) {
-    return "";
-  }
-
-  std::sort(pairs.begin(), pairs.end());
-
-  std::string result;
-  for (std::size_t i = 0; i < pairs.size(); ++i) {
-    if (i > 0) result += ',';
-    result += pairs[i].first;
-    result += '=';
-    result += pairs[i].second;
-  }
-  return result;
+  std::sort(tags.begin(), tags.end());
+  return tags;
 }
 
 std::string StatsConcentrator::encode_payload(
@@ -519,8 +513,8 @@ std::string StatsConcentrator::encode_payload(
   //           "SpanKind": string,
   //           "Synthetics": bool,
   //           "IsTraceRoot": Trilean,
-  //           "PeerTags": string (serialized),
-  //           "GRPCStatusCode": uint32,
+  //           "PeerTags": [string, ...] (array of "key:value"),
+  //           "GRPCStatusCode": string,
   //           "HTTPMethod": string,
   //           "HTTPEndpoint": string,
   //         }, ...
@@ -605,10 +599,13 @@ std::string StatsConcentrator::encode_payload(
       msgpack::pack_integer(payload, std::int64_t(static_cast<uint32_t>(agg_key.is_trace_root)));
 
       msgpack::pack_string(payload, "PeerTags");
-      msgpack::pack_string(payload, group.peer_tags_serialized);
+      msgpack::pack_array(payload, group.peer_tags_serialized.size());
+      for (const auto& ptag : group.peer_tags_serialized) {
+        msgpack::pack_string(payload, ptag);
+      }
 
       msgpack::pack_string(payload, "GRPCStatusCode");
-      msgpack::pack_integer(payload, static_cast<std::uint64_t>(agg_key.grpc_status_code));
+      msgpack::pack_string(payload, agg_key.grpc_status_code);
 
       msgpack::pack_string(payload, "HTTPMethod");
       msgpack::pack_string(payload, agg_key.http_method);

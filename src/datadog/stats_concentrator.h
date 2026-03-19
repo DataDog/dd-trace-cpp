@@ -54,7 +54,7 @@ struct StatsAggregationKey {
   std::string resource;
   std::string type;
   std::uint32_t http_status_code = 0;
-  std::uint32_t grpc_status_code = 0;
+  std::string grpc_status_code;
   std::string span_kind;
   bool synthetics = false;
   Trilean is_trace_root = Trilean::NOT_SET;
@@ -77,7 +77,7 @@ struct StatsGroupData {
   std::uint64_t duration = 0;  // total duration in nanoseconds
   DDSketch ok_sketch{0.01, 2048};
   DDSketch error_sketch{0.01, 2048};
-  std::string peer_tags_serialized;  // the actual peer tags string for payload
+  std::vector<std::string> peer_tags_serialized;  // array of "key:value" strings for payload
 };
 
 // A single 10-second time bucket.
@@ -106,7 +106,9 @@ bool is_top_level(const SpanData& span);
 bool is_measured(const SpanData& span);
 
 // Extract the gRPC status code from span tags, checking multiple tag names.
-std::uint32_t extract_grpc_status_code(const SpanData& span);
+// Returns a string representation (e.g., "0", "2", "14") to match the
+// protobuf definition (string GRPC_status_code = 18).
+std::string extract_grpc_status_code(const SpanData& span);
 
 // Extract the HTTP status code from span tags.
 std::uint32_t extract_http_status_code(const SpanData& span);
@@ -155,7 +157,7 @@ class StatsConcentrator {
 
   // Extract peer tags from a span (for client/producer/consumer kinds, or
   // internal with _dd.base_service override).
-  static std::string extract_peer_tags(const SpanData& span);
+  static std::vector<std::string> extract_peer_tags(const SpanData& span);
 
   mutable std::mutex mutex_;
   std::shared_ptr<HTTPClient> http_client_;

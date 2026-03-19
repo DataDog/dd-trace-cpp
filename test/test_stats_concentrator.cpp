@@ -165,20 +165,20 @@ STATS_TEST("extract_grpc_status_code: rpc.grpc.status_code tag") {
   auto span = make_span("svc", "op", "res");
   span->tags["rpc.grpc.status_code"] = "2";
 
-  CHECK(extract_grpc_status_code(*span) == 2);
+  CHECK(extract_grpc_status_code(*span) == "2");
 }
 
 STATS_TEST("extract_grpc_status_code: grpc.code numeric tag") {
   auto span = make_span("svc", "op", "res");
   span->numeric_tags["grpc.code"] = 14.0;
 
-  CHECK(extract_grpc_status_code(*span) == 14);
+  CHECK(extract_grpc_status_code(*span) == "14");
 }
 
 STATS_TEST("extract_grpc_status_code: no tag") {
   auto span = make_span("svc", "op", "res");
 
-  CHECK(extract_grpc_status_code(*span) == 0);
+  CHECK(extract_grpc_status_code(*span) == "");
 }
 
 STATS_TEST("concentrator: add eligible span creates bucket") {
