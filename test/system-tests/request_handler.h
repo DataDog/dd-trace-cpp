@@ -6,6 +6,8 @@
 #include <datadog/tracer_config.h>
 
 #include <datadog/json.hpp>
+#include <string>
+#include <unordered_map>
 
 #include "developer_noise.h"
 #include "httplib.h"
@@ -52,6 +54,10 @@ class RequestHandler final {
   // context and keep the span alive until the process terminate, thus
   // explaining the name :)
   std::vector<datadog::tracing::Span> blackhole_;
+
+  // Stable configuration values for the /config endpoint.
+  std::unordered_map<std::string, std::string> local_stable_config_values_;
+  std::unordered_map<std::string, std::string> fleet_stable_config_values_;
 
 #undef VALIDATION_ERROR
 };

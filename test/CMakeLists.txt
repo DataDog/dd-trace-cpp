@@ -40,6 +40,7 @@ add_executable(tests
     test_tracer.cpp
     test_trace_sampler.cpp
     test_endpoint_inferral.cpp
+    test_stable_config.cpp
 
     remote_config/test_remote_config.cpp
 )

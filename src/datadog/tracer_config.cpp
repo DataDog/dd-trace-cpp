@@ -14,6 +14,7 @@
 #include "null_logger.h"
 #include "parse_util.h"
 #include "platform_util.h"
+#include "stable_config.h"
 #include "string_util.h"
 #include "threaded_event_scheduler.h"
 
@@ -90,6 +91,20 @@ std::string json_quoted(StringView text) {
   std::string unquoted;
   assign(unquoted, text);
   return nlohmann::json(std::move(unquoted)).dump();
+}
+
+// Convert a stable config string value to Optional<bool>.
+Optional<bool> stable_config_bool(const StableConfig &cfg,
+                                  const std::string &key) {
+  auto val = cfg.lookup(key);
+  if (!val) return nullopt;
+  return !falsy(StringView(*val));
+}
+
+// Convert a stable config string value to Optional<std::string>.
+Optional<std::string> stable_config_string(const StableConfig &cfg,
+                                           const std::string &key) {
+  return cfg.lookup(key);
 }
 
 Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
@@ -275,6 +290,9 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   auto logger =
       user_config.logger ? user_config.logger : std::make_shared<NullLogger>();
 
+  // Load stable configs from YAML files.
+  auto stable_configs = load_stable_configs(*logger);
+
   Expected<TracerConfig> env_config = load_tracer_env_config(*logger);
   if (auto error = env_config.if_error()) {
     return *error;
@@ -284,10 +302,19 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.clock = clock;
   final_config.logger = logger;
 
+  // Store stable config data on FinalizedTracerConfig for telemetry and
+  // the parametric test server.
+  final_config.local_stable_config_values = stable_configs.local.values;
+  final_config.fleet_stable_config_values = stable_configs.fleet.values;
+  final_config.local_stable_config_id = stable_configs.local.config_id;
+  final_config.fleet_stable_config_id = stable_configs.fleet.config_id;
+
   // DD_SERVICE
   final_config.defaults.service = resolve_and_record_config(
-      env_config->service, user_config.service, &final_config.metadata,
-      ConfigName::SERVICE_NAME, get_process_name());
+      stable_config_string(stable_configs.fleet, "DD_SERVICE"),
+      env_config->service, user_config.service,
+      stable_config_string(stable_configs.local, "DD_SERVICE"),
+      &final_config.metadata, ConfigName::SERVICE_NAME, get_process_name());
 
   // Service type
   final_config.defaults.service_type =
@@ -295,13 +322,17 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   // DD_ENV
   final_config.defaults.environment = resolve_and_record_config(
-      env_config->environment, user_config.environment, &final_config.metadata,
-      ConfigName::SERVICE_ENV);
+      stable_config_string(stable_configs.fleet, "DD_ENV"),
+      env_config->environment, user_config.environment,
+      stable_config_string(stable_configs.local, "DD_ENV"),
+      &final_config.metadata, ConfigName::SERVICE_ENV);
 
   // DD_VERSION
   final_config.defaults.version = resolve_and_record_config(
-      env_config->version, user_config.version, &final_config.metadata,
-      ConfigName::SERVICE_VERSION);
+      stable_config_string(stable_configs.fleet, "DD_VERSION"),
+      env_config->version, user_config.version,
+      stable_config_string(stable_configs.local, "DD_VERSION"),
+      &final_config.metadata, ConfigName::SERVICE_VERSION);
 
   // Span name
   final_config.defaults.name = value_or(env_config->name, user_config.name, "");
@@ -346,13 +377,17 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   // Startup Logs
   final_config.log_on_startup = resolve_and_record_config(
+      stable_config_bool(stable_configs.fleet, "DD_TRACE_STARTUP_LOGS"),
       env_config->log_on_startup, user_config.log_on_startup,
+      stable_config_bool(stable_configs.local, "DD_TRACE_STARTUP_LOGS"),
       &final_config.metadata, ConfigName::STARTUP_LOGS, true,
       [](const bool &b) { return to_string(b); });
 
   // Report traces
   final_config.report_traces = resolve_and_record_config(
+      stable_config_bool(stable_configs.fleet, "DD_TRACE_ENABLED"),
       env_config->report_traces, user_config.report_traces,
+      stable_config_bool(stable_configs.local, "DD_TRACE_ENABLED"),
       &final_config.metadata, ConfigName::REPORT_TRACES, true,
       [](const bool &b) { return to_string(b); });
 
@@ -366,9 +401,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   // 128b Trace IDs
   final_config.generate_128bit_trace_ids = resolve_and_record_config(
+      stable_config_bool(stable_configs.fleet,
+                         "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED"),
       env_config->generate_128bit_trace_ids,
-      user_config.generate_128bit_trace_ids, &final_config.metadata,
-      ConfigName::GENEREATE_128BIT_TRACE_IDS, true,
+      user_config.generate_128bit_trace_ids,
+      stable_config_bool(stable_configs.local,
+                         "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED"),
+      &final_config.metadata, ConfigName::GENEREATE_128BIT_TRACE_IDS, true,
       [](const bool &b) { return to_string(b); });
 
   // Integration name & version
@@ -462,7 +501,9 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   // APM Tracing Enabled
   final_config.tracing_enabled = resolve_and_record_config(
+      stable_config_bool(stable_configs.fleet, "DD_APM_TRACING_ENABLED"),
       env_config->tracing_enabled, user_config.tracing_enabled,
+      stable_config_bool(stable_configs.local, "DD_APM_TRACING_ENABLED"),
       &final_config.metadata, ConfigName::APM_TRACING_ENABLED, true,
       [](const bool &b) { return to_string(b); });
 

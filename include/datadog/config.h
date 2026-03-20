@@ -44,7 +44,9 @@ struct ConfigMetadata {
     ENVIRONMENT_VARIABLE,  // Originating from environment variables
     CODE,                  // Defined in code
     REMOTE_CONFIG,         // Retrieved from remote configuration
-    DEFAULT                // Default value
+    DEFAULT,               // Default value
+    LOCAL_STABLE_CONFIG,   // From local stable config file
+    FLEET_STABLE_CONFIG    // From fleet stable config file
   };
 
   // Name of the configuration parameter
@@ -128,6 +130,66 @@ Value resolve_and_record_config(
 
   if (from_env) {
     add_entry(ConfigMetadata::Origin::ENVIRONMENT_VARIABLE, *from_env);
+  }
+
+  if (!metadata_entries.empty()) {
+    (*metadata)[config_name] = std::move(metadata_entries);
+  }
+
+  return chosen_value.value_or(Value{});
+}
+
+// Extended version of resolve_and_record_config that includes stable
+// configuration sources.  Precedence order (highest to lowest):
+//   fleet_stable > env > user/code > local_stable > default
+template <typename Value, typename Stringifier = std::nullptr_t,
+          typename DefaultValue = std::nullptr_t>
+Value resolve_and_record_config(
+    const Optional<Value>& from_fleet_stable, const Optional<Value>& from_env,
+    const Optional<Value>& from_user, const Optional<Value>& from_local_stable,
+    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>* metadata,
+    ConfigName config_name, DefaultValue fallback = nullptr,
+    Stringifier to_string_fn = nullptr) {
+  auto stringify = [&](const Value& v) -> std::string {
+    if constexpr (!std::is_same_v<Stringifier, std::nullptr_t>) {
+      return to_string_fn(v);
+    } else if constexpr (std::is_constructible_v<std::string, Value>) {
+      return std::string(v);
+    } else {
+      static_assert(!std::is_same_v<Value, Value>,
+                    "Non-string types require a stringifier function");
+      return "";
+    }
+  };
+
+  std::vector<ConfigMetadata> metadata_entries;
+  Optional<Value> chosen_value;
+
+  auto add_entry = [&](ConfigMetadata::Origin origin, const Value& val) {
+    std::string val_str = stringify(val);
+    metadata_entries.emplace_back(ConfigMetadata{config_name, val_str, origin});
+    chosen_value = val;
+  };
+
+  // Precedence: default < local_stable < user/code < env < fleet_stable
+  if constexpr (!std::is_same_v<DefaultValue, std::nullptr_t>) {
+    add_entry(ConfigMetadata::Origin::DEFAULT, fallback);
+  }
+
+  if (from_local_stable) {
+    add_entry(ConfigMetadata::Origin::LOCAL_STABLE_CONFIG, *from_local_stable);
+  }
+
+  if (from_user) {
+    add_entry(ConfigMetadata::Origin::CODE, *from_user);
+  }
+
+  if (from_env) {
+    add_entry(ConfigMetadata::Origin::ENVIRONMENT_VARIABLE, *from_env);
+  }
+
+  if (from_fleet_stable) {
+    add_entry(ConfigMetadata::Origin::FLEET_STABLE_CONFIG, *from_fleet_stable);
   }
 
   if (!metadata_entries.empty()) {
