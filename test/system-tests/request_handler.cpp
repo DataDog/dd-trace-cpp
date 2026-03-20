@@ -58,7 +58,9 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
   auto to_lower_key = [](const std::string& key) -> std::string {
     std::string result = key;
     std::transform(result.begin(), result.end(), result.begin(),
-                   [](unsigned char c) -> char { return static_cast<char>(std::tolower(c)); });
+                   [](unsigned char c) -> char {
+                     return static_cast<char>(std::tolower(c));
+                   });
     return result;
   };
 
@@ -87,7 +89,9 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
   auto normalize_value = [](const std::string& val) -> std::string {
     std::string lower = val;
     std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) -> char { return static_cast<char>(std::tolower(c)); });
+                   [](unsigned char c) -> char {
+                     return static_cast<char>(std::tolower(c));
+                   });
     if (lower == "true" || lower == "false") {
       return lower;
     }
