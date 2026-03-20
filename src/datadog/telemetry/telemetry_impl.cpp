@@ -599,7 +599,40 @@ std::string Telemetry::app_started_payload() {
     /// assumes telemetry event can only be generated from a tracer. The
     /// assumption is that the tracing product is always enabled and there
     /// is no need to declare it.
-    if (product.name == Product::Name::tracing) continue;
+    if (product.name == Product::Name::tracing) {
+      // Also emit additional (non-native) stable config entries for this
+      // product.  These use string-based names instead of ConfigName enum.
+      for (const auto& entry : config_.additional_config_entries) {
+        auto j = nlohmann::json{{"name", entry.name},
+                                {"value", entry.value},
+                                {"seq_id", 1}};
+        switch (entry.origin) {
+          case tracing::ConfigMetadata::Origin::LOCAL_STABLE_CONFIG:
+            j["origin"] = "local_stable_config";
+            break;
+          case tracing::ConfigMetadata::Origin::FLEET_STABLE_CONFIG:
+            j["origin"] = "fleet_stable_config";
+            if (entry.config_id) {
+              j["config_id"] = *entry.config_id;
+            }
+            break;
+          case tracing::ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
+            j["origin"] = "env_var";
+            break;
+          case tracing::ConfigMetadata::Origin::CODE:
+            j["origin"] = "code";
+            break;
+          case tracing::ConfigMetadata::Origin::REMOTE_CONFIG:
+            j["origin"] = "remote_config";
+            break;
+          case tracing::ConfigMetadata::Origin::DEFAULT:
+            j["origin"] = "default";
+            break;
+        }
+        configuration_json.emplace_back(std::move(j));
+      }
+      continue;
+    }
 
     auto p = nlohmann::json{
         {to_string(product.name),
