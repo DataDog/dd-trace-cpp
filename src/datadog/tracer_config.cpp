@@ -6,7 +6,6 @@
 #include <cassert>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "datadog/optional.h"
@@ -561,63 +560,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
     final_config.collector = user_config.collector;
   }
 
-  // Build additional config entries for stable config keys that are NOT
-  // natively consumed by dd-trace-cpp.  These are reported in telemetry so
-  // the backend sees all configured values and their origins.
-  {
-    // The set of DD_* keys already handled by the 5-arg
-    // resolve_and_record_config (which includes stable config sources).
-    // Keys only handled by the 3-arg version (env+user only) are NOT
-    // listed here, so their stable config values get picked up below.
-    static const std::unordered_set<std::string> native_keys = {
-        "DD_SERVICE",
-        "DD_ENV",
-        "DD_VERSION",
-        "DD_TRACE_STARTUP_LOGS",
-        "DD_TRACE_ENABLED",
-        "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED",
-        "DD_APM_TRACING_ENABLED",
-    };
 
-    // Collect all unique keys from both stable configs.
-    std::unordered_set<std::string> seen_keys;
-    for (const auto& [key, _] : stable_configs.local.values) {
-      seen_keys.insert(key);
-    }
-    for (const auto& [key, _] : stable_configs.fleet.values) {
-      seen_keys.insert(key);
-    }
-
-    for (const auto& key : seen_keys) {
-      if (native_keys.count(key)) continue;
-
-      // Determine the winning source.
-      // Precedence: fleet_stable > local_stable (env not checked for
-      // non-native keys since dd-trace-cpp doesn't consume them).
-      auto fleet_val = stable_configs.fleet.lookup(key);
-      auto local_val = stable_configs.local.lookup(key);
-      // We don't check actual env vars here for non-native keys because
-      // dd-trace-cpp doesn't consume them from the environment.
-
-      if (fleet_val) {
-        telemetry::AdditionalConfigEntry entry;
-        entry.name = key;
-        entry.value = *fleet_val;
-        entry.origin = ConfigMetadata::Origin::FLEET_STABLE_CONFIG;
-        entry.config_id = stable_configs.fleet.config_id;
-        final_config.telemetry.additional_config_entries.push_back(
-            std::move(entry));
-      } else if (local_val) {
-        telemetry::AdditionalConfigEntry entry;
-        entry.name = key;
-        entry.value = *local_val;
-        entry.origin = ConfigMetadata::Origin::LOCAL_STABLE_CONFIG;
-        // Local stable config does not have a config_id attached.
-        final_config.telemetry.additional_config_entries.push_back(
-            std::move(entry));
-      }
-    }
-  }
 
   return final_config;
 }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <datadog/config.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
 #include <datadog/telemetry/product.h>
@@ -45,18 +44,6 @@ struct Configuration {
   std::vector<Product> products;
 };
 
-// Represents a configuration entry for a key that is not natively consumed
-// by dd-trace-cpp (e.g. DD_LOGS_INJECTION, DD_PROFILING_ENABLED).  These
-// entries come from stable configuration files and are reported in telemetry
-// so that the backend knows about all configured values and their origins.
-struct AdditionalConfigEntry {
-  std::string name;  // DD_* key name, used as the telemetry config name
-  std::string value;
-  tracing::ConfigMetadata::Origin origin;
-  tracing::Optional<std::string>
-      config_id;  // fleet policy ID if origin is fleet
-};
-
 struct FinalizedConfiguration {
   bool debug;
   bool enabled;
@@ -67,9 +54,6 @@ struct FinalizedConfiguration {
   std::string integration_name;
   std::string integration_version;
   std::vector<Product> products;
-
-  // Non-native stable config entries to include in telemetry.
-  std::vector<AdditionalConfigEntry> additional_config_entries;
 
   // Onboarding metadata coming from `DD_INSTRUMENTATION_INSTALL_*` environment
   // variables.
