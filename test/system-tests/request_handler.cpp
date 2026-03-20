@@ -94,28 +94,11 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
     return val;
   };
 
-  // Default values for keys that dd-trace-cpp doesn't natively support
-  // but the system tests expect. These represent the product enablement
-  // defaults for features not available in the C++ tracer.
-  const std::unordered_map<std::string, std::string> product_defaults = {
-      {"DD_PROFILING_ENABLED", "false"},
-      {"DD_RUNTIME_METRICS_ENABLED", "false"},
-      {"DD_DATA_STREAMS_ENABLED", "false"},
-      {"DD_LOGS_INJECTION", "false"},
-      {"DD_DYNAMIC_INSTRUMENTATION_ENABLED", "false"},
-  };
-
-  // Start with product defaults, then overlay stable config, then env vars.
-  // This produces the merged effective config with correct precedence.
-  // Precedence: fleet_stable > env > local_stable > product_default
+  // Merge stable config and env var values with correct precedence.
+  // Precedence: fleet_stable > env > local_stable
   std::unordered_map<std::string, std::string> effective_config;
 
-  // 1. Product defaults (lowest precedence for non-native keys)
-  for (const auto& [key, value] : product_defaults) {
-    effective_config[key] = value;
-  }
-
-  // 2. Local stable config
+  // 1. Local stable config (lowest precedence)
   for (const auto& [key, value] : local_stable_config_values_) {
     effective_config[key] = normalize_value(value);
   }
