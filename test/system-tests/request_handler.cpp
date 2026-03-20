@@ -133,15 +133,6 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
     effective_config[key] = normalize_value(value);
   }
 
-  // Also include any env-var-only keys from stable configs that aren't
-  // in the product defaults or stable config maps yet.
-  // Check env vars for all stable config keys.
-  for (const auto& [key, value] : local_stable_config_values_) {
-    if (effective_config.find(key) == effective_config.end()) {
-      effective_config[key] = value;
-    }
-  }
-
   // Write all effective config values to the response.
   for (const auto& [key, value] : effective_config) {
     auto lower_key = to_lower_key(key);

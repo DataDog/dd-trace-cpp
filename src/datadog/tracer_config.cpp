@@ -6,6 +6,7 @@
 #include <cassert>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "datadog/optional.h"
@@ -97,7 +98,7 @@ std::string json_quoted(StringView text) {
 Optional<bool> stable_config_bool(const StableConfig &cfg,
                                   const std::string &key) {
   auto val = cfg.lookup(key);
-  if (!val) return nullopt;
+  if (!val || val->empty()) return nullopt;
   return !falsy(StringView(*val));
 }
 
@@ -568,30 +569,31 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     // resolve_and_record_config (which includes stable config sources).
     // Keys only handled by the 3-arg version (env+user only) are NOT
     // listed here, so their stable config values get picked up below.
-    static const std::unordered_map<std::string, int> native_keys = {
-        {"DD_SERVICE", 1},
-        {"DD_ENV", 1},
-        {"DD_VERSION", 1},
-        {"DD_TRACE_STARTUP_LOGS", 1},
-        {"DD_TRACE_ENABLED", 1},
-        {"DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED", 1},
-        {"DD_APM_TRACING_ENABLED", 1},
+    static const std::unordered_set<std::string> native_keys = {
+        "DD_SERVICE",
+        "DD_ENV",
+        "DD_VERSION",
+        "DD_TRACE_STARTUP_LOGS",
+        "DD_TRACE_ENABLED",
+        "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED",
+        "DD_APM_TRACING_ENABLED",
     };
 
     // Collect all unique keys from both stable configs.
-    std::unordered_map<std::string, int> seen_keys;
+    std::unordered_set<std::string> seen_keys;
     for (const auto &[key, _] : stable_configs.local.values) {
-      seen_keys[key] = 1;
+      seen_keys.insert(key);
     }
     for (const auto &[key, _] : stable_configs.fleet.values) {
-      seen_keys[key] = 1;
+      seen_keys.insert(key);
     }
 
-    for (const auto &[key, _] : seen_keys) {
+    for (const auto &key : seen_keys) {
       if (native_keys.count(key)) continue;
 
       // Determine the winning source.
-      // Precedence: fleet_stable > env > local_stable
+      // Precedence: fleet_stable > local_stable (env not checked for
+      // non-native keys since dd-trace-cpp doesn't consume them).
       auto fleet_val = stable_configs.fleet.lookup(key);
       auto local_val = stable_configs.local.lookup(key);
       // We don't check actual env vars here for non-native keys because
