@@ -50,10 +50,11 @@ struct Configuration {
 // entries come from stable configuration files and are reported in telemetry
 // so that the backend knows about all configured values and their origins.
 struct AdditionalConfigEntry {
-  std::string name;   // DD_* key name, used as the telemetry config name
+  std::string name;  // DD_* key name, used as the telemetry config name
   std::string value;
   tracing::ConfigMetadata::Origin origin;
-  tracing::Optional<std::string> config_id;  // fleet policy ID if origin is fleet
+  tracing::Optional<std::string>
+      config_id;  // fleet policy ID if origin is fleet
 };
 
 struct FinalizedConfiguration {

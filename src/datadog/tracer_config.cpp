@@ -45,7 +45,7 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
   };
 
   // Style names are separated by spaces, or a comma, or some combination.
-  for (const StringView &item : parse_list(input)) {
+  for (const StringView& item : parse_list(input)) {
     if (const auto style = parse_propagation_style(item)) {
       styles.push_back(*style);
     } else {
@@ -78,7 +78,7 @@ Optional<std::vector<PropagationStyle>> styles_from_env(
   }
 
   auto styles = parse_propagation_styles(*styles_env);
-  if (auto *error = styles.if_error()) {
+  if (auto* error = styles.if_error()) {
     std::string prefix;
     prefix += "Unable to parse ";
     append(prefix, name(env_var));
@@ -95,20 +95,20 @@ std::string json_quoted(StringView text) {
 }
 
 // Convert a stable config string value to Optional<bool>.
-Optional<bool> stable_config_bool(const StableConfig &cfg,
-                                  const std::string &key) {
+Optional<bool> stable_config_bool(const StableConfig& cfg,
+                                  const std::string& key) {
   auto val = cfg.lookup(key);
   if (!val || val->empty()) return nullopt;
   return !falsy(StringView(*val));
 }
 
 // Convert a stable config string value to Optional<std::string>.
-Optional<std::string> stable_config_string(const StableConfig &cfg,
-                                           const std::string &key) {
+Optional<std::string> stable_config_string(const StableConfig& cfg,
+                                           const std::string& key) {
   return cfg.lookup(key);
 }
 
-Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
+Expected<TracerConfig> load_tracer_env_config(Logger& logger) {
   TracerConfig env_cfg;
 
   if (auto service_env = lookup(environment::DD_SERVICE)) {
@@ -124,7 +124,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
 
   if (auto tags_env = lookup(environment::DD_TAGS)) {
     auto tags = parse_tags(*tags_env);
-    if (auto *error = tags.if_error()) {
+    if (auto* error = tags.if_error()) {
       std::string prefix;
       prefix += "Unable to parse ";
       append(prefix, name(environment::DD_TAGS));
@@ -163,7 +163,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   if (auto baggage_items_env =
           lookup(environment::DD_TRACE_BAGGAGE_MAX_ITEMS)) {
     auto maybe_value = parse_uint64(*baggage_items_env, 10);
-    if (auto *error = maybe_value.if_error()) {
+    if (auto* error = maybe_value.if_error()) {
       return *error;
     }
 
@@ -173,7 +173,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   if (auto baggage_bytes_env =
           lookup(environment::DD_TRACE_BAGGAGE_MAX_BYTES)) {
     auto maybe_value = parse_uint64(*baggage_bytes_env, 10);
-    if (auto *error = maybe_value.if_error()) {
+    if (auto* error = maybe_value.if_error()) {
       return *error;
     }
 
@@ -232,7 +232,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     return message;
   };
 
-  for (const auto &[var, var_override] : questionable_combinations) {
+  for (const auto& [var, var_override] : questionable_combinations) {
     const auto value = lookup(var);
     if (!value) {
       continue;
@@ -273,7 +273,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     } else {
       env_cfg.injection_styles = global_styles;
     }
-  } catch (Error &error) {
+  } catch (Error& error) {
     return std::move(error);
   }
 
@@ -282,12 +282,12 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
 
 }  // namespace
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config) {
   return finalize_config(config, default_clock);
 }
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
-                                                const Clock &clock) {
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
+                                                const Clock& clock) {
   auto logger =
       user_config.logger ? user_config.logger : std::make_shared<NullLogger>();
 
@@ -342,7 +342,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.defaults.tags = resolve_and_record_config(
       env_config->tags, user_config.tags, &final_config.metadata,
       ConfigName::TAGS, std::unordered_map<std::string, std::string>{},
-      [](const auto &tags) { return join_tags(tags); });
+      [](const auto& tags) { return join_tags(tags); });
 
   // Extraction Styles
   const std::vector<PropagationStyle> default_propagation_styles{
@@ -353,7 +353,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       env_config->extraction_styles, user_config.extraction_styles,
       &final_config.metadata, ConfigName::EXTRACTION_STYLES,
       default_propagation_styles,
-      [](const std::vector<PropagationStyle> &styles) {
+      [](const std::vector<PropagationStyle>& styles) {
         return join_propagation_styles(styles);
       });
 
@@ -367,7 +367,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       env_config->injection_styles, user_config.injection_styles,
       &final_config.metadata, ConfigName::INJECTION_STYLES,
       default_propagation_styles,
-      [](const std::vector<PropagationStyle> &styles) {
+      [](const std::vector<PropagationStyle>& styles) {
         return join_propagation_styles(styles);
       });
 
@@ -382,7 +382,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       env_config->log_on_startup, user_config.log_on_startup,
       stable_config_bool(stable_configs.local, "DD_TRACE_STARTUP_LOGS"),
       &final_config.metadata, ConfigName::STARTUP_LOGS, true,
-      [](const bool &b) { return to_string(b); });
+      [](const bool& b) { return to_string(b); });
 
   // Report traces
   final_config.report_traces = resolve_and_record_config(
@@ -390,7 +390,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       env_config->report_traces, user_config.report_traces,
       stable_config_bool(stable_configs.local, "DD_TRACE_ENABLED"),
       &final_config.metadata, ConfigName::REPORT_TRACES, true,
-      [](const bool &b) { return to_string(b); });
+      [](const bool& b) { return to_string(b); });
 
   // Report hostname
   final_config.report_hostname =
@@ -409,7 +409,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       stable_config_bool(stable_configs.local,
                          "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED"),
       &final_config.metadata, ConfigName::GENEREATE_128BIT_TRACE_IDS, true,
-      [](const bool &b) { return to_string(b); });
+      [](const bool& b) { return to_string(b); });
 
   // Integration name & version
   final_config.integration_name = value_or(
@@ -422,13 +422,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.baggage_opts.max_items = resolve_and_record_config(
       env_config->baggage_max_items, user_config.baggage_max_items,
       &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_ITEMS, 64UL,
-      [](const size_t &i) { return std::to_string(i); });
+      [](const size_t& i) { return std::to_string(i); });
 
   // Baggage - max bytes
   final_config.baggage_opts.max_bytes = resolve_and_record_config(
       env_config->baggage_max_bytes, user_config.baggage_max_bytes,
       &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_BYTES, 8192UL,
-      [](const size_t &i) { return std::to_string(i); });
+      [](const size_t& i) { return std::to_string(i); });
 
   if (final_config.baggage_opts.max_items <= 0 ||
       final_config.baggage_opts.max_bytes < 3) {
@@ -451,14 +451,14 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   auto agent_finalized =
       finalize_config(user_config.agent, final_config.logger, clock);
-  if (auto *error = agent_finalized.if_error()) {
+  if (auto* error = agent_finalized.if_error()) {
     return std::move(*error);
   }
 
   if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
     // Merge metadata vectors
-    for (auto &[key, values] : trace_sampler_config->metadata) {
-      auto &dest = final_config.metadata[key];
+    for (auto& [key, values] : trace_sampler_config->metadata) {
+      auto& dest = final_config.metadata[key];
       dest.insert(dest.end(), values.begin(), values.end());
     }
     final_config.trace_sampler = std::move(*trace_sampler_config);
@@ -469,8 +469,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   if (auto span_sampler_config =
           finalize_config(user_config.span_sampler, *logger)) {
     // Merge metadata vectors
-    for (auto &[key, values] : span_sampler_config->metadata) {
-      auto &dest = final_config.metadata[key];
+    for (auto& [key, values] : span_sampler_config->metadata) {
+      auto& dest = final_config.metadata[key];
       dest.insert(dest.end(), values.begin(), values.end());
     }
     final_config.span_sampler = std::move(*span_sampler_config);
@@ -506,7 +506,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       env_config->tracing_enabled, user_config.tracing_enabled,
       stable_config_bool(stable_configs.local, "DD_APM_TRACING_ENABLED"),
       &final_config.metadata, ConfigName::APM_TRACING_ENABLED, true,
-      [](const bool &b) { return to_string(b); });
+      [](const bool& b) { return to_string(b); });
 
   {
     // Resource Renaming Enabled
@@ -514,7 +514,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
         env_config->resource_renaming_enabled,
         user_config.resource_renaming_enabled, &final_config.metadata,
         ConfigName::TRACE_RESOURCE_RENAMING_ENABLED, false,
-        [](const bool &b) { return to_string(b); });
+        [](const bool& b) { return to_string(b); });
 
     // Resource Renaming Always Simplified Endpoint
     const bool resource_renaming_always_simplified_endpoint =
@@ -523,7 +523,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
             user_config.resource_renaming_always_simplified_endpoint,
             &final_config.metadata,
             ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
-            false, [](const bool &b) { return to_string(b); });
+            false, [](const bool& b) { return to_string(b); });
 
     if (!resource_renaming_enabled) {
       final_config.resource_renaming_mode =
@@ -553,8 +553,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   if (!user_config.collector) {
     final_config.collector = *agent_finalized;
     // Merge metadata vectors
-    for (auto &[key, values] : agent_finalized->metadata) {
-      auto &dest = final_config.metadata[key];
+    for (auto& [key, values] : agent_finalized->metadata) {
+      auto& dest = final_config.metadata[key];
       dest.insert(dest.end(), values.begin(), values.end());
     }
   } else {
@@ -581,14 +581,14 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
     // Collect all unique keys from both stable configs.
     std::unordered_set<std::string> seen_keys;
-    for (const auto &[key, _] : stable_configs.local.values) {
+    for (const auto& [key, _] : stable_configs.local.values) {
       seen_keys.insert(key);
     }
-    for (const auto &[key, _] : stable_configs.fleet.values) {
+    for (const auto& [key, _] : stable_configs.fleet.values) {
       seen_keys.insert(key);
     }
 
-    for (const auto &key : seen_keys) {
+    for (const auto& key : seen_keys) {
       if (native_keys.count(key)) continue;
 
       // Determine the winning source.

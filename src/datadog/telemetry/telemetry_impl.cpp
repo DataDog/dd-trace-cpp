@@ -603,9 +603,8 @@ std::string Telemetry::app_started_payload() {
       // Also emit additional (non-native) stable config entries for this
       // product.  These use string-based names instead of ConfigName enum.
       for (const auto& entry : config_.additional_config_entries) {
-        auto j = nlohmann::json{{"name", entry.name},
-                                {"value", entry.value},
-                                {"seq_id", 1}};
+        auto j = nlohmann::json{
+            {"name", entry.name}, {"value", entry.value}, {"seq_id", 1}};
         switch (entry.origin) {
           case tracing::ConfigMetadata::Origin::LOCAL_STABLE_CONFIG:
             j["origin"] = "local_stable_config";
