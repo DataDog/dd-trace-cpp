@@ -107,6 +107,38 @@ Optional<std::string> stable_config_string(const StableConfig& cfg,
   return cfg.lookup(key);
 }
 
+// Convert a stable config string value to Optional<uint64_t>.
+Optional<std::size_t> stable_config_uint64(const StableConfig& cfg,
+                                           const std::string& key) {
+  auto val = cfg.lookup(key);
+  if (!val || val->empty()) return nullopt;
+  auto result = parse_uint64(StringView(*val), 10);
+  if (result.if_error()) return nullopt;
+  return static_cast<std::size_t>(*result);
+}
+
+// Convert a stable config string value to
+// Optional<unordered_map<string, string>> (tags).
+Optional<std::unordered_map<std::string, std::string>> stable_config_tags(
+    const StableConfig& cfg, const std::string& key) {
+  auto val = cfg.lookup(key);
+  if (!val || val->empty()) return nullopt;
+  auto tags = parse_tags(StringView(*val));
+  if (tags.if_error()) return nullopt;
+  return std::move(*tags);
+}
+
+// Convert a stable config string value to
+// Optional<vector<PropagationStyle>>.
+Optional<std::vector<PropagationStyle>> stable_config_propagation_styles(
+    const StableConfig& cfg, const std::string& key) {
+  auto val = cfg.lookup(key);
+  if (!val || val->empty()) return nullopt;
+  auto styles = parse_propagation_styles(StringView(*val));
+  if (styles.if_error()) return nullopt;
+  return std::move(*styles);
+}
+
 Expected<TracerConfig> load_tracer_env_config(Logger& logger) {
   TracerConfig env_cfg;
 
@@ -339,8 +371,10 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
 
   // DD_TAGS
   final_config.defaults.tags = resolve_and_record_config(
-      env_config->tags, user_config.tags, &final_config.metadata,
-      ConfigName::TAGS, std::unordered_map<std::string, std::string>{},
+      stable_config_tags(stable_configs.fleet, "DD_TAGS"), env_config->tags,
+      user_config.tags, stable_config_tags(stable_configs.local, "DD_TAGS"),
+      &final_config.metadata, ConfigName::TAGS,
+      std::unordered_map<std::string, std::string>{},
       [](const auto& tags) { return join_tags(tags); });
 
   // Extraction Styles
@@ -348,10 +382,24 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
       PropagationStyle::DATADOG, PropagationStyle::W3C,
       PropagationStyle::BAGGAGE};
 
+  // Compute stable config extraction styles using the same cascade as env
+  // vars: specific extract > global.
+  auto stable_extraction_styles =
+      [&](const StableConfig& cfg) -> Optional<std::vector<PropagationStyle>> {
+    if (auto s = stable_config_propagation_styles(
+            cfg, "DD_TRACE_PROPAGATION_STYLE_EXTRACT"))
+      return s;
+    if (auto s = stable_config_propagation_styles(
+            cfg, "DD_PROPAGATION_STYLE_EXTRACT"))
+      return s;
+    return stable_config_propagation_styles(cfg, "DD_TRACE_PROPAGATION_STYLE");
+  };
+
   final_config.extraction_styles = resolve_and_record_config(
+      stable_extraction_styles(stable_configs.fleet),
       env_config->extraction_styles, user_config.extraction_styles,
-      &final_config.metadata, ConfigName::EXTRACTION_STYLES,
-      default_propagation_styles,
+      stable_extraction_styles(stable_configs.local), &final_config.metadata,
+      ConfigName::EXTRACTION_STYLES, default_propagation_styles,
       [](const std::vector<PropagationStyle>& styles) {
         return join_propagation_styles(styles);
       });
@@ -361,11 +409,25 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
                  "At least one extraction style must be specified."};
   }
 
+  // Compute stable config injection styles using the same cascade as env
+  // vars: specific inject > global.
+  auto stable_injection_styles =
+      [&](const StableConfig& cfg) -> Optional<std::vector<PropagationStyle>> {
+    if (auto s = stable_config_propagation_styles(
+            cfg, "DD_TRACE_PROPAGATION_STYLE_INJECT"))
+      return s;
+    if (auto s = stable_config_propagation_styles(
+            cfg, "DD_PROPAGATION_STYLE_INJECT"))
+      return s;
+    return stable_config_propagation_styles(cfg, "DD_TRACE_PROPAGATION_STYLE");
+  };
+
   // Injection Styles
   final_config.injection_styles = resolve_and_record_config(
+      stable_injection_styles(stable_configs.fleet),
       env_config->injection_styles, user_config.injection_styles,
-      &final_config.metadata, ConfigName::INJECTION_STYLES,
-      default_propagation_styles,
+      stable_injection_styles(stable_configs.local), &final_config.metadata,
+      ConfigName::INJECTION_STYLES, default_propagation_styles,
       [](const std::vector<PropagationStyle>& styles) {
         return join_propagation_styles(styles);
       });
@@ -419,13 +481,17 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
 
   // Baggage - max items
   final_config.baggage_opts.max_items = resolve_and_record_config(
+      stable_config_uint64(stable_configs.fleet, "DD_TRACE_BAGGAGE_MAX_ITEMS"),
       env_config->baggage_max_items, user_config.baggage_max_items,
+      stable_config_uint64(stable_configs.local, "DD_TRACE_BAGGAGE_MAX_ITEMS"),
       &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_ITEMS, 64UL,
       [](const size_t& i) { return std::to_string(i); });
 
   // Baggage - max bytes
   final_config.baggage_opts.max_bytes = resolve_and_record_config(
+      stable_config_uint64(stable_configs.fleet, "DD_TRACE_BAGGAGE_MAX_BYTES"),
       env_config->baggage_max_bytes, user_config.baggage_max_bytes,
+      stable_config_uint64(stable_configs.local, "DD_TRACE_BAGGAGE_MAX_BYTES"),
       &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_BYTES, 8192UL,
       [](const size_t& i) { return std::to_string(i); });
 
@@ -454,7 +520,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
     return std::move(*error);
   }
 
-  if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
+  if (auto trace_sampler_config =
+          finalize_config(user_config.trace_sampler, &stable_configs)) {
     // Merge metadata vectors
     for (auto& [key, values] : trace_sampler_config->metadata) {
       auto& dest = final_config.metadata[key];
@@ -466,7 +533,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
   }
 
   if (auto span_sampler_config =
-          finalize_config(user_config.span_sampler, *logger)) {
+          finalize_config(user_config.span_sampler, *logger, &stable_configs)) {
     // Merge metadata vectors
     for (auto& [key, values] : span_sampler_config->metadata) {
       auto& dest = final_config.metadata[key];
@@ -522,16 +589,26 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
   {
     // Resource Renaming Enabled
     const bool resource_renaming_enabled = resolve_and_record_config(
+        stable_config_bool(stable_configs.fleet,
+                           "DD_TRACE_RESOURCE_RENAMING_ENABLED"),
         env_config->resource_renaming_enabled,
-        user_config.resource_renaming_enabled, &final_config.metadata,
-        ConfigName::TRACE_RESOURCE_RENAMING_ENABLED, false,
-        [](const bool& b) { return to_string(b); });
+        user_config.resource_renaming_enabled,
+        stable_config_bool(stable_configs.local,
+                           "DD_TRACE_RESOURCE_RENAMING_ENABLED"),
+        &final_config.metadata, ConfigName::TRACE_RESOURCE_RENAMING_ENABLED,
+        false, [](const bool& b) { return to_string(b); });
 
     // Resource Renaming Always Simplified Endpoint
     const bool resource_renaming_always_simplified_endpoint =
         resolve_and_record_config(
+            stable_config_bool(
+                stable_configs.fleet,
+                "DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT"),
             env_config->resource_renaming_always_simplified_endpoint,
             user_config.resource_renaming_always_simplified_endpoint,
+            stable_config_bool(
+                stable_configs.local,
+                "DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT"),
             &final_config.metadata,
             ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
             false, [](const bool& b) { return to_string(b); });

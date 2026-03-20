@@ -20,6 +20,8 @@
 namespace datadog {
 namespace tracing {
 
+struct StableConfigs;
+
 struct TraceSamplerRule final {
   Rate rate;
   SpanMatcher matcher;
@@ -42,7 +44,7 @@ struct TraceSamplerConfig {
 
 class FinalizedTraceSamplerConfig {
   friend Expected<FinalizedTraceSamplerConfig> finalize_config(
-      const TraceSamplerConfig& config);
+      const TraceSamplerConfig& config, const StableConfigs* stable_configs);
   friend class FinalizedTracerConfig;
 
   FinalizedTraceSamplerConfig() = default;
@@ -58,7 +60,8 @@ class FinalizedTraceSamplerConfig {
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig& config);
+    const TraceSamplerConfig& config,
+    const StableConfigs* stable_configs = nullptr);
 
 }  // namespace tracing
 }  // namespace datadog

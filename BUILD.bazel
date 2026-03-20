@@ -83,6 +83,8 @@ cc_library(
         "src/datadog/tracer.cpp",
         "src/datadog/stable_config.cpp",
         "src/datadog/stable_config.h",
+        "src/datadog/yaml_parser.cpp",
+        "src/datadog/yaml_parser.h",
         "src/datadog/tracer_config.cpp",
         "src/datadog/version.cpp",
         "src/datadog/w3c_propagation.cpp",

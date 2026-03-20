@@ -9,14 +9,15 @@
 
 #include "json.hpp"
 #include "json_serializer.h"
+#include "stable_config.h"
 
 namespace datadog {
 namespace tracing {
 namespace {
 
-std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
+std::string to_string(const std::vector<SpanSamplerConfig::Rule>& rules) {
   nlohmann::json res;
-  for (const auto &r : rules) {
+  for (const auto& r : rules) {
     nlohmann::json j = r;
     j["sample_rate"] = r.sample_rate;
     if (r.max_per_second) {
@@ -37,7 +38,7 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
 
   try {
     json_rules = nlohmann::json::parse(rules_raw);
-  } catch (const nlohmann::json::parse_error &error) {
+  } catch (const nlohmann::json::parse_error& error) {
     std::string message;
     message += "Unable to parse JSON from ";
     append(message, env_var);
@@ -63,9 +64,9 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
   const std::unordered_set<std::string> allowed_properties{
       "service", "name", "resource", "tags", "sample_rate", "max_per_second"};
 
-  for (const auto &json_rule : json_rules) {
+  for (const auto& json_rule : json_rules) {
     auto matcher = from_json(json_rule);
-    if (auto *error = matcher.if_error()) {
+    if (auto* error = matcher.if_error()) {
       std::string prefix;
       prefix += "Unable to create a rule from ";
       append(prefix, env_var);
@@ -118,7 +119,7 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
     }
 
     // Look for unexpected properties.
-    for (const auto &[key, value] : json_rule.items()) {
+    for (const auto& [key, value] : json_rule.items()) {
       if (allowed_properties.count(key)) {
         continue;
       }
@@ -143,14 +144,14 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
   return rules;
 }
 
-Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
+Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger& logger) {
   SpanSamplerConfig env_config;
 
   auto rules_env = lookup(environment::DD_SPAN_SAMPLING_RULES);
   if (rules_env) {
     auto maybe_rules =
         parse_rules(*rules_env, name(environment::DD_SPAN_SAMPLING_RULES));
-    if (auto *error = maybe_rules.if_error()) {
+    if (auto* error = maybe_rules.if_error()) {
       return std::move(*error);
     }
     env_config.rules = std::move(*maybe_rules);
@@ -174,7 +175,7 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
     } else {
       const auto span_rules_file = std::string(*file_env);
 
-      const auto file_error = [&](const char *operation) {
+      const auto file_error = [&](const char* operation) {
         std::string message;
         message += "Unable to ";
         message += operation;
@@ -199,7 +200,7 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
 
       auto maybe_rules = parse_rules(
           rules_stream.str(), name(environment::DD_SPAN_SAMPLING_RULES_FILE));
-      if (auto *error = maybe_rules.if_error()) {
+      if (auto* error = maybe_rules.if_error()) {
         std::string prefix;
         prefix += "With ";
         append(prefix, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
@@ -218,10 +219,11 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
 
 }  // namespace
 
-SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
+SpanSamplerConfig::Rule::Rule(const SpanMatcher& base) : SpanMatcher(base) {}
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(
-    const SpanSamplerConfig &user_config, Logger &logger) {
+    const SpanSamplerConfig& user_config, Logger& logger,
+    const StableConfigs* stable_configs) {
   Expected<SpanSamplerConfig> env_config = load_span_sampler_env_config(logger);
   if (auto error = env_config.if_error()) {
     return *error;
@@ -237,15 +239,52 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
     user_rules = user_config.rules;
   }
 
+  Optional<std::vector<SpanSamplerConfig::Rule>> fleet_rules;
+  Optional<std::vector<SpanSamplerConfig::Rule>> local_rules;
+  if (stable_configs) {
+    auto parse_span_rules = [](const StableConfig& cfg, const std::string& key)
+        -> Optional<std::vector<SpanSamplerConfig::Rule>> {
+      auto val = cfg.lookup(key);
+      if (!val || val->empty()) return nullopt;
+      try {
+        auto json_rules = nlohmann::json::parse(*val);
+        if (!json_rules.is_array()) return nullopt;
+        std::vector<SpanSamplerConfig::Rule> rules;
+        for (const auto& json_rule : json_rules) {
+          auto matcher = from_json(json_rule);
+          if (matcher.if_error()) return nullopt;
+          SpanSamplerConfig::Rule rule{*matcher};
+          if (auto sr = json_rule.find("sample_rate");
+              sr != json_rule.end() && sr->is_number()) {
+            rule.sample_rate = *sr;
+          }
+          if (auto mps = json_rule.find("max_per_second");
+              mps != json_rule.end() && mps->is_number()) {
+            rule.max_per_second = *mps;
+          }
+          rules.emplace_back(std::move(rule));
+        }
+        return rules;
+      } catch (...) {
+        return nullopt;
+      }
+    };
+    fleet_rules =
+        parse_span_rules(stable_configs->fleet, "DD_SPAN_SAMPLING_RULES");
+    local_rules =
+        parse_span_rules(stable_configs->local, "DD_SPAN_SAMPLING_RULES");
+  }
+
   std::vector<SpanSamplerConfig::Rule> rules = resolve_and_record_config(
-      env_rules, user_rules, &result.metadata, ConfigName::SPAN_SAMPLING_RULES,
-      nullptr, [](const std::vector<SpanSamplerConfig::Rule> &r) {
+      fleet_rules, env_rules, user_rules, local_rules, &result.metadata,
+      ConfigName::SPAN_SAMPLING_RULES, nullptr,
+      [](const std::vector<SpanSamplerConfig::Rule>& r) {
         return to_string(r);
       });
 
-  for (const auto &rule : rules) {
+  for (const auto& rule : rules) {
     auto maybe_rate = Rate::from(rule.sample_rate);
-    if (auto *error = maybe_rate.if_error()) {
+    if (auto* error = maybe_rate.if_error()) {
       std::string prefix;
       prefix +=
           "Unable to parse sample_rate in span sampling rule with span "
@@ -272,7 +311,7 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
     }
 
     FinalizedSpanSamplerConfig::Rule finalized;
-    static_cast<SpanMatcher &>(finalized) = rule;
+    static_cast<SpanMatcher&>(finalized) = rule;
     finalized.sample_rate = *maybe_rate;
     finalized.max_per_second = rule.max_per_second;
     result.rules.push_back(std::move(finalized));
@@ -280,9 +319,9 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   return result;
 }
 
-std::string to_string(const FinalizedSpanSamplerConfig::Rule &rule) {
+std::string to_string(const FinalizedSpanSamplerConfig::Rule& rule) {
   // Get the base class's fields, then add our own.
-  nlohmann::json result = static_cast<const SpanMatcher &>(rule);
+  nlohmann::json result = static_cast<const SpanMatcher&>(rule);
   result["sample_rate"] = double(rule.sample_rate);
   if (rule.max_per_second) {
     result["max_per_second"] = *rule.max_per_second;
