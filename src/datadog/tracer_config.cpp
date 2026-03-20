@@ -488,6 +488,18 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
 
   final_config.http_client = agent_finalized->http_client;
 
+  // Attach fleet config_id to all FLEET_STABLE_CONFIG metadata entries.
+  // Must happen before metadata is moved into the telemetry Product below.
+  if (stable_configs.fleet.config_id) {
+    for (auto& [_, entries] : final_config.metadata) {
+      for (auto& entry : entries) {
+        if (entry.origin == ConfigMetadata::Origin::FLEET_STABLE_CONFIG) {
+          entry.config_id = stable_configs.fleet.config_id;
+        }
+      }
+    }
+  }
+
   // telemetry
   if (auto telemetry_final_config =
           telemetry::finalize_config(user_config.telemetry)) {

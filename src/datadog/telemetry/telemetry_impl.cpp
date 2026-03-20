@@ -743,6 +743,10 @@ nlohmann::json Telemetry::generate_configuration_field(
       break;
   }
 
+  if (config_metadata.config_id) {
+    j["config_id"] = *config_metadata.config_id;
+  }
+
   if (config_metadata.error) {
     // clang-format off
       j["error"] = {

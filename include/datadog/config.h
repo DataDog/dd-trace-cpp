@@ -57,6 +57,8 @@ struct ConfigMetadata {
   Origin origin;
   // Optional error associated with the configuration parameter
   Optional<Error> error;
+  // Optional fleet policy ID (set when origin is FLEET_STABLE_CONFIG)
+  Optional<std::string> config_id;
 
   ConfigMetadata() = default;
   ConfigMetadata(ConfigName n, std::string v, Origin orig,
