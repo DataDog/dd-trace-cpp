@@ -7,6 +7,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
+// windows.h defines ERROR as a macro which conflicts with our enum.
+#undef ERROR
 #endif
 
 namespace datadog {
@@ -119,7 +121,7 @@ std::string strip_inline_comment(const std::string& s) {
   return s;
 }
 
-enum class ParseResult { OK, ERROR };
+enum class ParseResult { OK, PARSE_ERROR };
 
 // Parse a YAML file's contents into a StableConfig.
 // Returns OK on success (including empty/missing apm_configuration_default).
@@ -152,7 +154,7 @@ ParseResult parse_yaml(const std::string& content, StableConfig& out) {
       auto colon_pos = trimmed.find(':');
       if (colon_pos == std::string::npos) {
         // Malformed line at top level.
-        return ParseResult::ERROR;
+        return ParseResult::PARSE_ERROR;
       }
 
       auto key = trim(trimmed.substr(0, colon_pos));
@@ -167,7 +169,7 @@ ParseResult parse_yaml(const std::string& content, StableConfig& out) {
         // The value after the colon should be empty (map follows on next
         // lines). If it's not empty, that's malformed for our purposes.
         if (!value.empty()) {
-          return ParseResult::ERROR;
+          return ParseResult::PARSE_ERROR;
         }
       } else if (key == "config_id") {
         out.config_id = unquote(value);
@@ -178,7 +180,7 @@ ParseResult parse_yaml(const std::string& content, StableConfig& out) {
       auto colon_pos = trimmed.find(':');
       if (colon_pos == std::string::npos) {
         // Malformed entry.
-        return ParseResult::ERROR;
+        return ParseResult::PARSE_ERROR;
       }
 
       auto key = trim(trimmed.substr(0, colon_pos));
