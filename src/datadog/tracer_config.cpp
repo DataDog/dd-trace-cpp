@@ -560,8 +560,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
     final_config.collector = user_config.collector;
   }
 
-
-
   return final_config;
 }
 
