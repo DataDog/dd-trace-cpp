@@ -21,16 +21,16 @@ FetchContent_MakeAvailable(yaml-cpp)
 set(CMAKE_POLICY_VERSION_MINIMUM "${_yaml_saved_policy_min}")
 
 # Ensure yaml-cpp is compiled with the same sanitizer flags as the main
-# project.  The sanitizers are set on dd-trace-cpp-specs as INTERFACE
-# properties, which yaml-cpp doesn't link against.  Without this, MSVC
-# ASAN annotation mismatches cause linker errors (LNK2038).
+# project.  Without this, MSVC ASAN annotation mismatches cause linker
+# errors (LNK2038).  We add only the sanitizer flags — not the full set
+# of compile options from dd-trace-cpp-specs (which includes -WX and
+# warning levels that would break yaml-cpp's own code).
 if (DD_TRACE_ENABLE_SANITIZE AND TARGET yaml-cpp)
-  get_target_property(_sanitize_opts dd-trace-cpp-specs INTERFACE_COMPILE_OPTIONS)
-  if (_sanitize_opts)
-    target_compile_options(yaml-cpp PRIVATE ${_sanitize_opts})
-  endif()
-  get_target_property(_sanitize_link dd-trace-cpp-specs INTERFACE_LINK_LIBRARIES)
-  if (_sanitize_link)
-    target_link_libraries(yaml-cpp PRIVATE ${_sanitize_link})
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT MATCHES "MSVC"))
+    target_compile_options(yaml-cpp PRIVATE /fsanitize=address)
+    target_link_options(yaml-cpp PRIVATE /fsanitize=address)
+  else()
+    target_compile_options(yaml-cpp PRIVATE -fsanitize=address,undefined)
+    target_link_options(yaml-cpp PRIVATE -fsanitize=address,undefined)
   endif()
 endif()
