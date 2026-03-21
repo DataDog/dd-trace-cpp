@@ -84,7 +84,6 @@ Optional<std::vector<Rule>> parse_stable_config_rules(
     }
     return rules;
   } catch (...) {
-    // TODO: log a warning when stable config JSON parsing fails
     return nullopt;
   }
 }
