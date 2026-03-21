@@ -31,75 +31,75 @@ CurlLibrary libcurl;
 
 }  // namespace
 
-CURL *CurlLibrary::easy_init() { return curl_easy_init(); }
+CURL* CurlLibrary::easy_init() { return curl_easy_init(); }
 
-void CurlLibrary::easy_cleanup(CURL *handle) { curl_easy_cleanup(handle); }
+void CurlLibrary::easy_cleanup(CURL* handle) { curl_easy_cleanup(handle); }
 
-CURLcode CurlLibrary::easy_getinfo_private(CURL *curl, char **user_data) {
+CURLcode CurlLibrary::easy_getinfo_private(CURL* curl, char** user_data) {
   return curl_easy_getinfo(curl, CURLINFO_PRIVATE, user_data);
 }
 
-CURLcode CurlLibrary::easy_getinfo_response_code(CURL *curl, long *code) {
+CURLcode CurlLibrary::easy_getinfo_response_code(CURL* curl, long* code) {
   return curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, code);
 }
 
-CURLcode CurlLibrary::easy_setopt_errorbuffer(CURL *handle, char *buffer) {
+CURLcode CurlLibrary::easy_setopt_errorbuffer(CURL* handle, char* buffer) {
   return curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, buffer);
 }
 
-CURLcode CurlLibrary::easy_setopt_headerdata(CURL *handle, void *data) {
+CURLcode CurlLibrary::easy_setopt_headerdata(CURL* handle, void* data) {
   return curl_easy_setopt(handle, CURLOPT_HEADERDATA, data);
 }
 
-CURLcode CurlLibrary::easy_setopt_headerfunction(CURL *handle,
+CURLcode CurlLibrary::easy_setopt_headerfunction(CURL* handle,
                                                  HeaderCallback on_header) {
   return curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, on_header);
 }
 
-CURLcode CurlLibrary::easy_setopt_httpheader(CURL *handle,
-                                             curl_slist *headers) {
+CURLcode CurlLibrary::easy_setopt_httpheader(CURL* handle,
+                                             curl_slist* headers) {
   return curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
 }
 
-CURLcode CurlLibrary::easy_setopt_post(CURL *handle, long post) {
+CURLcode CurlLibrary::easy_setopt_post(CURL* handle, long post) {
   return curl_easy_setopt(handle, CURLOPT_POST, post);
 }
 
-CURLcode CurlLibrary::easy_setopt_postfields(CURL *handle, const char *data) {
+CURLcode CurlLibrary::easy_setopt_postfields(CURL* handle, const char* data) {
   return curl_easy_setopt(handle, CURLOPT_POSTFIELDS, data);
 }
 
-CURLcode CurlLibrary::easy_setopt_postfieldsize(CURL *handle, long size) {
+CURLcode CurlLibrary::easy_setopt_postfieldsize(CURL* handle, long size) {
   return curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, size);
 }
 
-CURLcode CurlLibrary::easy_setopt_private(CURL *handle, void *pointer) {
+CURLcode CurlLibrary::easy_setopt_private(CURL* handle, void* pointer) {
   return curl_easy_setopt(handle, CURLOPT_PRIVATE, pointer);
 }
 
-CURLcode CurlLibrary::easy_setopt_unix_socket_path(CURL *handle,
-                                                   const char *path) {
+CURLcode CurlLibrary::easy_setopt_unix_socket_path(CURL* handle,
+                                                   const char* path) {
   return curl_easy_setopt(handle, CURLOPT_UNIX_SOCKET_PATH, path);
 }
 
-CURLcode CurlLibrary::easy_setopt_url(CURL *handle, const char *url) {
+CURLcode CurlLibrary::easy_setopt_url(CURL* handle, const char* url) {
   return curl_easy_setopt(handle, CURLOPT_URL, url);
 }
 
-CURLcode CurlLibrary::easy_setopt_writedata(CURL *handle, void *data) {
+CURLcode CurlLibrary::easy_setopt_writedata(CURL* handle, void* data) {
   return curl_easy_setopt(handle, CURLOPT_WRITEDATA, data);
 }
 
-CURLcode CurlLibrary::easy_setopt_writefunction(CURL *handle,
+CURLcode CurlLibrary::easy_setopt_writefunction(CURL* handle,
                                                 WriteCallback on_write) {
   return curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, on_write);
 }
 
-CURLcode CurlLibrary::easy_setopt_timeout_ms(CURL *handle, long timeout_ms) {
+CURLcode CurlLibrary::easy_setopt_timeout_ms(CURL* handle, long timeout_ms) {
   return curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, timeout_ms);
 }
 
-const char *CurlLibrary::easy_strerror(CURLcode error) {
+const char* CurlLibrary::easy_strerror(CURLcode error) {
   return curl_easy_strerror(error);
 }
 
@@ -109,51 +109,51 @@ CURLcode CurlLibrary::global_init(long flags) {
   return curl_global_init(flags);
 }
 
-CURLMcode CurlLibrary::multi_add_handle(CURLM *multi_handle,
-                                        CURL *easy_handle) {
+CURLMcode CurlLibrary::multi_add_handle(CURLM* multi_handle,
+                                        CURL* easy_handle) {
   return curl_multi_add_handle(multi_handle, easy_handle);
 }
 
-CURLMcode CurlLibrary::multi_cleanup(CURLM *multi_handle) {
+CURLMcode CurlLibrary::multi_cleanup(CURLM* multi_handle) {
   return curl_multi_cleanup(multi_handle);
 }
 
-CURLMsg *CurlLibrary::multi_info_read(CURLM *multi_handle, int *msgs_in_queue) {
+CURLMsg* CurlLibrary::multi_info_read(CURLM* multi_handle, int* msgs_in_queue) {
   return curl_multi_info_read(multi_handle, msgs_in_queue);
 }
 
-CURLM *CurlLibrary::multi_init() { return curl_multi_init(); }
+CURLM* CurlLibrary::multi_init() { return curl_multi_init(); }
 
-CURLMcode CurlLibrary::multi_perform(CURLM *multi_handle,
-                                     int *running_handles) {
+CURLMcode CurlLibrary::multi_perform(CURLM* multi_handle,
+                                     int* running_handles) {
   return curl_multi_perform(multi_handle, running_handles);
 }
 
-CURLMcode CurlLibrary::multi_poll(CURLM *multi_handle, curl_waitfd extra_fds[],
+CURLMcode CurlLibrary::multi_poll(CURLM* multi_handle, curl_waitfd extra_fds[],
                                   unsigned extra_nfds, int timeout_ms,
-                                  int *numfds) {
+                                  int* numfds) {
   return curl_multi_poll(multi_handle, extra_fds, extra_nfds, timeout_ms,
                          numfds);
 }
 
-CURLMcode CurlLibrary::multi_remove_handle(CURLM *multi_handle,
-                                           CURL *easy_handle) {
+CURLMcode CurlLibrary::multi_remove_handle(CURLM* multi_handle,
+                                           CURL* easy_handle) {
   return curl_multi_remove_handle(multi_handle, easy_handle);
 }
 
-const char *CurlLibrary::multi_strerror(CURLMcode error) {
+const char* CurlLibrary::multi_strerror(CURLMcode error) {
   return curl_multi_strerror(error);
 }
 
-CURLMcode CurlLibrary::multi_wakeup(CURLM *multi_handle) {
+CURLMcode CurlLibrary::multi_wakeup(CURLM* multi_handle) {
   return curl_multi_wakeup(multi_handle);
 }
 
-curl_slist *CurlLibrary::slist_append(curl_slist *list, const char *string) {
+curl_slist* CurlLibrary::slist_append(curl_slist* list, const char* string) {
   return curl_slist_append(list, string);
 }
 
-void CurlLibrary::slist_free_all(curl_slist *list) {
+void CurlLibrary::slist_free_all(curl_slist* list) {
   curl_slist_free_all(list);
 }
 
@@ -164,20 +164,20 @@ using URL = HTTPClient::URL;
 
 class CurlImpl {
   std::mutex mutex_;
-  CurlLibrary &curl_;
+  CurlLibrary& curl_;
   const std::shared_ptr<Logger> logger_;
   Clock clock_;
-  CURLM *multi_handle_;
-  std::unordered_set<CURL *> request_handles_;
-  std::list<CURL *> new_handles_;
+  CURLM* multi_handle_;
+  std::unordered_set<CURL*> request_handles_;
+  std::list<CURL*> new_handles_;
   bool shutting_down_;
   int num_active_handles_;
   std::condition_variable no_requests_;
   std::thread event_loop_;
 
   struct Request {
-    CurlLibrary *curl = nullptr;
-    curl_slist *request_headers = nullptr;
+    CurlLibrary* curl = nullptr;
+    curl_slist* request_headers = nullptr;
     std::string request_body;
     ResponseHandler on_response;
     ErrorHandler on_error;
@@ -190,45 +190,45 @@ class CurlImpl {
   };
 
   class HeaderWriter : public DictWriter {
-    curl_slist *list_ = nullptr;
+    curl_slist* list_ = nullptr;
     std::string buffer_;
-    CurlLibrary &curl_;
+    CurlLibrary& curl_;
 
    public:
-    explicit HeaderWriter(CurlLibrary &curl);
+    explicit HeaderWriter(CurlLibrary& curl);
     ~HeaderWriter();
-    curl_slist *release();
+    curl_slist* release();
     void set(StringView key, StringView value) override;
   };
 
   class HeaderReader : public DictReader {
-    std::unordered_map<std::string, std::string> *response_headers_lower_;
+    std::unordered_map<std::string, std::string>* response_headers_lower_;
     mutable std::string buffer_;
 
    public:
     explicit HeaderReader(
-        std::unordered_map<std::string, std::string> *response_headers_lower);
+        std::unordered_map<std::string, std::string>* response_headers_lower);
     Optional<StringView> lookup(StringView key) const override;
-    void visit(const std::function<void(StringView key, StringView value)>
-                   &visitor) const override;
+    void visit(const std::function<void(StringView key, StringView value)>&
+                   visitor) const override;
   };
 
   void run();
-  void handle_message(const CURLMsg &);
+  void handle_message(const CURLMsg&);
   CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
 
-  static std::size_t on_read_header(char *data, std::size_t, std::size_t length,
-                                    void *user_data);
-  static std::size_t on_read_body(char *data, std::size_t, std::size_t length,
-                                  void *user_data);
+  static std::size_t on_read_header(char* data, std::size_t, std::size_t length,
+                                    void* user_data);
+  static std::size_t on_read_body(char* data, std::size_t, std::size_t length,
+                                  void* user_data);
 
  public:
-  explicit CurlImpl(const std::shared_ptr<Logger> &, const Clock &,
-                    CurlLibrary &, const Curl::ThreadGenerator &);
+  explicit CurlImpl(const std::shared_ptr<Logger>&, const Clock&, CurlLibrary&,
+                    const Curl::ThreadGenerator&);
   ~CurlImpl();
 
-  Expected<void> post(const URL &url, HeadersSetter set_headers,
+  Expected<void> post(const URL& url, HeadersSetter set_headers,
                       std::string body, ResponseHandler on_response,
                       ErrorHandler on_error,
                       std::chrono::steady_clock::time_point deadline);
@@ -248,21 +248,21 @@ void throw_on_error(CURLcode result) {
 
 }  // namespace
 
-Curl::Curl(const std::shared_ptr<Logger> &logger, const Clock &clock)
+Curl::Curl(const std::shared_ptr<Logger>& logger, const Clock& clock)
     : Curl(logger, clock, libcurl) {}
 
-Curl::Curl(const std::shared_ptr<Logger> &logger, const Clock &clock,
-           CurlLibrary &curl)
+Curl::Curl(const std::shared_ptr<Logger>& logger, const Clock& clock,
+           CurlLibrary& curl)
     : Curl(logger, clock, curl,
-           [](auto &&func) { return std::thread(std::move(func)); }) {}
+           [](auto&& func) { return std::thread(std::move(func)); }) {}
 
-Curl::Curl(const std::shared_ptr<Logger> &logger, const Clock &clock,
-           CurlLibrary &curl, const Curl::ThreadGenerator &make_thread)
+Curl::Curl(const std::shared_ptr<Logger>& logger, const Clock& clock,
+           CurlLibrary& curl, const Curl::ThreadGenerator& make_thread)
     : impl_(new CurlImpl{logger, clock, curl, make_thread}) {}
 
 Curl::~Curl() { delete impl_; }
 
-Expected<void> Curl::post(const URL &url, HeadersSetter set_headers,
+Expected<void> Curl::post(const URL& url, HeadersSetter set_headers,
                           std::string body, ResponseHandler on_response,
                           ErrorHandler on_error,
                           std::chrono::steady_clock::time_point deadline) {
@@ -277,8 +277,8 @@ std::string Curl::config() const {
   return nlohmann::json::object({{"type", "datadog::tracing::Curl"}}).dump();
 }
 
-CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger, const Clock &clock,
-                   CurlLibrary &curl, const Curl::ThreadGenerator &make_thread)
+CurlImpl::CurlImpl(const std::shared_ptr<Logger>& logger, const Clock& clock,
+                   CurlLibrary& curl, const Curl::ThreadGenerator& make_thread)
     : curl_(curl),
       logger_(logger),
       clock_(clock),
@@ -295,7 +295,7 @@ CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger, const Clock &clock,
 
   try {
     event_loop_ = make_thread([this]() { run(); });
-  } catch (const std::system_error &error) {
+  } catch (const std::system_error& error) {
     logger_->log_error(
         Error{Error::CURL_HTTP_CLIENT_SETUP_FAILED, error.what()});
 
@@ -327,7 +327,7 @@ CurlImpl::~CurlImpl() {
 }
 
 Expected<void> CurlImpl::post(
-    const HTTPClient::URL &url, HeadersSetter set_headers, std::string body,
+    const HTTPClient::URL& url, HeadersSetter set_headers, std::string body,
     ResponseHandler on_response, ErrorHandler on_error,
     std::chrono::steady_clock::time_point deadline) try {
   if (multi_handle_ == nullptr) {
@@ -404,11 +404,11 @@ Expected<void> CurlImpl::post(
 }
 
 void CurlImpl::clear_requests() {
-  for (const auto &handle : request_handles_) {
-    char *user_data;
+  for (const auto& handle : request_handles_) {
+    char* user_data;
     if (log_on_error(curl_.easy_getinfo_private(handle, &user_data)) ==
         CURLE_OK) {
-      delete reinterpret_cast<Request *>(user_data);
+      delete reinterpret_cast<Request*>(user_data);
     }
 
     log_on_error(curl_.multi_remove_handle(multi_handle_, handle));
@@ -430,9 +430,9 @@ void CurlImpl::drain(std::chrono::steady_clock::time_point deadline) {
   log_on_error(curl_.multi_wakeup(multi_handle_));
 }
 
-std::size_t CurlImpl::on_read_header(char *data, std::size_t,
-                                     std::size_t length, void *user_data) {
-  const auto request = static_cast<Request *>(user_data);
+std::size_t CurlImpl::on_read_header(char* data, std::size_t,
+                                     std::size_t length, void* user_data) {
+  const auto request = static_cast<Request*>(user_data);
   // The idea is:
   //
   //         "    Foo-Bar  :   thingy, thingy, thing   \r\n"
@@ -460,9 +460,9 @@ std::size_t CurlImpl::on_read_header(char *data, std::size_t,
   return length;
 }
 
-std::size_t CurlImpl::on_read_body(char *data, std::size_t, std::size_t length,
-                                   void *user_data) {
-  const auto request = static_cast<Request *>(user_data);
+std::size_t CurlImpl::on_read_body(char* data, std::size_t, std::size_t length,
+                                   void* user_data) {
+  const auto request = static_cast<Request*>(user_data);
   request->response_body.append(data, length);
   return length;
 }
@@ -488,11 +488,11 @@ void CurlImpl::run() {
   int num_messages_remaining = 0;
 
   bool shutting_down = false;
-  CURLMsg *message = nullptr;
+  CURLMsg* message = nullptr;
   constexpr int max_wait_milliseconds = 10'000;
 
   std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
-  std::list<CURL *> handles_to_process;
+  std::list<CURL*> handles_to_process;
 
   while (true) {
     lock.lock();
@@ -509,15 +509,15 @@ void CurlImpl::run() {
 
     // New requests might have been added while we were sleeping.
     for (; !handles_to_process.empty(); handles_to_process.pop_front()) {
-      CURL *handle = handles_to_process.front();
-      char *user_data;
+      CURL* handle = handles_to_process.front();
+      char* user_data;
       if (log_on_error(curl_.easy_getinfo_private(handle, &user_data)) !=
           CURLE_OK) {
         curl_.easy_cleanup(handle);
         continue;
       }
 
-      auto *request = reinterpret_cast<Request *>(user_data);
+      auto* request = reinterpret_cast<Request*>(user_data);
       const auto timeout = request->deadline - clock_().tick;
       if (timeout <= std::chrono::steady_clock::time_point::duration::zero()) {
         std::string error_message;
@@ -566,18 +566,18 @@ void CurlImpl::run() {
   clear_requests();
 }
 
-void CurlImpl::handle_message(const CURLMsg &message) {
+void CurlImpl::handle_message(const CURLMsg& message) {
   if (message.msg != CURLMSG_DONE) {
     return;
   }
 
-  auto *const request_handle = message.easy_handle;
-  char *user_data;
+  auto* const request_handle = message.easy_handle;
+  char* user_data;
   if (log_on_error(curl_.easy_getinfo_private(request_handle, &user_data)) !=
       CURLE_OK) {
     return;
   }
-  auto &request = *reinterpret_cast<Request *>(user_data);
+  auto& request = *reinterpret_cast<Request*>(user_data);
 
   // `request` is done.  If we got a response, then call the response
   // handler.  If an error occurred, then call the error handler.
@@ -609,11 +609,11 @@ void CurlImpl::handle_message(const CURLMsg &message) {
 
 CurlImpl::Request::~Request() { curl->slist_free_all(request_headers); }
 
-CurlImpl::HeaderWriter::HeaderWriter(CurlLibrary &curl) : curl_(curl) {}
+CurlImpl::HeaderWriter::HeaderWriter(CurlLibrary& curl) : curl_(curl) {}
 
 CurlImpl::HeaderWriter::~HeaderWriter() { curl_.slist_free_all(list_); }
 
-curl_slist *CurlImpl::HeaderWriter::release() {
+curl_slist* CurlImpl::HeaderWriter::release() {
   auto list = list_;
   list_ = nullptr;
   return list;
@@ -629,7 +629,7 @@ void CurlImpl::HeaderWriter::set(StringView key, StringView value) {
 }
 
 CurlImpl::HeaderReader::HeaderReader(
-    std::unordered_map<std::string, std::string> *response_headers_lower)
+    std::unordered_map<std::string, std::string>* response_headers_lower)
     : response_headers_lower_(response_headers_lower) {}
 
 Optional<StringView> CurlImpl::HeaderReader::lookup(StringView key) const {
@@ -643,9 +643,9 @@ Optional<StringView> CurlImpl::HeaderReader::lookup(StringView key) const {
 }
 
 void CurlImpl::HeaderReader::visit(
-    const std::function<void(StringView key, StringView value)> &visitor)
+    const std::function<void(StringView key, StringView value)>& visitor)
     const {
-  for (const auto &[key, value] : *response_headers_lower_) {
+  for (const auto& [key, value] : *response_headers_lower_) {
     visitor(key, value);
   }
 }

@@ -113,8 +113,10 @@ TEST_CASE("TraceID serialization") {
     std::string expected_hex;
   };
 
-#define CASE(TRACE_ID, HEX) \
-  { __LINE__, #TRACE_ID, TRACE_ID, HEX }
+#define CASE(TRACE_ID, HEX)            \
+  {                                    \
+    __LINE__, #TRACE_ID, TRACE_ID, HEX \
+  }
   // clang-format off
   const auto test_case = GENERATE(values<TestCase>({
     CASE(TraceID(), "00000000000000000000000000000000"),

@@ -20,11 +20,11 @@ using namespace datadog::tracing;
 
 class SingleRequestMockCurlLibrary : public CurlLibrary {
  public:
-  void *user_data_on_header_ = nullptr;
+  void* user_data_on_header_ = nullptr;
   HeaderCallback on_header_ = nullptr;
-  void *user_data_on_write_ = nullptr;
+  void* user_data_on_write_ = nullptr;
   WriteCallback on_write_ = nullptr;
-  CURL *added_handle_ = nullptr;
+  CURL* added_handle_ = nullptr;
   CURLMsg message_;
   enum class state {
     unknown,
@@ -34,8 +34,8 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
   } state_ = state::unknown;
   // Since `SingleRequestMockCurlLibrary` supports at most one request,
   // `created_handles_` and `destroyed_handles_` will have size zero or one.
-  std::unordered_multiset<CURL *> created_handles_;
-  std::unordered_multiset<CURL *> destroyed_handles_;
+  std::unordered_multiset<CURL*> created_handles_;
+  std::unordered_multiset<CURL*> destroyed_handles_;
   // `message_result_` is the success/error code associated with the "done"
   // message sent to the event loop when the request has finished.
   CURLcode message_result_ = CURLE_OK;
@@ -45,48 +45,48 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
   bool delay_message_ = false;
   std::function<CURLMcode()> on_multi_perform = nullptr;
 
-  void easy_cleanup(CURL *handle) override {
+  void easy_cleanup(CURL* handle) override {
     destroyed_handles_.insert(handle);
     CurlLibrary::easy_cleanup(handle);
   }
 
-  CURL *easy_init() override {
-    CURL *handle = CurlLibrary::easy_init();
+  CURL* easy_init() override {
+    CURL* handle = CurlLibrary::easy_init();
     created_handles_.insert(handle);
     return handle;
   }
 
-  CURLcode easy_getinfo_response_code(CURL *, long *code) override {
+  CURLcode easy_getinfo_response_code(CURL*, long* code) override {
     *code = 200;
     return CURLE_OK;
   }
-  CURLcode easy_setopt_headerdata(CURL *, void *data) override {
+  CURLcode easy_setopt_headerdata(CURL*, void* data) override {
     user_data_on_header_ = data;
     return CURLE_OK;
   }
-  CURLcode easy_setopt_headerfunction(CURL *,
+  CURLcode easy_setopt_headerfunction(CURL*,
                                       HeaderCallback on_header) override {
     on_header_ = on_header;
     return CURLE_OK;
   }
-  CURLcode easy_setopt_writedata(CURL *, void *data) override {
+  CURLcode easy_setopt_writedata(CURL*, void* data) override {
     user_data_on_write_ = data;
     return CURLE_OK;
   }
 
-  CURLcode easy_setopt_writefunction(CURL *, WriteCallback on_write) override {
+  CURLcode easy_setopt_writefunction(CURL*, WriteCallback on_write) override {
     on_write_ = on_write;
     return CURLE_OK;
   }
 
-  CURLcode easy_setopt_timeout_ms(CURL *, long) override { return CURLE_OK; }
+  CURLcode easy_setopt_timeout_ms(CURL*, long) override { return CURLE_OK; }
 
-  CURLMcode multi_add_handle(CURLM *, CURL *easy_handle) override {
+  CURLMcode multi_add_handle(CURLM*, CURL* easy_handle) override {
     added_handle_ = easy_handle;
     state_ = state::added;
     return CURLM_OK;
   }
-  CURLMsg *multi_info_read(CURLM *, int *msgs_in_queue) override {
+  CURLMsg* multi_info_read(CURLM*, int* msgs_in_queue) override {
     if (delay_message_) {
       *msgs_in_queue = 0;
       return nullptr;
@@ -102,7 +102,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
     return &message_;
   }
 
-  CURLMcode multi_perform(CURLM *, int *running_handles) override {
+  CURLMcode multi_perform(CURLM*, int* running_handles) override {
     if (!added_handle_) {
       *running_handles = 0;
       return CURLM_OK;
@@ -143,7 +143,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
     state_ = state::performed;
     return CURLM_OK;
   }
-  CURLMcode multi_remove_handle(CURLM *, CURL *easy_handle) override {
+  CURLMcode multi_remove_handle(CURLM*, CURL* easy_handle) override {
     REQUIRE(easy_handle == added_handle_);
     added_handle_ = nullptr;
     return CURLM_OK;
@@ -152,7 +152,7 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
 
 #define CURL_TEST(x) TEST_CASE(x, "[curl]")
 
-const auto ignore = [](auto &&...) {};
+const auto ignore = [](auto&&...) {};
 
 using namespace std::chrono_literals;
 
@@ -190,7 +190,7 @@ CURL_TEST("parse response headers and body") {
     const HTTPClient::URL url = {"http", "whatever", "", ""};
     const auto result = client->post(
         url, ignore, "whatever",
-        [&](int status, const DictReader &headers, std::string body) {
+        [&](int status, const DictReader& headers, std::string body) {
           try {
             REQUIRE(status == 200);
             REQUIRE(headers.lookup("foo-bar") == "baz");
@@ -211,7 +211,7 @@ CURL_TEST("parse response headers and body") {
             exception = std::current_exception();
           }
         },
-        [&](const Error &error) { post_error = error; },
+        [&](const Error& error) { post_error = error; },
         clock().tick + std::chrono::seconds(10));
 
     REQUIRE(result);
@@ -227,7 +227,7 @@ CURL_TEST("bad multi-handle means error mode") {
   // If libcurl fails to allocate a multi-handle, then the HTTP client enters a
   // mode where calls to `post` always return an error.
   class MockCurlLibrary : public CurlLibrary {
-    CURLM *multi_init() override { return nullptr; }
+    CURLM* multi_init() override { return nullptr; }
   };
 
   const auto clock = default_clock;
@@ -250,8 +250,8 @@ CURL_TEST("bad std::thread means error mode") {
   const auto clock = default_clock;
   const auto logger = std::make_shared<MockLogger>();
   CurlLibrary libcurl;  // the default implementation
-  const auto client = std::make_shared<Curl>(
-      logger, clock, libcurl, [](auto &&) -> std::thread {
+  const auto client =
+      std::make_shared<Curl>(logger, clock, libcurl, [](auto&&) -> std::thread {
         throw std::system_error(
             std::make_error_code(std::errc::resource_unavailable_try_again));
       });
@@ -270,7 +270,7 @@ CURL_TEST("fail to allocate request handle") {
   // then `post` immediately returns an error.
   class MockCurlLibrary : public CurlLibrary {
    public:
-    CURL *easy_init() override { return nullptr; }
+    CURL* easy_init() override { return nullptr; }
   };
 
   const auto clock = default_clock;
@@ -295,73 +295,73 @@ CURL_TEST("setopt failures") {
     CURLoption fail = CURLOPT_LASTENTRY;
     CURLcode error = CURLE_OUT_OF_MEMORY;
 
-    CURLcode easy_setopt_errorbuffer(CURL *, char *) override {
+    CURLcode easy_setopt_errorbuffer(CURL*, char*) override {
       if (fail == CURLOPT_ERRORBUFFER) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_headerdata(CURL *, void *) override {
+    CURLcode easy_setopt_headerdata(CURL*, void*) override {
       if (fail == CURLOPT_HEADERDATA) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_headerfunction(CURL *, HeaderCallback) override {
+    CURLcode easy_setopt_headerfunction(CURL*, HeaderCallback) override {
       if (fail == CURLOPT_HEADERFUNCTION) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_httpheader(CURL *, curl_slist *) override {
+    CURLcode easy_setopt_httpheader(CURL*, curl_slist*) override {
       if (fail == CURLOPT_HTTPHEADER) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_post(CURL *, long) override {
+    CURLcode easy_setopt_post(CURL*, long) override {
       if (fail == CURLOPT_POST) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_postfields(CURL *, const char *) override {
+    CURLcode easy_setopt_postfields(CURL*, const char*) override {
       if (fail == CURLOPT_POSTFIELDS) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_postfieldsize(CURL *, long) override {
+    CURLcode easy_setopt_postfieldsize(CURL*, long) override {
       if (fail == CURLOPT_POSTFIELDSIZE) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_private(CURL *, void *) override {
+    CURLcode easy_setopt_private(CURL*, void*) override {
       if (fail == CURLOPT_PRIVATE) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_unix_socket_path(CURL *, const char *) override {
+    CURLcode easy_setopt_unix_socket_path(CURL*, const char*) override {
       if (fail == CURLOPT_UNIX_SOCKET_PATH) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_url(CURL *, const char *) override {
+    CURLcode easy_setopt_url(CURL*, const char*) override {
       if (fail == CURLOPT_URL) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_writedata(CURL *, void *) override {
+    CURLcode easy_setopt_writedata(CURL*, void*) override {
       if (fail == CURLOPT_WRITEDATA) {
         return error;
       }
       return CURLE_OK;
     }
-    CURLcode easy_setopt_writefunction(CURL *, WriteCallback) override {
+    CURLcode easy_setopt_writefunction(CURL*, WriteCallback) override {
       if (fail == CURLOPT_WRITEFUNCTION) {
         return error;
       }
@@ -375,7 +375,9 @@ CURL_TEST("setopt failures") {
   };
 
 #define CASE(OPTION) \
-  { OPTION, #OPTION }
+  {                  \
+    OPTION, #OPTION  \
+  }
 
   auto test_case = GENERATE(
       values<TestCase>({CASE(CURLOPT_ERRORBUFFER), CASE(CURLOPT_HEADERDATA),
@@ -425,7 +427,7 @@ CURL_TEST("handles are always cleaned up") {
     const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
     const auto result = client->post(
         url, ignore, "whatever",
-        [&](int status, const DictReader & /*headers*/, std::string body) {
+        [&](int status, const DictReader& /*headers*/, std::string body) {
           try {
             REQUIRE(status == 200);
             REQUIRE(body ==
@@ -434,7 +436,7 @@ CURL_TEST("handles are always cleaned up") {
             exception = std::current_exception();
           }
         },
-        [&](const Error &error) { post_error = error; }, dummy_deadline);
+        [&](const Error& error) { post_error = error; }, dummy_deadline);
 
     REQUIRE(result);
     client->drain(clock().tick + std::chrono::seconds(1));
@@ -451,7 +453,7 @@ CURL_TEST("handles are always cleaned up") {
     library.message_result_ = CURLE_COULDNT_CONNECT;  // any error would do
     const auto result = client->post(
         url, ignore, "whatever", ignore,
-        [&](const Error &error) { post_error = error; }, dummy_deadline);
+        [&](const Error& error) { post_error = error; }, dummy_deadline);
 
     REQUIRE(result);
     client->drain(clock().tick + std::chrono::seconds(1));

@@ -54,15 +54,15 @@ class SpookyHash {
   //
   // SpookyHash: hash a single message in one call, produce 128-bit output
   //
-  static void Hash128(const void *message,  // message to hash
+  static void Hash128(const void* message,  // message to hash
                       size_t length,        // length of message in bytes
-                      uint64 *hash1,   // in/out: in seed 1, out hash value 1
-                      uint64 *hash2);  // in/out: in seed 2, out hash value 2
+                      uint64* hash1,   // in/out: in seed 1, out hash value 1
+                      uint64* hash2);  // in/out: in seed 2, out hash value 2
 
   //
   // Hash64: hash a single message in one call, return 64-bit output
   //
-  static uint64 Hash64(const void *message,  // message to hash
+  static uint64 Hash64(const void* message,  // message to hash
                        size_t length,        // length of message in bytes
                        uint64 seed)          // seed
   {
@@ -74,7 +74,7 @@ class SpookyHash {
   //
   // Hash32: hash a single message in one call, produce 32-bit output
   //
-  static uint32 Hash32(const void *message,  // message to hash
+  static uint32 Hash32(const void* message,  // message to hash
                        size_t length,        // length of message in bytes
                        uint32 seed)          // seed
   {
@@ -92,7 +92,7 @@ class SpookyHash {
   //
   // Update: add a piece of a message to a SpookyHash state
   //
-  void Update(const void *message,  // message fragment
+  void Update(const void* message,  // message fragment
               size_t length);       // length of message fragment in bytes
 
   //
@@ -103,8 +103,8 @@ class SpookyHash {
   // The result is the same as if SpookyHash() had been called with
   // all the pieces concatenated into one message.
   //
-  void Final(uint64 *hash1,   // out only: first 64 bits of hash value.
-             uint64 *hash2);  // out only: second 64 bits of hash value.
+  void Final(uint64* hash1,   // out only: first 64 bits of hash value.
+             uint64* hash2);  // out only: second 64 bits of hash value.
 
   //
   // left rotate a 64-bit value by k bytes
@@ -126,10 +126,10 @@ class SpookyHash {
   //   When run forward or backwards one Mix
   // I tried 3 pairs of each; they all differed by at least 212 bits.
   //
-  static INLINE void Mix(const uint64 *data, uint64 &s0, uint64 &s1, uint64 &s2,
-                         uint64 &s3, uint64 &s4, uint64 &s5, uint64 &s6,
-                         uint64 &s7, uint64 &s8, uint64 &s9, uint64 &s10,
-                         uint64 &s11) {
+  static INLINE void Mix(const uint64* data, uint64& s0, uint64& s1, uint64& s2,
+                         uint64& s3, uint64& s4, uint64& s5, uint64& s6,
+                         uint64& s7, uint64& s8, uint64& s9, uint64& s10,
+                         uint64& s11) {
     s0 += data[0];
     s2 ^= s10;
     s11 ^= s0;
@@ -208,10 +208,10 @@ class SpookyHash {
   // Two iterations was almost good enough for a 64-bit result, but a
   // 128-bit result is reported, so End() does three iterations.
   //
-  static INLINE void EndPartial(uint64 &h0, uint64 &h1, uint64 &h2, uint64 &h3,
-                                uint64 &h4, uint64 &h5, uint64 &h6, uint64 &h7,
-                                uint64 &h8, uint64 &h9, uint64 &h10,
-                                uint64 &h11) {
+  static INLINE void EndPartial(uint64& h0, uint64& h1, uint64& h2, uint64& h3,
+                                uint64& h4, uint64& h5, uint64& h6, uint64& h7,
+                                uint64& h8, uint64& h9, uint64& h10,
+                                uint64& h11) {
     h11 += h1;
     h2 ^= h11;
     h1 = Rot64(h1, 44);
@@ -250,10 +250,10 @@ class SpookyHash {
     h0 = Rot64(h0, 54);
   }
 
-  static INLINE void End(const uint64 *data, uint64 &h0, uint64 &h1, uint64 &h2,
-                         uint64 &h3, uint64 &h4, uint64 &h5, uint64 &h6,
-                         uint64 &h7, uint64 &h8, uint64 &h9, uint64 &h10,
-                         uint64 &h11) {
+  static INLINE void End(const uint64* data, uint64& h0, uint64& h1, uint64& h2,
+                         uint64& h3, uint64& h4, uint64& h5, uint64& h6,
+                         uint64& h7, uint64& h8, uint64& h9, uint64& h10,
+                         uint64& h11) {
     h0 += data[0];
     h1 += data[1];
     h2 += data[2];
@@ -286,7 +286,7 @@ class SpookyHash {
   // with diffs defined by either xor or subtraction
   // with a base of all zeros plus a counter, or plus another bit, or random
   //
-  static INLINE void ShortMix(uint64 &h0, uint64 &h1, uint64 &h2, uint64 &h3) {
+  static INLINE void ShortMix(uint64& h0, uint64& h1, uint64& h2, uint64& h3) {
     h2 = Rot64(h2, 50);
     h2 += h3;
     h0 ^= h2;
@@ -337,7 +337,7 @@ class SpookyHash {
   // For every pair of input bits,
   // with probability 50 +- .75% (the worst case is approximately that)
   //
-  static INLINE void ShortEnd(uint64 &h0, uint64 &h1, uint64 &h2, uint64 &h3) {
+  static INLINE void ShortEnd(uint64& h0, uint64& h1, uint64& h2, uint64& h3) {
     h3 ^= h2;
     h2 = Rot64(h2, 15);
     h3 += h2;
@@ -381,10 +381,10 @@ class SpookyHash {
   // held to the same quality bar.
   //
   static void Short(
-      const void *message,  // message (array of bytes, not necessarily aligned)
+      const void* message,  // message (array of bytes, not necessarily aligned)
       size_t length,        // length of message (in bytes)
-      uint64 *hash1,        // in/out: in the seed, out the hash value
-      uint64 *hash2);       // in/out: in the seed, out the hash value
+      uint64* hash1,        // in/out: in the seed, out the hash value
+      uint64* hash2);       // in/out: in the seed, out the hash value
 
   // number of uint64's in internal state
   static const size_t sc_numVars = 12;
@@ -430,7 +430,7 @@ class FastHash final {
   ///
   /// @param data   Pointer to the data to hash.
   /// @param length Size of the data in bytes.
-  void append(const void *data, size_t length) { hasher_.Update(data, length); }
+  void append(const void* data, size_t length) { hasher_.Update(data, length); }
 
   /// Finalizes the hash computation and returns a 64-bit hash value.
   ///

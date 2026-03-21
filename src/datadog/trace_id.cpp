@@ -29,7 +29,7 @@ Expected<TraceID> TraceID::parse_hex(StringView input) {
   const auto parse_hex_piece =
       [input](StringView piece) -> Expected<std::uint64_t> {
     auto result = parse_uint64(piece, 16);
-    if (auto *error = result.if_error()) {
+    if (auto* error = result.if_error()) {
       std::string prefix = "Unable to parse trace ID from \"";
       append(prefix, input);
       prefix += "\": ";
@@ -42,7 +42,7 @@ Expected<TraceID> TraceID::parse_hex(StringView input) {
   // longer than that, then it will all fit in `TraceID::low`.
   if (input.size() <= 16) {
     auto result = parse_hex_piece(input);
-    if (auto *error = result.if_error()) {
+    if (auto* error = result.if_error()) {
       return std::move(*error);
     }
     return TraceID(*result);
@@ -56,13 +56,13 @@ Expected<TraceID> TraceID::parse_hex(StringView input) {
   TraceID trace_id;
 
   auto result = parse_hex_piece(low_hex);
-  if (auto *error = result.if_error()) {
+  if (auto* error = result.if_error()) {
     return std::move(*error);
   }
   trace_id.low = *result;
 
   result = parse_hex_piece(high_hex);
-  if (auto *error = result.if_error()) {
+  if (auto* error = result.if_error()) {
     return std::move(*error);
   }
   trace_id.high = *result;

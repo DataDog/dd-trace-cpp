@@ -12,17 +12,17 @@ constexpr bool ALLOW_UNALIGNED_READS = true;
 namespace datadog::common {
 namespace details {
 
-void SpookyHash::Short(const void *message, size_t length, uint64 *hash1,
-                       uint64 *hash2) {
+void SpookyHash::Short(const void* message, size_t length, uint64* hash1,
+                       uint64* hash2) {
   uint64 buf[2 * sc_numVars];
   union {
-    const uint8 *p8;
-    uint32 *p32;
-    uint64 *p64;
+    const uint8* p8;
+    uint32* p32;
+    uint64* p64;
     size_t i;
   } u;
 
-  u.p8 = (const uint8 *)message;
+  u.p8 = (const uint8*)message;
 
   if constexpr (!ALLOW_UNALIGNED_READS && (u.i & 0x7)) {
     memcpy(buf, message, length);
@@ -36,7 +36,7 @@ void SpookyHash::Short(const void *message, size_t length, uint64 *hash1,
   uint64 d = sc_const;
 
   if (length > 15) {
-    const uint64 *end = u.p64 + (length / 32) * 4;
+    const uint64* end = u.p64 + (length / 32) * 4;
 
     // handle all complete sets of 32 bytes
     for (; u.p64 < end; u.p64 += 4) {
@@ -116,8 +116,8 @@ void SpookyHash::Short(const void *message, size_t length, uint64 *hash1,
 }
 
 // do the whole hash in one call
-void SpookyHash::Hash128(const void *message, size_t length, uint64 *hash1,
-                         uint64 *hash2) {
+void SpookyHash::Hash128(const void* message, size_t length, uint64* hash1,
+                         uint64* hash2) {
   if (length < sc_bufSize) {
     Short(message, length, hash1, hash2);
     return;
@@ -125,10 +125,10 @@ void SpookyHash::Hash128(const void *message, size_t length, uint64 *hash1,
 
   uint64 h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11;
   uint64 buf[sc_numVars];
-  uint64 *end;
+  uint64* end;
   union {
-    const uint8 *p8;
-    uint64 *p64;
+    const uint8* p8;
+    uint64* p64;
     size_t i;
   } u;
   size_t remainder;
@@ -137,7 +137,7 @@ void SpookyHash::Hash128(const void *message, size_t length, uint64 *hash1,
   h1 = h4 = h7 = h10 = *hash2;
   h2 = h5 = h8 = h11 = sc_const;
 
-  u.p8 = (const uint8 *)message;
+  u.p8 = (const uint8*)message;
   end = u.p64 + (length / sc_blockSize) * sc_numVars;
 
   // handle all whole sc_blockSize blocks of bytes
@@ -155,10 +155,10 @@ void SpookyHash::Hash128(const void *message, size_t length, uint64 *hash1,
   }
 
   // handle the last partial block of sc_blockSize bytes
-  remainder = (length - ((const uint8 *)end - (const uint8 *)message));
+  remainder = (length - ((const uint8*)end - (const uint8*)message));
   memcpy(buf, end, remainder);
-  memset(((uint8 *)buf) + remainder, 0, sc_blockSize - remainder);
-  ((uint8 *)buf)[sc_blockSize - 1] = remainder;
+  memset(((uint8*)buf) + remainder, 0, sc_blockSize - remainder);
+  ((uint8*)buf)[sc_blockSize - 1] = remainder;
 
   // do some final mixing
   End(buf, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);
@@ -175,20 +175,20 @@ void SpookyHash::Init(uint64 seed1, uint64 seed2) {
 }
 
 // add a message fragment to the state
-void SpookyHash::Update(const void *message, size_t length) {
+void SpookyHash::Update(const void* message, size_t length) {
   uint64 h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11;
   size_t newLength = length + m_remainder;
   uint8 remainder;
   union {
-    const uint8 *p8;
-    uint64 *p64;
+    const uint8* p8;
+    uint64* p64;
     size_t i;
   } u;
-  const uint64 *end;
+  const uint64* end;
 
   // Is this message fragment too short?  If it is, stuff it away.
   if (newLength < sc_bufSize) {
-    memcpy(&((uint8 *)m_data)[m_remainder], message, length);
+    memcpy(&((uint8*)m_data)[m_remainder], message, length);
     m_length = length + m_length;
     m_remainder = (uint8)newLength;
     return;
@@ -218,19 +218,19 @@ void SpookyHash::Update(const void *message, size_t length) {
   // if we've got anything stuffed away, use it now
   if (m_remainder) {
     uint8 prefix = sc_bufSize - m_remainder;
-    memcpy(&(((uint8 *)m_data)[m_remainder]), message, prefix);
+    memcpy(&(((uint8*)m_data)[m_remainder]), message, prefix);
     u.p64 = m_data;
     Mix(u.p64, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);
     Mix(&u.p64[sc_numVars], h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);
-    u.p8 = ((const uint8 *)message) + prefix;
+    u.p8 = ((const uint8*)message) + prefix;
     length -= prefix;
   } else {
-    u.p8 = (const uint8 *)message;
+    u.p8 = (const uint8*)message;
   }
 
   // handle all whole blocks of sc_blockSize bytes
   end = u.p64 + (length / sc_blockSize) * sc_numVars;
-  remainder = (uint8)(length - ((const uint8 *)end - u.p8));
+  remainder = (uint8)(length - ((const uint8*)end - u.p8));
   if constexpr (ALLOW_UNALIGNED_READS || (u.i & 0x7) == 0) {
     while (u.p64 < end) {
       Mix(u.p64, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);
@@ -264,7 +264,7 @@ void SpookyHash::Update(const void *message, size_t length) {
 }
 
 // report the hash for the concatenation of all message fragments so far
-void SpookyHash::Final(uint64 *hash1, uint64 *hash2) {
+void SpookyHash::Final(uint64* hash1, uint64* hash2) {
   // init the variables
   if (m_length < sc_bufSize) {
     *hash1 = m_state[0];
@@ -273,7 +273,7 @@ void SpookyHash::Final(uint64 *hash1, uint64 *hash2) {
     return;
   }
 
-  const uint64 *data = (const uint64 *)m_data;
+  const uint64* data = (const uint64*)m_data;
   uint8 remainder = m_remainder;
 
   uint64 h0 = m_state[0];
@@ -297,9 +297,9 @@ void SpookyHash::Final(uint64 *hash1, uint64 *hash2) {
   }
 
   // mix in the last partial block, and the length mod sc_blockSize
-  memset(&((uint8 *)data)[remainder], 0, (sc_blockSize - remainder));
+  memset(&((uint8*)data)[remainder], 0, (sc_blockSize - remainder));
 
-  ((uint8 *)data)[sc_blockSize - 1] = remainder;
+  ((uint8*)data)[sc_blockSize - 1] = remainder;
 
   // do some final mixing
   End(data, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);

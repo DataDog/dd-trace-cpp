@@ -14,10 +14,10 @@ namespace tracing {
 
 class NullLogger : public Logger {
  public:
-  void log_error(const LogFunc&) override{};
-  void log_startup(const LogFunc&) override{};
+  void log_error(const LogFunc&) override {};
+  void log_startup(const LogFunc&) override {};
 
-  void log_error(const Error&) override{};
+  void log_error(const Error&) override {};
   void log_error(StringView) override{};
 };
 

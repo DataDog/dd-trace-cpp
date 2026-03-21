@@ -1265,7 +1265,8 @@ TEST_TRACER("span extraction") {
 
     auto test_case = GENERATE(values<TestCase>({
         {
-            __LINE__, "identical trace info",
+            __LINE__,
+            "identical trace info",
             "00-11111111111111110000000000000001-000000003ade68b1-"
             "01",                               // traceparent
             "dd=s:2;p:000000003ade68b1,foo=1",  // tracestate
@@ -1277,7 +1278,8 @@ TEST_TRACER("span extraction") {
         },
 
         {
-            __LINE__, "trace ids do not match",
+            __LINE__,
+            "trace ids do not match",
             "00-11111111111111110000000000000002-000000003ade68b1-"
             "01",                               // traceparent
             "dd=s:2;p:000000000000000a,foo=1",  // tracestate
@@ -1289,7 +1291,8 @@ TEST_TRACER("span extraction") {
         },
 
         {
-            __LINE__, "same trace, non-matching parent ids",
+            __LINE__,
+            "same trace, non-matching parent ids",
             "00-11111111111111110000000000000003-000000003ade68b1-"
             "01",                               // traceparent
             "dd=s:2;p:000000000000000a,foo=1",  // tracestate
@@ -1301,7 +1304,8 @@ TEST_TRACER("span extraction") {
         },
 
         {
-            __LINE__, "non-matching span, missing p value",
+            __LINE__,
+            "non-matching span, missing p value",
             "00-00000000000000000000000000000004-000000003ade68b1-"
             "01",                // traceparent
             "dd=s:2,foo=1",      // tracestate
@@ -1313,7 +1317,8 @@ TEST_TRACER("span extraction") {
         },
 
         {
-            __LINE__, "non-matching span, non-matching p value",
+            __LINE__,
+            "non-matching span, non-matching p value",
             "00-00000000000000000000000000000005-000000003ade68b1-"
             "01",                               // traceparent
             "dd=s:2;p:8fffffffffffffff,foo=1",  // tracestate
@@ -1851,7 +1856,9 @@ TEST_TRACER("APM tracing disabled") {
       auto finalized_config = finalize_config(config, clock);
       REQUIRE(finalized_config);
       Tracer tracer{*finalized_config};
-      { auto root1 = tracer.create_span(); }
+      {
+        auto root1 = tracer.create_span();
+      }
       REQUIRE(collector->chunks.size() == 1);
       REQUIRE(collector->chunks.front().size() == 1);
 
@@ -1930,7 +1937,9 @@ TEST_TRACER("APM tracing disabled") {
 
     // When APM Tracing is disabled, we allow one trace per second for service
     // liveness. To ensure consistency, consume the limiter slot.
-    { tracer.create_span(); }
+    {
+      tracer.create_span();
+    }
     collector->chunks.clear();
 
     // Case 1: extracted context with priority, but no `_dd.p.ts` → depends if

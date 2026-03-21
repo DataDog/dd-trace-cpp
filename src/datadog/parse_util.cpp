@@ -19,7 +19,7 @@ namespace {
 template <typename Integer>
 Expected<Integer> parse_integer(StringView input, int base, StringView kind) {
   Integer value;
-  const char *const end = input.data() + input.size();
+  const char* const end = input.data() + input.size();
   const auto status = std::from_chars(input.data(), end, value, base);
   if (status.ec == std::errc::invalid_argument) {
     std::string message;
@@ -103,12 +103,12 @@ std::vector<StringView> parse_list(StringView input) {
     return items;
   }
 
-  const char *const end = input.data() + input.size();
-  const char *current = input.data();
+  const char* const end = input.data() + input.size();
+  const char* current = input.data();
 
-  const char *begin_delim;
+  const char* begin_delim;
   do {
-    const char *begin_item =
+    const char* begin_item =
         std::find_if(current, end, [](uchar ch) { return !std::isspace(ch); });
     begin_delim = std::find_if(begin_item, end, [](uchar ch) {
       return std::isspace(ch) || ch == ',';
@@ -116,7 +116,7 @@ std::vector<StringView> parse_list(StringView input) {
 
     items.emplace_back(begin_item, std::size_t(begin_delim - begin_item));
 
-    const char *end_delim = std::find_if(
+    const char* end_delim = std::find_if(
         begin_delim, end, [](uchar ch) { return !std::isspace(ch); });
 
     if (end_delim != end && *end_delim == ',') {
@@ -136,7 +136,7 @@ Expected<std::unordered_map<std::string, std::string>> parse_tags(
   std::string key;
   std::string value;
 
-  for (const StringView &token : list) {
+  for (const StringView& token : list) {
     const auto separator = token.find(':');
 
     if (separator == std::string::npos) {

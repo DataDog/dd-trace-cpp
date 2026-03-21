@@ -95,7 +95,7 @@ enum Variable { DD_LIST_ENVIRONMENT_VARIABLES(WITH_COMMA) };
 #define QUOTED_WITH_COMMA(ARG, TYPE, DEFAULT_VALUE) \
   WITH_COMMA(QUOTED(ARG), TYPE, DEFAULT_VALUE)
 
-inline const char *const variable_names[] = {
+inline const char* const variable_names[] = {
     DD_LIST_ENVIRONMENT_VARIABLES(QUOTED_WITH_COMMA)};
 
 #undef QUOTED

@@ -82,7 +82,7 @@ class ConfigManager : public remote_config::Listener {
 
  public:
   ConfigManager(const FinalizedTracerConfig& config);
-  ~ConfigManager() override{};
+  ~ConfigManager() override {};
 
   remote_config::Products get_products() override;
   remote_config::Capabilities get_capabilities() override;
@@ -90,7 +90,7 @@ class ConfigManager : public remote_config::Listener {
   Optional<std::string> on_update(
       const Listener::Configuration& config) override;
   void on_revert(const Listener::Configuration& config) override;
-  void on_post_process() override{};
+  void on_post_process() override {};
 
   // Return the `TraceSampler` consistent with the most recent configuration.
   std::shared_ptr<TraceSampler> trace_sampler();

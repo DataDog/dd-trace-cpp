@@ -58,7 +58,7 @@ class HeaderWriter final : public dd::DictWriter {
   nlohmann::json& j_;
 
  public:
-  HeaderWriter(nlohmann::json& headers) : j_(headers){};
+  HeaderWriter(nlohmann::json& headers) : j_(headers) {};
   ~HeaderWriter() = default;
 
   // Associate the specified `value` with the specified `key`.  An
