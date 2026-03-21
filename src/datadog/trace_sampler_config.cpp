@@ -160,29 +160,8 @@ Optional<double> stable_config_double(const StableConfig& cfg,
 // Returns empty vector on any parse error (stable config errors are non-fatal).
 Optional<std::vector<TraceSamplerConfig::Rule>> stable_config_sampling_rules(
     const StableConfig& cfg, const std::string& key) {
-  auto val = cfg.lookup(key);
-  if (!val || val->empty()) return nullopt;
-
-  try {
-    auto json_rules = nlohmann::json::parse(*val);
-    if (!json_rules.is_array()) return nullopt;
-
-    std::vector<TraceSamplerConfig::Rule> rules;
-    for (const auto& json_rule : json_rules) {
-      auto matcher = from_json(json_rule);
-      if (matcher.if_error()) return nullopt;
-
-      TraceSamplerConfig::Rule rule{*matcher};
-      auto sample_rate = json_rule.find("sample_rate");
-      if (sample_rate != json_rule.end() && sample_rate->is_number()) {
-        rule.sample_rate = *sample_rate;
-      }
-      rules.emplace_back(std::move(rule));
-    }
-    return rules;
-  } catch (...) {
-    return nullopt;
-  }
+  return parse_stable_config_rules<TraceSamplerConfig::Rule, nlohmann::json>(
+      cfg, key, [](TraceSamplerConfig::Rule&, const nlohmann::json&) {});
 }
 
 }  // namespace

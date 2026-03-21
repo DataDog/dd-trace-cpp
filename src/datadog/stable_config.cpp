@@ -1,5 +1,6 @@
 #include "stable_config.h"
 
+#include <cstddef>
 #include <fstream>
 #include <string>
 
@@ -14,6 +15,11 @@
 namespace datadog {
 namespace tracing {
 namespace {
+
+// Maximum file size accepted for stable configuration files: 256KB.
+// This is a file I/O concern, not a parser concern, so it lives here rather
+// than in yaml_parser.h.
+constexpr std::size_t kMaxYamlFileSize = 256 * 1024;
 
 #ifdef _WIN32
 
@@ -95,7 +101,7 @@ StableConfig load_one(const std::string& path, Logger& logger) {
 
   file.seekg(0);
   std::string content(static_cast<std::size_t>(size), '\0');
-  if (!file.read(&content[0], size)) {
+  if (!file.read(content.data(), size)) {
     logger.log_error([&path](std::ostream& log) {
       log << "Stable config: unable to read " << path << "; skipping.";
     });

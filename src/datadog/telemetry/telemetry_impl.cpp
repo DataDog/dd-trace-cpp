@@ -743,8 +743,10 @@ nlohmann::json Telemetry::generate_configuration_field(
       break;
   }
 
-  if (config_metadata.config_id) {
-    j["config_id"] = *config_metadata.config_id;
+  if (config_metadata.origin ==
+          tracing::ConfigMetadata::Origin::FLEET_STABLE_CONFIG &&
+      config_.fleet_stable_config_id) {
+    j["config_id"] = *config_.fleet_stable_config_id;
   }
 
   if (config_metadata.error) {

@@ -17,6 +17,9 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+#include "json_serializer.h"
 
 namespace datadog {
 namespace tracing {
@@ -51,6 +54,40 @@ struct StableConfigs {
 // Load and parse both stable configuration files.
 // Returns empty configs (no error) if files don't exist.
 StableConfigs load_stable_configs(Logger& logger);
+
+// Parse a stable config JSON string as an array of sampling rules.
+// `customize_rule` is a callable that receives (Rule&, const json_rule&) to set
+// rule-specific fields beyond the base matcher and sample_rate.
+// Returns nullopt on any parse error (stable config errors are non-fatal).
+template <typename Rule, typename Json, typename Customize>
+Optional<std::vector<Rule>> parse_stable_config_rules(
+    const StableConfig& cfg, const std::string& key, Customize customize_rule) {
+  auto val = cfg.lookup(key);
+  if (!val || val->empty()) return nullopt;
+
+  try {
+    auto json_rules = Json::parse(*val);
+    if (!json_rules.is_array()) return nullopt;
+
+    std::vector<Rule> rules;
+    for (const auto& json_rule : json_rules) {
+      auto matcher = from_json(json_rule);
+      if (matcher.if_error()) return nullopt;
+
+      Rule rule{*matcher};
+      if (auto sr = json_rule.find("sample_rate");
+          sr != json_rule.end() && sr->is_number()) {
+        rule.sample_rate = *sr;
+      }
+      customize_rule(rule, json_rule);
+      rules.emplace_back(std::move(rule));
+    }
+    return rules;
+  } catch (...) {
+    // TODO: log a warning when stable config JSON parsing fails
+    return nullopt;
+  }
+}
 
 }  // namespace tracing
 }  // namespace datadog

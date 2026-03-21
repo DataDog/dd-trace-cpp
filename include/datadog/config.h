@@ -57,8 +57,6 @@ struct ConfigMetadata {
   Origin origin;
   // Optional error associated with the configuration parameter
   Optional<Error> error;
-  // Optional fleet policy ID (set when origin is FLEET_STABLE_CONFIG)
-  Optional<std::string> config_id;
 
   ConfigMetadata() = default;
   ConfigMetadata(ConfigName n, std::string v, Origin orig,
@@ -100,45 +98,11 @@ Value resolve_and_record_config(
     std::unordered_map<ConfigName, std::vector<ConfigMetadata>>* metadata,
     ConfigName config_name, DefaultValue fallback = nullptr,
     Stringifier to_string_fn = nullptr) {
-  auto stringify = [&](const Value& v) -> std::string {
-    if constexpr (!std::is_same_v<Stringifier, std::nullptr_t>) {
-      return to_string_fn(v);  // use provided function
-    } else if constexpr (std::is_constructible_v<std::string, Value>) {
-      return std::string(v);  // default behaviour (works for string-like types)
-    } else {
-      static_assert(!std::is_same_v<Value, Value>,
-                    "Non-string types require a stringifier function");
-      return "";  // unreachable
-    }
-  };
-
-  std::vector<ConfigMetadata> metadata_entries;
-  Optional<Value> chosen_value;
-
-  auto add_entry = [&](ConfigMetadata::Origin origin, const Value& val) {
-    std::string val_str = stringify(val);
-    metadata_entries.emplace_back(ConfigMetadata{config_name, val_str, origin});
-    chosen_value = val;
-  };
-
-  // Add DEFAULT entry if fallback was provided (detected by type)
-  if constexpr (!std::is_same_v<DefaultValue, std::nullptr_t>) {
-    add_entry(ConfigMetadata::Origin::DEFAULT, fallback);
-  }
-
-  if (from_user) {
-    add_entry(ConfigMetadata::Origin::CODE, *from_user);
-  }
-
-  if (from_env) {
-    add_entry(ConfigMetadata::Origin::ENVIRONMENT_VARIABLE, *from_env);
-  }
-
-  if (!metadata_entries.empty()) {
-    (*metadata)[config_name] = std::move(metadata_entries);
-  }
-
-  return chosen_value.value_or(Value{});
+  // Delegate to the 5-parameter overload with nullopt for fleet and local
+  // stable config sources.
+  return resolve_and_record_config(Optional<Value>{}, from_env, from_user,
+                                   Optional<Value>{}, metadata, config_name,
+                                   fallback, to_string_fn);
 }
 
 // Extended version of resolve_and_record_config that includes stable

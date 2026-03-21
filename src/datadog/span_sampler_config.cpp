@@ -242,32 +242,16 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   Optional<std::vector<SpanSamplerConfig::Rule>> fleet_rules;
   Optional<std::vector<SpanSamplerConfig::Rule>> local_rules;
   if (stable_configs) {
-    auto parse_span_rules = [](const StableConfig& cfg, const std::string& key)
-        -> Optional<std::vector<SpanSamplerConfig::Rule>> {
-      auto val = cfg.lookup(key);
-      if (!val || val->empty()) return nullopt;
-      try {
-        auto json_rules = nlohmann::json::parse(*val);
-        if (!json_rules.is_array()) return nullopt;
-        std::vector<SpanSamplerConfig::Rule> rules;
-        for (const auto& json_rule : json_rules) {
-          auto matcher = from_json(json_rule);
-          if (matcher.if_error()) return nullopt;
-          SpanSamplerConfig::Rule rule{*matcher};
-          if (auto sr = json_rule.find("sample_rate");
-              sr != json_rule.end() && sr->is_number()) {
-            rule.sample_rate = *sr;
-          }
-          if (auto mps = json_rule.find("max_per_second");
-              mps != json_rule.end() && mps->is_number()) {
-            rule.max_per_second = *mps;
-          }
-          rules.emplace_back(std::move(rule));
-        }
-        return rules;
-      } catch (...) {
-        return nullopt;
-      }
+    auto parse_span_rules = [](const StableConfig& cfg,
+                               const std::string& key) {
+      return parse_stable_config_rules<SpanSamplerConfig::Rule, nlohmann::json>(
+          cfg, key,
+          [](SpanSamplerConfig::Rule& rule, const nlohmann::json& json_rule) {
+            if (auto mps = json_rule.find("max_per_second");
+                mps != json_rule.end() && mps->is_number()) {
+              rule.max_per_second = *mps;
+            }
+          });
     };
     fleet_rules =
         parse_span_rules(stable_configs->fleet, "DD_SPAN_SAMPLING_RULES");

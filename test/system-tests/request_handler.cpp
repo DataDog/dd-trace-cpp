@@ -102,13 +102,23 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
   // Precedence: fleet_stable > env > local_stable
   std::unordered_map<std::string, std::string> effective_config;
 
-  // 1. Local stable config (lowest precedence)
+  // 1. Collect all keys from both local and fleet configs.
+  std::unordered_map<std::string, std::string> all_keys;
+  for (const auto& [key, value] : local_stable_config_values_) {
+    all_keys[key] = "";
+  }
+  for (const auto& [key, value] : fleet_stable_config_values_) {
+    all_keys[key] = "";
+  }
+
+  // 2. Local stable config (lowest precedence)
   for (const auto& [key, value] : local_stable_config_values_) {
     effective_config[key] = normalize_value(value);
   }
 
-  // 3. Environment variables (for keys we're tracking)
-  for (const auto& [key, value] : effective_config) {
+  // 3. Environment variables (check ALL tracked keys, not just those in
+  //    effective_config so far -- fleet keys are also checked).
+  for (const auto& [key, _] : all_keys) {
     const char* env_val = std::getenv(key.c_str());
     if (env_val != nullptr) {
       effective_config[key] = normalize_value(std::string(env_val));

@@ -6,15 +6,11 @@
 
 #include <datadog/optional.h>
 
-#include <cstddef>
 #include <string>
 #include <unordered_map>
 
 namespace datadog {
 namespace tracing {
-
-// Maximum file size accepted by the YAML parser: 256KB.
-constexpr std::size_t kMaxYamlFileSize = 256 * 1024;
 
 // Result of parsing a YAML stable configuration document.
 struct YamlParseResult {

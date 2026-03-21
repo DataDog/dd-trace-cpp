@@ -1,9 +1,10 @@
 #include <datadog/optional.h>
 #include <datadog/tracer_config.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <cstddef>
 #include <filesystem>
-#include <fstream>
 #include <string>
 #include <unordered_map>
 
@@ -11,6 +12,7 @@
 #include "mocks/loggers.h"
 #include "stable_config.h"
 #include "test.h"
+#include "yaml_parser.h"
 
 using namespace datadog::test;
 using namespace datadog::tracing;
@@ -25,7 +27,8 @@ class TempDir {
 
  public:
   TempDir() {
-    path_ = fs::temp_directory_path() / "dd-trace-cpp-test-stable-config";
+    path_ = fs::temp_directory_path() /
+            ("dd-trace-cpp-test-stable-config-" + std::to_string(getpid()));
     fs::create_directories(path_);
   }
 
@@ -36,12 +39,6 @@ class TempDir {
 
   const fs::path& path() const { return path_; }
 };
-
-void write_file(const fs::path& path, const std::string& content) {
-  fs::create_directories(path.parent_path());
-  std::ofstream f(path);
-  f << content;
-}
 
 }  // namespace
 
@@ -61,36 +58,27 @@ STABLE_CONFIG_TEST("StableConfig::lookup returns value for present key") {
 }
 
 STABLE_CONFIG_TEST("parse valid YAML with apm_configuration_default") {
-  TempDir tmp;
-  auto file = tmp.path() / "app_mon.yaml";
-  write_file(file, R"(
+  std::string yaml_content = R"(
 apm_configuration_default:
   DD_SERVICE: my-service
   DD_ENV: production
   DD_PROFILING_ENABLED: true
   DD_TRACE_SAMPLE_RATE: 0.5
-)");
+)";
 
-  MockLogger logger;
-  // Use load_one indirectly via load_stable_configs — but we need to test
-  // the parsing directly. Since load_one is in an anonymous namespace, we
-  // test via the full load path by manipulating the file paths.
-  // Instead, we test the public API by creating files at known paths.
-  // For unit tests, we'll test the YAML parsing behavior via
-  // finalize_config.
+  YamlParseResult parsed;
+  auto status = parse_yaml(yaml_content, parsed);
+  REQUIRE(status == YamlParseStatus::OK);
 
-  // For now, verify that the struct works correctly.
-  StableConfig cfg;
-  cfg.values["DD_SERVICE"] = "my-service";
-  cfg.values["DD_ENV"] = "production";
-  cfg.values["DD_PROFILING_ENABLED"] = "true";
-  cfg.values["DD_TRACE_SAMPLE_RATE"] = "0.5";
-
-  REQUIRE(cfg.lookup("DD_SERVICE") == Optional<std::string>("my-service"));
-  REQUIRE(cfg.lookup("DD_ENV") == Optional<std::string>("production"));
-  REQUIRE(cfg.lookup("DD_PROFILING_ENABLED") == Optional<std::string>("true"));
-  REQUIRE(cfg.lookup("DD_TRACE_SAMPLE_RATE") == Optional<std::string>("0.5"));
-  REQUIRE(!cfg.lookup("DD_MISSING").has_value());
+  REQUIRE(parsed.values.count("DD_SERVICE"));
+  REQUIRE(parsed.values["DD_SERVICE"] == "my-service");
+  REQUIRE(parsed.values.count("DD_ENV"));
+  REQUIRE(parsed.values["DD_ENV"] == "production");
+  REQUIRE(parsed.values.count("DD_PROFILING_ENABLED"));
+  REQUIRE(parsed.values["DD_PROFILING_ENABLED"] == "true");
+  REQUIRE(parsed.values.count("DD_TRACE_SAMPLE_RATE"));
+  REQUIRE(parsed.values["DD_TRACE_SAMPLE_RATE"] == "0.5");
+  REQUIRE(!parsed.values.count("DD_MISSING"));
 }
 
 STABLE_CONFIG_TEST("config_id is stored") {

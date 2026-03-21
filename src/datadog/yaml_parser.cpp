@@ -8,6 +8,9 @@ namespace tracing {
 namespace {
 
 // Remove leading and trailing whitespace from `s`.
+// This is intentionally a local function rather than reusing string_util.h's
+// trim(StringView), because this version also strips '\r' and '\n' to handle
+// Windows line endings in YAML files.
 std::string trim(const std::string& s) {
   const auto begin = s.find_first_not_of(" \t\r\n");
   if (begin == std::string::npos) return "";
@@ -77,6 +80,11 @@ YamlParseStatus parse_yaml(const std::string& content, YamlParseResult& out) {
     // Strip comments from lines that are entirely comments.
     auto trimmed = trim(line);
     if (trimmed.empty() || trimmed[0] == '#') {
+      continue;
+    }
+
+    // Skip YAML document markers (start '---' and end '...').
+    if (trimmed == "---" || trimmed == "...") {
       continue;
     }
 
