@@ -1,7 +1,5 @@
 #include <datadog/optional.h>
 #include <datadog/tracer_config.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include <cstddef>
 #include <filesystem>
@@ -28,7 +26,8 @@ class TempDir {
  public:
   TempDir() {
     path_ = fs::temp_directory_path() /
-            ("dd-trace-cpp-test-stable-config-" + std::to_string(getpid()));
+            ("dd-trace-cpp-test-stable-config-" +
+             std::to_string(std::hash<std::string>{}(__FILE__)));
     fs::create_directories(path_);
   }
 
