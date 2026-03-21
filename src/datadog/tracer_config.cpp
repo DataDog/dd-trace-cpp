@@ -101,12 +101,6 @@ Optional<bool> stable_config_bool(const StableConfig &cfg,
   return !falsy(StringView(*val));
 }
 
-// Convert a stable config string value to Optional<std::string>.
-Optional<std::string> stable_config_string(const StableConfig &cfg,
-                                           const std::string &key) {
-  return cfg.lookup(key);
-}
-
 // Convert a stable config string value to Optional<uint64_t>.
 Optional<std::size_t> stable_config_uint64(const StableConfig &cfg,
                                            const std::string &key) {
@@ -137,33 +131,6 @@ Optional<std::vector<PropagationStyle>> stable_config_propagation_styles(
   auto styles = parse_propagation_styles(StringView(*val));
   if (styles.if_error()) return nullopt;
   return std::move(*styles);
-}
-
-// Holds both fleet and local stable config values for a given key, reducing
-// the repetitive pattern of calling stable_config_*(fleet, key) and
-// stable_config_*(local, key) for each configuration parameter.
-template <typename T>
-struct StablePair {
-  Optional<T> fleet;
-  Optional<T> local;
-};
-
-StablePair<std::string> stable_string_pair(const StableConfigs &cfgs,
-                                           const std::string &key) {
-  return {stable_config_string(cfgs.fleet, key),
-          stable_config_string(cfgs.local, key)};
-}
-
-StablePair<bool> stable_bool_pair(const StableConfigs &cfgs,
-                                  const std::string &key) {
-  return {stable_config_bool(cfgs.fleet, key),
-          stable_config_bool(cfgs.local, key)};
-}
-
-StablePair<std::size_t> stable_uint64_pair(const StableConfigs &cfgs,
-                                           const std::string &key) {
-  return {stable_config_uint64(cfgs.fleet, key),
-          stable_config_uint64(cfgs.local, key)};
 }
 
 Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
@@ -362,32 +329,26 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.logger = logger;
 
   // DD_SERVICE
-  {
-    auto sc = stable_string_pair(stable_configs, "DD_SERVICE");
-    final_config.defaults.service = resolve_and_record_config(
-        sc.fleet, env_config->service, user_config.service, sc.local,
-        &final_config.metadata, ConfigName::SERVICE_NAME, get_process_name());
-  }
+  final_config.defaults.service = resolve_and_record_config(
+      stable_configs.fleet.lookup("DD_SERVICE"), env_config->service,
+      user_config.service, stable_configs.local.lookup("DD_SERVICE"),
+      &final_config.metadata, ConfigName::SERVICE_NAME, get_process_name());
 
   // Service type
   final_config.defaults.service_type =
       value_or(env_config->service_type, user_config.service_type, "web");
 
   // DD_ENV
-  {
-    auto sc = stable_string_pair(stable_configs, "DD_ENV");
-    final_config.defaults.environment = resolve_and_record_config(
-        sc.fleet, env_config->environment, user_config.environment, sc.local,
-        &final_config.metadata, ConfigName::SERVICE_ENV);
-  }
+  final_config.defaults.environment = resolve_and_record_config(
+      stable_configs.fleet.lookup("DD_ENV"), env_config->environment,
+      user_config.environment, stable_configs.local.lookup("DD_ENV"),
+      &final_config.metadata, ConfigName::SERVICE_ENV);
 
   // DD_VERSION
-  {
-    auto sc = stable_string_pair(stable_configs, "DD_VERSION");
-    final_config.defaults.version = resolve_and_record_config(
-        sc.fleet, env_config->version, user_config.version, sc.local,
-        &final_config.metadata, ConfigName::SERVICE_VERSION);
-  }
+  final_config.defaults.version = resolve_and_record_config(
+      stable_configs.fleet.lookup("DD_VERSION"), env_config->version,
+      user_config.version, stable_configs.local.lookup("DD_VERSION"),
+      &final_config.metadata, ConfigName::SERVICE_VERSION);
 
   // Span name
   final_config.defaults.name = value_or(env_config->name, user_config.name, "");
@@ -403,29 +364,32 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
         [](const auto &tags) { return join_tags(tags); });
   }
 
-  // Extraction Styles
+  // Extraction and Injection Styles
   const std::vector<PropagationStyle> default_propagation_styles{
       PropagationStyle::DATADOG, PropagationStyle::W3C,
       PropagationStyle::BAGGAGE};
 
-  // Compute stable config extraction styles using the same cascade as env
-  // vars: specific extract > global.
-  auto stable_extraction_styles =
-      [&](const StableConfig &cfg) -> Optional<std::vector<PropagationStyle>> {
-    if (auto s = stable_config_propagation_styles(
-            cfg, "DD_TRACE_PROPAGATION_STYLE_EXTRACT"))
-      return s;
-    if (auto s = stable_config_propagation_styles(
-            cfg, "DD_PROPAGATION_STYLE_EXTRACT"))
-      return s;
-    return stable_config_propagation_styles(cfg, "DD_TRACE_PROPAGATION_STYLE");
+  // Resolve stable config propagation styles using the same cascade as env
+  // vars: specific > legacy > global.
+  auto stable_propagation_styles =
+      [](const StableConfig &cfg, const std::string &specific_key,
+         const std::string &legacy_key, const std::string &global_key)
+      -> Optional<std::vector<PropagationStyle>> {
+    if (auto s = stable_config_propagation_styles(cfg, specific_key)) return s;
+    if (auto s = stable_config_propagation_styles(cfg, legacy_key)) return s;
+    return stable_config_propagation_styles(cfg, global_key);
   };
 
   final_config.extraction_styles = resolve_and_record_config(
-      stable_extraction_styles(stable_configs.fleet),
+      stable_propagation_styles(
+          stable_configs.fleet, "DD_TRACE_PROPAGATION_STYLE_EXTRACT",
+          "DD_PROPAGATION_STYLE_EXTRACT", "DD_TRACE_PROPAGATION_STYLE"),
       env_config->extraction_styles, user_config.extraction_styles,
-      stable_extraction_styles(stable_configs.local), &final_config.metadata,
-      ConfigName::EXTRACTION_STYLES, default_propagation_styles,
+      stable_propagation_styles(
+          stable_configs.local, "DD_TRACE_PROPAGATION_STYLE_EXTRACT",
+          "DD_PROPAGATION_STYLE_EXTRACT", "DD_TRACE_PROPAGATION_STYLE"),
+      &final_config.metadata, ConfigName::EXTRACTION_STYLES,
+      default_propagation_styles,
       [](const std::vector<PropagationStyle> &styles) {
         return join_propagation_styles(styles);
       });
@@ -435,25 +399,16 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
                  "At least one extraction style must be specified."};
   }
 
-  // Compute stable config injection styles using the same cascade as env
-  // vars: specific inject > global.
-  auto stable_injection_styles =
-      [&](const StableConfig &cfg) -> Optional<std::vector<PropagationStyle>> {
-    if (auto s = stable_config_propagation_styles(
-            cfg, "DD_TRACE_PROPAGATION_STYLE_INJECT"))
-      return s;
-    if (auto s = stable_config_propagation_styles(
-            cfg, "DD_PROPAGATION_STYLE_INJECT"))
-      return s;
-    return stable_config_propagation_styles(cfg, "DD_TRACE_PROPAGATION_STYLE");
-  };
-
-  // Injection Styles
   final_config.injection_styles = resolve_and_record_config(
-      stable_injection_styles(stable_configs.fleet),
+      stable_propagation_styles(
+          stable_configs.fleet, "DD_TRACE_PROPAGATION_STYLE_INJECT",
+          "DD_PROPAGATION_STYLE_INJECT", "DD_TRACE_PROPAGATION_STYLE"),
       env_config->injection_styles, user_config.injection_styles,
-      stable_injection_styles(stable_configs.local), &final_config.metadata,
-      ConfigName::INJECTION_STYLES, default_propagation_styles,
+      stable_propagation_styles(
+          stable_configs.local, "DD_TRACE_PROPAGATION_STYLE_INJECT",
+          "DD_PROPAGATION_STYLE_INJECT", "DD_TRACE_PROPAGATION_STYLE"),
+      &final_config.metadata, ConfigName::INJECTION_STYLES,
+      default_propagation_styles,
       [](const std::vector<PropagationStyle> &styles) {
         return join_propagation_styles(styles);
       });
@@ -464,22 +419,20 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   }
 
   // Startup Logs
-  {
-    auto sc = stable_bool_pair(stable_configs, "DD_TRACE_STARTUP_LOGS");
-    final_config.log_on_startup = resolve_and_record_config(
-        sc.fleet, env_config->log_on_startup, user_config.log_on_startup,
-        sc.local, &final_config.metadata, ConfigName::STARTUP_LOGS, true,
-        [](const bool &b) { return to_string(b); });
-  }
+  final_config.log_on_startup = resolve_and_record_config(
+      stable_config_bool(stable_configs.fleet, "DD_TRACE_STARTUP_LOGS"),
+      env_config->log_on_startup, user_config.log_on_startup,
+      stable_config_bool(stable_configs.local, "DD_TRACE_STARTUP_LOGS"),
+      &final_config.metadata, ConfigName::STARTUP_LOGS, true,
+      [](const bool &b) { return to_string(b); });
 
   // Report traces
-  {
-    auto sc = stable_bool_pair(stable_configs, "DD_TRACE_ENABLED");
-    final_config.report_traces = resolve_and_record_config(
-        sc.fleet, env_config->report_traces, user_config.report_traces,
-        sc.local, &final_config.metadata, ConfigName::REPORT_TRACES, true,
-        [](const bool &b) { return to_string(b); });
-  }
+  final_config.report_traces = resolve_and_record_config(
+      stable_config_bool(stable_configs.fleet, "DD_TRACE_ENABLED"),
+      env_config->report_traces, user_config.report_traces,
+      stable_config_bool(stable_configs.local, "DD_TRACE_ENABLED"),
+      &final_config.metadata, ConfigName::REPORT_TRACES, true,
+      [](const bool &b) { return to_string(b); });
 
   // Report hostname
   final_config.report_hostname =
@@ -490,15 +443,15 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       env_config->max_tags_header_size, user_config.max_tags_header_size, 512);
 
   // 128b Trace IDs
-  {
-    auto sc = stable_bool_pair(stable_configs,
-                               "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED");
-    final_config.generate_128bit_trace_ids = resolve_and_record_config(
-        sc.fleet, env_config->generate_128bit_trace_ids,
-        user_config.generate_128bit_trace_ids, sc.local, &final_config.metadata,
-        ConfigName::GENEREATE_128BIT_TRACE_IDS, true,
-        [](const bool &b) { return to_string(b); });
-  }
+  final_config.generate_128bit_trace_ids = resolve_and_record_config(
+      stable_config_bool(stable_configs.fleet,
+                         "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED"),
+      env_config->generate_128bit_trace_ids,
+      user_config.generate_128bit_trace_ids,
+      stable_config_bool(stable_configs.local,
+                         "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED"),
+      &final_config.metadata, ConfigName::GENEREATE_128BIT_TRACE_IDS, true,
+      [](const bool &b) { return to_string(b); });
 
   // Integration name & version
   final_config.integration_name = value_or(
@@ -508,22 +461,20 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
                tracer_version);
 
   // Baggage - max items
-  {
-    auto sc = stable_uint64_pair(stable_configs, "DD_TRACE_BAGGAGE_MAX_ITEMS");
-    final_config.baggage_opts.max_items = resolve_and_record_config(
-        sc.fleet, env_config->baggage_max_items, user_config.baggage_max_items,
-        sc.local, &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_ITEMS,
-        64UL, [](const size_t &i) { return std::to_string(i); });
-  }
+  final_config.baggage_opts.max_items = resolve_and_record_config(
+      stable_config_uint64(stable_configs.fleet, "DD_TRACE_BAGGAGE_MAX_ITEMS"),
+      env_config->baggage_max_items, user_config.baggage_max_items,
+      stable_config_uint64(stable_configs.local, "DD_TRACE_BAGGAGE_MAX_ITEMS"),
+      &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_ITEMS, 64UL,
+      [](const size_t &i) { return std::to_string(i); });
 
   // Baggage - max bytes
-  {
-    auto sc = stable_uint64_pair(stable_configs, "DD_TRACE_BAGGAGE_MAX_BYTES");
-    final_config.baggage_opts.max_bytes = resolve_and_record_config(
-        sc.fleet, env_config->baggage_max_bytes, user_config.baggage_max_bytes,
-        sc.local, &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_BYTES,
-        8192UL, [](const size_t &i) { return std::to_string(i); });
-  }
+  final_config.baggage_opts.max_bytes = resolve_and_record_config(
+      stable_config_uint64(stable_configs.fleet, "DD_TRACE_BAGGAGE_MAX_BYTES"),
+      env_config->baggage_max_bytes, user_config.baggage_max_bytes,
+      stable_config_uint64(stable_configs.local, "DD_TRACE_BAGGAGE_MAX_BYTES"),
+      &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_BYTES, 8192UL,
+      [](const size_t &i) { return std::to_string(i); });
 
   if (final_config.baggage_opts.max_items <= 0 ||
       final_config.baggage_opts.max_bytes < 3) {
@@ -550,8 +501,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     return std::move(*error);
   }
 
-  if (auto trace_sampler_config =
-          finalize_config(user_config.trace_sampler, &stable_configs)) {
+  if (auto trace_sampler_config = finalize_config(
+          user_config.trace_sampler, &stable_configs, logger.get())) {
     // Merge metadata vectors
     for (auto &[key, values] : trace_sampler_config->metadata) {
       auto &dest = final_config.metadata[key];
@@ -599,34 +550,37 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   }
 
   // APM Tracing Enabled
-  {
-    auto sc = stable_bool_pair(stable_configs, "DD_APM_TRACING_ENABLED");
-    final_config.tracing_enabled = resolve_and_record_config(
-        sc.fleet, env_config->tracing_enabled, user_config.tracing_enabled,
-        sc.local, &final_config.metadata, ConfigName::APM_TRACING_ENABLED, true,
-        [](const bool &b) { return to_string(b); });
-  }
+  final_config.tracing_enabled = resolve_and_record_config(
+      stable_config_bool(stable_configs.fleet, "DD_APM_TRACING_ENABLED"),
+      env_config->tracing_enabled, user_config.tracing_enabled,
+      stable_config_bool(stable_configs.local, "DD_APM_TRACING_ENABLED"),
+      &final_config.metadata, ConfigName::APM_TRACING_ENABLED, true,
+      [](const bool &b) { return to_string(b); });
 
   {
     // Resource Renaming Enabled
-    auto sc_rr =
-        stable_bool_pair(stable_configs, "DD_TRACE_RESOURCE_RENAMING_ENABLED");
     const bool resource_renaming_enabled = resolve_and_record_config(
-        sc_rr.fleet, env_config->resource_renaming_enabled,
-        user_config.resource_renaming_enabled, sc_rr.local,
+        stable_config_bool(stable_configs.fleet,
+                           "DD_TRACE_RESOURCE_RENAMING_ENABLED"),
+        env_config->resource_renaming_enabled,
+        user_config.resource_renaming_enabled,
+        stable_config_bool(stable_configs.local,
+                           "DD_TRACE_RESOURCE_RENAMING_ENABLED"),
         &final_config.metadata, ConfigName::TRACE_RESOURCE_RENAMING_ENABLED,
         false, [](const bool &b) { return to_string(b); });
 
     // Resource Renaming Always Simplified Endpoint
-    auto sc_rrase = stable_bool_pair(
-        stable_configs,
-        "DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT");
     const bool resource_renaming_always_simplified_endpoint =
         resolve_and_record_config(
-            sc_rrase.fleet,
+            stable_config_bool(
+                stable_configs.fleet,
+                "DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT"),
             env_config->resource_renaming_always_simplified_endpoint,
             user_config.resource_renaming_always_simplified_endpoint,
-            sc_rrase.local, &final_config.metadata,
+            stable_config_bool(
+                stable_configs.local,
+                "DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT"),
+            &final_config.metadata,
             ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
             false, [](const bool &b) { return to_string(b); });
 

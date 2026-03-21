@@ -1,4 +1,5 @@
 #include <datadog/environment.h>
+#include <datadog/logger.h>
 #include <datadog/trace_sampler_config.h>
 #include <datadog/trace_source.h>
 
@@ -7,6 +8,7 @@
 
 #include "json.hpp"
 #include "json_serializer.h"
+#include "null_logger.h"
 #include "parse_util.h"
 #include "stable_config.h"
 #include "string_util.h"
@@ -156,12 +158,62 @@ Optional<double> stable_config_double(const StableConfig &cfg,
   return *result;
 }
 
+// Parse a stable config JSON string as an array of sampling rules.
+// `customize_rule` is a callable that receives (Rule&, const json_rule&) to set
+// rule-specific fields beyond the base matcher and sample_rate.
+// Returns nullopt on any parse error (stable config errors are non-fatal).
+template <typename Rule, typename Json, typename Customize>
+Optional<std::vector<Rule>> parse_stable_config_rules(
+    const StableConfig &cfg, const std::string &key, Logger &logger,
+    Customize customize_rule) {
+  auto val = cfg.lookup(key);
+  if (!val || val->empty()) return nullopt;
+
+  try {
+    auto json_rules = Json::parse(*val);
+    if (!json_rules.is_array()) {
+      logger.log_error([&key](std::ostream &log) {
+        log << "Unable to parse JSON sampling rules from " << key
+            << ": expected a JSON array";
+      });
+      return nullopt;
+    }
+
+    std::vector<Rule> rules;
+    for (const auto &json_rule : json_rules) {
+      auto matcher = from_json(json_rule);
+      if (matcher.if_error()) {
+        logger.log_error([&key](std::ostream &log) {
+          log << "Unable to parse JSON sampling rules from " << key
+              << ": invalid rule matcher";
+        });
+        return nullopt;
+      }
+
+      Rule rule{*matcher};
+      if (auto sr = json_rule.find("sample_rate");
+          sr != json_rule.end() && sr->is_number()) {
+        rule.sample_rate = *sr;
+      }
+      customize_rule(rule, json_rule);
+      rules.emplace_back(std::move(rule));
+    }
+    return rules;
+  } catch (...) {
+    logger.log_error([&key](std::ostream &log) {
+      log << "Unable to parse JSON sampling rules from " << key;
+    });
+    return nullopt;
+  }
+}
+
 // Try to parse a stable config string value as trace sampling rules JSON.
-// Returns empty vector on any parse error (stable config errors are non-fatal).
+// Returns nullopt on any parse error (stable config errors are non-fatal).
 Optional<std::vector<TraceSamplerConfig::Rule>> stable_config_sampling_rules(
-    const StableConfig &cfg, const std::string &key) {
+    const StableConfig &cfg, const std::string &key, Logger &logger) {
   return parse_stable_config_rules<TraceSamplerConfig::Rule, nlohmann::json>(
-      cfg, key, [](TraceSamplerConfig::Rule &, const nlohmann::json &) {});
+      cfg, key, logger,
+      [](TraceSamplerConfig::Rule &, const nlohmann::json &) {});
 }
 
 }  // namespace
@@ -169,7 +221,11 @@ Optional<std::vector<TraceSamplerConfig::Rule>> stable_config_sampling_rules(
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig &config, const StableConfigs *stable_configs) {
+    const TraceSamplerConfig &config, const StableConfigs *stable_configs,
+    Logger *logger) {
+  NullLogger null_logger;
+  Logger &log = logger ? *logger : static_cast<Logger &>(null_logger);
+
   Expected<TraceSamplerConfig> env_config = load_trace_sampler_env_config();
   if (auto error = env_config.if_error()) {
     return *error;
@@ -184,9 +240,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   Optional<std::vector<TraceSamplerConfig::Rule>> local_rules;
   if (stable_configs) {
     fleet_rules = stable_config_sampling_rules(stable_configs->fleet,
-                                               "DD_TRACE_SAMPLING_RULES");
+                                               "DD_TRACE_SAMPLING_RULES", log);
     local_rules = stable_config_sampling_rules(stable_configs->local,
-                                               "DD_TRACE_SAMPLING_RULES");
+                                               "DD_TRACE_SAMPLING_RULES", log);
   }
 
   if (fleet_rules) {

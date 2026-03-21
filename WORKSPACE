@@ -40,6 +40,9 @@ http_archive(
     urls = ["https://github.com/bazelbuild/rules_cc/releases/download/0.2.14/rules_cc-0.2.14.tar.gz"],
 )
 
+# This pulls the upstream yaml-cpp 0.8.0 tarball directly.
+# MODULE.bazel uses "0.8.0.bcr.1" because that is the BCR (Bazel Central
+# Registry) patched release; the underlying library version is the same 0.8.0.
 http_archive(
     name = "yaml_cpp",
     sha256 = "fbe74bbdcee21d656715688706da3c8becfd946d92cd44705cc6098bb23b3a16",

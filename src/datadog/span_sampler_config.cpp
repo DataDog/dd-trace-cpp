@@ -15,6 +15,55 @@ namespace datadog {
 namespace tracing {
 namespace {
 
+// Parse a stable config JSON string as an array of sampling rules.
+// `customize_rule` is a callable that receives (Rule&, const json_rule&) to set
+// rule-specific fields beyond the base matcher and sample_rate.
+// Returns nullopt on any parse error (stable config errors are non-fatal).
+template <typename Rule, typename Json, typename Customize>
+Optional<std::vector<Rule>> parse_stable_config_rules(
+    const StableConfig &cfg, const std::string &key, Logger &logger,
+    Customize customize_rule) {
+  auto val = cfg.lookup(key);
+  if (!val || val->empty()) return nullopt;
+
+  try {
+    auto json_rules = Json::parse(*val);
+    if (!json_rules.is_array()) {
+      logger.log_error([&key](std::ostream &log) {
+        log << "Unable to parse JSON sampling rules from " << key
+            << ": expected a JSON array";
+      });
+      return nullopt;
+    }
+
+    std::vector<Rule> rules;
+    for (const auto &json_rule : json_rules) {
+      auto matcher = from_json(json_rule);
+      if (matcher.if_error()) {
+        logger.log_error([&key](std::ostream &log) {
+          log << "Unable to parse JSON sampling rules from " << key
+              << ": invalid rule matcher";
+        });
+        return nullopt;
+      }
+
+      Rule rule{*matcher};
+      if (auto sr = json_rule.find("sample_rate");
+          sr != json_rule.end() && sr->is_number()) {
+        rule.sample_rate = *sr;
+      }
+      customize_rule(rule, json_rule);
+      rules.emplace_back(std::move(rule));
+    }
+    return rules;
+  } catch (...) {
+    logger.log_error([&key](std::ostream &log) {
+      log << "Unable to parse JSON sampling rules from " << key;
+    });
+    return nullopt;
+  }
+}
+
 std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
   nlohmann::json res;
   for (const auto &r : rules) {
@@ -242,10 +291,10 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   Optional<std::vector<SpanSamplerConfig::Rule>> fleet_rules;
   Optional<std::vector<SpanSamplerConfig::Rule>> local_rules;
   if (stable_configs) {
-    auto parse_span_rules = [](const StableConfig &cfg,
-                               const std::string &key) {
+    auto parse_span_rules = [&logger](const StableConfig &cfg,
+                                      const std::string &key) {
       return parse_stable_config_rules<SpanSamplerConfig::Rule, nlohmann::json>(
-          cfg, key,
+          cfg, key, logger,
           [](SpanSamplerConfig::Rule &rule, const nlohmann::json &json_rule) {
             if (auto mps = json_rule.find("max_per_second");
                 mps != json_rule.end() && mps->is_number()) {

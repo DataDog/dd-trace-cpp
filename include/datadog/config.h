@@ -64,6 +64,11 @@ struct ConfigMetadata {
       : name(n), value(std::move(v)), origin(orig), error(std::move(err)) {}
 };
 
+// 3-parameter overload (env, user, default) kept for backward compatibility
+// with external projects (e.g., nginx-datadog, httpd-datadog) that include
+// this public header.  New internal code should prefer the 5-parameter
+// overload that also accepts fleet and local stable config sources.
+//
 // Returns the final configuration value using the following
 // precedence order: environment > user code > default, and populates metadata:
 // `metadata`: Records ALL configuration sources that were provided,

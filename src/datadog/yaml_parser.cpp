@@ -16,6 +16,8 @@ YamlParseStatus parse_yaml(const std::string& content, YamlParseResult& out) {
   YAML::Node root;
   try {
     root = YAML::Load(content);
+  } catch (const std::exception&) {
+    return YamlParseStatus::PARSE_ERROR;
   } catch (...) {
     return YamlParseStatus::PARSE_ERROR;
   }
