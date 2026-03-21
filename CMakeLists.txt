@@ -57,7 +57,6 @@ include(CMakePackageConfigHelpers)
 # Linking this library requires threads.
 find_package(Threads REQUIRED)
 include(cmake/deps/json.cmake)
-include(cmake/deps/yaml.cmake)
 include(cmake/utils.cmake)
 
 message(STATUS "dd-trace-cpp version=[${DD_TRACE_VERSION}]")
@@ -81,6 +80,10 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   message(STATUS "Compiler: GCC ${CMAKE_CXX_COMPILER_VERSION}")
   include(cmake/compiler/gcc.cmake)
 endif ()
+
+# yaml-cpp must be included AFTER the compiler setup above, because
+# clang.cmake sets -stdlib=libc++ which yaml-cpp needs to inherit.
+include(cmake/deps/yaml.cmake)
 
 if (DD_TRACE_BUILD_FUZZERS)
   add_subdirectory(fuzz)
