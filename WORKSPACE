@@ -41,7 +41,7 @@ http_archive(
 )
 
 http_archive(
-    name = "yaml-cpp",
+    name = "yaml_cpp",
     sha256 = "fbe74bbdcee21d656715688706da3c8becfd946d92cd44705cc6098bb23b3a16",
     strip_prefix = "yaml-cpp-0.8.0",
     urls = ["https://github.com/jbeder/yaml-cpp/archive/refs/tags/0.8.0.tar.gz"],
