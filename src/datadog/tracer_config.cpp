@@ -361,13 +361,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
   final_config.clock = clock;
   final_config.logger = logger;
 
-  // Store stable config data on FinalizedTracerConfig for telemetry and
-  // the parametric test server.
-  final_config.local_stable_config_values = stable_configs.local.values;
-  final_config.fleet_stable_config_values = stable_configs.fleet.values;
-  final_config.local_stable_config_id = stable_configs.local.config_id;
-  final_config.fleet_stable_config_id = stable_configs.fleet.config_id;
-
   // DD_SERVICE
   {
     auto sc = stable_string_pair(stable_configs, "DD_SERVICE");

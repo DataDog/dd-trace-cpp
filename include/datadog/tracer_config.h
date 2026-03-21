@@ -238,16 +238,6 @@ class FinalizedTracerConfig final {
   bool tracing_enabled;
   HttpEndpointCalculationMode resource_renaming_mode;
   std::unordered_map<std::string, std::string> process_tags;
-
-  // Stable configuration: all key-value pairs from both local and fleet
-  // stable config files. These are stored for the parametric test server
-  // (system-tests) which needs the raw maps to respond to /trace/config
-  // requests, and are NOT used in production tracer logic.  They include keys
-  // that dd-trace-cpp does not natively consume (e.g. DD_PROFILING_ENABLED).
-  std::unordered_map<std::string, std::string> local_stable_config_values;
-  std::unordered_map<std::string, std::string> fleet_stable_config_values;
-  Optional<std::string> local_stable_config_id;
-  Optional<std::string> fleet_stable_config_id;
 };
 
 // Return a `FinalizedTracerConfig` from the specified `config` and from any

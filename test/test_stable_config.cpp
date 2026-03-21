@@ -271,18 +271,3 @@ STABLE_CONFIG_TEST("bool precedence: fleet > env > user > local > default") {
     REQUIRE(result == false);
   }
 }
-
-STABLE_CONFIG_TEST("FinalizedTracerConfig stores stable config values") {
-  TracerConfig config;
-  config.service = "testsvc";
-
-  auto finalized = finalize_config(config);
-  REQUIRE(finalized);
-
-  // On a typical dev machine, the stable config files don't exist,
-  // so the maps should be empty.
-  // (We can't easily create the files at the expected paths in tests.)
-  // But the fields should exist and be accessible.
-  REQUIRE(finalized->local_stable_config_values.empty());
-  REQUIRE(finalized->fleet_stable_config_values.empty());
-}

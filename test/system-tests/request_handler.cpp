@@ -13,6 +13,8 @@
 #include <datadog/json.hpp>
 #include <string>
 
+#include "datadog/null_logger.h"
+#include "datadog/stable_config.h"
 #include "httplib.h"
 #include "utils.h"
 
@@ -20,11 +22,14 @@ RequestHandler::RequestHandler(
     datadog::tracing::FinalizedTracerConfig& tracerConfig,
     std::shared_ptr<ManualScheduler> scheduler,
     std::shared_ptr<DeveloperNoiseLogger> logger)
-    : tracer_(tracerConfig),
-      scheduler_(scheduler),
-      logger_(std::move(logger)),
-      local_stable_config_values_(tracerConfig.local_stable_config_values),
-      fleet_stable_config_values_(tracerConfig.fleet_stable_config_values) {}
+    : tracer_(tracerConfig), scheduler_(scheduler), logger_(std::move(logger)) {
+  // Load stable config values directly from disk rather than leaking them
+  // through the public FinalizedTracerConfig API.
+  datadog::tracing::NullLogger null_logger;
+  auto configs = datadog::tracing::load_stable_configs(null_logger);
+  local_stable_config_values_ = std::move(configs.local.values);
+  fleet_stable_config_values_ = std::move(configs.fleet.values);
+}
 
 void RequestHandler::set_error(const char* const file, int line,
                                const std::string& reason,
