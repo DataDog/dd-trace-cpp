@@ -57,6 +57,7 @@ include(CMakePackageConfigHelpers)
 # Linking this library requires threads.
 find_package(Threads REQUIRED)
 include(cmake/deps/json.cmake)
+include(cmake/deps/yaml.cmake)
 include(cmake/utils.cmake)
 
 message(STATUS "dd-trace-cpp version=[${DD_TRACE_VERSION}]")
@@ -244,6 +245,7 @@ target_link_libraries(dd-trace-cpp-objects
     Threads::Threads
   PRIVATE
     dd-trace-cpp::specs
+    $<BUILD_INTERFACE:yaml-cpp>
 )
 
 set_target_properties(dd-trace-cpp-objects

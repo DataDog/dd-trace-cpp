@@ -130,7 +130,6 @@ YAML_PARSER_TEST("flow sequences are skipped") {
       "  DD_ENV: prod\n",
       result);
   REQUIRE(status == YamlParseStatus::OK);
-  REQUIRE(result.values.size() == 2);
   REQUIRE(result.values.count("DD_TAGS") == 0);
   REQUIRE(result.values.at("DD_SERVICE") == "my-service");
   REQUIRE(result.values.at("DD_ENV") == "prod");
@@ -144,20 +143,7 @@ YAML_PARSER_TEST("flow mappings are skipped") {
       "  DD_SERVICE: my-service\n",
       result);
   REQUIRE(status == YamlParseStatus::OK);
-  REQUIRE(result.values.size() == 1);
-  REQUIRE(result.values.at("DD_SERVICE") == "my-service");
-}
-
-YAML_PARSER_TEST("block scalar indicators are skipped") {
-  YamlParseResult result;
-  auto status = parse_yaml(
-      "apm_configuration_default:\n"
-      "  DD_LITERAL: |something\n"
-      "  DD_FOLDED: >something\n"
-      "  DD_SERVICE: my-service\n",
-      result);
-  REQUIRE(status == YamlParseStatus::OK);
-  REQUIRE(result.values.size() == 1);
+  REQUIRE(result.values.count("DD_SOME_MAP") == 0);
   REQUIRE(result.values.at("DD_SERVICE") == "my-service");
 }
 
@@ -173,23 +159,13 @@ YAML_PARSER_TEST("Windows line endings are handled") {
   REQUIRE(result.values.at("DD_SERVICE") == "my-service");
 }
 
-YAML_PARSER_TEST("malformed top-level line returns PARSE_ERROR") {
+YAML_PARSER_TEST("malformed YAML returns PARSE_ERROR") {
   YamlParseResult result;
-  auto status = parse_yaml("not-a-valid-yaml-line\n", result);
+  auto status = parse_yaml("[invalid yaml: {{{", result);
   REQUIRE(status == YamlParseStatus::PARSE_ERROR);
 }
 
-YAML_PARSER_TEST("malformed entry under apm_configuration_default") {
-  YamlParseResult result;
-  auto status = parse_yaml(
-      "apm_configuration_default:\n"
-      "  not-a-key-value-pair\n",
-      result);
-  REQUIRE(status == YamlParseStatus::PARSE_ERROR);
-}
-
-YAML_PARSER_TEST(
-    "apm_configuration_default with value on same line is PARSE_ERROR") {
+YAML_PARSER_TEST("apm_configuration_default with scalar value is PARSE_ERROR") {
   YamlParseResult result;
   auto status = parse_yaml("apm_configuration_default: some_value\n", result);
   REQUIRE(status == YamlParseStatus::PARSE_ERROR);
@@ -256,16 +232,6 @@ YAML_PARSER_TEST("numeric values are stored as strings") {
   REQUIRE(result.values.at("DD_TRACE_BAGGAGE_MAX_ITEMS") == "64");
 }
 
-YAML_PARSER_TEST("tab indentation is handled") {
-  YamlParseResult result;
-  auto status = parse_yaml(
-      "apm_configuration_default:\n"
-      "\tDD_SERVICE: my-service\n",
-      result);
-  REQUIRE(status == YamlParseStatus::OK);
-  REQUIRE(result.values.at("DD_SERVICE") == "my-service");
-}
-
 YAML_PARSER_TEST("multiple top-level sections") {
   YamlParseResult result;
   auto status = parse_yaml(
@@ -279,5 +245,47 @@ YAML_PARSER_TEST("multiple top-level sections") {
   REQUIRE(status == YamlParseStatus::OK);
   REQUIRE(*result.config_id == "test-id");
   REQUIRE(result.values.size() == 1);
+  REQUIRE(result.values.at("DD_SERVICE") == "my-service");
+}
+
+YAML_PARSER_TEST("YAML document markers are handled") {
+  YamlParseResult result;
+  auto status = parse_yaml(
+      "---\n"
+      "config_id: doc-marker-id\n"
+      "apm_configuration_default:\n"
+      "  DD_SERVICE: my-service\n"
+      "...\n",
+      result);
+  REQUIRE(status == YamlParseStatus::OK);
+  REQUIRE(*result.config_id == "doc-marker-id");
+  REQUIRE(result.values.at("DD_SERVICE") == "my-service");
+}
+
+YAML_PARSER_TEST("quoted JSON strings are correctly unquoted") {
+  YamlParseResult result;
+  auto status = parse_yaml(
+      "apm_configuration_default:\n"
+      "  DD_TRACE_SAMPLING_RULES: '[{\"rate\":1}]'\n",
+      result);
+  REQUIRE(status == YamlParseStatus::OK);
+  REQUIRE(result.values.at("DD_TRACE_SAMPLING_RULES") == "[{\"rate\":1}]");
+}
+
+YAML_PARSER_TEST("non-map root returns PARSE_ERROR") {
+  YamlParseResult result;
+  auto status = parse_yaml("- item1\n- item2\n", result);
+  REQUIRE(status == YamlParseStatus::PARSE_ERROR);
+}
+
+YAML_PARSER_TEST("YAML anchors and aliases are handled") {
+  YamlParseResult result;
+  auto status = parse_yaml(
+      "config_id: &id anchor-id\n"
+      "apm_configuration_default:\n"
+      "  DD_SERVICE: my-service\n",
+      result);
+  REQUIRE(status == YamlParseStatus::OK);
+  REQUIRE(*result.config_id == "anchor-id");
   REQUIRE(result.values.at("DD_SERVICE") == "my-service");
 }

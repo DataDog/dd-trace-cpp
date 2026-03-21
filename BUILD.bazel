@@ -157,5 +157,9 @@ cc_library(
     deps = [
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
+        # TODO: Add yaml-cpp as a Bazel dependency. yaml-cpp is fetched via
+        # CMake FetchContent (cmake/deps/yaml.cmake) but needs an equivalent
+        # http_archive rule in WORKSPACE and a dep on "@yaml-cpp//:yaml-cpp"
+        # here. See https://github.com/jbeder/yaml-cpp for Bazel support.
     ],
 )
