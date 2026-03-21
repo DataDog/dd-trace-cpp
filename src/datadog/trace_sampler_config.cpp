@@ -23,7 +23,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
     nlohmann::json json_rules;
     try {
       json_rules = nlohmann::json::parse(*rules_env);
-    } catch (const nlohmann::json::parse_error& error) {
+    } catch (const nlohmann::json::parse_error &error) {
       std::string message;
       message += "Unable to parse JSON from ";
       append(message, name(environment::DD_TRACE_SAMPLING_RULES));
@@ -50,9 +50,9 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
     const std::unordered_set<std::string> allowed_properties{
         "service", "name", "resource", "tags", "sample_rate"};
 
-    for (const auto& json_rule : json_rules) {
+    for (const auto &json_rule : json_rules) {
       auto matcher = from_json(json_rule);
-      if (auto* error = matcher.if_error()) {
+      if (auto *error = matcher.if_error()) {
         std::string prefix;
         prefix += "Unable to create a rule from ";
         append(prefix, name(environment::DD_TRACE_SAMPLING_RULES));
@@ -85,7 +85,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
       }
 
       // Look for unexpected properties.
-      for (const auto& [key, value] : json_rule.items()) {
+      for (const auto &[key, value] : json_rule.items()) {
         if (allowed_properties.count(key)) {
           continue;
         }
@@ -110,7 +110,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
 
   if (auto sample_rate_env = lookup(environment::DD_TRACE_SAMPLE_RATE)) {
     auto maybe_sample_rate = parse_double(*sample_rate_env);
-    if (auto* error = maybe_sample_rate.if_error()) {
+    if (auto *error = maybe_sample_rate.if_error()) {
       std::string prefix;
       prefix += "While parsing ";
       append(prefix, name(environment::DD_TRACE_SAMPLE_RATE));
@@ -122,7 +122,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
 
   if (auto limit_env = lookup(environment::DD_TRACE_RATE_LIMIT)) {
     auto maybe_max_per_second = parse_double(*limit_env);
-    if (auto* error = maybe_max_per_second.if_error()) {
+    if (auto *error = maybe_max_per_second.if_error()) {
       std::string prefix;
       prefix += "While parsing ";
       append(prefix, name(environment::DD_TRACE_RATE_LIMIT));
@@ -135,9 +135,9 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
   return env_config;
 }
 
-std::string to_string(const std::vector<TraceSamplerConfig::Rule>& rules) {
+std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
   nlohmann::json res;
-  for (const auto& r : rules) {
+  for (const auto &r : rules) {
     auto j = nlohmann::json(static_cast<SpanMatcher>(r));
     j["sample_rate"] = r.sample_rate;
     res.emplace_back(std::move(j));
@@ -147,8 +147,8 @@ std::string to_string(const std::vector<TraceSamplerConfig::Rule>& rules) {
 }
 
 // Convert a stable config string value to Optional<double>.
-Optional<double> stable_config_double(const StableConfig& cfg,
-                                      const std::string& key) {
+Optional<double> stable_config_double(const StableConfig &cfg,
+                                      const std::string &key) {
   auto val = cfg.lookup(key);
   if (!val || val->empty()) return nullopt;
   auto result = parse_double(StringView(*val));
@@ -159,17 +159,17 @@ Optional<double> stable_config_double(const StableConfig& cfg,
 // Try to parse a stable config string value as trace sampling rules JSON.
 // Returns empty vector on any parse error (stable config errors are non-fatal).
 Optional<std::vector<TraceSamplerConfig::Rule>> stable_config_sampling_rules(
-    const StableConfig& cfg, const std::string& key) {
+    const StableConfig &cfg, const std::string &key) {
   return parse_stable_config_rules<TraceSamplerConfig::Rule, nlohmann::json>(
-      cfg, key, [](TraceSamplerConfig::Rule&, const nlohmann::json&) {});
+      cfg, key, [](TraceSamplerConfig::Rule &, const nlohmann::json &) {});
 }
 
 }  // namespace
 
-TraceSamplerConfig::Rule::Rule(const SpanMatcher& base) : SpanMatcher(base) {}
+TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig& config, const StableConfigs* stable_configs) {
+    const TraceSamplerConfig &config, const StableConfigs *stable_configs) {
   Expected<TraceSamplerConfig> env_config = load_trace_sampler_env_config();
   if (auto error = env_config.if_error()) {
     return *error;
@@ -211,9 +211,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
                        ConfigMetadata::Origin::LOCAL_STABLE_CONFIG)};
   }
 
-  for (const auto& rule : rules) {
+  for (const auto &rule : rules) {
     auto maybe_rate = Rate::from(rule.sample_rate);
-    if (auto* error = maybe_rate.if_error()) {
+    if (auto *error = maybe_rate.if_error()) {
       std::string prefix;
       prefix +=
           "Unable to parse sample_rate in trace sampling rule with root span "
@@ -242,7 +242,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   Optional<double> sample_rate = resolve_and_record_config(
       fleet_sample_rate, env_config->sample_rate, config.sample_rate,
       local_sample_rate, &result.metadata, ConfigName::TRACE_SAMPLING_RATE, 1.0,
-      [](const double& d) { return to_string(d, 1); });
+      [](const double &d) { return to_string(d, 1); });
 
   bool is_sample_rate_provided = fleet_sample_rate || env_config->sample_rate ||
                                  config.sample_rate || local_sample_rate;
@@ -251,7 +251,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   // sample rate is valid.
   if (sample_rate && is_sample_rate_provided) {
     auto maybe_rate = Rate::from(*sample_rate);
-    if (auto* error = maybe_rate.if_error()) {
+    if (auto *error = maybe_rate.if_error()) {
       return error->with_prefix(
           "Unable to parse overall sample_rate for trace sampling: ");
     }
@@ -275,7 +275,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
   double max_per_second = resolve_and_record_config(
       fleet_rate_limit, env_config->max_per_second, config.max_per_second,
       local_rate_limit, &result.metadata, ConfigName::TRACE_SAMPLING_LIMIT,
-      100.0, [](const double& d) { return std::to_string(d); });
+      100.0, [](const double &d) { return std::to_string(d); });
 
   const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
   if (!(max_per_second > 0) ||
