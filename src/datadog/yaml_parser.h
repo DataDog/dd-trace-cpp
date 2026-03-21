@@ -1,8 +1,8 @@
 #pragma once
 
-// This component provides a minimal YAML parser for stable configuration files.
-// It extracts a config_id and a flat key-value map from the
-// `apm_configuration_default` section of a YAML document.
+// This component provides a YAML parser for stable configuration files,
+// using yaml-cpp.  It extracts a config_id and a flat key-value map from
+// the `apm_configuration_default` section of a YAML document.
 
 #include <datadog/optional.h>
 
