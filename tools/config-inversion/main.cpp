@@ -4,7 +4,6 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <sstream>
-#include <unordered_map>
 
 #include "datadog/environment.h"
 
@@ -12,16 +11,16 @@ namespace fs = std::filesystem;
 namespace env = datadog::tracing::environment;
 
 template <typename T>
-std::string to_string_any(const T& value) {
+nlohmann::json to_json_default(const T& value) {
   std::ostringstream oss;
   oss << value;
   return oss.str();
 }
 
-// Variables whose registry implementation letter differs from the default "A".
-static const std::unordered_map<std::string, const char*> implementation_overrides = {
-    {"_DD_ROOT_CPP_SESSION_ID", "B"},
-};
+template <>
+nlohmann::json to_json_default(std::nullptr_t const&) {
+  return nullptr;
+}
 
 nlohmann::json build_configuration() {
   nlohmann::json j;
@@ -34,14 +33,13 @@ nlohmann::json build_configuration() {
 
 #define ENV_DEFAULT_RESOLVED_IN_CODE(X) ""
 
-#define X(NAME, TYPE, DEFAULT_VALUE)                                           \
-  do {                                                                         \
-    auto obj = nlohmann::json::object();                                       \
-    obj["default"] = to_string_any(DEFAULT_VALUE);                             \
-    auto it = implementation_overrides.find(QUOTED(NAME));                     \
-    obj["implementation"] = (it != implementation_overrides.end()) ? it->second : "A"; \
-    obj["type"] = QUOTED(TYPE);                                                \
-    supported_configurations[QUOTED(NAME)] = nlohmann::json::array({obj});     \
+#define X(NAME, TYPE, DEFAULT_VALUE)                                       \
+  do {                                                                     \
+    auto obj = nlohmann::json::object();                                   \
+    obj["default"] = to_json_default(DEFAULT_VALUE);                       \
+    obj["implementation"] = "A";                                           \
+    obj["type"] = QUOTED(TYPE);                                            \
+    supported_configurations[QUOTED(NAME)] = nlohmann::json::array({obj}); \
   } while (0);
 
   DD_LIST_ENVIRONMENT_VARIABLES(X)
