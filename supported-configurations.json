@@ -282,7 +282,7 @@
     ],
     "_DD_ROOT_CPP_SESSION_ID": [
       {
-        "default": "",
+        "default": null,
         "implementation": "A",
         "type": "STRING"
       }
