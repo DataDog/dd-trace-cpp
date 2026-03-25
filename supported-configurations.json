@@ -28,13 +28,6 @@
         "type": "STRING"
       }
     ],
-    "_DD_ROOT_CPP_SESSION_ID": [
-      {
-        "default": null,
-        "implementation": "A",
-        "type": "STRING"
-      }
-    ],
     "DD_INSTRUMENTATION_INSTALL_ID": [
       {
         "default": "",
@@ -281,6 +274,13 @@
       }
     ],
     "DD_VERSION": [
+      {
+        "default": "",
+        "implementation": "A",
+        "type": "STRING"
+      }
+    ],
+    "_DD_ROOT_CPP_SESSION_ID": [
       {
         "default": "",
         "implementation": "A",
