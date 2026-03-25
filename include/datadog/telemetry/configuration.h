@@ -1,6 +1,5 @@
 #pragma once
 
-#include <datadog/config.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
 #include <datadog/telemetry/product.h>
@@ -55,6 +54,10 @@ struct FinalizedConfiguration {
   std::string integration_name;
   std::string integration_version;
   std::vector<Product> products;
+
+  // Fleet stable config ID, used to attach config_id to telemetry entries
+  // with FLEET_STABLE_CONFIG origin at serialization time.
+  tracing::Optional<std::string> fleet_stable_config_id;
 
   // Onboarding metadata coming from `DD_INSTRUMENTATION_INSTALL_*` environment
   // variables.
