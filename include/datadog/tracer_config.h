@@ -225,6 +225,7 @@ class FinalizedTracerConfig final {
   bool log_on_startup;
   bool generate_128bit_trace_ids;
   Optional<RuntimeID> runtime_id;
+  Optional<std::string> root_session_id;
   Clock clock;
   std::string integration_name;
   std::string integration_version;

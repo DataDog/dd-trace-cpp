@@ -53,10 +53,13 @@ void init(FinalizedConfiguration configuration,
           std::shared_ptr<tracing::HTTPClient> client,
           std::shared_ptr<tracing::EventScheduler> event_scheduler,
           tracing::HTTPClient::URL agent_url, tracing::Clock clock) {
-  instance(Ctor_param{configuration,
-                      tracing::TracerSignature(tracing::RuntimeID::generate(),
-                                               tracing::get_process_name(), ""),
-                      logger, client, event_scheduler, agent_url, clock});
+  auto runtime_id = tracing::RuntimeID::generate();
+  auto root_session_id = runtime_id.string();
+  instance(Ctor_param{
+      configuration,
+      tracing::TracerSignature(runtime_id, std::move(root_session_id),
+                               tracing::get_process_name(), ""),
+      logger, client, event_scheduler, agent_url, clock});
 }
 
 void init(FinalizedConfiguration configuration,

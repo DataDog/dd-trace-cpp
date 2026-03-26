@@ -407,6 +407,10 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     final_config.runtime_id = user_config.runtime_id;
   }
 
+  if (auto val = lookup(environment::_DD_ROOT_CPP_SESSION_ID)) {
+    final_config.root_session_id = std::string{*val};
+  }
+
   final_config.process_tags = user_config.process_tags;
 
   auto agent_finalized =

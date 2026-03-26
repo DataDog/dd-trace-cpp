@@ -199,7 +199,8 @@ DATADOG_AGENT_TEST("Remote Configuration") {
   auto finalized = finalize_config(config);
   REQUIRE(finalized);
 
-  const TracerSignature signature(RuntimeID::generate(), "testsvc", "test");
+  auto rid = RuntimeID::generate();
+  const TracerSignature signature(rid, rid.string(), "testsvc", "test");
 
   // TODO: set telemetry mock
   auto config_manager = std::make_shared<ConfigManager>(*finalized);

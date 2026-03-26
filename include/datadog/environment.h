@@ -81,7 +81,8 @@ namespace environment {
   MACRO(DD_APM_TRACING_ENABLED, BOOLEAN, true)                                 \
   MACRO(DD_TRACE_RESOURCE_RENAMING_ENABLED, BOOLEAN, false)                    \
   MACRO(DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT, BOOLEAN, false) \
-  MACRO(DD_EXTERNAL_ENV, STRING, "")
+  MACRO(DD_EXTERNAL_ENV, STRING, "")                                           \
+  MACRO(_DD_ROOT_CPP_SESSION_ID, STRING, nullptr)
 
 #define ENV_DEFAULT_RESOLVED_IN_CODE(X) X
 #define WITH_COMMA(ARG, TYPE, DEFAULT_VALUE) ARG,
@@ -95,7 +96,7 @@ enum Variable { DD_LIST_ENVIRONMENT_VARIABLES(WITH_COMMA) };
 #define QUOTED_WITH_COMMA(ARG, TYPE, DEFAULT_VALUE) \
   WITH_COMMA(QUOTED(ARG), TYPE, DEFAULT_VALUE)
 
-inline const char *const variable_names[] = {
+inline const char* const variable_names[] = {
     DD_LIST_ENVIRONMENT_VARIABLES(QUOTED_WITH_COMMA)};
 
 #undef QUOTED
@@ -109,6 +110,10 @@ StringView name(Variable variable);
 // Return the value of the specified environment `variable`, or return
 // `nullopt` if that variable is not set in the environment.
 Optional<StringView> lookup(Variable variable);
+
+// Set the specified environment `variable` to `value`. Does not overwrite if
+// already set (equivalent to setenv(..., 0) on POSIX).
+void set(Variable variable, StringView value);
 
 std::string to_json();
 

@@ -47,8 +47,10 @@ auto logger = std::make_shared<NullLogger>();
 
 REMOTE_CONFIG_TEST("initial state payload") {
   // Verify the initial payload structure for a remote configuration instance.
+  auto runtime_id = RuntimeID::generate();
   const TracerSignature tracer_signature{
-      /* runtime_id = */ RuntimeID::generate(),
+      /* runtime_id = */ runtime_id,
+      /* root_session_id = */ runtime_id.string(),
       /* service = */ "testsvc",
       /* environment = */ "test"};
 
@@ -92,8 +94,10 @@ REMOTE_CONFIG_TEST("initial state payload") {
 // TODO: test all combination of product and capabilities generation
 
 REMOTE_CONFIG_TEST("response processing") {
+  auto runtime_id = RuntimeID::generate();
   const TracerSignature tracer_signature{
-      /* runtime_id = */ RuntimeID::generate(),
+      /* runtime_id = */ runtime_id,
+      /* root_session_id = */ runtime_id.string(),
       /* service = */ "testsvc",
       /* environment = */ "test"};
 

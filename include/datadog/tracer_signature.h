@@ -33,6 +33,7 @@ namespace tracing {
 
 struct TracerSignature {
   RuntimeID runtime_id;
+  std::string root_session_id;
   std::string default_service;
   std::string default_environment;
   std::string library_version;
@@ -40,8 +41,10 @@ struct TracerSignature {
   StringView library_language_version;
 
   TracerSignature() = delete;
-  TracerSignature(RuntimeID id, std::string service, std::string environment)
+  TracerSignature(RuntimeID id, std::string root_session, std::string service,
+                  std::string environment)
       : runtime_id(id),
+        root_session_id(std::move(root_session)),
         default_service(std::move(service)),
         default_environment(std::move(environment)),
         library_version(tracer_version),

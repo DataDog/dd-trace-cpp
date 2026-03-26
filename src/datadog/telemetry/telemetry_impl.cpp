@@ -302,13 +302,18 @@ void Telemetry::app_started() {
   auto payload = app_started_payload();
 
   auto on_headers = [payload_size = payload.size(),
-                     debug_enabled = config_.debug](DictWriter& headers) {
+                     debug_enabled = config_.debug,
+                     &sig = tracer_signature_](DictWriter& headers) {
     headers.set("Content-Type", "application/json");
     headers.set("Content-Length", std::to_string(payload_size));
     headers.set("DD-Telemetry-API-Version", "v2");
     headers.set("DD-Client-Library-Language", "cpp");
     headers.set("DD-Client-Library-Version", tracer_version);
     headers.set("DD-Telemetry-Request-Type", "app-started");
+    headers.set("DD-Session-ID", sig.runtime_id.string());
+    if (sig.root_session_id != sig.runtime_id.string()) {
+      headers.set("DD-Root-Session-ID", sig.root_session_id);
+    }
     if (debug_enabled) {
       headers.set("DD-Telemetry-Debug-Enabled", "true");
     }
@@ -356,14 +361,18 @@ void Telemetry::app_closing() {
 
 void Telemetry::send_payload(StringView request_type, std::string payload) {
   auto set_telemetry_headers = [request_type, payload_size = payload.size(),
-                                debug_enabled =
-                                    config_.debug](DictWriter& headers) {
+                                debug_enabled = config_.debug,
+                                &sig = tracer_signature_](DictWriter& headers) {
     headers.set("Content-Type", "application/json");
     headers.set("Content-Length", std::to_string(payload_size));
     headers.set("DD-Telemetry-API-Version", "v2");
     headers.set("DD-Client-Library-Language", "cpp");
     headers.set("DD-Client-Library-Version", tracer_version);
     headers.set("DD-Telemetry-Request-Type", request_type);
+    headers.set("DD-Session-ID", sig.runtime_id.string());
+    if (sig.root_session_id != sig.runtime_id.string()) {
+      headers.set("DD-Root-Session-ID", sig.root_session_id);
+    }
     if (debug_enabled) {
       headers.set("DD-Telemetry-Debug-Enabled", "true");
     }
