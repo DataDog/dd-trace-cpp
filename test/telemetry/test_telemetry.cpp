@@ -82,6 +82,11 @@ struct FakeEventScheduler : public EventScheduler {
     metrics_callback();
   }
 
+  void trigger_extended_heartbeat() {
+    assert(extended_heartbeat_callback != nullptr);
+    extended_heartbeat_callback();
+  }
+
   std::string config() const override {
     return nlohmann::json::object({{"type", "FakeEventScheduler"}}).dump();
   }
@@ -397,6 +402,49 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     REQUIRE(message_batch["payload"].size() >= 1);
 
     REQUIRE(find_payload(message_batch["payload"], "app-heartbeat"));
+  }
+
+  SECTION("generates an extended heartbeat with configuration") {
+    client->clear();
+
+    Product product;
+    product.name = Product::Name::tracing;
+    product.enabled = true;
+    product.version = tracer_version;
+    product.configurations =
+        std::unordered_map<ConfigName, std::vector<ConfigMetadata>>{
+            {ConfigName::SERVICE_NAME,
+             {ConfigMetadata(ConfigName::SERVICE_NAME, "my-service",
+                             ConfigMetadata::Origin::CODE)}},
+        };
+
+    Configuration cfg;
+    cfg.products.emplace_back(std::move(product));
+
+    auto scheduler2 = std::make_shared<FakeEventScheduler>();
+    Telemetry telemetry2{*finalize_config(cfg),
+                         tracer_signature,
+                         logger,
+                         client,
+                         scheduler2,
+                         *url};
+
+    client->clear();
+    scheduler2->trigger_extended_heartbeat();
+
+    auto message_batch = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(message_batch));
+
+    auto ext_hb =
+        find_payload(message_batch["payload"], "app-extended-heartbeat");
+    REQUIRE(ext_hb.has_value());
+
+    auto& config_payload = (*ext_hb)["payload"]["configuration"];
+    REQUIRE(config_payload.is_array());
+    REQUIRE(config_payload.size() == 1);
+    CHECK(config_payload[0]["name"] == "service");
+    CHECK(config_payload[0]["value"] == "my-service");
+    CHECK(config_payload[0]["origin"] == "code");
   }
 
   SECTION("metrics reporting") {
