@@ -54,7 +54,8 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
     if (auto error = maybe_value.if_error()) {
       return *error;
     }
-    env_cfg.extended_heartbeat_interval_seconds = static_cast<int>(*maybe_value);
+    env_cfg.extended_heartbeat_interval_seconds =
+        static_cast<int>(*maybe_value);
   }
 
   return env_cfg;
