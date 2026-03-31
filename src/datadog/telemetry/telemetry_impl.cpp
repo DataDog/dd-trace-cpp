@@ -223,6 +223,10 @@ void Telemetry::schedule_tasks() {
       config_.heartbeat_interval,
       [this]() { send_payload("app-heartbeat", heartbeat_and_telemetry()); }));
 
+  tasks_.emplace_back(scheduler_->schedule_recurring_event(
+      config_.extended_heartbeat_interval,
+      [this]() { send_payload("app-extended-heartbeat", extended_heartbeat_payload()); }));
+
   if (config_.report_metrics) {
     tasks_.emplace_back(scheduler_->schedule_recurring_event(
         config_.metrics_interval, [this]() mutable { capture_metrics(); }));
@@ -675,6 +679,28 @@ std::string Telemetry::app_started_payload() {
     batch["payload"].emplace_back(std::move(integration_msg));
   }
 
+  return batch.dump();
+}
+
+std::string Telemetry::extended_heartbeat_payload() {
+  auto configuration_json = nlohmann::json::array();
+
+  for (const auto& product : config_.products) {
+    for (const auto& [_, config_metadatas] : product.configurations) {
+      for (const auto& config_metadata : config_metadatas) {
+        configuration_json.emplace_back(
+            generate_configuration_field(config_metadata));
+      }
+    }
+  }
+
+  auto extended_hb_msg = nlohmann::json{
+      {"request_type", "app-extended-heartbeat"},
+      {"payload", nlohmann::json{{"configuration", configuration_json}}},
+  };
+
+  auto batch = generate_telemetry_body("message-batch");
+  batch["payload"] = nlohmann::json::array({std::move(extended_hb_msg)});
   return batch.dump();
 }
 
