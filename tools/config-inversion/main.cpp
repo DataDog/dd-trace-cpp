@@ -11,15 +11,10 @@ namespace fs = std::filesystem;
 namespace env = datadog::tracing::environment;
 
 template <typename T>
-nlohmann::json to_json_default(const T& value) {
+std::string to_string_any(const T& value) {
   std::ostringstream oss;
   oss << value;
   return oss.str();
-}
-
-template <>
-nlohmann::json to_json_default(std::nullptr_t const&) {
-  return nullptr;
 }
 
 nlohmann::json build_configuration() {
@@ -36,7 +31,7 @@ nlohmann::json build_configuration() {
 #define X(NAME, TYPE, DEFAULT_VALUE)                                       \
   do {                                                                     \
     auto obj = nlohmann::json::object();                                   \
-    obj["default"] = to_json_default(DEFAULT_VALUE);                       \
+    obj["default"] = to_string_any(DEFAULT_VALUE);                         \
     obj["implementation"] = "A";                                           \
     obj["type"] = QUOTED(TYPE);                                            \
     supported_configurations[QUOTED(NAME)] = nlohmann::json::array({obj}); \
