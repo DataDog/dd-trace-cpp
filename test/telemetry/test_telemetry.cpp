@@ -46,19 +46,27 @@ struct FakeEventScheduler : public EventScheduler {
   size_t count_tasks = 0;
   std::function<void()> heartbeat_callback = nullptr;
   std::function<void()> metrics_callback = nullptr;
+  std::function<void()> extended_heartbeat_callback = nullptr;
   Optional<std::chrono::steady_clock::duration> heartbeat_interval;
   Optional<std::chrono::steady_clock::duration> metrics_interval;
+  Optional<std::chrono::steady_clock::duration> extended_heartbeat_interval;
   bool cancelled = false;
 
   // NOTE: White box testing. This is a limitation of the event scheduler API.
+  // Tasks are registered in order: heartbeat (0), metrics (1, if enabled),
+  // extended heartbeat (last).
   Cancel schedule_recurring_event(std::chrono::steady_clock::duration interval,
                                   std::function<void()> callback) override {
     if (count_tasks == 0) {
       heartbeat_callback = callback;
       heartbeat_interval = interval;
-    } else if (count_tasks == 1) {
+    } else if (interval <= std::chrono::minutes(1)) {
+      // Metrics interval is <= 60s; extended heartbeat is much larger.
       metrics_callback = callback;
       metrics_interval = interval;
+    } else {
+      extended_heartbeat_callback = callback;
+      extended_heartbeat_interval = interval;
     }
     count_tasks++;
     return [this]() { cancelled = true; };
