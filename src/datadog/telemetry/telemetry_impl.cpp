@@ -223,15 +223,15 @@ void Telemetry::schedule_tasks() {
       config_.heartbeat_interval,
       [this]() { send_payload("app-heartbeat", heartbeat_and_telemetry()); }));
 
-  tasks_.emplace_back(scheduler_->schedule_recurring_event(
-      config_.extended_heartbeat_interval, [this]() {
-        send_payload("app-extended-heartbeat", extended_heartbeat_payload());
-      }));
-
   if (config_.report_metrics) {
     tasks_.emplace_back(scheduler_->schedule_recurring_event(
         config_.metrics_interval, [this]() mutable { capture_metrics(); }));
   }
+
+  tasks_.emplace_back(scheduler_->schedule_recurring_event(
+      config_.extended_heartbeat_interval, [this]() {
+        send_payload("app-extended-heartbeat", extended_heartbeat_payload());
+      }));
 }
 
 Telemetry::~Telemetry() {

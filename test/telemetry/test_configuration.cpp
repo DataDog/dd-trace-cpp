@@ -21,6 +21,7 @@ TELEMETRY_CONFIGURATION_TEST("defaults") {
   CHECK(cfg->report_metrics == true);
   CHECK(cfg->metrics_interval == 60s);
   CHECK(cfg->heartbeat_interval == 10s);
+  CHECK(cfg->extended_heartbeat_interval == 86400s);
   CHECK(cfg->install_id.has_value() == false);
   CHECK(cfg->install_type.has_value() == false);
   CHECK(cfg->install_time.has_value() == false);
