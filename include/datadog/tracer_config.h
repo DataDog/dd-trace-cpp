@@ -189,6 +189,11 @@ struct TracerConfig {
   // This option is ignored if `resource_renaming_enabled` is not `true`.
   Optional<bool> resource_renaming_always_simplified_endpoint;
 
+  // Root session ID inherited from the parent process via
+  // `_DD_ROOT_CPP_SESSION_ID`. Tracks the runtime ID of the first C++ process
+  // in a fork/spawn chain.
+  Optional<std::string> root_session_id;
+
   /// A mapping of process-specific tags used to uniquely identify processes.
   ///
   /// The `process_tags` map allows associating arbitrary string-based keys and

@@ -261,6 +261,10 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     return std::move(error);
   }
 
+  if (auto val = lookup(environment::_DD_ROOT_CPP_SESSION_ID)) {
+    env_cfg.root_session_id = std::string{*val};
+  }
+
   return env_cfg;
 }
 
@@ -407,8 +411,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     final_config.runtime_id = user_config.runtime_id;
   }
 
-  if (auto val = lookup(environment::_DD_ROOT_CPP_SESSION_ID)) {
-    final_config.root_session_id = std::string{*val};
+  if (env_config->root_session_id) {
+    final_config.root_session_id = env_config->root_session_id;
   }
 
   final_config.process_tags = user_config.process_tags;
