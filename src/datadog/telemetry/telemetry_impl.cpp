@@ -60,6 +60,14 @@ HTTPClient::URL make_telemetry_endpoint(HTTPClient::URL url) {
   return url;
 }
 
+void set_session_headers(DictWriter& headers,
+                         const tracing::TracerSignature& sig) {
+  headers.set("DD-Session-ID", sig.runtime_id.string());
+  if (sig.root_session_id != sig.runtime_id.string()) {
+    headers.set("DD-Root-Session-ID", sig.root_session_id);
+  }
+}
+
 void cancel_tasks(std::vector<tracing::EventScheduler::Cancel>& tasks) {
   for (auto& cancel_task : tasks) {
     cancel_task();
@@ -310,10 +318,7 @@ void Telemetry::app_started() {
     headers.set("DD-Client-Library-Language", "cpp");
     headers.set("DD-Client-Library-Version", tracer_version);
     headers.set("DD-Telemetry-Request-Type", "app-started");
-    headers.set("DD-Session-ID", sig.runtime_id.string());
-    if (sig.root_session_id != sig.runtime_id.string()) {
-      headers.set("DD-Root-Session-ID", sig.root_session_id);
-    }
+    set_session_headers(headers, sig);
     if (debug_enabled) {
       headers.set("DD-Telemetry-Debug-Enabled", "true");
     }
@@ -369,10 +374,7 @@ void Telemetry::send_payload(StringView request_type, std::string payload) {
     headers.set("DD-Client-Library-Language", "cpp");
     headers.set("DD-Client-Library-Version", tracer_version);
     headers.set("DD-Telemetry-Request-Type", request_type);
-    headers.set("DD-Session-ID", sig.runtime_id.string());
-    if (sig.root_session_id != sig.runtime_id.string()) {
-      headers.set("DD-Root-Session-ID", sig.root_session_id);
-    }
+    set_session_headers(headers, sig);
     if (debug_enabled) {
       headers.set("DD-Telemetry-Debug-Enabled", "true");
     }
