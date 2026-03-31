@@ -401,7 +401,7 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
     Telemetry telemetry{*finalize_config(), sig, logger, client,
                         scheduler,          *url};
 
-    client->request_headers.items.clear();
+    client->clear();
     scheduler->trigger_heartbeat();
 
     auto session_it = client->request_headers.items.find("DD-Session-ID");
