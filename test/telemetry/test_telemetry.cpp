@@ -447,6 +447,58 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     CHECK(config_payload[0]["origin"] == "code");
   }
 
+  SECTION(
+      "extended heartbeat reflects runtime configuration changes (remote "
+      "config)") {
+    client->clear();
+
+    Product product;
+    product.name = Product::Name::tracing;
+    product.enabled = true;
+    product.version = tracer_version;
+    product.configurations =
+        std::unordered_map<ConfigName, std::vector<ConfigMetadata>>{
+            {ConfigName::SERVICE_NAME,
+             {ConfigMetadata(ConfigName::SERVICE_NAME, "my-service",
+                             ConfigMetadata::Origin::CODE)}},
+        };
+
+    Configuration cfg;
+    cfg.products.emplace_back(std::move(product));
+
+    auto scheduler2 = std::make_shared<FakeEventScheduler>();
+    Telemetry telemetry2{*finalize_config(cfg), tracer_signature, logger,
+                         client, scheduler2, *url};
+
+    // Simulate a remote config update overriding SERVICE_NAME
+    telemetry2.capture_configuration_change(
+        {{ConfigName::SERVICE_NAME, "rc-service",
+          ConfigMetadata::Origin::REMOTE_CONFIG}});
+    telemetry2.send_configuration_change();
+
+    client->clear();
+    scheduler2->trigger_extended_heartbeat();
+
+    auto payload = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(payload));
+
+    auto ext_hb = find_payload(payload["payload"], "app-extended-heartbeat");
+    REQUIRE(ext_hb.has_value());
+
+    auto& configuration = (*ext_hb)["payload"]["configuration"];
+    REQUIRE(configuration.is_array());
+
+    bool found = false;
+    for (const auto& entry : configuration) {
+      if (entry["name"] == "service") {
+        found = true;
+        CHECK(entry["value"] == "rc-service");
+        CHECK(entry["origin"] == "remote_config");
+      }
+    }
+    CHECK(found);
+  }
+
   SECTION("metrics reporting") {
     SECTION("counters are correctly serialized in generate-metrics payload") {
       client->clear();
