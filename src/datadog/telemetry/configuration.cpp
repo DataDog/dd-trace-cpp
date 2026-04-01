@@ -125,7 +125,7 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
   // extended_heartbeat_interval_seconds
   auto extended_heartbeat_interval =
       pick(env_config->extended_heartbeat_interval_seconds,
-           user_config.extended_heartbeat_interval_seconds, 86400);
+           user_config.extended_heartbeat_interval_seconds, 86400.);
   if (extended_heartbeat_interval.second <= 0) {
     return Error{
         Error::Code::OUT_OF_RANGE_INTEGER,
