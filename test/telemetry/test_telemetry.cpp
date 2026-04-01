@@ -467,8 +467,12 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     cfg.products.emplace_back(std::move(product));
 
     auto scheduler2 = std::make_shared<FakeEventScheduler>();
-    Telemetry telemetry2{*finalize_config(cfg), tracer_signature, logger,
-                         client, scheduler2, *url};
+    Telemetry telemetry2{*finalize_config(cfg),
+                         tracer_signature,
+                         logger,
+                         client,
+                         scheduler2,
+                         *url};
 
     // Simulate a remote config update overriding SERVICE_NAME
     telemetry2.capture_configuration_change(

@@ -146,6 +146,8 @@ class Telemetry final {
            tracing::Optional<std::string> stacktrace = tracing::nullopt);
 
   nlohmann::json generate_telemetry_body(std::string request_type);
+  nlohmann::json serialize_configuration_field(
+      const tracing::ConfigMetadata& config_metadata, std::size_t seq_id);
   nlohmann::json generate_configuration_field(
       const tracing::ConfigMetadata& config_metadata);
 

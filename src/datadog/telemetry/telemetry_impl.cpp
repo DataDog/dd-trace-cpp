@@ -689,32 +689,8 @@ std::string Telemetry::extended_heartbeat_payload() {
   auto configuration_json = nlohmann::json::array();
 
   for (const auto& [name, config_metadata] : all_configurations_) {
-    auto seq_id = config_seq_ids_[name];
-    auto j = nlohmann::json{{"name", to_string(config_metadata.name)},
-                            {"value", config_metadata.value},
-                            {"seq_id", seq_id}};
-
-    switch (config_metadata.origin) {
-      case ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
-        j["origin"] = "env_var";
-        break;
-      case ConfigMetadata::Origin::CODE:
-        j["origin"] = "code";
-        break;
-      case ConfigMetadata::Origin::REMOTE_CONFIG:
-        j["origin"] = "remote_config";
-        break;
-      case ConfigMetadata::Origin::DEFAULT:
-        j["origin"] = "default";
-        break;
-    }
-
-    if (config_metadata.error) {
-      j["error"] = {{"code", config_metadata.error->code},
-                    {"message", config_metadata.error->message}};
-    }
-
-    configuration_json.emplace_back(std::move(j));
+    configuration_json.emplace_back(
+        serialize_configuration_field(config_metadata, config_seq_ids_[name]));
   }
 
   auto extended_hb_msg = nlohmann::json{
@@ -760,14 +736,8 @@ nlohmann::json Telemetry::generate_telemetry_body(std::string request_type) {
   });
 }
 
-nlohmann::json Telemetry::generate_configuration_field(
-    const ConfigMetadata& config_metadata) {
-  // NOTE(@dmehala): `seq_id` should start at 1 so that the go backend can
-  // detect between non set fields.
-  config_seq_ids_[config_metadata.name] += 1;
-  auto seq_id = config_seq_ids_[config_metadata.name];
-  all_configurations_[config_metadata.name] = config_metadata;
-
+nlohmann::json Telemetry::serialize_configuration_field(
+    const ConfigMetadata& config_metadata, std::size_t seq_id) {
   auto j = nlohmann::json{{"name", to_string(config_metadata.name)},
                           {"value", config_metadata.value},
                           {"seq_id", seq_id}};
@@ -797,6 +767,16 @@ nlohmann::json Telemetry::generate_configuration_field(
   }
 
   return j;
+}
+
+nlohmann::json Telemetry::generate_configuration_field(
+    const ConfigMetadata& config_metadata) {
+  // NOTE(@dmehala): `seq_id` should start at 1 so that the go backend can
+  // detect between non set fields.
+  config_seq_ids_[config_metadata.name] += 1;
+  all_configurations_[config_metadata.name] = config_metadata;
+  return serialize_configuration_field(config_metadata,
+                                       config_seq_ids_[config_metadata.name]);
 }
 
 void Telemetry::capture_configuration_change(
