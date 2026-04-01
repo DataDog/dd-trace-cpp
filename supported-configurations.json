@@ -119,6 +119,13 @@
         "type": "BOOLEAN"
       }
     ],
+    "DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL": [
+      {
+        "default": "86400",
+        "implementation": "A",
+        "type": "DECIMAL"
+      }
+    ],
     "DD_TELEMETRY_HEARTBEAT_INTERVAL": [
       {
         "default": "10",
