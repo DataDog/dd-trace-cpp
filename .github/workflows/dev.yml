@@ -53,9 +53,9 @@ jobs:
     permissions:
       contents: read
       packages: read
+      id-token: write
     env:
       BUILD_DIR: .build
-      DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - name: Configure
@@ -75,8 +75,15 @@ jobs:
           tmp_file="$(mktemp)"
           xsltproc --output "$tmp_file" ".github/workflows/add_final_status.xsl" "$xml_file"
           mv "$tmp_file" "$xml_file"
+      - name: Get Datadog credentials
+        id: dd-sts
+        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+        with:
+          policy: public-datadog-dd-trace-cpp
       - name: Upload test report to Datadog
         if: success() || failure()
+        env:
+          DD_API_KEY: ${{ steps.dd-sts.outputs.api_key }}
         run: |
           curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-${{ matrix.arch }}" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
           datadog-ci junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp .build/report.xml
@@ -145,6 +152,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      id-token: write
     env:
       DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
@@ -179,8 +187,15 @@ jobs:
           $transform.Transform($xmlFile, $tmpFile)
 
           Move-Item -Force $tmpFile $xmlFile
+      - name: Get Datadog credentials
+        id: dd-sts
+        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+        with:
+          policy: public-datadog-dd-trace-cpp
       - name: Upload test report to Datadog
         if: success() || failure()
+        env:
+          DD_API_KEY: ${{ steps.dd-sts.outputs.api_key }}
         run: |
           Invoke-WebRequest -Uri "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_win-x64" -OutFile "datadog-ci.exe"
           ./datadog-ci.exe junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp report.xml
@@ -195,12 +210,18 @@ jobs:
     permissions:
       contents: read
       packages: read
-    env:
-      DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
+      id-token: write
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - run: bin/test --coverage --verbose
+      - name: Get Datadog credentials
+        id: dd-sts
+        uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+        with:
+          policy: public-datadog-dd-trace-cpp
       - name: Report Datadog coverage
+        env:
+          DD_API_KEY: ${{ steps.dd-sts.outputs.api_key }}
         run: |
           curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-arm64" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
           cd .coverage
