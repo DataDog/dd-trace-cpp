@@ -55,7 +55,7 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
       return *error;
     }
     env_cfg.extended_heartbeat_interval_seconds =
-        static_cast<int>(*maybe_value);
+        *maybe_value;
   }
 
   return env_cfg;
