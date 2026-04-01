@@ -54,8 +54,7 @@ tracing::Expected<Configuration> load_telemetry_env_config() {
     if (auto error = maybe_value.if_error()) {
       return *error;
     }
-    env_cfg.extended_heartbeat_interval_seconds =
-        *maybe_value;
+    env_cfg.extended_heartbeat_interval_seconds = *maybe_value;
   }
 
   return env_cfg;
@@ -133,7 +132,7 @@ tracing::Expected<FinalizedConfiguration> finalize_config(
   }
   result.extended_heartbeat_interval =
       std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::seconds(extended_heartbeat_interval.second));
+          std::chrono::duration<double>(extended_heartbeat_interval.second));
 
   // integration_name
   std::tie(origin, result.integration_name) =

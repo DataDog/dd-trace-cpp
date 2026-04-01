@@ -69,7 +69,7 @@ namespace environment {
   MACRO(DD_VERSION, STRING, "")                                                \
   MACRO(DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED, BOOLEAN, true)            \
   MACRO(DD_TELEMETRY_HEARTBEAT_INTERVAL, DECIMAL, 10)                          \
-  MACRO(DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL, DECIMAL, 86400.0)                  \
+  MACRO(DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL, DECIMAL, 86400.0)            \
   MACRO(DD_TELEMETRY_METRICS_ENABLED, BOOLEAN, true)                           \
   MACRO(DD_TELEMETRY_METRICS_INTERVAL_SECONDS, DECIMAL, 60)                    \
   MACRO(DD_TELEMETRY_DEBUG, BOOLEAN, false)                                    \
@@ -96,7 +96,7 @@ enum Variable { DD_LIST_ENVIRONMENT_VARIABLES(WITH_COMMA) };
 #define QUOTED_WITH_COMMA(ARG, TYPE, DEFAULT_VALUE) \
   WITH_COMMA(QUOTED(ARG), TYPE, DEFAULT_VALUE)
 
-inline const char *const variable_names[] = {
+inline const char* const variable_names[] = {
     DD_LIST_ENVIRONMENT_VARIABLES(QUOTED_WITH_COMMA)};
 
 #undef QUOTED
