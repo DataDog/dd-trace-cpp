@@ -32,7 +32,7 @@ struct Configuration {
   // Interval at which the extended heartbeat payload will be sent.
   // Can be overriden by `DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL` environment
   // variable. Default: 86400 seconds (24 hours).
-  tracing::Optional<int> extended_heartbeat_interval_seconds;
+  tracing::Optional<double> extended_heartbeat_interval_seconds;
   // `integration_name` is the name of the product integrating this library.
   // Example: "nginx", "envoy" or "istio".
   tracing::Optional<std::string> integration_name;
