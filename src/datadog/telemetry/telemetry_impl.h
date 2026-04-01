@@ -66,6 +66,9 @@ class Telemetry final {
   uint64_t seq_id_ = 0;
   // Track sequence id per configuration field
   std::unordered_map<tracing::ConfigName, std::size_t> config_seq_ids_;
+  // Track the latest reported value for each configuration field
+  std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>
+      all_configurations_;
 
   tracing::HostInfo host_info_;
 

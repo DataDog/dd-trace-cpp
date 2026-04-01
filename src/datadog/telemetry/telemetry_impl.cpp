@@ -256,6 +256,7 @@ Telemetry::Telemetry(Telemetry&& rhs)
       distributions_(std::move(rhs.distributions_)),
       seq_id_(rhs.seq_id_),
       config_seq_ids_(rhs.config_seq_ids_),
+      all_configurations_(rhs.all_configurations_),
       host_info_(rhs.host_info_) {
   cancel_tasks(rhs.tasks_);
   schedule_tasks();
@@ -279,6 +280,7 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
     std::swap(distributions_, rhs.distributions_);
     std::swap(seq_id_, rhs.seq_id_);
     std::swap(config_seq_ids_, rhs.config_seq_ids_);
+    std::swap(all_configurations_, rhs.all_configurations_);
     std::swap(host_info_, rhs.host_info_);
     schedule_tasks();
   }
@@ -686,13 +688,33 @@ std::string Telemetry::app_started_payload() {
 std::string Telemetry::extended_heartbeat_payload() {
   auto configuration_json = nlohmann::json::array();
 
-  for (const auto& product : config_.products) {
-    for (const auto& [_, config_metadatas] : product.configurations) {
-      for (const auto& config_metadata : config_metadatas) {
-        configuration_json.emplace_back(
-            generate_configuration_field(config_metadata));
-      }
+  for (const auto& [name, config_metadata] : all_configurations_) {
+    auto seq_id = config_seq_ids_[name];
+    auto j = nlohmann::json{{"name", to_string(config_metadata.name)},
+                            {"value", config_metadata.value},
+                            {"seq_id", seq_id}};
+
+    switch (config_metadata.origin) {
+      case ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
+        j["origin"] = "env_var";
+        break;
+      case ConfigMetadata::Origin::CODE:
+        j["origin"] = "code";
+        break;
+      case ConfigMetadata::Origin::REMOTE_CONFIG:
+        j["origin"] = "remote_config";
+        break;
+      case ConfigMetadata::Origin::DEFAULT:
+        j["origin"] = "default";
+        break;
     }
+
+    if (config_metadata.error) {
+      j["error"] = {{"code", config_metadata.error->code},
+                    {"message", config_metadata.error->message}};
+    }
+
+    configuration_json.emplace_back(std::move(j));
   }
 
   auto extended_hb_msg = nlohmann::json{
@@ -744,6 +766,7 @@ nlohmann::json Telemetry::generate_configuration_field(
   // detect between non set fields.
   config_seq_ids_[config_metadata.name] += 1;
   auto seq_id = config_seq_ids_[config_metadata.name];
+  all_configurations_[config_metadata.name] = config_metadata;
 
   auto j = nlohmann::json{{"name", to_string(config_metadata.name)},
                           {"value", config_metadata.value},
