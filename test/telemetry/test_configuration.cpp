@@ -114,6 +114,14 @@ TELEMETRY_CONFIGURATION_TEST("environment environment override") {
     REQUIRE(final_cfg);
     CHECK(final_cfg->heartbeat_interval == 42s);
   }
+
+  SECTION("Override extended heartbeat interval") {
+    cfg.extended_heartbeat_interval_seconds = 99999;
+    ddtest::EnvGuard env("DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL", "120");
+    auto final_cfg = telemetry::finalize_config(cfg);
+    REQUIRE(final_cfg);
+    CHECK(final_cfg->extended_heartbeat_interval == 120s);
+  }
 }
 
 TELEMETRY_CONFIGURATION_TEST("validation") {
