@@ -44,7 +44,9 @@ struct ConfigMetadata {
     ENVIRONMENT_VARIABLE,  // Originating from environment variables
     CODE,                  // Defined in code
     REMOTE_CONFIG,         // Retrieved from remote configuration
-    DEFAULT                // Default value
+    DEFAULT,               // Default value
+    LOCAL_STABLE_CONFIG,   // From local stable config file
+    FLEET_STABLE_CONFIG    // From fleet stable config file
   };
 
   // Name of the configuration parameter
@@ -62,6 +64,11 @@ struct ConfigMetadata {
       : name(n), value(std::move(v)), origin(orig), error(std::move(err)) {}
 };
 
+// 3-parameter overload (env, user, default) kept for backward compatibility
+// with external projects (e.g., nginx-datadog, httpd-datadog) that include
+// this public header.  New internal code should prefer the 5-parameter
+// overload that also accepts fleet and local stable config sources.
+//
 // Returns the final configuration value using the following
 // precedence order: environment > user code > default, and populates metadata:
 // `metadata`: Records ALL configuration sources that were provided,
@@ -96,15 +103,33 @@ Value resolve_and_record_config(
     std::unordered_map<ConfigName, std::vector<ConfigMetadata>>* metadata,
     ConfigName config_name, DefaultValue fallback = nullptr,
     Stringifier to_string_fn = nullptr) {
+  // Delegate to the 5-parameter overload with nullopt for fleet and local
+  // stable config sources.
+  return resolve_and_record_config(Optional<Value>{}, from_env, from_user,
+                                   Optional<Value>{}, metadata, config_name,
+                                   fallback, to_string_fn);
+}
+
+// Extended version of resolve_and_record_config that includes stable
+// configuration sources.  Precedence order (highest to lowest):
+//   fleet_stable > env > user/code > local_stable > default
+template <typename Value, typename Stringifier = std::nullptr_t,
+          typename DefaultValue = std::nullptr_t>
+Value resolve_and_record_config(
+    const Optional<Value>& from_fleet_stable, const Optional<Value>& from_env,
+    const Optional<Value>& from_user, const Optional<Value>& from_local_stable,
+    std::unordered_map<ConfigName, std::vector<ConfigMetadata>>* metadata,
+    ConfigName config_name, DefaultValue fallback = nullptr,
+    Stringifier to_string_fn = nullptr) {
   auto stringify = [&](const Value& v) -> std::string {
     if constexpr (!std::is_same_v<Stringifier, std::nullptr_t>) {
-      return to_string_fn(v);  // use provided function
+      return to_string_fn(v);
     } else if constexpr (std::is_constructible_v<std::string, Value>) {
-      return std::string(v);  // default behaviour (works for string-like types)
+      return std::string(v);
     } else {
       static_assert(!std::is_same_v<Value, Value>,
                     "Non-string types require a stringifier function");
-      return "";  // unreachable
+      return "";
     }
   };
 
@@ -117,9 +142,13 @@ Value resolve_and_record_config(
     chosen_value = val;
   };
 
-  // Add DEFAULT entry if fallback was provided (detected by type)
+  // Precedence: default < local_stable < user/code < env < fleet_stable
   if constexpr (!std::is_same_v<DefaultValue, std::nullptr_t>) {
     add_entry(ConfigMetadata::Origin::DEFAULT, fallback);
+  }
+
+  if (from_local_stable) {
+    add_entry(ConfigMetadata::Origin::LOCAL_STABLE_CONFIG, *from_local_stable);
   }
 
   if (from_user) {
@@ -128,6 +157,10 @@ Value resolve_and_record_config(
 
   if (from_env) {
     add_entry(ConfigMetadata::Origin::ENVIRONMENT_VARIABLE, *from_env);
+  }
+
+  if (from_fleet_stable) {
+    add_entry(ConfigMetadata::Origin::FLEET_STABLE_CONFIG, *from_fleet_stable);
   }
 
   if (!metadata_entries.empty()) {
