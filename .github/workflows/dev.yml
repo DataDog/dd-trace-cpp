@@ -67,6 +67,7 @@ jobs:
         env:
           ASAN_OPTIONS: alloc_dealloc_mismatch=0
       - name: Upload test report to Datadog
+        if: success() || failure()
         run: |
           curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-${{ matrix.arch }}" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
           datadog-ci junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp .build/report.xml
@@ -156,9 +157,10 @@ jobs:
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }}
           .\build\test\tests.exe -r junit -o report.xml
       - name: Upload test report to Datadog
+        if: success() || failure()
         run: |
           Invoke-WebRequest -Uri "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_win-x64" -OutFile "datadog-ci.exe"
-          ./datadog-ci.exe junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp  report.xml
+          ./datadog-ci.exe junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp report.xml
 
   coverage:
     needs: build-linux-cmake 
