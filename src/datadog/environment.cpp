@@ -11,16 +11,16 @@ namespace environment {
 StringView name(Variable variable) { return variable_names[variable]; }
 
 Optional<StringView> lookup(Variable variable) {
-  const char *name = variable_names[variable];
-  const char *value = std::getenv(name);
+  const char* name = variable_names[variable];
+  const char* value = std::getenv(name);
   if (!value) {
     return nullopt;
   }
   return StringView{value};
 }
 
-void set(Variable variable, StringView value) {
-  const char *name = variable_names[variable];
+void set_if_not_set(Variable variable, StringView value) {
+  const char* name = variable_names[variable];
 #ifdef _WIN32
   if (!std::getenv(name)) {
     _putenv_s(name, value.data());
@@ -33,8 +33,8 @@ void set(Variable variable, StringView value) {
 std::string to_json() {
   auto result = nlohmann::json::object({});
 
-  for (const char *name : variable_names) {
-    if (const char *value = std::getenv(name)) {
+  for (const char* name : variable_names) {
+    if (const char* value = std::getenv(name)) {
       result[name] = value;
     }
   }

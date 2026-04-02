@@ -65,8 +65,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       baggage_extraction_enabled_(false),
       tracing_enabled_(config.tracing_enabled),
       resource_renaming_mode_(config.resource_renaming_mode) {
-  environment::set(environment::_DD_ROOT_CPP_SESSION_ID,
-                   signature_.root_session_id);
+  environment::set_if_not_set(environment::_DD_ROOT_CPP_SESSION_ID,
+                              signature_.root_session_id);
 
   telemetry::init(config.telemetry, signature_, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
