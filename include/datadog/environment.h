@@ -84,7 +84,6 @@ namespace environment {
   MACRO(DD_TRACE_RESOURCE_RENAMING_ENABLED, BOOLEAN, false)                    \
   MACRO(DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT, BOOLEAN, false) \
   MACRO(DD_EXTERNAL_ENV, STRING, "")                                           \
-  /* Internal: session ID for stable telemetry headers. Not user-facing. */    \
   MACRO(_DD_ROOT_CPP_SESSION_ID, STRING, "")
 
 #define ENV_DEFAULT_RESOLVED_IN_CODE(X) X
