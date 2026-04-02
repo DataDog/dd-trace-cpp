@@ -66,6 +66,9 @@ class Telemetry final {
   uint64_t seq_id_ = 0;
   // Track sequence id per configuration field
   std::unordered_map<tracing::ConfigName, std::size_t> config_seq_ids_;
+  // Track the latest reported value for each configuration field
+  std::unordered_map<tracing::ConfigName, tracing::ConfigMetadata>
+      all_configurations_;
 
   tracing::HostInfo host_info_;
 
@@ -143,6 +146,8 @@ class Telemetry final {
            tracing::Optional<std::string> stacktrace = tracing::nullopt);
 
   nlohmann::json generate_telemetry_body(std::string request_type);
+  nlohmann::json serialize_configuration_field(
+      const tracing::ConfigMetadata& config_metadata, std::size_t seq_id);
   nlohmann::json generate_configuration_field(
       const tracing::ConfigMetadata& config_metadata);
 
@@ -152,6 +157,9 @@ class Telemetry final {
   // Constructs a messsage-batch containing `app-heartbeat`, and if metrics
   // have been modified, a `generate-metrics` message.
   std::string heartbeat_and_telemetry();
+  // Constructs a message-batch containing `app-extended-heartbeat` with the
+  // full configuration payload.
+  std::string extended_heartbeat_payload();
   // Constructs a message-batch containing `app-closing`, and if metrics have
   // been modified, a `generate-metrics` message.
   std::string app_closing_payload();

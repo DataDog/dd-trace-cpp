@@ -46,19 +46,27 @@ struct FakeEventScheduler : public EventScheduler {
   size_t count_tasks = 0;
   std::function<void()> heartbeat_callback = nullptr;
   std::function<void()> metrics_callback = nullptr;
+  std::function<void()> extended_heartbeat_callback = nullptr;
   Optional<std::chrono::steady_clock::duration> heartbeat_interval;
   Optional<std::chrono::steady_clock::duration> metrics_interval;
+  Optional<std::chrono::steady_clock::duration> extended_heartbeat_interval;
   bool cancelled = false;
 
   // NOTE: White box testing. This is a limitation of the event scheduler API.
+  // Tasks are registered in order: heartbeat (0), metrics (1, if enabled),
+  // extended heartbeat (last).
   Cancel schedule_recurring_event(std::chrono::steady_clock::duration interval,
                                   std::function<void()> callback) override {
     if (count_tasks == 0) {
       heartbeat_callback = callback;
       heartbeat_interval = interval;
-    } else if (count_tasks == 1) {
+    } else if (interval <= std::chrono::minutes(1)) {
+      // Metrics interval is <= 60s; extended heartbeat is much larger.
       metrics_callback = callback;
       metrics_interval = interval;
+    } else {
+      extended_heartbeat_callback = callback;
+      extended_heartbeat_interval = interval;
     }
     count_tasks++;
     return [this]() { cancelled = true; };
@@ -72,6 +80,11 @@ struct FakeEventScheduler : public EventScheduler {
   void trigger_metrics_capture() {
     assert(metrics_callback != nullptr);
     metrics_callback();
+  }
+
+  void trigger_extended_heartbeat() {
+    assert(extended_heartbeat_callback != nullptr);
+    extended_heartbeat_callback();
   }
 
   std::string config() const override {
@@ -452,6 +465,105 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     REQUIRE(message_batch["payload"].size() >= 1);
 
     REQUIRE(find_payload(message_batch["payload"], "app-heartbeat"));
+  }
+
+  SECTION("generates an extended heartbeat with configuration") {
+    client->clear();
+
+    Product product;
+    product.name = Product::Name::tracing;
+    product.enabled = true;
+    product.version = tracer_version;
+    product.configurations =
+        std::unordered_map<ConfigName, std::vector<ConfigMetadata>>{
+            {ConfigName::SERVICE_NAME,
+             {ConfigMetadata(ConfigName::SERVICE_NAME, "my-service",
+                             ConfigMetadata::Origin::CODE)}},
+        };
+
+    Configuration cfg;
+    cfg.products.emplace_back(std::move(product));
+
+    auto scheduler2 = std::make_shared<FakeEventScheduler>();
+    Telemetry telemetry2{*finalize_config(cfg),
+                         tracer_signature,
+                         logger,
+                         client,
+                         scheduler2,
+                         *url};
+
+    client->clear();
+    scheduler2->trigger_extended_heartbeat();
+
+    auto message_batch = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(message_batch));
+
+    auto ext_hb =
+        find_payload(message_batch["payload"], "app-extended-heartbeat");
+    REQUIRE(ext_hb.has_value());
+
+    auto& config_payload = (*ext_hb)["payload"]["configuration"];
+    REQUIRE(config_payload.is_array());
+    REQUIRE(config_payload.size() == 1);
+    CHECK(config_payload[0]["name"] == "service");
+    CHECK(config_payload[0]["value"] == "my-service");
+    CHECK(config_payload[0]["origin"] == "code");
+  }
+
+  SECTION(
+      "extended heartbeat reflects runtime configuration changes (remote "
+      "config)") {
+    client->clear();
+
+    Product product;
+    product.name = Product::Name::tracing;
+    product.enabled = true;
+    product.version = tracer_version;
+    product.configurations =
+        std::unordered_map<ConfigName, std::vector<ConfigMetadata>>{
+            {ConfigName::SERVICE_NAME,
+             {ConfigMetadata(ConfigName::SERVICE_NAME, "my-service",
+                             ConfigMetadata::Origin::CODE)}},
+        };
+
+    Configuration cfg;
+    cfg.products.emplace_back(std::move(product));
+
+    auto scheduler2 = std::make_shared<FakeEventScheduler>();
+    Telemetry telemetry2{*finalize_config(cfg),
+                         tracer_signature,
+                         logger,
+                         client,
+                         scheduler2,
+                         *url};
+
+    // Simulate a remote config update overriding SERVICE_NAME
+    telemetry2.capture_configuration_change(
+        {{ConfigName::SERVICE_NAME, "rc-service",
+          ConfigMetadata::Origin::REMOTE_CONFIG}});
+    telemetry2.send_configuration_change();
+
+    client->clear();
+    scheduler2->trigger_extended_heartbeat();
+
+    auto payload = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(payload));
+
+    auto ext_hb = find_payload(payload["payload"], "app-extended-heartbeat");
+    REQUIRE(ext_hb.has_value());
+
+    auto& configuration = (*ext_hb)["payload"]["configuration"];
+    REQUIRE(configuration.is_array());
+
+    bool found = false;
+    for (const auto& entry : configuration) {
+      if (entry["name"] == "service") {
+        found = true;
+        CHECK(entry["value"] == "rc-service");
+        CHECK(entry["origin"] == "remote_config");
+      }
+    }
+    CHECK(found);
   }
 
   SECTION("metrics reporting") {
