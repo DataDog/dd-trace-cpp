@@ -59,14 +59,14 @@
     "DD_PROPAGATION_STYLE_EXTRACT": [
       {
         "default": "datadog,tracecontext,baggage",
-        "implementation": "A",
+        "implementation": "C",
         "type": "array"
       }
     ],
     "DD_PROPAGATION_STYLE_INJECT": [
       {
         "default": "datadog,tracecontext,baggage",
-        "implementation": "A",
+        "implementation": "C",
         "type": "array"
       }
     ],
@@ -87,7 +87,7 @@
     "DD_SERVICE": [
       {
         "default": "",
-        "implementation": "A",
+        "implementation": "F",
         "type": "string"
       }
     ],
@@ -101,7 +101,7 @@
     "DD_SPAN_SAMPLING_RULES_FILE": [
       {
         "default": "",
-        "implementation": "A",
+        "implementation": "B",
         "type": "string"
       }
     ],
@@ -129,7 +129,7 @@
     "DD_TELEMETRY_HEARTBEAT_INTERVAL": [
       {
         "default": "10",
-        "implementation": "A",
+        "implementation": "D",
         "type": "decimal"
       }
     ],
@@ -206,21 +206,21 @@
     "DD_TRACE_PROPAGATION_STYLE": [
       {
         "default": "datadog,tracecontext,baggage",
-        "implementation": "A",
+        "implementation": "D",
         "type": "array"
       }
     ],
     "DD_TRACE_PROPAGATION_STYLE_EXTRACT": [
       {
         "default": "datadog,tracecontext,baggage",
-        "implementation": "A",
+        "implementation": "D",
         "type": "array"
       }
     ],
     "DD_TRACE_PROPAGATION_STYLE_INJECT": [
       {
         "default": "datadog,tracecontext,baggage",
-        "implementation": "A",
+        "implementation": "D",
         "type": "array"
       }
     ],
@@ -255,14 +255,14 @@
     "DD_TRACE_SAMPLE_RATE": [
       {
         "default": "1",
-        "implementation": "A",
+        "implementation": "C",
         "type": "decimal"
       }
     ],
     "DD_TRACE_SAMPLING_RULES": [
       {
         "default": "[]",
-        "implementation": "A",
+        "implementation": "D",
         "type": "array"
       }
     ],
