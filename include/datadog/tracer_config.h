@@ -189,8 +189,8 @@ struct TracerConfig {
   // This option is ignored if `resource_renaming_enabled` is not `true`.
   Optional<bool> resource_renaming_always_simplified_endpoint;
 
-  // Root session ID inherited from the parent process. Tracks the runtime ID
-  // of the first C++ process in a fork/spawn chain.
+  // Populated internally from the root_session_id singleton. Tracks the
+  // runtime ID of the first C++ process in a fork/spawn chain.
   Optional<std::string> root_session_id;
 
   /// A mapping of process-specific tags used to uniquely identify processes.
@@ -253,13 +253,6 @@ class FinalizedTracerConfig final {
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config);
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config,
                                                 const Clock& clock);
-
-// Set the root session ID singleton. Thread-safe; only the first call takes
-// effect (subsequent calls are no-ops). Immutable after init, so fork-safe.
-void set_root_session_id(const std::string& id);
-
-// Return the root session ID, or an empty string if not yet initialized.
-const std::string& get_root_session_id();
 
 }  // namespace tracing
 }  // namespace datadog

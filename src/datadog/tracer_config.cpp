@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -15,6 +14,7 @@
 #include "null_logger.h"
 #include "parse_util.h"
 #include "platform_util.h"
+#include "root_session_id.h"
 #include "string_util.h"
 #include "threaded_event_scheduler.h"
 
@@ -262,7 +262,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger& logger) {
     return std::move(error);
   }
 
-  const auto& root_sid = get_root_session_id();
+  const auto& root_sid = root_session_id::get();
   if (!root_sid.empty()) {
     env_cfg.root_session_id = root_sid;
   }
@@ -271,20 +271,6 @@ Expected<TracerConfig> load_tracer_env_config(Logger& logger) {
 }
 
 }  // namespace
-
-static std::string& root_session_id_instance() {
-  static std::string id;
-  return id;
-}
-
-static std::once_flag root_session_id_flag;
-
-void set_root_session_id(const std::string& id) {
-  std::call_once(root_session_id_flag,
-                 [&]() { root_session_id_instance() = id; });
-}
-
-const std::string& get_root_session_id() { return root_session_id_instance(); }
 
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config) {
   return finalize_config(config, default_clock);
