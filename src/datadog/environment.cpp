@@ -19,17 +19,6 @@ Optional<StringView> lookup(Variable variable) {
   return StringView{value};
 }
 
-void set_if_not_set(Variable variable, StringView value) {
-  const char* name = variable_names[variable];
-#ifdef _WIN32
-  if (!std::getenv(name)) {
-    _putenv_s(name, value.data());
-  }
-#else
-  setenv(name, value.data(), /*overwrite=*/0);
-#endif
-}
-
 std::string to_json() {
   auto result = nlohmann::json::object({});
 

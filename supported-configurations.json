@@ -286,13 +286,6 @@
         "implementation": "A",
         "type": "STRING"
       }
-    ],
-    "_DD_ROOT_CPP_SESSION_ID": [
-      {
-        "default": "",
-        "implementation": "A",
-        "type": "STRING"
-      }
     ]
   },
   "version": "2"
