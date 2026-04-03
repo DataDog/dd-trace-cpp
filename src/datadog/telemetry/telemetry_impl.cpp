@@ -62,8 +62,9 @@ HTTPClient::URL make_telemetry_endpoint(HTTPClient::URL url) {
 
 void set_session_headers(DictWriter& headers,
                          const tracing::TracerSignature& sig) {
-  headers.set("DD-Session-ID", sig.runtime_id.string());
-  if (sig.root_session_id != sig.runtime_id.string()) {
+  const auto& session_id = sig.runtime_id.string();
+  headers.set("DD-Session-ID", session_id);
+  if (sig.root_session_id != session_id) {
     headers.set("DD-Root-Session-ID", sig.root_session_id);
   }
 }
@@ -314,53 +315,7 @@ void Telemetry::log_warning(std::string message) {
 }
 
 void Telemetry::app_started() {
-  auto payload = app_started_payload();
-
-  auto on_headers = [payload_size = payload.size(),
-                     debug_enabled = config_.debug,
-                     &sig = tracer_signature_](DictWriter& headers) {
-    headers.set("Content-Type", "application/json");
-    headers.set("Content-Length", std::to_string(payload_size));
-    headers.set("DD-Telemetry-API-Version", "v2");
-    headers.set("DD-Client-Library-Language", "cpp");
-    headers.set("DD-Client-Library-Version", tracer_version);
-    headers.set("DD-Telemetry-Request-Type", "app-started");
-    set_session_headers(headers, sig);
-    if (debug_enabled) {
-      headers.set("DD-Telemetry-Debug-Enabled", "true");
-    }
-  };
-
-  auto on_response = [logger = logger_](int response_status, const DictReader&,
-                                        std::string response_body) {
-    if (response_status < 200 || response_status >= 300) {
-      logger->log_error([&](auto& stream) {
-        stream << "Unexpected telemetry response status " << response_status
-               << " with body (if any, starts on next line):\n"
-               << response_body;
-      });
-    }
-  };
-
-  auto on_error = [logger = logger_](Error error) {
-    logger->log_error(error.with_prefix(
-        "Error occurred during HTTP request for telemetry: "));
-  };
-
-  increment_counter(internal_metrics::requests, {"endpoint:agent"});
-  add_datapoint(internal_metrics::bytes_sent, {"endpoint:agent"},
-                payload.size());
-
-  auto post_result =
-      http_client_->post(telemetry_endpoint_, on_headers, std::move(payload),
-                         std::move(on_response), std::move(on_error),
-                         clock_().tick + request_timeout);
-  if (auto* error = post_result.if_error()) {
-    increment_counter(internal_metrics::errors,
-                      {"type:network", "endpoint:agent"});
-    logger_->log_error(
-        error->with_prefix("Unexpected error submitting telemetry event: "));
-  }
+  send_payload("app-started", app_started_payload());
 }
 
 void Telemetry::app_closing() {
