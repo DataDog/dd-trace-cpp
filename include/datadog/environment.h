@@ -35,6 +35,9 @@ namespace environment {
 //       The runtime default is resolved in C++ configuration finalization
 //       logic. The description is emitted as the "default" field in
 //       metadata/supported-configurations.json.
+//   - nullptr
+//       There is no default value. This is emitted as JSON null in
+//       metadata/supported-configurations.json.
 #define DD_LIST_ENVIRONMENT_VARIABLES(MACRO)                                   \
   MACRO(DD_AGENT_HOST, STRING, "localhost")                                    \
   MACRO(DD_ENV, STRING, "")                                                    \
@@ -60,29 +63,29 @@ namespace environment {
             "then defaults to http://localhost:8126."))                        \
   MACRO(DD_TRACE_DEBUG, BOOLEAN, false)                                        \
   MACRO(DD_TRACE_ENABLED, BOOLEAN, true)                                       \
-  MACRO(DD_TRACE_RATE_LIMIT, DECIMAL, 100.0)                                   \
+  MACRO(DD_TRACE_RATE_LIMIT, INT, 100)                                         \
   MACRO(DD_TRACE_REPORT_HOSTNAME, BOOLEAN, false)                              \
-  MACRO(DD_TRACE_SAMPLE_RATE, DECIMAL, 1.0)                                    \
+  MACRO(DD_TRACE_SAMPLE_RATE, DECIMAL, 1)                                      \
   MACRO(DD_TRACE_SAMPLING_RULES, ARRAY, "[]")                                  \
   MACRO(DD_TRACE_STARTUP_LOGS, BOOLEAN, true)                                  \
   MACRO(DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH, INT, 512)                        \
   MACRO(DD_VERSION, STRING, "")                                                \
   MACRO(DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED, BOOLEAN, true)            \
   MACRO(DD_TELEMETRY_HEARTBEAT_INTERVAL, DECIMAL, 10)                          \
-  MACRO(DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL, DECIMAL, 86400.0)            \
+  MACRO(DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL, INT, 86400)                  \
   MACRO(DD_TELEMETRY_METRICS_ENABLED, BOOLEAN, true)                           \
   MACRO(DD_TELEMETRY_METRICS_INTERVAL_SECONDS, DECIMAL, 60)                    \
   MACRO(DD_TELEMETRY_DEBUG, BOOLEAN, false)                                    \
   MACRO(DD_TRACE_BAGGAGE_MAX_ITEMS, INT, 64)                                   \
   MACRO(DD_TRACE_BAGGAGE_MAX_BYTES, INT, 8192)                                 \
   MACRO(DD_TELEMETRY_LOG_COLLECTION_ENABLED, BOOLEAN, true)                    \
-  MACRO(DD_INSTRUMENTATION_INSTALL_ID, STRING, "")                             \
-  MACRO(DD_INSTRUMENTATION_INSTALL_TYPE, STRING, "")                           \
-  MACRO(DD_INSTRUMENTATION_INSTALL_TIME, STRING, "")                           \
+  MACRO(DD_INSTRUMENTATION_INSTALL_ID, STRING, nullptr)                        \
+  MACRO(DD_INSTRUMENTATION_INSTALL_TYPE, STRING, nullptr)                      \
+  MACRO(DD_INSTRUMENTATION_INSTALL_TIME, STRING, nullptr)                      \
   MACRO(DD_APM_TRACING_ENABLED, BOOLEAN, true)                                 \
   MACRO(DD_TRACE_RESOURCE_RENAMING_ENABLED, BOOLEAN, false)                    \
   MACRO(DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT, BOOLEAN, false) \
-  MACRO(DD_EXTERNAL_ENV, STRING, "")
+  MACRO(DD_EXTERNAL_ENV, STRING, nullptr)
 
 #define ENV_DEFAULT_RESOLVED_IN_CODE(X) X
 #define WITH_COMMA(ARG, TYPE, DEFAULT_VALUE) ARG,
