@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cxxopts.hpp>
 #include <filesystem>
 #include <fstream>
@@ -33,7 +34,12 @@ nlohmann::json build_configuration() {
     auto obj = nlohmann::json::object();                                   \
     obj["default"] = to_string_any(DEFAULT_VALUE);                         \
     obj["implementation"] = "A";                                           \
-    obj["type"] = QUOTED(TYPE);                                            \
+    {                                                                      \
+      std::string type_str = QUOTED(TYPE);                                 \
+      std::transform(type_str.begin(), type_str.end(), type_str.begin(),   \
+                     [](unsigned char c) { return std::tolower(c); });     \
+      obj["type"] = type_str;                                              \
+    }                                                                      \
     supported_configurations[QUOTED(NAME)] = nlohmann::json::array({obj}); \
   } while (0);
 
