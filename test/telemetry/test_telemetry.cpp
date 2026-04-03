@@ -102,10 +102,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
   auto client = std::make_shared<MockHTTPClient>();
   auto scheduler = std::make_shared<FakeEventScheduler>();
 
-  const TracerSignature tracer_signature{
-      /* runtime_id = */ RuntimeID::generate(),
-      /* service = */ "testsvc",
-      /* environment = */ "test"};
+  auto runtime_id = RuntimeID::generate();
+  const TracerSignature tracer_signature{runtime_id, "testsvc", "test"};
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
@@ -366,6 +364,67 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
   }
 }
 
+TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
+  auto logger = std::make_shared<MockLogger>();
+  auto client = std::make_shared<MockHTTPClient>();
+  auto scheduler = std::make_shared<FakeEventScheduler>();
+  auto url = HTTPClient::URL::parse("http://localhost:8000");
+
+  SECTION("root process: DD-Session-ID present, DD-Root-Session-ID absent") {
+    auto session_rid = RuntimeID::generate();
+    const TracerSignature sig{session_rid, "testsvc", "test"};
+
+    Telemetry telemetry{*finalize_config(), sig, logger, client,
+                        scheduler,          *url};
+
+    auto it = client->request_headers.items.find("DD-Session-ID");
+    REQUIRE(it != client->request_headers.items.end());
+    CHECK(it->second == session_rid.string());
+
+    CHECK(client->request_headers.items.find("DD-Root-Session-ID") ==
+          client->request_headers.items.end());
+  }
+
+  SECTION("child process: DD-Root-Session-ID present when different") {
+    auto session_rid = RuntimeID::generate();
+    auto root_rid = RuntimeID::generate();
+    const TracerSignature sig{session_rid, root_rid.string(), "testsvc",
+                              "test"};
+
+    Telemetry telemetry{*finalize_config(), sig, logger, client,
+                        scheduler,          *url};
+
+    auto session_it = client->request_headers.items.find("DD-Session-ID");
+    REQUIRE(session_it != client->request_headers.items.end());
+    CHECK(session_it->second == session_rid.string());
+
+    auto root_it = client->request_headers.items.find("DD-Root-Session-ID");
+    REQUIRE(root_it != client->request_headers.items.end());
+    CHECK(root_it->second == root_rid.string());
+  }
+
+  SECTION("heartbeat includes session headers") {
+    auto session_rid = RuntimeID::generate();
+    auto root_rid = RuntimeID::generate();
+    const TracerSignature sig{session_rid, root_rid.string(), "testsvc",
+                              "test"};
+
+    Telemetry telemetry{*finalize_config(), sig, logger, client,
+                        scheduler,          *url};
+
+    client->clear();
+    scheduler->trigger_heartbeat();
+
+    auto session_it = client->request_headers.items.find("DD-Session-ID");
+    REQUIRE(session_it != client->request_headers.items.end());
+    CHECK(session_it->second == session_rid.string());
+
+    auto root_it = client->request_headers.items.find("DD-Root-Session-ID");
+    REQUIRE(root_it != client->request_headers.items.end());
+    CHECK(root_it->second == root_rid.string());
+  }
+}
+
 TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
   const Clock clock = [] {
     TimePoint result;
@@ -377,10 +436,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
   auto client = std::make_shared<MockHTTPClient>();
   auto scheduler = std::make_shared<FakeEventScheduler>();
 
-  const TracerSignature tracer_signature{
-      /* runtime_id = */ RuntimeID::generate(),
-      /* service = */ "testsvc",
-      /* environment = */ "test"};
+  auto runtime_id = RuntimeID::generate();
+  const TracerSignature tracer_signature{runtime_id, "testsvc", "test"};
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
@@ -981,10 +1038,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
   auto client = std::make_shared<MockHTTPClient>();
   auto scheduler = std::make_shared<FakeEventScheduler>();
 
-  const TracerSignature tracer_signature{
-      /* runtime_id = */ RuntimeID::generate(),
-      /* service = */ "testsvc",
-      /* environment = */ "test"};
+  auto runtime_id = RuntimeID::generate();
+  const TracerSignature tracer_signature{runtime_id, "testsvc", "test"};
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 

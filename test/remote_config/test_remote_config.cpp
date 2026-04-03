@@ -47,10 +47,8 @@ auto logger = std::make_shared<NullLogger>();
 
 REMOTE_CONFIG_TEST("initial state payload") {
   // Verify the initial payload structure for a remote configuration instance.
-  const TracerSignature tracer_signature{
-      /* runtime_id = */ RuntimeID::generate(),
-      /* service = */ "testsvc",
-      /* environment = */ "test"};
+  auto runtime_id = RuntimeID::generate();
+  const TracerSignature tracer_signature{runtime_id, "testsvc", "test"};
 
   auto tracing_listener = std::make_shared<FakeListener>();
   tracing_listener->products = rc::product::APM_TRACING;
@@ -92,10 +90,8 @@ REMOTE_CONFIG_TEST("initial state payload") {
 // TODO: test all combination of product and capabilities generation
 
 REMOTE_CONFIG_TEST("response processing") {
-  const TracerSignature tracer_signature{
-      /* runtime_id = */ RuntimeID::generate(),
-      /* service = */ "testsvc",
-      /* environment = */ "test"};
+  auto runtime_id = RuntimeID::generate();
+  const TracerSignature tracer_signature{runtime_id, "testsvc", "test"};
 
   SECTION("ill formatted input",
           "inputs not following the Remote Configuration JSON schema should "

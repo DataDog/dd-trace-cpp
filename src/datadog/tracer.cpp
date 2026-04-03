@@ -24,6 +24,7 @@
 #include "msgpack.h"
 #include "platform_util.h"
 #include "random.h"
+#include "root_session_id.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tags.h"
@@ -48,8 +49,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     : logger_(config.logger),
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
-      signature_{runtime_id_, config.defaults.service,
-                 config.defaults.environment},
+      signature_{runtime_id_,
+                 config.root_session_id.value_or(runtime_id_.string()),
+                 config.defaults.service, config.defaults.environment},
       config_manager_(std::make_shared<ConfigManager>(config)),
       collector_(/* see constructor body */),
       span_sampler_(
@@ -64,6 +66,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       baggage_extraction_enabled_(false),
       tracing_enabled_(config.tracing_enabled),
       resource_renaming_mode_(config.resource_renaming_mode) {
+  root_session_id::set(signature_.root_session_id);
+
   telemetry::init(config.telemetry, signature_, logger_, config.http_client,
                   config.event_scheduler, config.agent_url);
   if (config.report_hostname) {

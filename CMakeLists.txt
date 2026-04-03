@@ -197,6 +197,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/parse_util.cpp
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp
+    src/datadog/root_session_id.cpp
     src/datadog/rate.cpp
     src/datadog/remote_config/product.cpp
     src/datadog/remote_config/remote_config.cpp

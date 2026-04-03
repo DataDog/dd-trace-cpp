@@ -189,6 +189,10 @@ struct TracerConfig {
   // This option is ignored if `resource_renaming_enabled` is not `true`.
   Optional<bool> resource_renaming_always_simplified_endpoint;
 
+  // Populated internally from the root_session_id singleton. Tracks the
+  // runtime ID of the first C++ process in a fork/spawn chain.
+  Optional<std::string> root_session_id;
+
   /// A mapping of process-specific tags used to uniquely identify processes.
   ///
   /// The `process_tags` map allows associating arbitrary string-based keys and
@@ -225,6 +229,7 @@ class FinalizedTracerConfig final {
   bool log_on_startup;
   bool generate_128bit_trace_ids;
   Optional<RuntimeID> runtime_id;
+  Optional<std::string> root_session_id;
   Clock clock;
   std::string integration_name;
   std::string integration_version;
