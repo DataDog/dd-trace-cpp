@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cxxopts.hpp>
 #include <filesystem>
 #include <fstream>
@@ -17,7 +18,23 @@ std::string to_string_any(const T& value) {
   return oss.str();
 }
 
-nlohmann::json build_configuration() {
+// Look up the existing implementation version for a config name from a
+// previously generated JSON. Returns "A" if not found.
+std::string existing_version(const nlohmann::json& existing,
+                             const std::string& name) {
+  if (existing.contains("supportedConfigurations")) {
+    const auto& sc = existing["supportedConfigurations"];
+    if (sc.contains(name) && sc[name].is_array() && !sc[name].empty()) {
+      const auto& first = sc[name][0];
+      if (first.contains("implementation")) {
+        return first["implementation"].get<std::string>();
+      }
+    }
+  }
+  return "A";
+}
+
+nlohmann::json build_configuration(const nlohmann::json& existing) {
   nlohmann::json j;
   j["version"] = "2";
 
@@ -32,8 +49,13 @@ nlohmann::json build_configuration() {
   do {                                                                     \
     auto obj = nlohmann::json::object();                                   \
     obj["default"] = to_string_any(DEFAULT_VALUE);                         \
-    obj["implementation"] = "A";                                           \
-    obj["type"] = QUOTED(TYPE);                                            \
+    obj["implementation"] = existing_version(existing, QUOTED(NAME));      \
+    {                                                                      \
+      std::string type_str = QUOTED(TYPE);                                 \
+      std::transform(type_str.begin(), type_str.end(), type_str.begin(),   \
+                     [](unsigned char c) { return std::tolower(c); });     \
+      obj["type"] = type_str;                                              \
+    }                                                                      \
     supported_configurations[QUOTED(NAME)] = nlohmann::json::array({obj}); \
   } while (0);
 
@@ -64,7 +86,17 @@ int main(int argc, char** argv) {
 
   const fs::path output_file = result["output-file"].as<std::string>();
 
-  const auto j = build_configuration();
+  // Read existing file to preserve implementation versions.
+  nlohmann::json existing;
+  {
+    std::ifstream in(output_file);
+    if (in) {
+      existing = nlohmann::json::parse(in, nullptr, false);
+      if (existing.is_discarded()) existing = nlohmann::json::object();
+    }
+  }
+
+  const auto j = build_configuration(existing);
   std::ofstream file(output_file, std::ios::binary);
   if (!file) {
     std::cerr << "Unable to write configuration file";
