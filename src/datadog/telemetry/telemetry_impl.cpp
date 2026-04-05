@@ -227,6 +227,11 @@ void Telemetry::schedule_tasks() {
     tasks_.emplace_back(scheduler_->schedule_recurring_event(
         config_.metrics_interval, [this]() mutable { capture_metrics(); }));
   }
+
+  tasks_.emplace_back(scheduler_->schedule_recurring_event(
+      config_.extended_heartbeat_interval, [this]() {
+        send_payload("app-extended-heartbeat", extended_heartbeat_payload());
+      }));
 }
 
 Telemetry::~Telemetry() {
@@ -251,6 +256,7 @@ Telemetry::Telemetry(Telemetry&& rhs)
       distributions_(std::move(rhs.distributions_)),
       seq_id_(rhs.seq_id_),
       config_seq_ids_(rhs.config_seq_ids_),
+      all_configurations_(rhs.all_configurations_),
       host_info_(rhs.host_info_) {
   cancel_tasks(rhs.tasks_);
   schedule_tasks();
@@ -274,6 +280,7 @@ Telemetry& Telemetry::operator=(Telemetry&& rhs) {
     std::swap(distributions_, rhs.distributions_);
     std::swap(seq_id_, rhs.seq_id_);
     std::swap(config_seq_ids_, rhs.config_seq_ids_);
+    std::swap(all_configurations_, rhs.all_configurations_);
     std::swap(host_info_, rhs.host_info_);
     schedule_tasks();
   }
@@ -678,6 +685,24 @@ std::string Telemetry::app_started_payload() {
   return batch.dump();
 }
 
+std::string Telemetry::extended_heartbeat_payload() {
+  auto configuration_json = nlohmann::json::array();
+
+  for (const auto& [name, config_metadata] : all_configurations_) {
+    configuration_json.emplace_back(
+        serialize_configuration_field(config_metadata, config_seq_ids_[name]));
+  }
+
+  auto extended_hb_msg = nlohmann::json{
+      {"request_type", "app-extended-heartbeat"},
+      {"payload", nlohmann::json{{"configuration", configuration_json}}},
+  };
+
+  auto batch = generate_telemetry_body("message-batch");
+  batch["payload"] = nlohmann::json::array({std::move(extended_hb_msg)});
+  return batch.dump();
+}
+
 nlohmann::json Telemetry::generate_telemetry_body(std::string request_type) {
   std::time_t tracer_time = std::chrono::duration_cast<std::chrono::seconds>(
                                 clock_().wall.time_since_epoch())
@@ -711,13 +736,8 @@ nlohmann::json Telemetry::generate_telemetry_body(std::string request_type) {
   });
 }
 
-nlohmann::json Telemetry::generate_configuration_field(
-    const ConfigMetadata& config_metadata) {
-  // NOTE(@dmehala): `seq_id` should start at 1 so that the go backend can
-  // detect between non set fields.
-  config_seq_ids_[config_metadata.name] += 1;
-  auto seq_id = config_seq_ids_[config_metadata.name];
-
+nlohmann::json Telemetry::serialize_configuration_field(
+    const ConfigMetadata& config_metadata, std::size_t seq_id) {
   auto j = nlohmann::json{{"name", to_string(config_metadata.name)},
                           {"value", config_metadata.value},
                           {"seq_id", seq_id}};
@@ -747,6 +767,16 @@ nlohmann::json Telemetry::generate_configuration_field(
   }
 
   return j;
+}
+
+nlohmann::json Telemetry::generate_configuration_field(
+    const ConfigMetadata& config_metadata) {
+  // NOTE(@dmehala): `seq_id` should start at 1 so that the go backend can
+  // detect between non set fields.
+  config_seq_ids_[config_metadata.name] += 1;
+  all_configurations_[config_metadata.name] = config_metadata;
+  return serialize_configuration_field(config_metadata,
+                                       config_seq_ids_[config_metadata.name]);
 }
 
 void Telemetry::capture_configuration_change(

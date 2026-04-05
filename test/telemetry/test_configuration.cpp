@@ -21,6 +21,7 @@ TELEMETRY_CONFIGURATION_TEST("defaults") {
   CHECK(cfg->report_metrics == true);
   CHECK(cfg->metrics_interval == 60s);
   CHECK(cfg->heartbeat_interval == 10s);
+  CHECK(cfg->extended_heartbeat_interval == 86400s);
   CHECK(cfg->install_id.has_value() == false);
   CHECK(cfg->install_type.has_value() == false);
   CHECK(cfg->install_time.has_value() == false);
@@ -33,6 +34,7 @@ TELEMETRY_CONFIGURATION_TEST("code override") {
   cfg.report_metrics = false;
   cfg.metrics_interval_seconds = 1;
   cfg.heartbeat_interval_seconds = 2;
+  cfg.extended_heartbeat_interval_seconds = 3600;
   cfg.integration_name = "test";
   cfg.integration_version = "2024.10.28";
 
@@ -44,6 +46,7 @@ TELEMETRY_CONFIGURATION_TEST("code override") {
   CHECK(final_cfg->report_metrics == false);
   CHECK(final_cfg->metrics_interval == 1s);
   CHECK(final_cfg->heartbeat_interval == 2s);
+  CHECK(final_cfg->extended_heartbeat_interval == 3600s);
   CHECK(final_cfg->integration_name == "test");
   CHECK(final_cfg->integration_version == "2024.10.28");
 }
@@ -113,6 +116,14 @@ TELEMETRY_CONFIGURATION_TEST("environment environment override") {
     REQUIRE(final_cfg);
     CHECK(final_cfg->heartbeat_interval == 42s);
   }
+
+  SECTION("Override extended heartbeat interval") {
+    cfg.extended_heartbeat_interval_seconds = 99999;
+    ddtest::EnvGuard env("DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL", "120");
+    auto final_cfg = telemetry::finalize_config(cfg);
+    REQUIRE(final_cfg);
+    CHECK(final_cfg->extended_heartbeat_interval == 120s);
+  }
 }
 
 TELEMETRY_CONFIGURATION_TEST("validation") {
@@ -143,6 +154,22 @@ TELEMETRY_CONFIGURATION_TEST("validation") {
 
     SECTION("environment variable override") {
       ddtest::EnvGuard env("DD_TELEMETRY_METRICS_INTERVAL_SECONDS", "-42");
+      auto final_cfg = telemetry::finalize_config();
+      REQUIRE(!final_cfg);
+    }
+  }
+
+  SECTION("extended heartbeat interval validation") {
+    SECTION("code override") {
+      telemetry::Configuration cfg;
+      cfg.extended_heartbeat_interval_seconds = -100;
+
+      auto final_cfg = telemetry::finalize_config(cfg);
+      REQUIRE(!final_cfg);
+    }
+
+    SECTION("environment variable override") {
+      ddtest::EnvGuard env("DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL", "-1");
       auto final_cfg = telemetry::finalize_config();
       REQUIRE(!final_cfg);
     }

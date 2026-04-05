@@ -7,7 +7,9 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <cstdio>
 #include <regex>
+#include <string>
 #include <vector>
 
 #include "matchers.h"
@@ -310,7 +312,9 @@ TEST_CASE("TraceSegment finalization of spans") {
       REQUIRE_THAT(span.tags, ContainsSubset(filtered));
       // "_dd.p.dm" will be added, because we made a sampling decision.
       REQUIRE(span.tags.count("_dd.p.dm") == 1);
-      REQUIRE(span.tags.count("_dd.p.ksr") == 1);
+      // "_dd.p.ksr" is NOT set because this uses the DEFAULT mechanism (no
+      // agent configuration received yet).
+      REQUIRE(span.tags.count("_dd.p.ksr") == 0);
     }
 
     SECTION("rate tags") {
@@ -325,7 +329,8 @@ TEST_CASE("TraceSegment finalization of spans") {
         REQUIRE(collector->span_count() == 1);
         const auto& span = collector->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
-        REQUIRE(span.tags.at(tags::internal::ksr) == "1.000000");
+        // ksr is NOT set for the DEFAULT mechanism.
+        REQUIRE(span.tags.count(tags::internal::ksr) == 0);
       }
 
       SECTION(
@@ -348,7 +353,8 @@ TEST_CASE("TraceSegment finalization of spans") {
         {
           REQUIRE(collector_response->span_count() == 1);
           const auto& span = collector_response->first_span();
-          CHECK(span.tags.at(tags::internal::ksr) == "1.000000");
+          // ksr is NOT set for the DEFAULT mechanism.
+          CHECK(span.tags.count(tags::internal::ksr) == 0);
         }
 
         collector_response->chunks.clear();
@@ -361,7 +367,7 @@ TEST_CASE("TraceSegment finalization of spans") {
           REQUIRE(collector_response->span_count() == 1);
           const auto& span = collector_response->first_span();
           CHECK(span.numeric_tags.at(tags::internal::agent_sample_rate) == 1.0);
-          CHECK(span.tags.at(tags::internal::ksr) == "1.000000");
+          CHECK(span.tags.at(tags::internal::ksr) == "1");
         }
       }
 
@@ -392,7 +398,11 @@ TEST_CASE("TraceSegment finalization of spans") {
         const auto& span = collector->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::rule_sample_rate) ==
                 sample_rate);
-        CHECK(span.tags.at(tags::internal::ksr) == std::to_string(sample_rate));
+        {
+          char buf[32];
+          std::snprintf(buf, sizeof(buf), "%.6g", sample_rate);
+          CHECK(span.tags.at(tags::internal::ksr) == std::string(buf));
+        }
         if (sample_rate == 1.0) {
           REQUIRE(span.numeric_tags.at(
                       tags::internal::rule_limiter_sample_rate) == 1.0);
