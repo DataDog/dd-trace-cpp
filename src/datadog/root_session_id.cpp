@@ -1,5 +1,7 @@
 #include "root_session_id.h"
 
+#include <mutex>
+
 namespace datadog {
 namespace tracing {
 namespace root_session_id {
@@ -11,9 +13,15 @@ std::string& instance() {
   return id;
 }
 
+std::mutex& mutex() {
+  static std::mutex m;
+  return m;
+}
+
 }  // namespace
 
 void set(const std::string& id) {
+  std::lock_guard<std::mutex> lock(mutex());
   if (instance().empty()) {
     instance() = id;
   }
