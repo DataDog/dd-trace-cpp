@@ -1,6 +1,6 @@
 #include "root_session_id.h"
 
-#include <mutex>
+#include <atomic>
 
 namespace datadog {
 namespace tracing {
@@ -13,16 +13,16 @@ std::string& instance() {
   return id;
 }
 
-std::mutex& mutex() {
-  static std::mutex m;
-  return m;
+std::atomic<bool>& initialized() {
+  static std::atomic<bool> flag{false};
+  return flag;
 }
 
 }  // namespace
 
 void set(const std::string& id) {
-  std::lock_guard<std::mutex> lock(mutex());
-  if (instance().empty()) {
+  bool expected = false;
+  if (initialized().compare_exchange_strong(expected, true)) {
     instance() = id;
   }
 }
