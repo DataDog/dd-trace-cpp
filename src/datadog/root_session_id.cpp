@@ -8,20 +8,29 @@ namespace root_session_id {
 
 namespace {
 
+std::mutex& mutex() {
+  static std::mutex m;
+  return m;
+}
+
 std::string& instance() {
   static std::string id;
   return id;
 }
 
-std::once_flag& flag() {
-  static std::once_flag f;
-  return f;
+bool& initialized() {
+  static bool init = false;
+  return init;
 }
 
 }  // namespace
 
 void set(const std::string& id) {
-  std::call_once(flag(), [&]() { instance() = id; });
+  std::lock_guard<std::mutex> lock(mutex());
+  if (!initialized()) {
+    instance() = id;
+    initialized() = true;
+  }
 }
 
 const std::string& get() { return instance(); }
