@@ -102,8 +102,10 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
   auto client = std::make_shared<MockHTTPClient>();
   auto scheduler = std::make_shared<FakeEventScheduler>();
 
-  auto runtime_id = RuntimeID::generate();
-  const TracerSignature tracer_signature{runtime_id, "testsvc", "test"};
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
@@ -436,8 +438,10 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
   auto client = std::make_shared<MockHTTPClient>();
   auto scheduler = std::make_shared<FakeEventScheduler>();
 
-  auto runtime_id = RuntimeID::generate();
-  const TracerSignature tracer_signature{runtime_id, "testsvc", "test"};
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
@@ -1038,8 +1042,10 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
   auto client = std::make_shared<MockHTTPClient>();
   auto scheduler = std::make_shared<FakeEventScheduler>();
 
-  auto runtime_id = RuntimeID::generate();
-  const TracerSignature tracer_signature{runtime_id, "testsvc", "test"};
+  const TracerSignature tracer_signature{
+      /* runtime_id = */ RuntimeID::generate(),
+      /* service = */ "testsvc",
+      /* environment = */ "test"};
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
