@@ -374,10 +374,10 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
 
   SECTION("root process: DD-Session-ID present, DD-Root-Session-ID absent") {
     auto session_rid = RuntimeID::generate();
-    const TracerSignature sig(session_rid, "testsvc", "test");
+    const TracerSignature tracer_signature(session_rid, "testsvc", "test");
 
-    Telemetry telemetry{*finalize_config(), sig, logger, client,
-                        scheduler,          *url};
+    Telemetry telemetry{
+        *finalize_config(), tracer_signature, logger, client, scheduler, *url};
 
     auto it = client->request_headers.items.find("DD-Session-ID");
     REQUIRE(it != client->request_headers.items.end());
@@ -390,11 +390,11 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
   SECTION("child process: DD-Root-Session-ID present when different") {
     auto session_rid = RuntimeID::generate();
     auto root_rid = RuntimeID::generate();
-    const TracerSignature sig(session_rid, root_rid.string(), "testsvc",
-                              "test");
+    const TracerSignature tracer_signature(session_rid, root_rid.string(),
+                                           "testsvc", "test");
 
-    Telemetry telemetry{*finalize_config(), sig, logger, client,
-                        scheduler,          *url};
+    Telemetry telemetry{
+        *finalize_config(), tracer_signature, logger, client, scheduler, *url};
 
     auto session_it = client->request_headers.items.find("DD-Session-ID");
     REQUIRE(session_it != client->request_headers.items.end());
@@ -408,11 +408,11 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
   SECTION("heartbeat includes session headers") {
     auto session_rid = RuntimeID::generate();
     auto root_rid = RuntimeID::generate();
-    const TracerSignature sig(session_rid, root_rid.string(), "testsvc",
-                              "test");
+    const TracerSignature tracer_signature(session_rid, root_rid.string(),
+                                           "testsvc", "test");
 
-    Telemetry telemetry{*finalize_config(), sig, logger, client,
-                        scheduler,          *url};
+    Telemetry telemetry{
+        *finalize_config(), tracer_signature, logger, client, scheduler, *url};
 
     client->clear();
     scheduler->trigger_heartbeat();
