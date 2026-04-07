@@ -20,14 +20,13 @@ std::atomic<bool>& initialized() {
 
 }  // namespace
 
-void set(const std::string& id) {
+const std::string& get_or_init(const std::string& runtime_id) {
   bool expected = false;
   if (initialized().compare_exchange_strong(expected, true)) {
-    instance() = id;
+    instance() = runtime_id;
   }
+  return instance();
 }
-
-const std::string& get() { return instance(); }
 
 }  // namespace root_session_id
 }  // namespace tracing

@@ -14,7 +14,6 @@
 #include "null_logger.h"
 #include "parse_util.h"
 #include "platform_util.h"
-#include "root_session_id.h"
 #include "string_util.h"
 #include "threaded_event_scheduler.h"
 
@@ -260,11 +259,6 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     }
   } catch (Error &error) {
     return std::move(error);
-  }
-
-  const auto &root_sid = root_session_id::get();
-  if (!root_sid.empty()) {
-    env_cfg.root_session_id = root_sid;
   }
 
   return env_cfg;
