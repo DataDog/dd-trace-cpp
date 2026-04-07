@@ -43,8 +43,7 @@ ROOT_SESSION_ID_TEST("child process inherits root session ID after fork") {
     close(pipefd[0]);
     auto child_rid = RuntimeID::generate();
     const auto& result = root_session_id::get_or_init(child_rid.string());
-    auto written =
-        write(pipefd[1], result.data(), result.size());
+    auto written = write(pipefd[1], result.data(), result.size());
     close(pipefd[1]);
     _exit(written == static_cast<ssize_t>(result.size()) ? 0 : 1);
   }

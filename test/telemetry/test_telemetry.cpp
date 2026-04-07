@@ -11,9 +11,9 @@
 #include "../common/environment.h"
 #include "datadog/runtime_id.h"
 #include "datadog/telemetry/telemetry_impl.h"
-#include "root_session_id.h"
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
+#include "root_session_id.h"
 #include "test.h"
 
 namespace ddtest = datadog::test;
