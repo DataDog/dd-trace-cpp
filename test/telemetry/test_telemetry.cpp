@@ -11,6 +11,7 @@
 #include "../common/environment.h"
 #include "datadog/runtime_id.h"
 #include "datadog/telemetry/telemetry_impl.h"
+#include "root_session_id.h"
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
 #include "test.h"
@@ -372,7 +373,12 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
   auto scheduler = std::make_shared<FakeEventScheduler>();
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
+  // Acquire the root session ID from the singleton.
+  auto init_rid = RuntimeID::generate();
+  const auto& root_id = root_session_id::get_or_init(init_rid.string());
+
   SECTION("root process: DD-Session-ID present, DD-Root-Session-ID absent") {
+    // Simulate root process: session_id == root_session_id
     auto session_rid = RuntimeID::generate();
     const TracerSignature sig{session_rid, session_rid.string(), "testsvc",
                               "test"};
@@ -390,9 +396,7 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
 
   SECTION("child process: DD-Root-Session-ID present when different") {
     auto session_rid = RuntimeID::generate();
-    auto root_rid = RuntimeID::generate();
-    const TracerSignature sig{session_rid, root_rid.string(), "testsvc",
-                              "test"};
+    const TracerSignature sig{session_rid, root_id, "testsvc", "test"};
 
     Telemetry telemetry{*finalize_config(), sig, logger, client,
                         scheduler,          *url};
@@ -403,14 +407,12 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
 
     auto root_it = client->request_headers.items.find("DD-Root-Session-ID");
     REQUIRE(root_it != client->request_headers.items.end());
-    CHECK(root_it->second == root_rid.string());
+    CHECK(root_it->second == root_id);
   }
 
   SECTION("heartbeat includes session headers") {
     auto session_rid = RuntimeID::generate();
-    auto root_rid = RuntimeID::generate();
-    const TracerSignature sig{session_rid, root_rid.string(), "testsvc",
-                              "test"};
+    const TracerSignature sig{session_rid, root_id, "testsvc", "test"};
 
     Telemetry telemetry{*finalize_config(), sig, logger, client,
                         scheduler,          *url};
@@ -424,7 +426,7 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
 
     auto root_it = client->request_headers.items.find("DD-Root-Session-ID");
     REQUIRE(root_it != client->request_headers.items.end());
-    CHECK(root_it->second == root_rid.string());
+    CHECK(root_it->second == root_id);
   }
 }
 
