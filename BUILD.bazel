@@ -45,7 +45,6 @@ cc_library(
         "src/datadog/propagation_style.cpp",
         "src/datadog/random.cpp",
         "src/datadog/random.h",
-        "src/datadog/root_session_id.cpp",
         "src/datadog/root_session_id.h",
         "src/datadog/rate.cpp",
         "src/datadog/remote_config/product.cpp",

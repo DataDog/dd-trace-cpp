@@ -41,11 +41,13 @@ struct TracerSignature {
   StringView library_language_version;
 
   TracerSignature() = delete;
+
   TracerSignature(RuntimeID runtime_id, std::string default_service,
                   std::string default_environment)
       : TracerSignature(runtime_id, runtime_id.string(),
                         std::move(default_service),
                         std::move(default_environment)) {}
+
   TracerSignature(RuntimeID runtime_id, std::string root_session_id,
                   std::string default_service, std::string default_environment)
       : runtime_id(runtime_id),

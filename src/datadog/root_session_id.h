@@ -2,12 +2,11 @@
 
 #include <string>
 
-namespace datadog {
-namespace tracing {
-namespace root_session_id {
+namespace datadog::tracing::root_session_id {
 
-const std::string& get_or_init(const std::string& runtime_id);
+inline const std::string& get_or_init(const std::string& runtime_id) {
+  static const std::string id = runtime_id;
+  return id;
+}
 
-}  // namespace root_session_id
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing::root_session_id
