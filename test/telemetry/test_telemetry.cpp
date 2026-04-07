@@ -373,12 +373,10 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
   auto scheduler = std::make_shared<FakeEventScheduler>();
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
-  // Acquire the root session ID from the singleton.
   auto init_rid = RuntimeID::generate();
   const auto& root_id = root_session_id::get_or_init(init_rid.string());
 
   SECTION("root process: DD-Session-ID present, DD-Root-Session-ID absent") {
-    // Simulate root process: session_id == root_session_id
     auto session_rid = RuntimeID::generate();
     const TracerSignature sig{session_rid, session_rid.string(), "testsvc",
                               "test"};
