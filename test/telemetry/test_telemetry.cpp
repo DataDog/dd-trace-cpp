@@ -374,7 +374,8 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
 
   SECTION("root process: DD-Session-ID present, DD-Root-Session-ID absent") {
     auto session_rid = RuntimeID::generate();
-    const TracerSignature sig{session_rid, "testsvc", "test"};
+    const TracerSignature sig{session_rid, session_rid.string(), "testsvc",
+                              "test"};
 
     Telemetry telemetry{*finalize_config(), sig, logger, client,
                         scheduler,          *url};

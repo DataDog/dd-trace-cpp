@@ -24,7 +24,6 @@
 #include "msgpack.h"
 #include "platform_util.h"
 #include "random.h"
-#include "root_session_id.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tags.h"
@@ -49,9 +48,8 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     : logger_(config.logger),
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
-      signature_{runtime_id_,
-                 root_session_id::get_or_init(runtime_id_.string()),
-                 config.defaults.service, config.defaults.environment},
+      signature_{runtime_id_, config.defaults.service,
+                 config.defaults.environment},
       config_manager_(std::make_shared<ConfigManager>(config)),
       collector_(/* see constructor body */),
       span_sampler_(
