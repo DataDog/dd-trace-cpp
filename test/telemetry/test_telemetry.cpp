@@ -377,7 +377,7 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
     const TracerSignature sig(session_rid, "testsvc", "test");
 
     Telemetry telemetry{*finalize_config(), sig, logger, client,
-                        scheduler, *url};
+                        scheduler,          *url};
 
     auto it = client->request_headers.items.find("DD-Session-ID");
     REQUIRE(it != client->request_headers.items.end());
@@ -394,7 +394,7 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
                               "test");
 
     Telemetry telemetry{*finalize_config(), sig, logger, client,
-                        scheduler, *url};
+                        scheduler,          *url};
 
     auto session_it = client->request_headers.items.find("DD-Session-ID");
     REQUIRE(session_it != client->request_headers.items.end());
@@ -412,7 +412,7 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
                               "test");
 
     Telemetry telemetry{*finalize_config(), sig, logger, client,
-                        scheduler, *url};
+                        scheduler,          *url};
 
     client->clear();
     scheduler->trigger_heartbeat();
