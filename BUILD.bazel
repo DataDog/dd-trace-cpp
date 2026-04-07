@@ -84,7 +84,6 @@ cc_library(
         "src/datadog/trace_source.cpp",
         "src/datadog/tracer.cpp",
         "src/datadog/tracer_config.cpp",
-        "src/datadog/tracer_signature.cpp",
         "src/datadog/version.cpp",
         "src/datadog/w3c_propagation.cpp",
         "src/datadog/w3c_propagation.h",
