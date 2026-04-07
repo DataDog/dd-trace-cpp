@@ -18,6 +18,7 @@ add_executable(tests
 
     # telemetry test cases
     telemetry/test_configuration.cpp
+    telemetry/test_root_session_id.cpp
     telemetry/test_telemetry.cpp
 
     # test cases
