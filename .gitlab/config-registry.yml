@@ -19,7 +19,7 @@ variables:
     - when: on_success
   variables:
     LOCAL_JSON_PATH: ""
-    BACKFILLED: ""
+    BACKFILLED: "true"
   before_script:
     - *download-scripts-from-template
   script:

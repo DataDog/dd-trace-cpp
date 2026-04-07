@@ -23,29 +23,29 @@
     ],
     "DD_EXTERNAL_ENV": [
       {
-        "default": "",
-        "implementation": "B",
+        "default": null,
+        "implementation": "A",
         "type": "string"
       }
     ],
     "DD_INSTRUMENTATION_INSTALL_ID": [
       {
-        "default": "",
-        "implementation": "B",
+        "default": null,
+        "implementation": "A",
         "type": "string"
       }
     ],
     "DD_INSTRUMENTATION_INSTALL_TIME": [
       {
-        "default": "",
-        "implementation": "B",
+        "default": null,
+        "implementation": "A",
         "type": "string"
       }
     ],
     "DD_INSTRUMENTATION_INSTALL_TYPE": [
       {
-        "default": "",
-        "implementation": "B",
+        "default": null,
+        "implementation": "A",
         "type": "string"
       }
     ],
@@ -79,8 +79,8 @@
     ],
     "DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS": [
       {
-        "default": "5",
-        "implementation": "C",
+        "default": "5.0",
+        "implementation": "A",
         "type": "decimal"
       }
     ],
@@ -122,8 +122,8 @@
     "DD_TELEMETRY_EXTENDED_HEARTBEAT_INTERVAL": [
       {
         "default": "86400",
-        "implementation": "B",
-        "type": "decimal"
+        "implementation": "A",
+        "type": "int"
       }
     ],
     "DD_TELEMETRY_HEARTBEAT_INTERVAL": [
@@ -227,8 +227,8 @@
     "DD_TRACE_RATE_LIMIT": [
       {
         "default": "100",
-        "implementation": "C",
-        "type": "decimal"
+        "implementation": "A",
+        "type": "int"
       }
     ],
     "DD_TRACE_REPORT_HOSTNAME": [
