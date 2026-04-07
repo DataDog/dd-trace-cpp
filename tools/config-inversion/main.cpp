@@ -14,7 +14,8 @@ namespace env = datadog::tracing::environment;
 template <typename T>
 std::string to_string_any(const T& value) {
   std::ostringstream oss;
-  oss << value;
+  // boolalpha ensures bools are serialized as "true"/"false" instead of "1"/"0".
+  oss << std::boolalpha << value;
   return oss.str();
 }
 
