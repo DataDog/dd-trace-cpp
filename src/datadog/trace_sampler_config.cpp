@@ -1,4 +1,5 @@
 #include <datadog/environment.h>
+#include <datadog/logger.h>
 #include <datadog/trace_sampler_config.h>
 #include <datadog/trace_source.h>
 
@@ -7,7 +8,9 @@
 
 #include "json.hpp"
 #include "json_serializer.h"
+#include "null_logger.h"
 #include "parse_util.h"
+#include "stable_config.h"
 #include "string_util.h"
 #include "tags.h"
 
@@ -145,12 +148,84 @@ std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
   return res.dump();
 }
 
+// Convert a stable config string value to Optional<double>.
+Optional<double> stable_config_double(const StableConfig &cfg,
+                                      const std::string &key) {
+  auto val = cfg.lookup(key);
+  if (!val || val->empty()) return nullopt;
+  auto result = parse_double(StringView(*val));
+  if (result.if_error()) return nullopt;
+  return *result;
+}
+
+// Parse a stable config JSON string as an array of sampling rules.
+// `customize_rule` is a callable that receives (Rule&, const json_rule&) to set
+// rule-specific fields beyond the base matcher and sample_rate.
+// Returns nullopt on any parse error (stable config errors are non-fatal).
+template <typename Rule, typename Json, typename Customize>
+Optional<std::vector<Rule>> parse_stable_config_rules(
+    const StableConfig &cfg, const std::string &key, Logger &logger,
+    Customize customize_rule) {
+  auto val = cfg.lookup(key);
+  if (!val || val->empty()) return nullopt;
+
+  try {
+    auto json_rules = Json::parse(*val);
+    if (!json_rules.is_array()) {
+      logger.log_error([&key](std::ostream &log) {
+        log << "Unable to parse JSON sampling rules from " << key
+            << ": expected a JSON array";
+      });
+      return nullopt;
+    }
+
+    std::vector<Rule> rules;
+    for (const auto &json_rule : json_rules) {
+      auto matcher = from_json(json_rule);
+      if (matcher.if_error()) {
+        logger.log_error([&key](std::ostream &log) {
+          log << "Unable to parse JSON sampling rules from " << key
+              << ": invalid rule matcher";
+        });
+        return nullopt;
+      }
+
+      Rule rule{*matcher};
+      if (auto sr = json_rule.find("sample_rate");
+          sr != json_rule.end() && sr->is_number()) {
+        rule.sample_rate = *sr;
+      }
+      customize_rule(rule, json_rule);
+      rules.emplace_back(std::move(rule));
+    }
+    return rules;
+  } catch (...) {
+    logger.log_error([&key](std::ostream &log) {
+      log << "Unable to parse JSON sampling rules from " << key;
+    });
+    return nullopt;
+  }
+}
+
+// Try to parse a stable config string value as trace sampling rules JSON.
+// Returns nullopt on any parse error (stable config errors are non-fatal).
+Optional<std::vector<TraceSamplerConfig::Rule>> stable_config_sampling_rules(
+    const StableConfig &cfg, const std::string &key, Logger &logger) {
+  return parse_stable_config_rules<TraceSamplerConfig::Rule, nlohmann::json>(
+      cfg, key, logger,
+      [](TraceSamplerConfig::Rule &, const nlohmann::json &) {});
+}
+
 }  // namespace
 
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig &config) {
+    const TraceSamplerConfig &config, const StableConfigs *stable_configs,
+    Logger *logger) {
+  NullLogger null_logger;
+  Logger &log = logger ? *logger : static_cast<Logger &>(null_logger);
+
   Expected<TraceSamplerConfig> env_config = load_trace_sampler_env_config();
   if (auto error = env_config.if_error()) {
     return *error;
@@ -160,7 +235,22 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   std::vector<TraceSamplerConfig::Rule> rules;
 
-  if (!env_config->rules.empty()) {
+  // Precedence: fleet_stable > env > user/code > local_stable
+  Optional<std::vector<TraceSamplerConfig::Rule>> fleet_rules;
+  Optional<std::vector<TraceSamplerConfig::Rule>> local_rules;
+  if (stable_configs) {
+    fleet_rules = stable_config_sampling_rules(stable_configs->fleet,
+                                               "DD_TRACE_SAMPLING_RULES", log);
+    local_rules = stable_config_sampling_rules(stable_configs->local,
+                                               "DD_TRACE_SAMPLING_RULES", log);
+  }
+
+  if (fleet_rules) {
+    rules = std::move(*fleet_rules);
+    result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
+        ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
+                       ConfigMetadata::Origin::FLEET_STABLE_CONFIG)};
+  } else if (!env_config->rules.empty()) {
     rules = std::move(env_config->rules);
     result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
@@ -170,6 +260,11 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
                        ConfigMetadata::Origin::CODE)};
+  } else if (local_rules) {
+    rules = std::move(*local_rules);
+    result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
+        ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
+                       ConfigMetadata::Origin::LOCAL_STABLE_CONFIG)};
   }
 
   for (const auto &rule : rules) {
@@ -191,12 +286,22 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
+  Optional<double> fleet_sample_rate;
+  Optional<double> local_sample_rate;
+  if (stable_configs) {
+    fleet_sample_rate =
+        stable_config_double(stable_configs->fleet, "DD_TRACE_SAMPLE_RATE");
+    local_sample_rate =
+        stable_config_double(stable_configs->local, "DD_TRACE_SAMPLE_RATE");
+  }
+
   Optional<double> sample_rate = resolve_and_record_config(
-      env_config->sample_rate, config.sample_rate, &result.metadata,
-      ConfigName::TRACE_SAMPLING_RATE, 1.0,
+      fleet_sample_rate, env_config->sample_rate, config.sample_rate,
+      local_sample_rate, &result.metadata, ConfigName::TRACE_SAMPLING_RATE, 1.0,
       [](const double &d) { return to_string(d, 1); });
 
-  bool is_sample_rate_provided = env_config->sample_rate || config.sample_rate;
+  bool is_sample_rate_provided = fleet_sample_rate || env_config->sample_rate ||
+                                 config.sample_rate || local_sample_rate;
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
   // appended to the end of `rules`. First, though, we have to make sure the
   // sample rate is valid.
@@ -214,10 +319,19 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
+  Optional<double> fleet_rate_limit;
+  Optional<double> local_rate_limit;
+  if (stable_configs) {
+    fleet_rate_limit =
+        stable_config_double(stable_configs->fleet, "DD_TRACE_RATE_LIMIT");
+    local_rate_limit =
+        stable_config_double(stable_configs->local, "DD_TRACE_RATE_LIMIT");
+  }
+
   double max_per_second = resolve_and_record_config(
-      env_config->max_per_second, config.max_per_second, &result.metadata,
-      ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
-      [](const double &d) { return std::to_string(d); });
+      fleet_rate_limit, env_config->max_per_second, config.max_per_second,
+      local_rate_limit, &result.metadata, ConfigName::TRACE_SAMPLING_LIMIT,
+      100.0, [](const double &d) { return std::to_string(d); });
 
   const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
   if (!(max_per_second > 0) ||

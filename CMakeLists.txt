@@ -81,6 +81,10 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   include(cmake/compiler/gcc.cmake)
 endif ()
 
+# yaml-cpp must be included AFTER the compiler setup above, because
+# clang.cmake sets -stdlib=libc++ which yaml-cpp needs to inherit.
+include(cmake/deps/yaml.cmake)
+
 if (DD_TRACE_BUILD_FUZZERS)
   add_subdirectory(fuzz)
 endif ()
@@ -210,6 +214,8 @@ target_sources(dd-trace-cpp-objects
     src/datadog/tags.cpp
     src/datadog/tag_propagation.cpp
     src/datadog/threaded_event_scheduler.cpp
+    src/datadog/stable_config.cpp
+    src/datadog/yaml_parser.cpp
     src/datadog/tracer_config.cpp
     src/datadog/tracer.cpp
     src/datadog/trace_id.cpp
@@ -242,6 +248,7 @@ target_link_libraries(dd-trace-cpp-objects
     Threads::Threads
   PRIVATE
     dd-trace-cpp::specs
+    $<BUILD_INTERFACE:yaml-cpp>
 )
 
 set_target_properties(dd-trace-cpp-objects
