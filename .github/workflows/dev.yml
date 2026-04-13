@@ -201,9 +201,7 @@ jobs:
     secrets:
       TEST_OPTIMIZATION_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     permissions:
-      contents: read
       id-token: write
-      packages: write
     with:
       library: cpp
       binaries_artifact: system_tests_binaries
