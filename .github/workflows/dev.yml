@@ -205,6 +205,7 @@ jobs:
       id-token: write
     with:
       library: cpp
+      ref: 1e5d6b7096279ca43ce4826fda3cc805635b63c1
       binaries_artifact: system_tests_binaries
       parametric_job_count: 8  # dedicated parameter to speed up parametric job
       scenarios: PARAMETRIC
