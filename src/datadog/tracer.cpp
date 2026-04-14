@@ -49,10 +49,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     : logger_(config.logger),
       runtime_id_(config.runtime_id ? *config.runtime_id
                                     : RuntimeID::generate()),
-      signature_{runtime_id_,
+      signature_(runtime_id_,
                  root_session_id::get_or_init(
                      config.root_session_id.value_or(runtime_id_.string())),
-                 config.defaults.service, config.defaults.environment},
+                 config.defaults.service, config.defaults.environment),
       config_manager_(std::make_shared<ConfigManager>(config)),
       collector_(/* see constructor body */),
       span_sampler_(
