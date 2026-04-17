@@ -235,6 +235,40 @@ TEST_CASE("tracer new with invalid config and null error", "[c_binding]") {
   dd_tracer_conf_free(conf);
 }
 
+namespace {
+std::vector<std::vector<uint8_t>> g_callback_payloads;
+void callback_sink(const uint8_t *data, size_t size, void * /*user_data*/) {
+  g_callback_payloads.emplace_back(data, data + size);
+}
+}  // namespace
+
+TEST_CASE("custom collector callback receives trace payload", "[c_binding]") {
+  g_callback_payloads.clear();
+
+  auto *conf = dd_tracer_conf_new();
+  dd_tracer_conf_set(conf, DD_OPT_SERVICE_NAME, "callback-service");
+  dd_tracer_conf_set_collector_callback(conf, callback_sink, nullptr);
+
+  auto *tracer = dd_tracer_new(conf, nullptr);
+  REQUIRE(tracer != nullptr);
+  dd_tracer_conf_free(conf);
+
+  auto *span = dd_tracer_create_span(tracer, {.name = "callback.test"});
+  REQUIRE(span != nullptr);
+  dd_span_finish(span);
+  dd_span_free(span);
+  dd_tracer_free(tracer);
+
+  REQUIRE(g_callback_payloads.size() == 1);
+  CHECK(!g_callback_payloads[0].empty());
+  // Spot-check: short strings are embedded as raw ASCII bytes in msgpack.
+  const std::string_view blob(
+      reinterpret_cast<const char *>(g_callback_payloads[0].data()),
+      g_callback_payloads[0].size());
+  CHECK(blob.find("callback-service") != std::string_view::npos);
+  CHECK(blob.find("callback.test") != std::string_view::npos);
+}
+
 TEST_CASE("null arguments do not crash", "[c_binding]") {
   CHECK(dd_tracer_new(nullptr, nullptr) == nullptr);
   CHECK(dd_tracer_create_span(nullptr, {.name = "x"}) == nullptr);
@@ -255,4 +289,5 @@ TEST_CASE("null arguments do not crash", "[c_binding]") {
   dd_span_finish(nullptr);
   dd_span_set_resource(nullptr, "res");
   dd_span_set_service(nullptr, "svc");
+  dd_tracer_conf_set_collector_callback(nullptr, callback_sink, nullptr);
 }

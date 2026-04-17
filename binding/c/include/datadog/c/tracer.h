@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(_WIN32)
 #if defined(DD_TRACE_C_BUILDING)
@@ -33,6 +34,16 @@ typedef const char* (*dd_context_read_callback)(const char* key);
 // @param key    Header name to set
 // @param value  Header value to set
 typedef void (*dd_context_write_callback)(const char* key, const char* value);
+
+// Callback invoked with the msgpack-encoded trace payload that would
+// otherwise be POSTed to /v0.4/traces. The bytes are identical to the
+// HTTP body the tracer would have sent. `user_data` is passed through
+// from dd_tracer_conf_set_collector_callback.
+//
+// Called synchronously on the thread finishing a span; if it blocks,
+// all span-finishing on that thread stalls.
+typedef void (*dd_trace_msgpack_callback)(const uint8_t* data, size_t size,
+                                          void* user_data);
 
 typedef enum {
   DD_OPT_SERVICE_NAME = 0,
@@ -89,6 +100,28 @@ DD_TRACE_C_API void dd_tracer_conf_free(dd_conf_t* handle);
 DD_TRACE_C_API void dd_tracer_conf_set(dd_conf_t* handle,
                                        dd_tracer_option option,
                                        const void* value);
+
+// Install (or clear, by passing NULL) a custom collector callback. When a
+// callback is set, finished trace chunks are handed to it instead of being
+// POSTed to the Datadog Agent; telemetry and remote-configuration polling
+// are also disabled for the resulting tracer.
+//
+// Caveats:
+//   - Telemetry is process-global; if another tracer has already initialized
+//     telemetry as enabled in this process, that traffic continues.
+//   - DD_TRACE_AGENT_URL, if set to a malformed URL, still fails tracer
+//     creation even in callback mode (finalize_config validates the URL
+//     before the callback path is taken).
+//
+// `user_data` must remain valid for the lifetime of any tracer built from
+// this handle (the callback may fire during tracer shutdown). No-op if
+// handle is NULL.
+//
+// @param handle    Configuration handle
+// @param callback  Callback to receive msgpack payloads, or NULL to clear
+// @param user_data Opaque pointer passed verbatim to the callback
+DD_TRACE_C_API void dd_tracer_conf_set_collector_callback(
+    dd_conf_t* handle, dd_trace_msgpack_callback callback, void* user_data);
 
 // Creates a tracer instance. The configuration handle may be freed with
 // dd_tracer_conf_free after this call returns.
