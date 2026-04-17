@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(_WIN32)
 #if defined(DD_TRACE_C_BUILDING)
@@ -51,6 +52,7 @@ typedef struct {
   const char* service_type;
   const char* environment;
   const char* version;
+  int64_t start_time_ns;  // UNIX-epoch nanoseconds; 0 = use current time
 } dd_span_options_t;
 
 // Error codes returned by the C binding.
@@ -178,6 +180,13 @@ DD_TRACE_C_API dd_span_t* dd_span_create_child(dd_span_t* span_handle,
 //
 // @param span_handle Span handle
 DD_TRACE_C_API void dd_span_finish(dd_span_t* span_handle);
+
+// Finish a span using an explicit end time. No-op if span_handle is NULL.
+//
+// @param span_handle Span handle
+// @param end_time_ns Wall-clock end time (UNIX-epoch ns); 0 = current time
+DD_TRACE_C_API void dd_span_finish_with_time(dd_span_t* span_handle,
+                                             int64_t end_time_ns);
 
 // Get the trace ID as a zero-padded hex string.
 //
