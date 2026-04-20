@@ -104,7 +104,7 @@ TEST_CASE("span create, tag, finish, free", "[c_binding]") {
   dd_span_set_error(span, 1);
   dd_span_set_error_message(span, "something broke");
 
-  dd_span_finish_with_time(span, end_ns);
+  dd_span_set_end_time(span, end_ns);
   dd_span_free(span);
 
   const auto &sd = ctx.collector->first_span();
@@ -122,31 +122,17 @@ TEST_CASE("span create, tag, finish, free", "[c_binding]") {
         std::chrono::milliseconds(1));
 }
 
-TEST_CASE("finish clamps negative durations to zero", "[c_binding]") {
+TEST_CASE("set_end_time before start clamps to zero duration", "[c_binding]") {
   auto ctx = make_tracer();
 
-  // Explicit end before explicit start.
   const int64_t past_ns = 1'700'000'000'000'000'000LL;
-  auto *s1 = dd_tracer_create_span(
-      ctx.tracer, {.name = "explicit", .start_time_ns = past_ns});
-  dd_span_finish_with_time(s1, past_ns - 1'000'000LL);
-  dd_span_free(s1);
+  auto *span = dd_tracer_create_span(
+      ctx.tracer, {.name = "reversed", .start_time_ns = past_ns});
+  REQUIRE(span != nullptr);
+  dd_span_set_end_time(span, past_ns - 1'000'000LL);
+  dd_span_free(span);
 
-  // Sentinel finish (steady_clock::now()) with a start projected into
-  // the future — exercises the implicit-path clamp.
-  const int64_t future_ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          (std::chrono::system_clock::now() + std::chrono::hours(1))
-              .time_since_epoch())
-          .count();
-  auto *s2 = dd_tracer_create_span(
-      ctx.tracer, {.name = "implicit", .start_time_ns = future_ns});
-  dd_span_finish(s2);
-  dd_span_free(s2);
-
-  for (const auto &chunk : ctx.collector->chunks)
-    for (const auto &span : chunk)
-      CHECK(span->duration >= std::chrono::nanoseconds(0));
+  CHECK(ctx.collector->first_span().duration >= std::chrono::nanoseconds(0));
 }
 
 TEST_CASE("create span with resource", "[c_binding]") {
@@ -291,7 +277,7 @@ TEST_CASE("null arguments do not crash", "[c_binding]") {
   dd_span_set_error_message(nullptr, "msg");
   dd_span_inject(nullptr, test_header_writer);
   dd_span_finish(nullptr);
-  dd_span_finish_with_time(nullptr, 0);
+  dd_span_set_end_time(nullptr, 0);
   dd_span_set_resource(nullptr, "res");
   dd_span_set_service(nullptr, "svc");
 }

@@ -44,12 +44,18 @@ class ContextWriter : public dd::DictWriter {
   }
 };
 
-// tick is derived from the current system/steady offset so that duration
-// (end.tick - start.tick) stays correct across FFI-supplied timestamps.
-dd::TimePoint wall_ns_to_timepoint(int64_t wall_ns) {
-  const auto wall = std::chrono::system_clock::time_point(
+std::chrono::system_clock::time_point wall_ns_to_system_time(int64_t wall_ns) {
+  return std::chrono::system_clock::time_point(
       std::chrono::round<std::chrono::system_clock::duration>(
           std::chrono::nanoseconds(wall_ns)));
+}
+
+// Create a TimePoint from a wall-clock timestamp in nanoseconds. The tick is
+// derived from the wall clock using the current offset between the system and
+// the steady clocks. This keeps duration computed from ticks accurate when
+// the start time is supplied via FFI.
+dd::TimePoint wall_ns_to_timepoint(int64_t wall_ns) {
+  const auto wall = wall_ns_to_system_time(wall_ns);
   const auto now_wall = std::chrono::system_clock::now();
   const auto now_tick = std::chrono::steady_clock::now();
   return {wall,
@@ -76,7 +82,7 @@ dd::SpanConfig make_span_config(dd_span_options_t options) {
   if (options.version != nullptr) {
     span_config.version = options.version;
   }
-  if (options.start_time_ns != 0) {
+  if (options.start_time_ns != DD_TRACE_CURRENT_TIME) {
     span_config.start = wall_ns_to_timepoint(options.start_time_ns);
   }
   return span_config;
@@ -265,33 +271,28 @@ dd_span_t *dd_span_create_child(dd_span_t *span_handle,
 }
 
 void dd_span_finish(dd_span_t *span_handle) {
-  dd_span_finish_with_time(span_handle, 0);
+  if (span_handle == nullptr) {
+    return;
+  }
+  reinterpret_cast<dd::Span *>(span_handle)
+      ->set_end_time(std::chrono::steady_clock::now());
 }
 
-void dd_span_finish_with_time(dd_span_t *span_handle, int64_t end_time_ns) {
+void dd_span_set_end_time(dd_span_t *span_handle, int64_t end_time_ns) {
   if (span_handle == nullptr) {
     return;
   }
   auto *span = reinterpret_cast<dd::Span *>(span_handle);
+  // Anchor end.tick to start.tick + wall delta so NTP adjustments during the
+  // span's lifetime don't skew duration. Clamp to start.tick on negative
+  // deltas — serialization casts duration to uint64_t.
   const auto start = span->start_time();
-  // Explicit path anchors to start.wall so NTP adjustments during the
-  // span's lifetime don't skew duration; implicit path uses steady now.
-  // Both clamp to start.tick so a negative duration never ships
-  // (serialization casts duration to uint64_t).
-  std::chrono::steady_clock::time_point end_tick;
-  if (end_time_ns == 0) {
-    end_tick = std::chrono::steady_clock::now();
-  } else {
-    const auto end_wall = std::chrono::system_clock::time_point(
-        std::chrono::round<std::chrono::system_clock::duration>(
-            std::chrono::nanoseconds(end_time_ns)));
-    end_tick =
-        start.tick +
-        (end_wall > start.wall
-             ? std::chrono::duration_cast<dd::Duration>(end_wall - start.wall)
-             : dd::Duration::zero());
-  }
-  span->set_end_time(end_tick > start.tick ? end_tick : start.tick);
+  const auto end_wall = wall_ns_to_system_time(end_time_ns);
+  const auto duration =
+      end_wall > start.wall
+          ? std::chrono::duration_cast<dd::Duration>(end_wall - start.wall)
+          : dd::Duration::zero();
+  span->set_end_time(start.tick + duration);
 }
 
 int dd_span_get_trace_id(dd_span_t *span_handle, char *buffer,

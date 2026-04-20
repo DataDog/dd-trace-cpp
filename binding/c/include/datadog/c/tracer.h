@@ -44,6 +44,9 @@ typedef enum {
   DD_OPT_INTEGRATION_VERSION = 5
 } dd_tracer_option;
 
+// Sentinel for start_time_ns meaning "use the current time."
+static const int64_t DD_TRACE_CURRENT_TIME = -1;
+
 // Options for creating a span. Unset fields default to NULL.
 typedef struct {
   const char* name;
@@ -52,7 +55,7 @@ typedef struct {
   const char* service_type;
   const char* environment;
   const char* version;
-  int64_t start_time_ns;  // UNIX-epoch nanoseconds; 0 = use current time
+  int64_t start_time_ns;  // Unix-epoch nanoseconds or DD_TRACE_CURRENT_TIME.
 } dd_span_options_t;
 
 // Error codes returned by the C binding.
@@ -181,12 +184,17 @@ DD_TRACE_C_API dd_span_t* dd_span_create_child(dd_span_t* span_handle,
 // @param span_handle Span handle
 DD_TRACE_C_API void dd_span_finish(dd_span_t* span_handle);
 
-// Finish a span using an explicit end time. No-op if span_handle is NULL.
+// Set the end time of a span from an explicit wall-clock timestamp. The
+// span itself is finished when dd_span_free destroys it. To use the
+// current time, call dd_span_finish instead. If end_time_ns is earlier
+// than the span's start time, the resulting duration is clamped to zero.
+// No-op if span_handle is NULL.
 //
 // @param span_handle Span handle
-// @param end_time_ns Wall-clock end time (UNIX-epoch ns); 0 = current time
-DD_TRACE_C_API void dd_span_finish_with_time(dd_span_t* span_handle,
-                                             int64_t end_time_ns);
+// @param end_time_ns Wall-clock end time (Unix-epoch nanoseconds).
+//                    DD_TRACE_CURRENT_TIME does not apply here.
+DD_TRACE_C_API void dd_span_set_end_time(dd_span_t* span_handle,
+                                         int64_t end_time_ns);
 
 // Get the trace ID as a zero-padded hex string.
 //
