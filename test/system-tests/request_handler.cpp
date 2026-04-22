@@ -7,8 +7,14 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 #include <datadog/json.hpp>
+#include <string>
 
+#include "datadog/null_logger.h"
+#include "datadog/stable_config.h"
 #include "httplib.h"
 #include "utils.h"
 
@@ -16,9 +22,14 @@ RequestHandler::RequestHandler(
     datadog::tracing::FinalizedTracerConfig& tracerConfig,
     std::shared_ptr<ManualScheduler> scheduler,
     std::shared_ptr<DeveloperNoiseLogger> logger)
-    : tracer_(tracerConfig),
-      scheduler_(scheduler),
-      logger_(std::move(logger)) {}
+    : tracer_(tracerConfig), scheduler_(scheduler), logger_(std::move(logger)) {
+  // Load stable config values directly from disk rather than leaking them
+  // through the public FinalizedTracerConfig API.
+  datadog::tracing::NullLogger null_logger;
+  auto configs = datadog::tracing::load_stable_configs(null_logger);
+  local_stable_config_values_ = std::move(configs.local.values);
+  fleet_stable_config_values_ = std::move(configs.fleet.values);
+}
 
 void RequestHandler::set_error(const char* const file, int line,
                                const std::string& reason,
@@ -47,6 +58,17 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
                                      httplib::Response& res) {
   auto tracer_cfg = nlohmann::json::parse(tracer_.config());
 
+  // Helper: convert a DD_* key name to lowercase (e.g. "DD_SERVICE" ->
+  // "dd_service").
+  auto to_lower_key = [](const std::string& key) -> std::string {
+    std::string result = key;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c) -> char {
+                     return static_cast<char>(std::tolower(c));
+                   });
+    return result;
+  };
+
   // clang-format off
     auto response_body = nlohmann::json{
       { "config", {
@@ -65,6 +87,60 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
     if (trace_sampler_cfg.contains("max_per_second")) {
       response_body["config"]["dd_trace_rate_limit"] =
           std::to_string((int)trace_sampler_cfg["max_per_second"]);
+    }
+  }
+
+  // Helper: normalize boolean-like strings to lowercase.
+  auto normalize_value = [](const std::string& val) -> std::string {
+    std::string lower = val;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) -> char {
+                     return static_cast<char>(std::tolower(c));
+                   });
+    if (lower == "true" || lower == "false") {
+      return lower;
+    }
+    return val;
+  };
+
+  // Merge stable config and env var values with correct precedence.
+  // Precedence: fleet_stable > env > local_stable
+  std::unordered_map<std::string, std::string> effective_config;
+
+  // 1. Collect all keys from both local and fleet configs.
+  std::unordered_map<std::string, std::string> all_keys;
+  for (const auto& [key, value] : local_stable_config_values_) {
+    all_keys[key] = "";
+  }
+  for (const auto& [key, value] : fleet_stable_config_values_) {
+    all_keys[key] = "";
+  }
+
+  // 2. Local stable config (lowest precedence)
+  for (const auto& [key, value] : local_stable_config_values_) {
+    effective_config[key] = normalize_value(value);
+  }
+
+  // 3. Environment variables (check ALL tracked keys, not just those in
+  //    effective_config so far -- fleet keys are also checked).
+  for (const auto& [key, _] : all_keys) {
+    const char* env_val = std::getenv(key.c_str());
+    if (env_val != nullptr) {
+      effective_config[key] = normalize_value(std::string(env_val));
+    }
+  }
+
+  // 4. Fleet stable config (highest precedence)
+  for (const auto& [key, value] : fleet_stable_config_values_) {
+    effective_config[key] = normalize_value(value);
+  }
+
+  // Write all effective config values to the response.
+  for (const auto& [key, value] : effective_config) {
+    auto lower_key = to_lower_key(key);
+    // Only set if not already present from the native config above.
+    if (!response_body["config"].contains(lower_key)) {
+      response_body["config"][lower_key] = value;
     }
   }
 
