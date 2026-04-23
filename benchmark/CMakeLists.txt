@@ -6,6 +6,7 @@
 add_executable(dd_trace_cpp-benchmark
     benchmark.cpp
     hasher.cpp
+    trace_id_bench.cpp
 )
 
 # Google Benchmark is included as a git submodule.
