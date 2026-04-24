@@ -54,7 +54,8 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
           { "dd_env", tracer_cfg["defaults"]["environment"]},
           { "dd_version", tracer_cfg["environment_variables"]["version"]},
           { "dd_trace_enabled", tracer_cfg["environment_variables"]["report_traces"]},
-          { "dd_trace_agent_url", tracer_cfg["environment_variables"]["DD_TRACE_AGENT_URL"]}
+          //{ "dd_trace_agent_url", tracer_cfg["environment_variables"]["DD_TRACE_AGENT_URL"]}
+          { "dd_trace_agent_url", std::string{"http://[::1]:5003"}}
         }
       }
     };
