@@ -163,6 +163,81 @@ BAGGAGE_TEST("extract") {
       FAIL("mistmatch between what is expected and the result");
     }
   }
+
+  SECTION("custom items and bytes limits are respected") {
+    struct TestCase final {
+      std::string name;
+      std::string input;
+      size_t max_bytes;
+      size_t max_items;
+      Expected<Baggage, Baggage::Error> expected_baggage;
+    };
+
+    auto test_case = GENERATE(values<TestCase>({
+        {
+            "valid input respects maximum item and bytes limits",
+            "key1=value1,key2=value2",
+            2048,
+            2,
+            Baggage(std::unordered_map<std::string, std::string>{
+                {"key1", "value1"}, {"key2", "value2"}}),
+        },
+        {
+            "max items reached",
+            "key1=value1,key2=value2",
+            2048,
+            1,
+            Baggage::Error{Baggage::Error::MAXIMUM_CAPACITY_REACHED},
+        },
+        {
+            "max items limit of zero is enforced",
+            "key1=value1,key2=value2",
+            2048,
+            0,
+            Baggage::Error{Baggage::Error::MAXIMUM_CAPACITY_REACHED},
+        },
+        {
+            "max bytes reached",
+            "key1=value1,key2=value2",
+            16,
+            1000,
+            Baggage::Error{Baggage::Error::MAXIMUM_BYTES_REACHED},
+        },
+        {
+            "max bytes value of zero is enforced",
+            "key1=value1,key2=value2",
+            0,
+            1000,
+            Baggage::Error{Baggage::Error::MAXIMUM_BYTES_REACHED},
+        },
+        {
+            "empty baggage does not breach max items limit or max bytes limit",
+            "",
+            0,
+            0,
+            Baggage(),
+        },
+    }));
+
+    CAPTURE(test_case.name, test_case.input, test_case.max_items,
+            test_case.max_bytes);
+
+    const std::unordered_map<std::string, std::string> headers{
+        {"baggage", test_case.input}};
+    MockDictReader reader(headers);
+
+    Baggage::Options opts{test_case.max_bytes, test_case.max_items};
+    auto maybe_baggage = Baggage::extract(reader, opts);
+    if (maybe_baggage.has_value() && test_case.expected_baggage.has_value()) {
+      CHECK(*maybe_baggage == *test_case.expected_baggage);
+    } else if (maybe_baggage.if_error() &&
+               test_case.expected_baggage.if_error()) {
+      CHECK(maybe_baggage.error().code ==
+            test_case.expected_baggage.error().code);
+    } else {
+      FAIL("mistmatch between what is expected and the result");
+    }
+  }
 }
 
 BAGGAGE_TEST("inject") {
