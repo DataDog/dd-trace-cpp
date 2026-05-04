@@ -1274,8 +1274,9 @@ TEST_TRACER("span extraction") {
     const auto extracted = extract_w3c(reader, span_tags, logger);
     REQUIRE(extracted);
 
-    // The oversized "dd" entry was rejected, so origin/trace_tags/propagated_tags/etc. were
-    // not parsed from it. Other vendor entries are preserved for propagation.
+    // The oversized "dd" entry was rejected, so
+    // origin/trace_tags/propagated_tags/etc. were not parsed from it. Other
+    // vendor entries are preserved for propagation.
     REQUIRE(extracted->origin == nullopt);
     REQUIRE(extracted->trace_tags.empty());
     REQUIRE(extracted->sampling_priority == 0);
@@ -1525,7 +1526,7 @@ TEST_TRACER("span extraction") {
         }
       }
 
-      SECTION("is noted in an error tag value") {        
+      SECTION("is noted in an error tag value") {
         {
           auto maybe_span = tracer.extract_span(reader);
           REQUIRE(maybe_span);
@@ -1538,7 +1539,7 @@ TEST_TRACER("span extraction") {
         const SpanData& span = collector->first_span();
         REQUIRE(span.tags.count(tags::internal::propagation_error) == 1);
         REQUIRE(span.tags.find(tags::internal::propagation_error)->second ==
-        "extract_max_size");
+                "extract_max_size");
       }
     }
   }

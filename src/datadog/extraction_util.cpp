@@ -152,7 +152,8 @@ Expected<ExtractedData> extract_datadog(
 
   auto trace_tags = headers.lookup("x-datadog-tags");
   if (trace_tags) {
-    // If the X-Datadog-Tags value exceeds 512 bytes, drop it and record a propagation error tag.
+    // If the X-Datadog-Tags value exceeds 512 bytes, drop it and record a
+    // propagation error tag.
     if (trace_tags->size() > 512) {
       std::string message;
       message +=

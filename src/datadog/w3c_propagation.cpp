@@ -278,8 +278,9 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
 // `extract_tracestate` populates the `additional_w3c_tracestate` field of
 // `ExtractedData`, in addition to those populated by
 // `parse_datadog_tracestate`.
-void extract_tracestate(ExtractedData& result, const DictReader& headers,
-                        std::unordered_map<std::string, std::string>& span_tags) {
+void extract_tracestate(
+    ExtractedData& result, const DictReader& headers,
+    std::unordered_map<std::string, std::string>& span_tags) {
   const auto maybe_tracestate = headers.lookup("tracestate");
   if (!maybe_tracestate || maybe_tracestate->empty()) {
     return;
@@ -300,7 +301,8 @@ void extract_tracestate(ExtractedData& result, const DictReader& headers,
     result.additional_w3c_tracestate = std::move(other_entries);
   }
 
-  // If the "dd" vendor entry's value exceeds 512 bytes, drop it and record a propagation error tag.
+  // If the "dd" vendor entry's value exceeds 512 bytes, drop it and record a
+  // propagation error tag.
   if (datadog_value.size() > 512) {
     span_tags[tags::internal::propagation_error] = "extract_max_size";
     return;
