@@ -1248,6 +1248,48 @@ TEST_TRACER("span extraction") {
     REQUIRE(span_tags.empty());
   }
 
+  SECTION(
+      "'extract_max_size' propagation error if tracestate \"dd\" vendor "
+      "value is oversized on extract") {
+    std::unordered_map<std::string, std::string> span_tags;
+    MockLogger logger;
+    CAPTURE(logger.entries);
+    CAPTURE(span_tags);
+
+    // Build a "dd" vendor value that exceeds the 512 limit
+    std::string dd_value = "s:1;p:000000003ade68b1;o:synthetics";
+    for (int i = 0; dd_value.size() <= 513; ++i) {
+      dd_value += ";t.k";
+      dd_value += std::to_string(i);
+      dd_value += ":v";
+      dd_value += std::to_string(i);
+    }
+
+    std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-00000000000000000000000000000001-0000000000000001-00"},
+        {"tracestate", "dd=" + dd_value + ",vendorx=keepme"}};
+    MockDictReader reader{headers};
+
+    const auto extracted = extract_w3c(reader, span_tags, logger);
+    REQUIRE(extracted);
+
+    // The oversized "dd" entry was rejected, so
+    // origin/trace_tags/propagated_tags/etc. were not parsed from it. Other
+    // vendor entries are preserved for propagation.
+    REQUIRE(extracted->origin == nullopt);
+    REQUIRE(extracted->trace_tags.empty());
+    REQUIRE(extracted->sampling_priority == 0);
+    REQUIRE(extracted->additional_w3c_tracestate == "vendorx=keepme");
+    REQUIRE(extracted->additional_datadog_w3c_tracestate == nullopt);
+    REQUIRE(extracted->datadog_w3c_parent_id == "0000000000000000");
+
+    REQUIRE(logger.entries.empty());
+    REQUIRE(span_tags.count(tags::internal::propagation_error) == 1);
+    REQUIRE(span_tags.at(tags::internal::propagation_error) ==
+            "extract_max_size");
+  }
+
   SECTION("W3C Phase 3 support - Preferring tracecontext") {
     // Tests behavior from system-test
     // test_headers_tracecontext.py::test_tracestate_w3c_p_extract_datadog_w3c
@@ -1454,6 +1496,49 @@ TEST_TRACER("span extraction") {
         REQUIRE(span.tags.count(tags::internal::propagation_error) == 1);
         REQUIRE(span.tags.find(tags::internal::propagation_error)->second ==
                 "malformed_tid invalidhex");
+      }
+    }
+
+    SECTION("exceeds the extract limit") {
+      std::string header_value = "_dd.p.first=ok";
+      for (int i = 0; header_value.size() <= 512; ++i) {
+        header_value += ",_dd.p.k";
+        header_value += std::to_string(i);
+        header_value += "=";
+        header_value += std::string(40, 'v');
+      }
+      headers["x-datadog-tags"] = header_value;
+
+      SECTION("is not propagated") {
+        auto maybe_span = tracer.extract_span(reader);
+        REQUIRE(maybe_span);
+
+        // The oversized header was rejected, so the trace tags from it must
+        // not have been propagated. Inject and confirm "_dd.p.first" is
+        // absent.
+        MockDictWriter writer;
+        maybe_span->inject(writer);
+
+        const auto injected = writer.items.find("x-datadog-tags");
+        if (injected != writer.items.end()) {
+          REQUIRE(injected->second.find("_dd.p.first") == std::string::npos);
+        }
+      }
+
+      SECTION("is noted in an error tag value") {
+        {
+          auto maybe_span = tracer.extract_span(reader);
+          REQUIRE(maybe_span);
+        }
+        // Now that the span is destroyed, it will have been sent to the
+        // collector.
+        // We can inspect the `SpanData` in the collector to verify that the
+        // `tags::internal::propagation_error` ("_dd.propagation_error") tag
+        // is set to the expected value.
+        const SpanData& span = collector->first_span();
+        REQUIRE(span.tags.count(tags::internal::propagation_error) == 1);
+        REQUIRE(span.tags.find(tags::internal::propagation_error)->second ==
+                "extract_max_size");
       }
     }
   }

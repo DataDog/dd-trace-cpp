@@ -41,9 +41,15 @@ constexpr bool is_allowed_value_char(char c) {
 }
 
 Expected<std::unordered_map<std::string, std::string>, Baggage::Error>
-parse_baggage(StringView input) {
+parse_baggage(StringView input, const Baggage::Options& opts) {
   std::unordered_map<std::string, std::string> result;
   if (input.empty()) return result;
+
+  // This API throws an error when limits are exceeded, so we can simply check
+  // the entire header length against the maximum bytes limit.
+  if (input.size() > opts.max_bytes) {
+    return Baggage::Error{Baggage::Error::MAXIMUM_BYTES_REACHED};
+  }
 
   enum class state : char {
     leading_spaces_key,
@@ -93,8 +99,9 @@ parse_baggage(StringView input) {
         if (c == '=') {
         consume_key:
           size_t count = tmp_end - beg;
-          if (count < 1)
+          if (count < 1) {
             return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
+          }
 
           key = StringView{input.data() + beg, count};
           internal_state = state::leading_spaces_value;
@@ -138,11 +145,15 @@ parse_baggage(StringView input) {
         if (c == ',') {
         consume_value:
           size_t count = tmp_end - beg;
-          if (count < 1)
+          if (count < 1) {
             return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER,
                                   tmp_end};
+          }
 
           value = StringView{input.data() + beg, count};
+          if (result.size() >= opts.max_items) {
+            return Baggage::Error{Baggage::Error::MAXIMUM_CAPACITY_REACHED};
+          }
           result.emplace(std::string(key), std::string(value));
           beg = i;
           tmp_end = i;
@@ -158,10 +169,17 @@ parse_baggage(StringView input) {
 
   if (internal_state == state::value) {
     value = StringView{input.data() + beg, end - beg};
+    if (result.size() >= opts.max_items) {
+      return Baggage::Error{Baggage::Error::MAXIMUM_CAPACITY_REACHED};
+    }
+
     result.emplace(std::string(key), std::string(value));
   } else if (internal_state == state::trailing_spaces_value ||
              internal_state == state::properties) {
     value = StringView{input.data() + beg, tmp_end - beg};
+    if (result.size() >= opts.max_items) {
+      return Baggage::Error{Baggage::Error::MAXIMUM_CAPACITY_REACHED};
+    }
     result.emplace(std::string(key), std::string(value));
   } else {
     return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, end};
@@ -264,14 +282,15 @@ Expected<void> Baggage::inject(DictWriter& writer, const Options& opts) const {
   return res;
 }
 
-Expected<Baggage, Baggage::Error> Baggage::extract(const DictReader& headers) {
+Expected<Baggage, Baggage::Error> Baggage::extract(const DictReader& headers,
+                                                   const Options& opts) {
   auto found = headers.lookup("baggage");
   if (!found) {
     return Baggage::Error{Error::MISSING_HEADER};
   }
 
   // TODO(@dmehala): Avoid allocation
-  auto bv = parse_baggage(*found);
+  auto bv = parse_baggage(*found, opts);
   if (auto error = bv.if_error()) {
     return *error;
   }

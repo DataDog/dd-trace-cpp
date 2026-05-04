@@ -57,8 +57,10 @@ class Baggage {
   /// instance if no errors are encounters .
   ///
   /// @param `reader` The input `DictReader` from which to extract the data.
+  /// @param `opts` Extraction options governing maximum items and bytes.
   /// @return A `Baggage` instance or an `Error`.
-  static Expected<Baggage, Error> extract(const DictReader& reader);
+  static Expected<Baggage, Error> extract(
+      const DictReader& reader, const Options& opts = default_options);
 
   /// Initializes an empty Baggage with the default maximum capacity.
   Baggage() = default;
