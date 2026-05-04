@@ -1508,7 +1508,6 @@ TEST_TRACER("span extraction") {
         header_value += std::string(40, 'v');
       }
       headers["x-datadog-tags"] = header_value;
-      MockDictReader reader{headers};
 
       SECTION("is not propagated") {
         auto maybe_span = tracer.extract_span(reader);
