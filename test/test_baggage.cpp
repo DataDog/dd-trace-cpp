@@ -160,7 +160,7 @@ BAGGAGE_TEST("extract") {
       CHECK(maybe_baggage.error().code ==
             test_case.expected_baggage.error().code);
     } else {
-      FAIL("mistmatch between what is expected and the result");
+      FAIL("mismatch between what is expected and the result");
     }
   }
 
@@ -235,7 +235,7 @@ BAGGAGE_TEST("extract") {
       CHECK(maybe_baggage.error().code ==
             test_case.expected_baggage.error().code);
     } else {
-      FAIL("mistmatch between what is expected and the result");
+      FAIL("mismatch between what is expected and the result");
     }
   }
 }

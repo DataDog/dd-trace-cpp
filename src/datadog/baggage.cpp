@@ -99,8 +99,9 @@ parse_baggage(StringView input, const Baggage::Options& opts) {
         if (c == '=') {
         consume_key:
           size_t count = tmp_end - beg;
-          if (count < 1)
+          if (count < 1) {
             return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, i};
+          }
 
           key = StringView{input.data() + beg, count};
           internal_state = state::leading_spaces_value;
@@ -144,15 +145,15 @@ parse_baggage(StringView input, const Baggage::Options& opts) {
         if (c == ',') {
         consume_value:
           size_t count = tmp_end - beg;
-          if (count < 1)
+          if (count < 1) {
             return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER,
                                   tmp_end};
+          }
 
           value = StringView{input.data() + beg, count};
           if (result.size() >= opts.max_items) {
             return Baggage::Error{Baggage::Error::MAXIMUM_CAPACITY_REACHED};
           }
-
           result.emplace(std::string(key), std::string(value));
           beg = i;
           tmp_end = i;
@@ -179,7 +180,6 @@ parse_baggage(StringView input, const Baggage::Options& opts) {
     if (result.size() >= opts.max_items) {
       return Baggage::Error{Baggage::Error::MAXIMUM_CAPACITY_REACHED};
     }
-
     result.emplace(std::string(key), std::string(value));
   } else {
     return Baggage::Error{Baggage::Error::MALFORMED_BAGGAGE_HEADER, end};

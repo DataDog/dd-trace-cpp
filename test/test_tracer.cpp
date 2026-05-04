@@ -1258,7 +1258,7 @@ TEST_TRACER("span extraction") {
 
     // Build a "dd" vendor value that exceeds the 512 limit
     std::string dd_value = "s:1;p:000000003ade68b1;o:synthetics";
-    for (int i = 0; dd_value.size() <= 1024; ++i) {
+    for (int i = 0; dd_value.size() <= 513; ++i) {
       dd_value += ";t.k";
       dd_value += std::to_string(i);
       dd_value += ":v";

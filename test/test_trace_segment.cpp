@@ -175,7 +175,7 @@ TEST_CASE("TraceSegment finalization of spans") {
 
   SECTION("root span") {
     SECTION(
-        "'extract_max_size' propagation error if X-Datadog-Tags oversized on "
+        "'extract_max_size' propagation error if x-datadog-tags oversized on "
         "extract") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
