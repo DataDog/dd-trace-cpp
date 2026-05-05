@@ -401,11 +401,8 @@ TEST_CASE("TraceSegment finalization of spans") {
         const auto& span = collector->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::rule_sample_rate) ==
                 sample_rate);
-        {
-          char buf[32];
-          std::snprintf(buf, sizeof(buf), "%.6g", sample_rate);
-          CHECK(span.tags.at(tags::internal::ksr) == std::string(buf));
-        }
+        CHECK(span.tags.at(tags::internal::ksr) ==
+              (sample_rate == 0.0 ? "0" : "1"));
         if (sample_rate == 1.0) {
           REQUIRE(span.numeric_tags.at(
                       tags::internal::rule_limiter_sample_rate) == 1.0);
