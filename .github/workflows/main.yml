@@ -44,3 +44,4 @@ jobs:
         with:
           binary: ./.build/fuzz/remote-configuration/remote-config-fuzz
           duration_seconds: ${DURATION_SEC}
+
