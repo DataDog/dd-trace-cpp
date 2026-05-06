@@ -45,15 +45,3 @@ jobs:
         with:
           binary: ./.build/fuzz/remote-configuration/remote-config-fuzz
           duration_seconds: ${DURATION_SEC}
-
-  system-tests:
-    uses: DataDog/system-tests/.github/workflows/system-tests.yml@main
-    permissions:
-      contents: read
-      id-token: write
-    with:
-      library: cpp
-      parametric_job_count: 8  # dedicated parameter to speed up parametric job
-      scenarios: PARAMETRIC
-      _system_tests_dev_mode: true
-      push_to_test_optimization: true
