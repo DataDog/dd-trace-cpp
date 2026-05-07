@@ -141,6 +141,11 @@ struct TracerConfig {
   // specify the same `runtime_id` for all tracer instances in the same run.
   Optional<RuntimeID> runtime_id;
 
+  // Root session ID for stable telemetry correlation across forked workers.
+  // Integrations (nginx, httpd, kong) should set this in the master process
+  // before workers fork so all Tracers share the same root.
+  Optional<std::string> root_session_id;
+
   // `integration_name` is the name of the product integrating this library.
   // Example: "nginx", "envoy" or "istio".
   Optional<std::string> integration_name;
@@ -225,6 +230,7 @@ class FinalizedTracerConfig final {
   bool log_on_startup;
   bool generate_128bit_trace_ids;
   Optional<RuntimeID> runtime_id;
+  Optional<std::string> root_session_id;
   Clock clock;
   std::string integration_name;
   std::string integration_version;

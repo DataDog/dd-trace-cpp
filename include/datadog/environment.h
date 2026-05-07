@@ -20,6 +20,8 @@ namespace environment {
 
 // Central registry for supported environment variables.
 // All configurations must be registered here.
+// See also:
+// https://feature-parity.us1.prod.dog/configurations?viewType=configurations
 //
 // This registry is the single source of truth for:
 //   - env variable name allowlist (`include/datadog/environment.h`)

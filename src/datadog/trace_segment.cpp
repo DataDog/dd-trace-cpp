@@ -31,8 +31,8 @@
 #include "trace_sampler.h"
 #include "w3c_propagation.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
+
 namespace {
 
 struct Cache {
@@ -109,7 +109,37 @@ void maybe_calculate_http_endpoint(HttpEndpointCalculationMode renaming_mode,
     }
   }
 }
-}  // namespace
+
+// Convert rate to a fixed-point string with 6 decimal digits,
+// stripping trailing zeros and a decimal point. Examples:
+//   0.100000 -> "0.1"
+//   0.123456789 -> "0.123456"
+//   1.0 -> "1"
+Optional<std::string> format_rate(double rate, Logger& logger) {
+  constexpr int nb_decimal_digits = 6;
+  std::array<char, nb_decimal_digits + 2> buf;
+  char* const begin = buf.data();
+  auto [end, error_code] =
+      std::to_chars(begin, begin + buf.size(), rate, std::chars_format::fixed,
+                    nb_decimal_digits);
+  if (error_code != std::errc()) {
+    logger.log_error("rate to string conversion failed: " +
+                     std::make_error_code(error_code).message());
+    return nullopt;
+  }
+  // strip trailing zeros and possibly the decimal point
+  if (std::find(begin, end, '.') != end) {
+    while ((end > begin) && (*(end - 1) == '0')) {
+      --end;
+    }
+    if ((end > begin) && (*(end - 1) == '.')) {
+      --end;
+    }
+  }
+  return std::string(begin, end);
+}
+
+}  // anonymous namespace
 
 TraceSegment::TraceSegment(
     const std::shared_ptr<Logger>& logger,
@@ -322,22 +352,17 @@ void TraceSegment::make_sampling_decision_if_null() {
 
   update_decision_maker_trace_tag();
 
-  // Only set ksr when the sampling mechanism is explicit (agent rate, rule, or
-  // remote rule).  The DEFAULT mechanism means we haven't received any
-  // configuration from the agent yet, so ksr would be meaningless.
+  // Only set ksr when the sampling mechanism is explicit.
+  // The DEFAULT mechanism means we haven't received any configuration from the
+  // agent yet, so ksr would be meaningless.
   if (sampling_decision_->mechanism &&
-      *sampling_decision_->mechanism != int(SamplingMechanism::DEFAULT)) {
-    std::array<char, 8> buf;
-    const auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(),
-                                         *sampling_decision_->configured_rate,
-                                         std::chars_format::general, 6);
-    if (ec != std::errc()) {
-      std::string error{"string conversion failed: "};
-      error += std::make_error_code(ec).message();
-      logger_->log_error(error);
+      (*sampling_decision_->mechanism != int(SamplingMechanism::DEFAULT))) {
+    const Optional<std::string> rate_string =
+        format_rate(*sampling_decision_->configured_rate, *logger_);
+    if (!rate_string) {
       return;
     }
-    trace_tags_.emplace_back(tags::internal::ksr, std::string(buf.data(), ptr));
+    trace_tags_.emplace_back(tags::internal::ksr, *rate_string);
   }
 }
 
@@ -481,5 +506,4 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
 
 SpanData& TraceSegment::local_root() const { return *spans_.front(); }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing

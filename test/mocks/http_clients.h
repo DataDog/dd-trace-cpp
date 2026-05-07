@@ -41,7 +41,10 @@ struct MockHTTPClient : public HTTPClient {
   ErrorHandler on_error_;
   std::string request_body;
 
-  void clear() { request_body = ""; }
+  void clear() {
+    request_body = "";
+    request_headers.items.clear();
+  }
 
   Expected<void> post(
       const URL&, HeadersSetter set_headers, std::string body,

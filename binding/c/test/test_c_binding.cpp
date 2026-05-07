@@ -91,7 +91,11 @@ TEST_CASE("tracer new propagates error", "[c_binding]") {
 TEST_CASE("span create, tag, finish, free", "[c_binding]") {
   auto ctx = make_tracer();
 
-  auto *span = dd_tracer_create_span(ctx.tracer, {.name = "test.op"});
+  const int64_t start_ns = 1'700'000'000'000'000'000LL;
+  const int64_t end_ns = start_ns + 42'000'000LL;
+
+  auto *span = dd_tracer_create_span(
+      ctx.tracer, {.name = "test.op", .start_time_ns = start_ns});
   REQUIRE(span != nullptr);
 
   dd_span_set_tag(span, "http.method", "GET");
@@ -100,7 +104,7 @@ TEST_CASE("span create, tag, finish, free", "[c_binding]") {
   dd_span_set_error(span, 1);
   dd_span_set_error_message(span, "something broke");
 
-  dd_span_finish(span);
+  dd_span_set_end_time(span, end_ns);
   dd_span_free(span);
 
   const auto &sd = ctx.collector->first_span();
@@ -109,6 +113,26 @@ TEST_CASE("span create, tag, finish, free", "[c_binding]") {
   CHECK(sd.service == "user-service");
   CHECK(sd.error == true);
   CHECK(sd.tags.at("error.message") == "something broke");
+
+  CHECK(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            sd.start.wall.time_since_epoch())
+            .count() == start_ns);
+  CHECK(std::chrono::abs(sd.duration -
+                         std::chrono::nanoseconds(end_ns - start_ns)) <
+        std::chrono::milliseconds(1));
+}
+
+TEST_CASE("set_end_time before start clamps to zero duration", "[c_binding]") {
+  auto ctx = make_tracer();
+
+  const int64_t past_ns = 1'700'000'000'000'000'000LL;
+  auto *span = dd_tracer_create_span(
+      ctx.tracer, {.name = "reversed", .start_time_ns = past_ns});
+  REQUIRE(span != nullptr);
+  dd_span_set_end_time(span, past_ns - 1'000'000LL);
+  dd_span_free(span);
+
+  CHECK(ctx.collector->first_span().duration >= std::chrono::nanoseconds(0));
 }
 
 TEST_CASE("create span with resource", "[c_binding]") {
@@ -253,6 +277,7 @@ TEST_CASE("null arguments do not crash", "[c_binding]") {
   dd_span_set_error_message(nullptr, "msg");
   dd_span_inject(nullptr, test_header_writer);
   dd_span_finish(nullptr);
+  dd_span_set_end_time(nullptr, 0);
   dd_span_set_resource(nullptr, "res");
   dd_span_set_service(nullptr, "svc");
 }
