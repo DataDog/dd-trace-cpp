@@ -116,6 +116,14 @@ StringView name(Variable variable);
 // `nullopt` if that variable is not set in the environment.
 Optional<StringView> lookup(Variable variable);
 
+// Return the value of the environment variable named `name`, or
+// `nullopt` if that variable is not set in the environment.  Use this
+// overload when the variable name is known at runtime (e.g. inside
+// `ConfigSource` implementations) rather than at compile time.  The
+// returned `StringView` borrows from `getenv`'s thread-local storage
+// and is valid until the next environment mutation.
+Optional<StringView> lookup(StringView name);
+
 std::string to_json();
 
 }  // namespace environment
