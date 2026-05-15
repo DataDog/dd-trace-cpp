@@ -181,6 +181,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/cerr_logger.cpp
     src/datadog/clock.cpp
     src/datadog/config_manager.cpp
+    src/datadog/config_provider.cpp
     src/datadog/collector_response.cpp
     src/datadog/datadog_agent_config.cpp
     src/datadog/datadog_agent.cpp

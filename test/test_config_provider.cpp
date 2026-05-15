@@ -1,8 +1,11 @@
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
+#include "config_provider.h"
 #include "config_source.h"
 #include "environment_source.h"
 #include "test.h"
@@ -79,4 +82,134 @@ CONFIG_PROVIDER_TEST("EnvironmentSource: returns nullopt for empty variable") {
   auto val = src.lookup("DD_CONFIG_EMPTY_TEST");
   ::unsetenv("DD_CONFIG_EMPTY_TEST");
   REQUIRE(!val.has_value());
+}
+
+namespace {
+
+// Build a ConfigProvider with optional fleet, env, local sources and a
+// fresh metadata map for use in tests.
+struct ProviderHarness {
+  std::unique_ptr<ConfigSource> fleet;
+  std::unique_ptr<ConfigSource> env;
+  std::unique_ptr<ConfigSource> local;
+  std::unordered_map<ConfigName, std::vector<ConfigMetadata>> metadata;
+  ConfigProvider provider;
+
+  ProviderHarness(std::unique_ptr<ConfigSource> f,
+                  std::unique_ptr<ConfigSource> e,
+                  std::unique_ptr<ConfigSource> l)
+      : fleet(std::move(f)),
+        env(std::move(e)),
+        local(std::move(l)),
+        provider(fleet.get(), env.get(), local.get(), &metadata) {}
+};
+
+}  // namespace
+
+CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get_string: env wins when only env is set") {
+  ProviderHarness h(
+      nullptr,
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_SERVICE", "env"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      nullptr);
+
+  auto result =
+      h.provider.get_string(ConfigName::SERVICE_NAME, "DD_SERVICE",
+                            Optional<std::string>{}, std::string{"default"});
+  REQUIRE(result == "env");
+
+  auto it = h.metadata.find(ConfigName::SERVICE_NAME);
+  REQUIRE(it != h.metadata.end());
+  REQUIRE(it->second.size() == 2);  // DEFAULT + env
+  REQUIRE(it->second[0].origin == ConfigMetadata::Origin::DEFAULT);
+  REQUIRE(it->second[1].origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+  REQUIRE(it->second[1].value == "env");
+}
+
+CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get_string: user_value wins over default when env empty") {
+  ProviderHarness h(nullptr,
+                    std::make_unique<MapSource>(
+                        std::unordered_map<std::string, std::string>{},
+                        ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+                    nullptr);
+
+  auto result =
+      h.provider.get_string(ConfigName::SERVICE_NAME, "DD_SERVICE",
+                            Optional<std::string>{"user"}, std::string{"d"});
+  REQUIRE(result == "user");
+}
+
+CONFIG_PROVIDER_TEST("ConfigProvider::get_string: env beats user") {
+  ProviderHarness h(
+      nullptr,
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_SERVICE", "env"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      nullptr);
+
+  auto result =
+      h.provider.get_string(ConfigName::SERVICE_NAME, "DD_SERVICE",
+                            Optional<std::string>{"user"}, std::string{"d"});
+  REQUIRE(result == "env");
+}
+
+CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get_string: only default if everything empty") {
+  ProviderHarness h(nullptr,
+                    std::make_unique<MapSource>(
+                        std::unordered_map<std::string, std::string>{},
+                        ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+                    nullptr);
+
+  auto result = h.provider.get_string(ConfigName::SERVICE_NAME, "DD_SERVICE",
+                                      Optional<std::string>{},
+                                      std::string{"default-svc"});
+  REQUIRE(result == "default-svc");
+  REQUIRE(h.metadata[ConfigName::SERVICE_NAME].size() == 1);
+  REQUIRE(h.metadata[ConfigName::SERVICE_NAME][0].origin ==
+          ConfigMetadata::Origin::DEFAULT);
+}
+
+CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get_string: null source pointers are skipped") {
+  // Simulates PR R's state: no stable config sources yet.
+  ProviderHarness h(nullptr, nullptr, nullptr);
+  auto result =
+      h.provider.get_string(ConfigName::SERVICE_NAME, "DD_SERVICE",
+                            Optional<std::string>{}, std::string{"default"});
+  REQUIRE(result == "default");
+}
+
+CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get_string: full chain fleet > env > user > local > "
+    "default") {
+  ProviderHarness h(
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_SERVICE", "fleet"}},
+          ConfigMetadata::Origin::FLEET_STABLE_CONFIG,
+          Optional<std::string>{"id-99"}),
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_SERVICE", "env"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_SERVICE", "local"}},
+          ConfigMetadata::Origin::LOCAL_STABLE_CONFIG));
+
+  auto result = h.provider.get_string(ConfigName::SERVICE_NAME, "DD_SERVICE",
+                                      Optional<std::string>{"user"},
+                                      std::string{"default"});
+  REQUIRE(result == "fleet");
+
+  auto& entries = h.metadata[ConfigName::SERVICE_NAME];
+  REQUIRE(entries.size() == 5);
+  REQUIRE(entries[0].origin == ConfigMetadata::Origin::DEFAULT);
+  REQUIRE(entries[1].origin == ConfigMetadata::Origin::LOCAL_STABLE_CONFIG);
+  REQUIRE(entries[2].origin == ConfigMetadata::Origin::CODE);
+  REQUIRE(entries[3].origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+  REQUIRE(entries[4].origin == ConfigMetadata::Origin::FLEET_STABLE_CONFIG);
+  REQUIRE(entries[4].config_id.has_value());
+  REQUIRE(*entries[4].config_id == "id-99");
 }

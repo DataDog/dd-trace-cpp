@@ -768,6 +768,15 @@ nlohmann::json Telemetry::serialize_configuration_field(
     case ConfigMetadata::Origin::DEFAULT:
       j["origin"] = "default";
       break;
+    case ConfigMetadata::Origin::LOCAL_STABLE_CONFIG:
+      j["origin"] = "local_stable_config";
+      break;
+    case ConfigMetadata::Origin::FLEET_STABLE_CONFIG:
+      j["origin"] = "fleet_stable_config";
+      if (config_metadata.config_id) {
+        j["config_id"] = *config_metadata.config_id;
+      }
+      break;
   }
 
   if (config_metadata.error) {

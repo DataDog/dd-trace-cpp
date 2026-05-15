@@ -44,7 +44,9 @@ struct ConfigMetadata {
     ENVIRONMENT_VARIABLE,  // Originating from environment variables
     CODE,                  // Defined in code
     REMOTE_CONFIG,         // Retrieved from remote configuration
-    DEFAULT                // Default value
+    DEFAULT,               // Default value
+    LOCAL_STABLE_CONFIG,   // Local stable configuration file
+    FLEET_STABLE_CONFIG,   // Fleet-managed stable configuration file
   };
 
   // Name of the configuration parameter
@@ -55,6 +57,9 @@ struct ConfigMetadata {
   Origin origin;
   // Optional error associated with the configuration parameter
   Optional<Error> error;
+  // Optional config identifier (set when the value came from a fleet
+  // stable config file that included `config_id: ...`).
+  Optional<std::string> config_id;
 
   ConfigMetadata() = default;
   ConfigMetadata(ConfigName n, std::string v, Origin orig,

@@ -14,6 +14,8 @@ cc_library(
         "src/datadog/common/hash.h",
         "src/datadog/config_manager.cpp",
         "src/datadog/config_manager.h",
+        "src/datadog/config_provider.cpp",
+        "src/datadog/config_provider.h",
         "src/datadog/config_source.h",
         "src/datadog/datadog_agent.cpp",
         "src/datadog/datadog_agent.h",
