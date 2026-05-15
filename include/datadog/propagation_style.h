@@ -5,6 +5,9 @@
 // one `std::vector<PropagationStyle>` for extraction and another for injection.
 // See `tracer_config.h`.
 
+#include <vector>
+
+#include "expected.h"
 #include "optional.h"
 #include "string_view.h"
 
@@ -29,6 +32,12 @@ enum class PropagationStyle {
 StringView to_string_view(PropagationStyle style);
 
 Optional<PropagationStyle> parse_propagation_style(StringView text);
+
+// Parse a comma-or-space-separated list of propagation style names into a
+// vector of `PropagationStyle`.  Returns an error if any item is unknown
+// or if a style is duplicated.
+Expected<std::vector<PropagationStyle>> parse_propagation_styles(
+    StringView input);
 
 }  // namespace tracing
 }  // namespace datadog

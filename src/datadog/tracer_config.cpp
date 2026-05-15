@@ -21,50 +21,6 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-Expected<std::vector<PropagationStyle>> parse_propagation_styles(
-    StringView input) {
-  std::vector<PropagationStyle> styles;
-
-  const auto last_is_duplicate = [&]() -> Optional<Error> {
-    assert(!styles.empty());
-
-    const auto dupe =
-        std::find(styles.begin(), styles.end() - 1, styles.back());
-    if (dupe == styles.end() - 1) {
-      return nullopt;  // no duplicate
-    }
-
-    std::string message;
-    message += "The propagation style ";
-    message += std::string(to_string_view(styles.back()));
-    message += " is duplicated in: ";
-    append(message, input);
-    return Error{Error::DUPLICATE_PROPAGATION_STYLE, std::move(message)};
-  };
-
-  // Style names are separated by spaces, or a comma, or some combination.
-  for (const StringView &item : parse_list(input)) {
-    if (const auto style = parse_propagation_style(item)) {
-      styles.push_back(*style);
-    } else {
-      std::string message;
-      message += "Unsupported propagation style \"";
-      append(message, item);
-      message += "\" in list \"";
-      append(message, input);
-      message +=
-          "\".  The following styles are supported: Datadog, B3, tracecontext.";
-      return Error{Error::UNKNOWN_PROPAGATION_STYLE, std::move(message)};
-    }
-
-    if (auto maybe_error = last_is_duplicate()) {
-      return *maybe_error;
-    }
-  }
-
-  return styles;
-}
-
 // Return a `std::vector<PropagationStyle>` parsed from the specified `env_var`.
 // If `env_var` is not in the environment, return `nullopt`. If an error occurs,
 // throw an `Error`.
