@@ -5,8 +5,11 @@
 #include <cmath>
 #include <unordered_set>
 
+#include "config_provider.h"
+#include "environment_source.h"
 #include "json.hpp"
 #include "json_serializer.h"
+#include "null_logger.h"
 #include "parse_util.h"
 #include "string_util.h"
 #include "tags.h"
@@ -191,17 +194,25 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
-  Optional<double> sample_rate = resolve_and_record_config(
-      env_config->sample_rate, config.sample_rate, &result.metadata,
-      ConfigName::TRACE_SAMPLING_RATE, 1.0,
-      [](const double &d) { return to_string(d, 1); });
+  NullLogger null_logger;
+  EnvironmentSource env_src;
+  ConfigProvider provider(/*fleet=*/nullptr, &env_src, /*local=*/nullptr,
+                          &result.metadata);
 
-  bool is_sample_rate_provided = env_config->sample_rate || config.sample_rate;
+  const double sample_rate = provider.get_double(
+      ConfigName::TRACE_SAMPLING_RATE, "DD_TRACE_SAMPLE_RATE",
+      config.sample_rate, 1.0, null_logger);
+
+  // A sample rate is "provided" if any non-default source contributed.
+  // The provider always records a DEFAULT entry plus one entry per source
+  // that has a value, so any size > 1 means a source contributed.
+  const bool is_sample_rate_provided =
+      result.metadata[ConfigName::TRACE_SAMPLING_RATE].size() > 1;
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
   // appended to the end of `rules`. First, though, we have to make sure the
   // sample rate is valid.
-  if (sample_rate && is_sample_rate_provided) {
-    auto maybe_rate = Rate::from(*sample_rate);
+  if (is_sample_rate_provided) {
+    auto maybe_rate = Rate::from(sample_rate);
     if (auto *error = maybe_rate.if_error()) {
       return error->with_prefix(
           "Unable to parse overall sample_rate for trace sampling: ");
@@ -214,10 +225,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
-  double max_per_second = resolve_and_record_config(
-      env_config->max_per_second, config.max_per_second, &result.metadata,
-      ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
-      [](const double &d) { return std::to_string(d); });
+  const double max_per_second = provider.get_double(
+      ConfigName::TRACE_SAMPLING_LIMIT, "DD_TRACE_RATE_LIMIT",
+      config.max_per_second, 100.0, null_logger);
 
   const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
   if (!(max_per_second > 0) ||
