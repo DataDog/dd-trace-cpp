@@ -1,8 +1,10 @@
+#include <cstdlib>
 #include <string>
 #include <unordered_map>
 #include <utility>
 
 #include "config_source.h"
+#include "environment_source.h"
 #include "test.h"
 
 using namespace datadog::tracing;
@@ -52,4 +54,29 @@ CONFIG_PROVIDER_TEST(
     "ConfigSource: MapSource returns nullopt for missing key") {
   MapSource src({}, ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
   REQUIRE(!src.lookup("DD_SERVICE").has_value());
+}
+
+CONFIG_PROVIDER_TEST("EnvironmentSource: reads from getenv") {
+  ::setenv("DD_CONFIG_PROVIDER_TEST_KEY", "found-it", 1);
+  EnvironmentSource src;
+  auto val = src.lookup("DD_CONFIG_PROVIDER_TEST_KEY");
+  ::unsetenv("DD_CONFIG_PROVIDER_TEST_KEY");
+  REQUIRE(val.has_value());
+  REQUIRE(*val == "found-it");
+  REQUIRE(src.origin() == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+  REQUIRE(!src.config_id().has_value());
+}
+
+CONFIG_PROVIDER_TEST("EnvironmentSource: returns nullopt for unset variable") {
+  ::unsetenv("DD_NEVER_SET_VAR_FOR_TEST");
+  EnvironmentSource src;
+  REQUIRE(!src.lookup("DD_NEVER_SET_VAR_FOR_TEST").has_value());
+}
+
+CONFIG_PROVIDER_TEST("EnvironmentSource: returns nullopt for empty variable") {
+  ::setenv("DD_CONFIG_EMPTY_TEST", "", 1);
+  EnvironmentSource src;
+  auto val = src.lookup("DD_CONFIG_EMPTY_TEST");
+  ::unsetenv("DD_CONFIG_EMPTY_TEST");
+  REQUIRE(!val.has_value());
 }
