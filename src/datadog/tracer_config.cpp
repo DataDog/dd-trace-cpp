@@ -8,8 +8,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include "config_provider.h"
 #include "datadog/optional.h"
 #include "datadog_agent.h"
+#include "environment_source.h"
 #include "json.hpp"
 #include "null_logger.h"
 #include "parse_util.h"
@@ -240,21 +242,28 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.clock = clock;
   final_config.logger = logger;
 
+  EnvironmentSource env_src;
+  ConfigProvider provider(/*fleet=*/nullptr, &env_src, /*local=*/nullptr,
+                          &final_config.metadata);
+
   // DD_SERVICE
-  final_config.defaults.service = resolve_and_record_config(
-      env_config->service, user_config.service, &final_config.metadata,
-      ConfigName::SERVICE_NAME, get_process_name());
+  final_config.defaults.service =
+      provider.get_string(ConfigName::SERVICE_NAME, "DD_SERVICE",
+                          user_config.service, get_process_name());
 
   // Service type
   final_config.defaults.service_type =
       value_or(env_config->service_type, user_config.service_type, "web");
 
-  // DD_ENV
+  // DD_ENV — uses resolve_and_record_config's "no default" mode (does
+  // not record a DEFAULT metadata entry when no value is set).  The
+  // provider currently always records DEFAULT; keep this site on the
+  // existing resolver until that semantic is added.
   final_config.defaults.environment = resolve_and_record_config(
       env_config->environment, user_config.environment, &final_config.metadata,
       ConfigName::SERVICE_ENV);
 
-  // DD_VERSION
+  // DD_VERSION — same "no default" semantic as DD_ENV.
   final_config.defaults.version = resolve_and_record_config(
       env_config->version, user_config.version, &final_config.metadata,
       ConfigName::SERVICE_VERSION);
@@ -263,16 +272,20 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.defaults.name = value_or(env_config->name, user_config.name, "");
 
   // DD_TAGS
-  final_config.defaults.tags = resolve_and_record_config(
-      env_config->tags, user_config.tags, &final_config.metadata,
-      ConfigName::TAGS, std::unordered_map<std::string, std::string>{},
-      [](const auto &tags) { return join_tags(tags); });
+  final_config.defaults.tags = provider.get_tags(
+      ConfigName::TAGS, "DD_TAGS", user_config.tags,
+      std::unordered_map<std::string, std::string>{}, *logger);
 
   // Extraction Styles
   const std::vector<PropagationStyle> default_propagation_styles{
       PropagationStyle::DATADOG, PropagationStyle::W3C,
       PropagationStyle::BAGGAGE};
 
+  // Extraction styles support a fallback chain across three env vars
+  // (DD_TRACE_PROPAGATION_STYLE_EXTRACT > DD_PROPAGATION_STYLE_EXTRACT >
+  // DD_TRACE_PROPAGATION_STYLE) that the env_config loader already
+  // resolves into env_config->extraction_styles.  Use the existing
+  // resolver here.
   final_config.extraction_styles = resolve_and_record_config(
       env_config->extraction_styles, user_config.extraction_styles,
       &final_config.metadata, ConfigName::EXTRACTION_STYLES,
@@ -286,7 +299,7 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
                  "At least one extraction style must be specified."};
   }
 
-  // Injection Styles
+  // Injection styles: same fallback chain pattern as extraction.
   final_config.injection_styles = resolve_and_record_config(
       env_config->injection_styles, user_config.injection_styles,
       &final_config.metadata, ConfigName::INJECTION_STYLES,
@@ -301,16 +314,14 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   }
 
   // Startup Logs
-  final_config.log_on_startup = resolve_and_record_config(
-      env_config->log_on_startup, user_config.log_on_startup,
-      &final_config.metadata, ConfigName::STARTUP_LOGS, true,
-      [](const bool &b) { return to_string(b); });
+  final_config.log_on_startup =
+      provider.get_bool(ConfigName::STARTUP_LOGS, "DD_TRACE_STARTUP_LOGS",
+                        user_config.log_on_startup, true);
 
   // Report traces
-  final_config.report_traces = resolve_and_record_config(
-      env_config->report_traces, user_config.report_traces,
-      &final_config.metadata, ConfigName::REPORT_TRACES, true,
-      [](const bool &b) { return to_string(b); });
+  final_config.report_traces =
+      provider.get_bool(ConfigName::REPORT_TRACES, "DD_TRACE_ENABLED",
+                        user_config.report_traces, true);
 
   // Report hostname
   final_config.report_hostname =
@@ -321,11 +332,10 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       env_config->max_tags_header_size, user_config.max_tags_header_size, 512);
 
   // 128b Trace IDs
-  final_config.generate_128bit_trace_ids = resolve_and_record_config(
-      env_config->generate_128bit_trace_ids,
-      user_config.generate_128bit_trace_ids, &final_config.metadata,
-      ConfigName::GENEREATE_128BIT_TRACE_IDS, true,
-      [](const bool &b) { return to_string(b); });
+  final_config.generate_128bit_trace_ids =
+      provider.get_bool(ConfigName::GENEREATE_128BIT_TRACE_IDS,
+                        "DD_TRACE_128_BIT_TRACEID_GENERATION_ENABLED",
+                        user_config.generate_128bit_trace_ids, true);
 
   // Integration name & version
   final_config.integration_name = value_or(
@@ -335,16 +345,14 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
                tracer_version);
 
   // Baggage - max items
-  final_config.baggage_opts.max_items = resolve_and_record_config(
-      env_config->baggage_max_items, user_config.baggage_max_items,
-      &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_ITEMS, 64UL,
-      [](const size_t &i) { return std::to_string(i); });
+  final_config.baggage_opts.max_items = provider.get_uint64(
+      ConfigName::TRACE_BAGGAGE_MAX_ITEMS, "DD_TRACE_BAGGAGE_MAX_ITEMS",
+      user_config.baggage_max_items, 64UL, *logger);
 
   // Baggage - max bytes
-  final_config.baggage_opts.max_bytes = resolve_and_record_config(
-      env_config->baggage_max_bytes, user_config.baggage_max_bytes,
-      &final_config.metadata, ConfigName::TRACE_BAGGAGE_MAX_BYTES, 8192UL,
-      [](const size_t &i) { return std::to_string(i); });
+  final_config.baggage_opts.max_bytes = provider.get_uint64(
+      ConfigName::TRACE_BAGGAGE_MAX_BYTES, "DD_TRACE_BAGGAGE_MAX_BYTES",
+      user_config.baggage_max_bytes, 8192UL, *logger);
 
   if (final_config.baggage_opts.max_items <= 0 ||
       final_config.baggage_opts.max_bytes < 3) {
@@ -415,27 +423,22 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   }
 
   // APM Tracing Enabled
-  final_config.tracing_enabled = resolve_and_record_config(
-      env_config->tracing_enabled, user_config.tracing_enabled,
-      &final_config.metadata, ConfigName::APM_TRACING_ENABLED, true,
-      [](const bool &b) { return to_string(b); });
+  final_config.tracing_enabled = provider.get_bool(
+      ConfigName::APM_TRACING_ENABLED, "DD_APM_TRACING_ENABLED",
+      user_config.tracing_enabled, true);
 
   {
     // Resource Renaming Enabled
-    const bool resource_renaming_enabled = resolve_and_record_config(
-        env_config->resource_renaming_enabled,
-        user_config.resource_renaming_enabled, &final_config.metadata,
-        ConfigName::TRACE_RESOURCE_RENAMING_ENABLED, false,
-        [](const bool &b) { return to_string(b); });
+    const bool resource_renaming_enabled =
+        provider.get_bool(ConfigName::TRACE_RESOURCE_RENAMING_ENABLED,
+                          "DD_TRACE_RESOURCE_RENAMING_ENABLED",
+                          user_config.resource_renaming_enabled, false);
 
     // Resource Renaming Always Simplified Endpoint
-    const bool resource_renaming_always_simplified_endpoint =
-        resolve_and_record_config(
-            env_config->resource_renaming_always_simplified_endpoint,
-            user_config.resource_renaming_always_simplified_endpoint,
-            &final_config.metadata,
-            ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
-            false, [](const bool &b) { return to_string(b); });
+    const bool resource_renaming_always_simplified_endpoint = provider.get_bool(
+        ConfigName::TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT,
+        "DD_TRACE_RESOURCE_RENAMING_ALWAYS_SIMPLIFIED_ENDPOINT",
+        user_config.resource_renaming_always_simplified_endpoint, false);
 
     if (!resource_renaming_enabled) {
       final_config.resource_renaming_mode =
