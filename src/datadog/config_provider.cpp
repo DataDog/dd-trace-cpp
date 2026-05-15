@@ -13,74 +13,16 @@
 namespace datadog {
 namespace tracing {
 
-namespace {
-
-// Append a metadata entry, optionally with a config_id.
-void record(std::vector<ConfigMetadata>& entries, ConfigName name,
-            std::string value, ConfigMetadata::Origin origin,
-            const Optional<std::string>& config_id) {
+void ConfigProvider::record_entry(std::vector<ConfigMetadata>& entries,
+                                  ConfigName name, std::string value,
+                                  ConfigMetadata::Origin origin,
+                                  const Optional<std::string>& config_id) {
   ConfigMetadata md(name, std::move(value), origin);
   if (config_id) {
     md.config_id = *config_id;
   }
   entries.emplace_back(std::move(md));
 }
-
-// resolve walks fleet, env, user_value, local, default in precedence
-// order.  parse_fn converts a source's raw string into T (returns
-// Expected<T>).  stringify renders T as a string for metadata entries
-// for the default and user-supplied values (source values use the raw
-// string directly).  logger may be nullptr (in which case parse
-// failures are silent).
-template <typename T, typename ParseFn, typename StringifyFn>
-T resolve(ConfigName name, StringView env_key, const Optional<T>& user_value,
-          T default_value, const ConfigSource* fleet, const ConfigSource* env,
-          const ConfigSource* local,
-          std::unordered_map<ConfigName, std::vector<ConfigMetadata>>* metadata,
-          ParseFn parse_fn, StringifyFn stringify, Logger* logger) {
-  auto& entries = (*metadata)[name];
-
-  auto attempt = [&](const ConfigSource* src) -> Optional<T> {
-    if (!src) return nullopt;
-    auto raw = src->lookup(env_key);
-    if (!raw) return nullopt;
-    auto result = parse_fn(*raw);
-    if (auto* err = result.if_error()) {
-      if (logger) {
-        std::string key_copy{env_key};
-        std::string raw_copy = *raw;
-        std::string err_msg = err->message;
-        logger->log_error([key_copy, raw_copy, err_msg](std::ostream& log) {
-          log << "Config: invalid value for " << key_copy << ": " << raw_copy
-              << " (" << err_msg
-              << "); falling through to lower-precedence source.";
-        });
-      }
-      return nullopt;
-    }
-    record(entries, name, *raw, src->origin(), src->config_id());
-    return *result;
-  };
-
-  record(entries, name, stringify(default_value),
-         ConfigMetadata::Origin::DEFAULT, nullopt);
-  T chosen = default_value;
-
-  if (auto v = attempt(local)) chosen = *v;
-
-  if (user_value) {
-    record(entries, name, stringify(*user_value), ConfigMetadata::Origin::CODE,
-           nullopt);
-    chosen = *user_value;
-  }
-
-  if (auto v = attempt(env)) chosen = *v;
-  if (auto v = attempt(fleet)) chosen = *v;
-
-  return chosen;
-}
-
-}  // namespace
 
 ConfigProvider::ConfigProvider(
     const ConfigSource* fleet, const ConfigSource* env,
@@ -93,9 +35,8 @@ std::string ConfigProvider::get_string(ConfigName name, StringView env_key,
                                        std::string default_value) {
   auto parse = [](const std::string& s) -> Expected<std::string> { return s; };
   auto stringify = [](const std::string& s) { return s; };
-  return resolve<std::string>(name, env_key, user_value,
-                              std::move(default_value), fleet_, env_, local_,
-                              metadata_, parse, stringify, nullptr);
+  return get<std::string>(name, env_key, user_value, std::move(default_value),
+                          parse, stringify, nullptr);
 }
 
 bool ConfigProvider::get_bool(ConfigName name, StringView env_key,
@@ -105,8 +46,8 @@ bool ConfigProvider::get_bool(ConfigName name, StringView env_key,
     return !falsy(StringView(s));
   };
   auto stringify = [](const bool& b) { return to_string(b); };
-  return resolve<bool>(name, env_key, user_value, default_value, fleet_, env_,
-                       local_, metadata_, parse, stringify, nullptr);
+  return get<bool>(name, env_key, user_value, default_value, parse, stringify,
+                   nullptr);
 }
 
 std::size_t ConfigProvider::get_uint64(ConfigName name, StringView env_key,
@@ -119,9 +60,8 @@ std::size_t ConfigProvider::get_uint64(ConfigName name, StringView env_key,
     return static_cast<std::size_t>(*r);
   };
   auto stringify = [](const std::size_t& v) { return std::to_string(v); };
-  return resolve<std::size_t>(name, env_key, user_value, default_value, fleet_,
-                              env_, local_, metadata_, parse, stringify,
-                              &logger);
+  return get<std::size_t>(name, env_key, user_value, default_value, parse,
+                          stringify, &logger);
 }
 
 double ConfigProvider::get_double(ConfigName name, StringView env_key,
@@ -131,8 +71,8 @@ double ConfigProvider::get_double(ConfigName name, StringView env_key,
     return parse_double(StringView(s));
   };
   auto stringify = [](const double& v) { return to_string(v, 1); };
-  return resolve<double>(name, env_key, user_value, default_value, fleet_, env_,
-                         local_, metadata_, parse, stringify, &logger);
+  return get<double>(name, env_key, user_value, default_value, parse, stringify,
+                     &logger);
 }
 
 std::unordered_map<std::string, std::string> ConfigProvider::get_tags(
@@ -145,9 +85,8 @@ std::unordered_map<std::string, std::string> ConfigProvider::get_tags(
     return parse_tags(StringView(s));
   };
   auto stringify = [](const TagMap& m) { return join_tags(m); };
-  return resolve<TagMap>(name, env_key, user_value, std::move(default_value),
-                         fleet_, env_, local_, metadata_, parse, stringify,
-                         &logger);
+  return get<TagMap>(name, env_key, user_value, std::move(default_value), parse,
+                     stringify, &logger);
 }
 
 std::vector<PropagationStyle> ConfigProvider::get_propagation_styles(
@@ -161,9 +100,39 @@ std::vector<PropagationStyle> ConfigProvider::get_propagation_styles(
   auto stringify = [](const StyleList& s) {
     return join_propagation_styles(s);
   };
-  return resolve<StyleList>(name, env_key, user_value, std::move(default_value),
-                            fleet_, env_, local_, metadata_, parse, stringify,
-                            &logger);
+  return get<StyleList>(name, env_key, user_value, std::move(default_value),
+                        parse, stringify, &logger);
+}
+
+std::vector<PropagationStyle>
+ConfigProvider::get_propagation_styles_with_aliases(
+    ConfigName name, std::initializer_list<StringView> env_keys,
+    const Optional<std::vector<PropagationStyle>>& user_value,
+    std::vector<PropagationStyle> default_value, Logger& logger) {
+  // Try each env_key in order.  Use the first that any source supplies.
+  // Behavior detail: each call records its own metadata entries; only
+  // the call that produced a non-default winner survives in the final
+  // map (the others contribute their DEFAULT entry, then overwritten).
+  // To avoid metadata noise, peek the env source first and skip empty
+  // keys before delegating.
+  for (auto env_key : env_keys) {
+    bool any_source_has_value = false;
+    if (fleet_ && fleet_->lookup(env_key))
+      any_source_has_value = true;
+    else if (env_ && env_->lookup(env_key))
+      any_source_has_value = true;
+    else if (local_ && local_->lookup(env_key))
+      any_source_has_value = true;
+    if (any_source_has_value) {
+      return get_propagation_styles(name, env_key, user_value,
+                                    std::move(default_value), logger);
+    }
+  }
+  // No source supplied any key.  Fall through to user_value or default
+  // via the regular accessor using the first (canonical) key.  This
+  // also records a DEFAULT entry for telemetry.
+  return get_propagation_styles(name, *env_keys.begin(), user_value,
+                                std::move(default_value), logger);
 }
 
 }  // namespace tracing

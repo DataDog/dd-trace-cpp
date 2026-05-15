@@ -255,18 +255,13 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.defaults.service_type =
       value_or(env_config->service_type, user_config.service_type, "web");
 
-  // DD_ENV — uses resolve_and_record_config's "no default" mode (does
-  // not record a DEFAULT metadata entry when no value is set).  The
-  // provider currently always records DEFAULT; keep this site on the
-  // existing resolver until that semantic is added.
-  final_config.defaults.environment = resolve_and_record_config(
-      env_config->environment, user_config.environment, &final_config.metadata,
-      ConfigName::SERVICE_ENV);
+  // DD_ENV
+  final_config.defaults.environment = provider.get_string(
+      ConfigName::SERVICE_ENV, "DD_ENV", user_config.environment, "");
 
-  // DD_VERSION — same "no default" semantic as DD_ENV.
-  final_config.defaults.version = resolve_and_record_config(
-      env_config->version, user_config.version, &final_config.metadata,
-      ConfigName::SERVICE_VERSION);
+  // DD_VERSION
+  final_config.defaults.version = provider.get_string(
+      ConfigName::SERVICE_VERSION, "DD_VERSION", user_config.version, "");
 
   // Span name
   final_config.defaults.name = value_or(env_config->name, user_config.name, "");
@@ -281,32 +276,25 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       PropagationStyle::DATADOG, PropagationStyle::W3C,
       PropagationStyle::BAGGAGE};
 
-  // Extraction styles support a fallback chain across three env vars
-  // (DD_TRACE_PROPAGATION_STYLE_EXTRACT > DD_PROPAGATION_STYLE_EXTRACT >
-  // DD_TRACE_PROPAGATION_STYLE) that the env_config loader already
-  // resolves into env_config->extraction_styles.  Use the existing
-  // resolver here.
-  final_config.extraction_styles = resolve_and_record_config(
-      env_config->extraction_styles, user_config.extraction_styles,
-      &final_config.metadata, ConfigName::EXTRACTION_STYLES,
-      default_propagation_styles,
-      [](const std::vector<PropagationStyle> &styles) {
-        return join_propagation_styles(styles);
-      });
+  // Extraction styles: try the specific env var first, then the
+  // legacy form, then the global form.  Same chain pattern Java uses.
+  final_config.extraction_styles = provider.get_propagation_styles_with_aliases(
+      ConfigName::EXTRACTION_STYLES,
+      {"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "DD_PROPAGATION_STYLE_EXTRACT",
+       "DD_TRACE_PROPAGATION_STYLE"},
+      user_config.extraction_styles, default_propagation_styles, *logger);
 
   if (final_config.extraction_styles.empty()) {
     return Error{Error::MISSING_SPAN_EXTRACTION_STYLE,
                  "At least one extraction style must be specified."};
   }
 
-  // Injection styles: same fallback chain pattern as extraction.
-  final_config.injection_styles = resolve_and_record_config(
-      env_config->injection_styles, user_config.injection_styles,
-      &final_config.metadata, ConfigName::INJECTION_STYLES,
-      default_propagation_styles,
-      [](const std::vector<PropagationStyle> &styles) {
-        return join_propagation_styles(styles);
-      });
+  // Injection styles: symmetric fallback chain.
+  final_config.injection_styles = provider.get_propagation_styles_with_aliases(
+      ConfigName::INJECTION_STYLES,
+      {"DD_TRACE_PROPAGATION_STYLE_INJECT", "DD_PROPAGATION_STYLE_INJECT",
+       "DD_TRACE_PROPAGATION_STYLE"},
+      user_config.injection_styles, default_propagation_styles, *logger);
 
   if (final_config.injection_styles.empty()) {
     return Error{Error::MISSING_SPAN_INJECTION_STYLE,

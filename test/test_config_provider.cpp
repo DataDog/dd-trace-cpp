@@ -77,6 +77,11 @@ CONFIG_PROVIDER_TEST("EnvironmentSource: returns nullopt for unset variable") {
   REQUIRE(!src.lookup("DD_NEVER_SET_VAR_FOR_TEST").has_value());
 }
 
+#ifndef _MSC_VER
+// Skipped on MSVC: _putenv("NAME=") deletes the variable rather than
+// setting it to an empty value, so EnvGuard can't model an explicitly
+// empty env var on Windows.  The same source code on Linux/macOS
+// preserves empty values, matching environment::lookup's contract.
 CONFIG_PROVIDER_TEST(
     "EnvironmentSource: preserves empty value (matches environment::lookup)") {
   EnvGuard guard{"DD_CONFIG_EMPTY_TEST", ""};
@@ -85,6 +90,7 @@ CONFIG_PROVIDER_TEST(
   REQUIRE(val.has_value());
   REQUIRE(*val == "");
 }
+#endif
 
 namespace {
 
@@ -331,6 +337,46 @@ CONFIG_PROVIDER_TEST(
   REQUIRE(styles.size() == 1);
   REQUIRE(styles[0] == PropagationStyle::DATADOG);
   REQUIRE(logger.error_count() == 1);
+}
+
+CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get<T>: generic accessor with caller-supplied parse") {
+  // Use the generic accessor to look up a vector<int> via a caller
+  // parser.  Demonstrates the API for complex types that have no
+  // dedicated accessor.
+  ProviderHarness h(
+      nullptr,
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_NUMBERS", "1,2,3"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      nullptr);
+  auto parse = [](const std::string& s) -> Expected<std::vector<int>> {
+    std::vector<int> out;
+    std::size_t start = 0;
+    while (start <= s.size()) {
+      auto comma = s.find(',', start);
+      auto end = comma == std::string::npos ? s.size() : comma;
+      auto token = s.substr(start, end - start);
+      if (!token.empty()) out.push_back(std::stoi(token));
+      if (comma == std::string::npos) break;
+      start = comma + 1;
+    }
+    return out;
+  };
+  auto stringify = [](const std::vector<int>& v) {
+    std::string out;
+    for (std::size_t i = 0; i < v.size(); ++i) {
+      if (i > 0) out += ',';
+      out += std::to_string(v[i]);
+    }
+    return out;
+  };
+  MockLogger logger;
+  auto result = h.provider.get<std::vector<int>>(
+      ConfigName::SERVICE_NAME, "DD_NUMBERS", Optional<std::vector<int>>{},
+      std::vector<int>{}, parse, stringify, &logger);
+  REQUIRE(result == std::vector<int>{1, 2, 3});
+  REQUIRE(logger.error_count() == 0);
 }
 
 CONFIG_PROVIDER_TEST(

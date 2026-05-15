@@ -1500,7 +1500,7 @@ TRACER_CONFIG_TEST("telemetry products contain configuration precedence") {
           "env-service");
   }
 
-  SECTION("two sources: CODE -> ENVIRONMENT_VARIABLE (no default)") {
+  SECTION("two sources: DEFAULT -> CODE -> ENVIRONMENT_VARIABLE for DD_ENV") {
     TracerConfig config;
     config.service = "test";
     config.environment = "dev";
@@ -1512,18 +1512,19 @@ TRACER_CONFIG_TEST("telemetry products contain configuration precedence") {
     const auto& configs = finalized->telemetry.products[0].configurations.at(
         ConfigName::SERVICE_ENV);
 
-    // Two sources (will receive seq_id 1, 2)
-    REQUIRE(configs.size() == 2);
-    CHECK(configs[0].origin == ConfigMetadata::Origin::CODE);
-    CHECK(configs[0].value == "dev");
-    CHECK(configs[1].origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
-    CHECK(configs[1].value == "prod");
+    // DEFAULT + CODE + ENVIRONMENT_VARIABLE (seq_id 1, 2, 3)
+    REQUIRE(configs.size() == 3);
+    CHECK(configs[0].origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(configs[1].origin == ConfigMetadata::Origin::CODE);
+    CHECK(configs[1].value == "dev");
+    CHECK(configs[2].origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(configs[2].value == "prod");
 
     CHECK(finalized->metadata.at(ConfigName::SERVICE_ENV).back().value ==
           "prod");
   }
 
-  SECTION("single source: CODE only") {
+  SECTION("two sources: DEFAULT -> CODE for DD_VERSION") {
     TracerConfig config;
     config.service = "test";
     config.version = "1.2.3";
@@ -1534,9 +1535,10 @@ TRACER_CONFIG_TEST("telemetry products contain configuration precedence") {
     const auto& configs = finalized->telemetry.products[0].configurations.at(
         ConfigName::SERVICE_VERSION);
 
-    // Single source (will receive seq_id 1)
-    REQUIRE(configs.size() == 1);
-    CHECK(configs[0].origin == ConfigMetadata::Origin::CODE);
-    CHECK(configs[0].value == "1.2.3");
+    // DEFAULT + CODE (seq_id 1, 2)
+    REQUIRE(configs.size() == 2);
+    CHECK(configs[0].origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(configs[1].origin == ConfigMetadata::Origin::CODE);
+    CHECK(configs[1].value == "1.2.3");
   }
 }
