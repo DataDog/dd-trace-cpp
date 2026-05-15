@@ -25,6 +25,7 @@ add_executable(tests
     test_base64.cpp
     test_cerr_logger.cpp
     test_config_manager.cpp
+    test_config_provider.cpp
     test_datadog_agent.cpp
     test_glob.cpp
     test_limiter.cpp
