@@ -1,6 +1,5 @@
 #pragma once
 
-#include <datadog/config.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
 #include <datadog/telemetry/product.h>

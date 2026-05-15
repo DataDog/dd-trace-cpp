@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <variant>
 #include <vector>
 

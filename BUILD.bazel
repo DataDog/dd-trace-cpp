@@ -87,6 +87,11 @@ cc_library(
         "src/datadog/trace_segment.cpp",
         "src/datadog/trace_source.cpp",
         "src/datadog/tracer.cpp",
+        "src/datadog/stable_config.cpp",
+        "src/datadog/stable_config.h",
+        "src/datadog/stable_config_source.h",
+        "src/datadog/yaml_parser.cpp",
+        "src/datadog/yaml_parser.h",
         "src/datadog/tracer_config.cpp",
         "src/datadog/version.cpp",
         "src/datadog/w3c_propagation.cpp",
@@ -159,5 +164,10 @@ cc_library(
     deps = [
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
+        # yaml-cpp is an implementation detail; CMake links it PRIVATE.
+        # rules_cc's `implementation_deps` would be the analog, but the
+        # version pinned in MODULE.bazel does not yet support it, so we
+        # keep yaml-cpp in `deps` and document the asymmetry here.
+        "@yaml_cpp//:yaml-cpp",
     ],
 )

@@ -1,4 +1,5 @@
 #include <datadog/environment.h>
+#include <datadog/optional.h>
 #include <datadog/string_view.h>
 #include <datadog/tracer_config.h>
 
@@ -9,13 +10,14 @@
 #include <vector>
 
 #include "config_provider.h"
-#include "datadog/optional.h"
 #include "datadog_agent.h"
 #include "environment_source.h"
 #include "json.hpp"
 #include "null_logger.h"
 #include "parse_util.h"
 #include "platform_util.h"
+#include "stable_config.h"
+#include "stable_config_source.h"
 #include "string_util.h"
 #include "threaded_event_scheduler.h"
 
@@ -34,7 +36,7 @@ Optional<std::vector<PropagationStyle>> styles_from_env(
   }
 
   auto styles = parse_propagation_styles(*styles_env);
-  if (auto *error = styles.if_error()) {
+  if (auto* error = styles.if_error()) {
     std::string prefix;
     prefix += "Unable to parse ";
     append(prefix, name(env_var));
@@ -50,7 +52,7 @@ std::string json_quoted(StringView text) {
   return nlohmann::json(std::move(unquoted)).dump();
 }
 
-Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
+Expected<TracerConfig> load_tracer_env_config(Logger& logger) {
   TracerConfig env_cfg;
 
   if (auto service_env = lookup(environment::DD_SERVICE)) {
@@ -66,7 +68,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
 
   if (auto tags_env = lookup(environment::DD_TAGS)) {
     auto tags = parse_tags(*tags_env);
-    if (auto *error = tags.if_error()) {
+    if (auto* error = tags.if_error()) {
       std::string prefix;
       prefix += "Unable to parse ";
       append(prefix, name(environment::DD_TAGS));
@@ -105,7 +107,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   if (auto baggage_items_env =
           lookup(environment::DD_TRACE_BAGGAGE_MAX_ITEMS)) {
     auto maybe_value = parse_uint64(*baggage_items_env, 10);
-    if (auto *error = maybe_value.if_error()) {
+    if (auto* error = maybe_value.if_error()) {
       return *error;
     }
 
@@ -115,7 +117,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   if (auto baggage_bytes_env =
           lookup(environment::DD_TRACE_BAGGAGE_MAX_BYTES)) {
     auto maybe_value = parse_uint64(*baggage_bytes_env, 10);
-    if (auto *error = maybe_value.if_error()) {
+    if (auto* error = maybe_value.if_error()) {
       return *error;
     }
 
@@ -174,7 +176,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     return message;
   };
 
-  for (const auto &[var, var_override] : questionable_combinations) {
+  for (const auto& [var, var_override] : questionable_combinations) {
     const auto value = lookup(var);
     if (!value) {
       continue;
@@ -215,7 +217,7 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
     } else {
       env_cfg.injection_styles = global_styles;
     }
-  } catch (Error &error) {
+  } catch (Error& error) {
     return std::move(error);
   }
 
@@ -224,14 +226,17 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
 
 }  // namespace
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config) {
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config) {
   return finalize_config(config, default_clock);
 }
 
-Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
-                                                const Clock &clock) {
+Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& user_config,
+                                                const Clock& clock) {
   auto logger =
       user_config.logger ? user_config.logger : std::make_shared<NullLogger>();
+
+  // Load stable configs from YAML files.
+  auto stable_configs = load_stable_configs(*logger);
 
   Expected<TracerConfig> env_config = load_tracer_env_config(*logger);
   if (auto error = env_config.if_error()) {
@@ -243,7 +248,9 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   final_config.logger = logger;
 
   EnvironmentSource env_src;
-  ConfigProvider provider(/*fleet=*/nullptr, &env_src, /*local=*/nullptr,
+  FleetStableConfigSource fleet_src(stable_configs.fleet);
+  LocalStableConfigSource local_src(stable_configs.local);
+  ConfigProvider provider(&fleet_src, &env_src, &local_src,
                           &final_config.metadata);
 
   // DD_SERVICE
@@ -361,14 +368,14 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
 
   auto agent_finalized =
       finalize_config(user_config.agent, final_config.logger, clock);
-  if (auto *error = agent_finalized.if_error()) {
+  if (auto* error = agent_finalized.if_error()) {
     return std::move(*error);
   }
 
   if (auto trace_sampler_config = finalize_config(user_config.trace_sampler)) {
     // Merge metadata vectors
-    for (auto &[key, values] : trace_sampler_config->metadata) {
-      auto &dest = final_config.metadata[key];
+    for (auto& [key, values] : trace_sampler_config->metadata) {
+      auto& dest = final_config.metadata[key];
       dest.insert(dest.end(), values.begin(), values.end());
     }
     final_config.trace_sampler = std::move(*trace_sampler_config);
@@ -379,8 +386,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   if (auto span_sampler_config =
           finalize_config(user_config.span_sampler, *logger)) {
     // Merge metadata vectors
-    for (auto &[key, values] : span_sampler_config->metadata) {
-      auto &dest = final_config.metadata[key];
+    for (auto& [key, values] : span_sampler_config->metadata) {
+      auto& dest = final_config.metadata[key];
       dest.insert(dest.end(), values.begin(), values.end());
     }
     final_config.span_sampler = std::move(*span_sampler_config);
@@ -456,8 +463,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
   if (!user_config.collector) {
     final_config.collector = *agent_finalized;
     // Merge metadata vectors
-    for (auto &[key, values] : agent_finalized->metadata) {
-      auto &dest = final_config.metadata[key];
+    for (auto& [key, values] : agent_finalized->metadata) {
+      auto& dest = final_config.metadata[key];
       dest.insert(dest.end(), values.begin(), values.end());
     }
   } else {

@@ -8,6 +8,7 @@
 #include <datadog/tracer_config.h>
 
 #include <datadog/json.hpp>
+#include <string>
 
 #include "httplib.h"
 #include "utils.h"

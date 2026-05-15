@@ -6,6 +6,8 @@
 #include <datadog/tracer_config.h>
 
 #include <datadog/json.hpp>
+#include <string>
+#include <unordered_map>
 
 #include "developer_noise.h"
 #include "httplib.h"
