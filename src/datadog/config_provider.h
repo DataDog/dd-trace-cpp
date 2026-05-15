@@ -63,6 +63,14 @@ class ConfigProvider {
   double get_double(ConfigName name, StringView env_key,
                     const Optional<double>& user_value, double default_value,
                     Logger& logger);
+
+  // Tag-map accessor.  Parses comma-separated `key:value` pairs (the
+  // DD_TAGS convention).
+  std::unordered_map<std::string, std::string> get_tags(
+      ConfigName name, StringView env_key,
+      const Optional<std::unordered_map<std::string, std::string>>& user_value,
+      std::unordered_map<std::string, std::string> default_value,
+      Logger& logger);
 };
 
 }  // namespace tracing

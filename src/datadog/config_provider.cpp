@@ -134,5 +134,20 @@ double ConfigProvider::get_double(ConfigName name, StringView env_key,
                          local_, metadata_, parse, stringify, &logger);
 }
 
+std::unordered_map<std::string, std::string> ConfigProvider::get_tags(
+    ConfigName name, StringView env_key,
+    const Optional<std::unordered_map<std::string, std::string>>& user_value,
+    std::unordered_map<std::string, std::string> default_value,
+    Logger& logger) {
+  using TagMap = std::unordered_map<std::string, std::string>;
+  auto parse = [](const std::string& s) -> Expected<TagMap> {
+    return parse_tags(StringView(s));
+  };
+  auto stringify = [](const TagMap& m) { return join_tags(m); };
+  return resolve<TagMap>(name, env_key, user_value, std::move(default_value),
+                         fleet_, env_, local_, metadata_, parse, stringify,
+                         &logger);
+}
+
 }  // namespace tracing
 }  // namespace datadog
