@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -8,6 +9,7 @@
 #include "config_provider.h"
 #include "config_source.h"
 #include "environment_source.h"
+#include "mocks/loggers.h"
 #include "test.h"
 
 using namespace datadog::tracing;
@@ -212,4 +214,65 @@ CONFIG_PROVIDER_TEST(
   REQUIRE(entries[4].origin == ConfigMetadata::Origin::FLEET_STABLE_CONFIG);
   REQUIRE(entries[4].config_id.has_value());
   REQUIRE(*entries[4].config_id == "id-99");
+}
+
+CONFIG_PROVIDER_TEST("ConfigProvider::get_bool: parses true and false") {
+  ProviderHarness h(
+      nullptr,
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_X", "true"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      nullptr);
+  REQUIRE(h.provider.get_bool(ConfigName::REPORT_TRACES, "DD_X",
+                              Optional<bool>{}, false) == true);
+
+  ProviderHarness h2(
+      nullptr,
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_X", "false"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      nullptr);
+  REQUIRE(h2.provider.get_bool(ConfigName::REPORT_TRACES, "DD_X",
+                               Optional<bool>{}, true) == false);
+}
+
+CONFIG_PROVIDER_TEST("ConfigProvider::get_uint64: valid value") {
+  ProviderHarness h(
+      nullptr,
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_X", "1234"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      nullptr);
+  MockLogger logger;
+  REQUIRE(h.provider.get_uint64(ConfigName::TRACE_BAGGAGE_MAX_ITEMS, "DD_X",
+                                Optional<std::size_t>{}, 64, logger) == 1234);
+  REQUIRE(logger.error_count() == 0);
+}
+
+CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get_uint64: invalid env value falls through to default") {
+  ProviderHarness h(nullptr,
+                    std::make_unique<MapSource>(
+                        std::unordered_map<std::string, std::string>{
+                            {"DD_X", "not-a-number"}},
+                        ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+                    nullptr);
+  MockLogger logger;
+  auto result =
+      h.provider.get_uint64(ConfigName::TRACE_BAGGAGE_MAX_ITEMS, "DD_X",
+                            Optional<std::size_t>{}, 64, logger);
+  REQUIRE(result == 64);
+  REQUIRE(logger.error_count() == 1);
+}
+
+CONFIG_PROVIDER_TEST("ConfigProvider::get_double: parses 0.5") {
+  ProviderHarness h(
+      nullptr,
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{{"DD_X", "0.5"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      nullptr);
+  MockLogger logger;
+  REQUIRE(h.provider.get_double(ConfigName::TRACE_SAMPLING_RATE, "DD_X",
+                                Optional<double>{}, 1.0, logger) == 0.5);
 }

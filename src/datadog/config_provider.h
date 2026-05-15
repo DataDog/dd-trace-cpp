@@ -17,6 +17,7 @@
 #include <datadog/optional.h>
 #include <datadog/string_view.h>
 
+#include <cstddef>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -25,6 +26,7 @@ namespace datadog {
 namespace tracing {
 
 class ConfigSource;
+class Logger;
 
 class ConfigProvider {
   const ConfigSource* fleet_;
@@ -45,6 +47,22 @@ class ConfigProvider {
   std::string get_string(ConfigName name, StringView env_key,
                          const Optional<std::string>& user_value,
                          std::string default_value);
+
+  // Boolean accessor.  Matches the env-var convention: any non-falsy
+  // string is treated as true.
+  bool get_bool(ConfigName name, StringView env_key,
+                const Optional<bool>& user_value, bool default_value);
+
+  // Unsigned-integer accessor.  Logs an error and falls through to the
+  // next-lower-precedence source on parse failure.
+  std::size_t get_uint64(ConfigName name, StringView env_key,
+                         const Optional<std::size_t>& user_value,
+                         std::size_t default_value, Logger& logger);
+
+  // Floating-point accessor.  Logs and falls through on parse failure.
+  double get_double(ConfigName name, StringView env_key,
+                    const Optional<double>& user_value, double default_value,
+                    Logger& logger);
 };
 
 }  // namespace tracing
