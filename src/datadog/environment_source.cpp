@@ -11,7 +11,10 @@ Optional<std::string> EnvironmentSource::lookup(StringView key) const {
   // null-terminated, so copy into std::string.
   std::string null_terminated{key};
   const char* val = std::getenv(null_terminated.c_str());
-  if (val == nullptr || val[0] == '\0') return nullopt;
+  if (val == nullptr) return nullopt;
+  // An explicit empty value is preserved (matches environment::lookup
+  // semantics): callers that want to ignore empty values should do so
+  // after lookup.
   return std::string{val};
 }
 

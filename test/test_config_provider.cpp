@@ -78,12 +78,14 @@ CONFIG_PROVIDER_TEST("EnvironmentSource: returns nullopt for unset variable") {
   REQUIRE(!src.lookup("DD_NEVER_SET_VAR_FOR_TEST").has_value());
 }
 
-CONFIG_PROVIDER_TEST("EnvironmentSource: returns nullopt for empty variable") {
+CONFIG_PROVIDER_TEST(
+    "EnvironmentSource: preserves empty value (matches environment::lookup)") {
   ::setenv("DD_CONFIG_EMPTY_TEST", "", 1);
   EnvironmentSource src;
   auto val = src.lookup("DD_CONFIG_EMPTY_TEST");
   ::unsetenv("DD_CONFIG_EMPTY_TEST");
-  REQUIRE(!val.has_value());
+  REQUIRE(val.has_value());
+  REQUIRE(*val == "");
 }
 
 namespace {

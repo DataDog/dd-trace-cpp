@@ -46,13 +46,14 @@ T resolve(ConfigName name, StringView env_key, const Optional<T>& user_value,
     if (!raw) return nullopt;
     auto result = parse_fn(*raw);
     if (auto* err = result.if_error()) {
-      (void)err;
       if (logger) {
         std::string key_copy{env_key};
         std::string raw_copy = *raw;
-        logger->log_error([key_copy, raw_copy](std::ostream& log) {
+        std::string err_msg = err->message;
+        logger->log_error([key_copy, raw_copy, err_msg](std::ostream& log) {
           log << "Config: invalid value for " << key_copy << ": " << raw_copy
-              << "; falling through to lower-precedence source.";
+              << " (" << err_msg
+              << "); falling through to lower-precedence source.";
         });
       }
       return nullopt;

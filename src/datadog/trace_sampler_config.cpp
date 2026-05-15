@@ -204,10 +204,12 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
       config.sample_rate, 1.0, null_logger);
 
   // A sample rate is "provided" if any non-default source contributed.
-  // The provider always records a DEFAULT entry plus one entry per source
-  // that has a value, so any size > 1 means a source contributed.
+  // The provider always records the chosen source last, so check the
+  // back entry's origin.
+  const auto &rate_entries = result.metadata[ConfigName::TRACE_SAMPLING_RATE];
   const bool is_sample_rate_provided =
-      result.metadata[ConfigName::TRACE_SAMPLING_RATE].size() > 1;
+      !rate_entries.empty() &&
+      rate_entries.back().origin != ConfigMetadata::Origin::DEFAULT;
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
   // appended to the end of `rules`. First, though, we have to make sure the
   // sample rate is valid.
