@@ -296,6 +296,44 @@ CONFIG_PROVIDER_TEST(
 }
 
 CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get_propagation_styles: parses datadog,tracecontext") {
+  ProviderHarness h(
+      nullptr,
+      std::make_unique<MapSource>(
+          std::unordered_map<std::string, std::string>{
+              {"DD_TRACE_PROPAGATION_STYLE", "datadog,tracecontext"}},
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+      nullptr);
+  MockLogger logger;
+  auto styles = h.provider.get_propagation_styles(
+      ConfigName::EXTRACTION_STYLES, "DD_TRACE_PROPAGATION_STYLE",
+      Optional<std::vector<PropagationStyle>>{},
+      std::vector<PropagationStyle>{}, logger);
+  REQUIRE(styles.size() == 2);
+  REQUIRE(styles[0] == PropagationStyle::DATADOG);
+  REQUIRE(styles[1] == PropagationStyle::W3C);
+}
+
+CONFIG_PROVIDER_TEST(
+    "ConfigProvider::get_propagation_styles: invalid value falls through") {
+  ProviderHarness h(nullptr,
+                    std::make_unique<MapSource>(
+                        std::unordered_map<std::string, std::string>{
+                            {"DD_TRACE_PROPAGATION_STYLE", "bogus-style"}},
+                        ConfigMetadata::Origin::ENVIRONMENT_VARIABLE),
+                    nullptr);
+  MockLogger logger;
+  std::vector<PropagationStyle> default_styles{PropagationStyle::DATADOG};
+  auto styles = h.provider.get_propagation_styles(
+      ConfigName::EXTRACTION_STYLES, "DD_TRACE_PROPAGATION_STYLE",
+      Optional<std::vector<PropagationStyle>>{}, default_styles, logger);
+  // Parse fails -> falls through to default.
+  REQUIRE(styles.size() == 1);
+  REQUIRE(styles[0] == PropagationStyle::DATADOG);
+  REQUIRE(logger.error_count() == 1);
+}
+
+CONFIG_PROVIDER_TEST(
     "ConfigProvider::get_tags: malformed value falls through to default") {
   ProviderHarness h(nullptr,
                     std::make_unique<MapSource>(

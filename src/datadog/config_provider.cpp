@@ -149,5 +149,21 @@ std::unordered_map<std::string, std::string> ConfigProvider::get_tags(
                          &logger);
 }
 
+std::vector<PropagationStyle> ConfigProvider::get_propagation_styles(
+    ConfigName name, StringView env_key,
+    const Optional<std::vector<PropagationStyle>>& user_value,
+    std::vector<PropagationStyle> default_value, Logger& logger) {
+  using StyleList = std::vector<PropagationStyle>;
+  auto parse = [](const std::string& s) -> Expected<StyleList> {
+    return parse_propagation_styles(StringView(s));
+  };
+  auto stringify = [](const StyleList& s) {
+    return join_propagation_styles(s);
+  };
+  return resolve<StyleList>(name, env_key, user_value, std::move(default_value),
+                            fleet_, env_, local_, metadata_, parse, stringify,
+                            &logger);
+}
+
 }  // namespace tracing
 }  // namespace datadog

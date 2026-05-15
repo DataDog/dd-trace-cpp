@@ -15,6 +15,7 @@
 
 #include <datadog/config.h>
 #include <datadog/optional.h>
+#include <datadog/propagation_style.h>
 #include <datadog/string_view.h>
 
 #include <cstddef>
@@ -71,6 +72,13 @@ class ConfigProvider {
       const Optional<std::unordered_map<std::string, std::string>>& user_value,
       std::unordered_map<std::string, std::string> default_value,
       Logger& logger);
+
+  // Propagation-style list accessor.  Parses a comma-or-space-separated
+  // list of style names.
+  std::vector<PropagationStyle> get_propagation_styles(
+      ConfigName name, StringView env_key,
+      const Optional<std::vector<PropagationStyle>>& user_value,
+      std::vector<PropagationStyle> default_value, Logger& logger);
 };
 
 }  // namespace tracing
