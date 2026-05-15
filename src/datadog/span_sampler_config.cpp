@@ -228,20 +228,26 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   }
 
   FinalizedSpanSamplerConfig result;
-  Optional<std::vector<SpanSamplerConfig::Rule>> env_rules;
-  Optional<std::vector<SpanSamplerConfig::Rule>> user_rules;
-  if (!env_config->rules.empty()) {
-    env_rules = env_config->rules;
-  }
-  if (!user_config.rules.empty()) {
-    user_rules = user_config.rules;
-  }
 
-  std::vector<SpanSamplerConfig::Rule> rules = resolve_and_record_config(
-      env_rules, user_rules, &result.metadata, ConfigName::SPAN_SAMPLING_RULES,
-      nullptr, [](const std::vector<SpanSamplerConfig::Rule> &r) {
-        return to_string(r);
-      });
+  // Precedence: env > user > default.  env_config->rules is pre-resolved
+  // from DD_SPAN_SAMPLING_RULES or DD_SPAN_SAMPLING_RULES_FILE.
+  std::vector<SpanSamplerConfig::Rule> rules;
+  std::vector<ConfigMetadata> entries;
+  if (!user_config.rules.empty()) {
+    entries.emplace_back(ConfigName::SPAN_SAMPLING_RULES,
+                         to_string(user_config.rules),
+                         ConfigMetadata::Origin::CODE);
+    rules = user_config.rules;
+  }
+  if (!env_config->rules.empty()) {
+    entries.emplace_back(ConfigName::SPAN_SAMPLING_RULES,
+                         to_string(env_config->rules),
+                         ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    rules = env_config->rules;
+  }
+  if (!entries.empty()) {
+    result.metadata[ConfigName::SPAN_SAMPLING_RULES] = std::move(entries);
+  }
 
   for (const auto &rule : rules) {
     auto maybe_rate = Rate::from(rule.sample_rate);
