@@ -6,41 +6,34 @@
 namespace {
 namespace dd = datadog::tracing;
 
-void BM_TraceID_HexPadded(benchmark::State& state) {
-  const dd::TraceID id{0xDEADBEEFCAFEBABEULL, 0x0102030405060708ULL};
+void BM_TraceID_HexPadded(benchmark::State& state, dd::TraceID id) {
   for (auto _ : state) {
     auto result = id.hex_padded();
     benchmark::DoNotOptimize(result);
   }
 }
-BENCHMARK(BM_TraceID_HexPadded);
+BENCHMARK_CAPTURE(BM_TraceID_HexPadded, NoPadding,
+                  dd::TraceID{0xDEADBEEFCAFEBABEULL, 0x0102030405060708ULL});
+BENCHMARK_CAPTURE(BM_TraceID_HexPadded, WithPadding, dd::TraceID{1, 0});
 
-void BM_TraceID_ParseHex_128bit(benchmark::State& state) {
-  const std::string input{"0102030405060708deadbeefcafebabe"};
+void BM_TraceID_ParseHex(benchmark::State& state, std::string input) {
   for (auto _ : state) {
     auto result = dd::TraceID::parse_hex(input);
     benchmark::DoNotOptimize(result);
   }
 }
-BENCHMARK(BM_TraceID_ParseHex_128bit);
+BENCHMARK_CAPTURE(BM_TraceID_ParseHex, 64bit, std::string{"deadbeefcafebabe"});
+BENCHMARK_CAPTURE(BM_TraceID_ParseHex, 128bit,
+                  std::string{"0102030405060708deadbeefcafebabe"});
 
-void BM_TraceID_ParseHex_64bit(benchmark::State& state) {
-  const std::string input{"deadbeefcafebabe"};
-  for (auto _ : state) {
-    auto result = dd::TraceID::parse_hex(input);
-    benchmark::DoNotOptimize(result);
-  }
-}
-BENCHMARK(BM_TraceID_ParseHex_64bit);
-
-void BM_HexPadded_uint64(benchmark::State& state) {
-  const std::uint64_t value = 0xDEADBEEFCAFEBABEULL;
+void BM_HexPadded_uint64(benchmark::State& state, std::uint64_t value) {
   for (auto _ : state) {
     auto result = dd::hex_padded(value);
     benchmark::DoNotOptimize(result);
   }
 }
-BENCHMARK(BM_HexPadded_uint64);
+BENCHMARK_CAPTURE(BM_HexPadded_uint64, NoPadding, 0xDEADBEEFCAFEBABEULL);
+BENCHMARK_CAPTURE(BM_HexPadded_uint64, WorstCasePadding, 0x1ULL);
 
 void BM_Hex_uint64(benchmark::State& state) {
   const std::uint64_t value = 0xDEADBEEFCAFEBABEULL;
