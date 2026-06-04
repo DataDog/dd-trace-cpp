@@ -22,7 +22,7 @@ using NoopTelemetry = std::monostate;
 
 /// `TelemetryProxy` holds either the real implementation or a no-op
 /// implementation.
-using TelemetryProxy = std::variant<NoopTelemetry, Telemetry>;
+using TelemetryProxy = std::variant<NoopTelemetry, std::shared_ptr<Telemetry>>;
 
 /// NOTE(@dmehala): Here to facilitate Meyer's singleton construction.
 struct Ctor_param final {
@@ -37,9 +37,9 @@ struct Ctor_param final {
 
 TelemetryProxy make_telemetry(const tracing::Optional<Ctor_param>& init) {
   if (!init || !init->configuration.enabled) return NoopTelemetry{};
-  return Telemetry{init->configuration, init->tracer_signature, init->logger,
-                   init->client,        init->scheduler,        init->agent_url,
-                   init->clock};
+  return Telemetry::create(init->configuration, init->tracer_signature,
+                           init->logger, init->client, init->scheduler,
+                           init->agent_url, init->clock);
 }
 
 TelemetryProxy& instance(
@@ -69,10 +69,19 @@ void init(FinalizedConfiguration configuration,
                       event_scheduler, agent_url, clock});
 }
 
+void shutdown() {
+  std::visit(
+      details::Overload{
+          [](std::shared_ptr<Telemetry>& telemetry) { telemetry->shutdown(); },
+          [](NoopTelemetry) {},
+      },
+      instance());
+}
+
 void send_configuration_change() {
   std::visit(
       details::Overload{
-          [&](Telemetry& telemetry) { telemetry.send_configuration_change(); },
+          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->send_configuration_change(); },
           [](NoopTelemetry) {},
       },
       instance());
@@ -81,8 +90,8 @@ void send_configuration_change() {
 void capture_configuration_change(
     const std::vector<tracing::ConfigMetadata>& new_configuration) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) {
-                   telemetry.capture_configuration_change(new_configuration);
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->capture_configuration_change(new_configuration);
                  },
                  [](NoopTelemetry) {},
              },
@@ -92,7 +101,7 @@ void capture_configuration_change(
 namespace log {
 void warning(std::string message) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) { telemetry.log_warning(message); },
+                 [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->log_warning(message); },
                  [](NoopTelemetry) {},
              },
              instance());
@@ -100,7 +109,7 @@ void warning(std::string message) {
 
 void error(std::string message) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) { telemetry.log_error(message); },
+                 [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->log_error(message); },
                  [](NoopTelemetry) {},
              },
              instance());
@@ -108,8 +117,8 @@ void error(std::string message) {
 
 void error(std::string message, std::string stacktrace) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) {
-                   telemetry.log_error(message, stacktrace);
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->log_error(message, stacktrace);
                  },
                  [](auto&&) {},
              },
@@ -121,7 +130,7 @@ namespace counter {
 void increment(const Counter& counter) {
   std::visit(
       details::Overload{
-          [&](Telemetry& telemetry) { telemetry.increment_counter(counter); },
+          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->increment_counter(counter); },
           [](auto&&) {},
       },
       instance());
@@ -129,8 +138,8 @@ void increment(const Counter& counter) {
 
 void increment(const Counter& counter, const std::vector<std::string>& tags) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) {
-                   telemetry.increment_counter(counter, tags);
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->increment_counter(counter, tags);
                  },
                  [](auto&&) {},
              },
@@ -140,7 +149,7 @@ void increment(const Counter& counter, const std::vector<std::string>& tags) {
 void decrement(const Counter& counter) {
   std::visit(
       details::Overload{
-          [&](Telemetry& telemetry) { telemetry.decrement_counter(counter); },
+          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->decrement_counter(counter); },
           [](auto&&) {},
       },
       instance());
@@ -148,8 +157,8 @@ void decrement(const Counter& counter) {
 
 void decrement(const Counter& counter, const std::vector<std::string>& tags) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) {
-                   telemetry.decrement_counter(counter, tags);
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->decrement_counter(counter, tags);
                  },
                  [](auto&&) {},
              },
@@ -159,7 +168,7 @@ void decrement(const Counter& counter, const std::vector<std::string>& tags) {
 void set(const Counter& counter, uint64_t value) {
   std::visit(
       details::Overload{
-          [&](Telemetry& telemetry) { telemetry.set_counter(counter, value); },
+          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->set_counter(counter, value); },
           [](auto&&) {},
       },
       instance());
@@ -168,8 +177,8 @@ void set(const Counter& counter, uint64_t value) {
 void set(const Counter& counter, const std::vector<std::string>& tags,
          uint64_t value) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) {
-                   telemetry.set_counter(counter, tags, value);
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->set_counter(counter, tags, value);
                  },
                  [](auto&&) {},
              },
@@ -181,7 +190,7 @@ void set(const Counter& counter, const std::vector<std::string>& tags,
 namespace rate {
 void set(const Rate& rate, uint64_t value) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) { telemetry.set_rate(rate, value); },
+                 [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->set_rate(rate, value); },
                  [](auto&&) {},
              },
              instance());
@@ -191,7 +200,7 @@ void set(const Rate& rate, const std::vector<std::string>& tags,
          uint64_t value) {
   std::visit(
       details::Overload{
-          [&](Telemetry& telemetry) { telemetry.set_rate(rate, tags, value); },
+          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->set_rate(rate, tags, value); },
           [](auto&&) {},
       },
       instance());
@@ -202,8 +211,8 @@ namespace distribution {
 
 void add(const Distribution& distribution, uint64_t value) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) {
-                   telemetry.add_datapoint(distribution, value);
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->add_datapoint(distribution, value);
                  },
                  [](auto&&) {},
              },
@@ -213,8 +222,8 @@ void add(const Distribution& distribution, uint64_t value) {
 void add(const Distribution& distribution, const std::vector<std::string>& tags,
          uint64_t value) {
   std::visit(details::Overload{
-                 [&](Telemetry& telemetry) {
-                   telemetry.add_datapoint(distribution, tags, value);
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->add_datapoint(distribution, tags, value);
                  },
                  [](auto&&) {},
              },

@@ -749,6 +749,11 @@ TEST_SPAN("injecting W3C tracestate header") {
   // If one of these test cases results in a local sampling decision, let it be
   // "drop."
   config.trace_sampler.sample_rate = 0.0;
+  // Disable telemetry so no real Curl HTTP client / background thread is
+  // created. Otherwise the telemetry "app_started" request to a (likely
+  // absent) agent fails and logs an error into the shared MockLogger, racing
+  // against the `error_count() == 0` assertion below.
+  config.telemetry.enabled = false;
   const auto logger = std::make_shared<MockLogger>();
   config.logger = logger;
   config.collector = std::make_shared<NullCollector>();
