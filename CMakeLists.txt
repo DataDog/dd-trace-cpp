@@ -194,6 +194,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/limiter.cpp
     src/datadog/logger.cpp
     src/datadog/msgpack.cpp
+    src/datadog/otel_process_ctx.cpp
     src/datadog/parse_util.cpp
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp

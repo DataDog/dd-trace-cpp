@@ -65,6 +65,9 @@ class Tracer {
   Tracer(const FinalizedTracerConfig& config,
          const std::shared_ptr<const IDGenerator>& generator);
 
+  // Drops all state, including process discovery and process context.
+  ~Tracer();
+
   // Create a new trace and return the root span of the trace.  Optionally
   // specify a `config` indicating the attributes of the root span.
   Span create_span();
