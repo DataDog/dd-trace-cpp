@@ -7,6 +7,14 @@
   #define _GNU_SOURCE
 #endif
 
+#if defined(__GNUC__) && defined(__cplusplus) && __cplusplus < 202002L
+  // This file uses C99 compound literals with designated initializers
+  // throughout. They are standard in C (since C99) and in C++ (since C++20),
+  // but trigger -Wpedantic when compiled as C++17 or older. Silence them at
+  // translation-unit scope so the file builds cleanly under strict flags.
+  #pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
 // Note: Things here are needed for NOOP. Things that are only for non-NOOP get added further below.
 
 #include <stdio.h>

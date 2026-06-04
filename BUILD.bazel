@@ -39,6 +39,8 @@ cc_library(
         "src/datadog/msgpack.cpp",
         "src/datadog/msgpack.h",
         "src/datadog/null_logger.h",
+        "src/datadog/otel_process_ctx.cpp",
+        "src/datadog/otel_process_ctx.h",
         "src/datadog/parse_util.cpp",
         "src/datadog/parse_util.h",
         "src/datadog/platform_util.h",
