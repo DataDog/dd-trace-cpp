@@ -165,7 +165,7 @@ void Tracer::store_config(
 
   const auto defaults = config_manager_->span_defaults();
   const std::string runtime_id_string = runtime_id_.string();
-  const std::string tracer_version = signature_.library_version;
+  const std::string tracer_version_value = signature_.library_version;
   const std::string tracer_language(signature_.library_language);
   const std::string hostname_value = hostname_.value_or("");
   const std::string service_name = defaults->service;
@@ -185,7 +185,7 @@ void Tracer::store_config(
     buffer,
     "schema_version",  [&](auto& buffer) { msgpack::pack_integer(buffer, std::uint64_t(2)); return Expected<void>{}; },
     "runtime_id",      [&](auto& buffer) { return msgpack::pack_string(buffer, runtime_id_string); },
-    "tracer_version",  [&](auto& buffer) { return msgpack::pack_string(buffer, tracer_version); },
+    "tracer_version",  [&](auto& buffer) { return msgpack::pack_string(buffer, tracer_version_value); },
     "tracer_language", [&](auto& buffer) { return msgpack::pack_string(buffer, tracer_language); },
     "hostname",        [&](auto& buffer) { return msgpack::pack_string(buffer, hostname_value); },
     "service_name",    [&](auto& buffer) { return msgpack::pack_string(buffer, service_name); },
@@ -219,7 +219,7 @@ void Tracer::store_config(
   otel_data.service_name = service_name.c_str();
   otel_data.service_version = service_version.c_str();
   otel_data.telemetry_sdk_language = tracer_language.c_str();
-  otel_data.telemetry_sdk_version = tracer_version.c_str();
+  otel_data.telemetry_sdk_version = tracer_version_value.c_str();
   otel_data.telemetry_sdk_name = "dd-trace-cpp";
   otel_data.resource_attributes = resource_attrs;
   otel_data.extra_attributes = extra_attrs;
