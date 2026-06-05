@@ -471,7 +471,7 @@ Expected<Baggage, Baggage::Error> Tracer::extract_baggage(
     return Baggage::Error{Baggage::Error::DISABLED};
   }
 
-  auto maybe_baggage = Baggage::extract(reader);
+  auto maybe_baggage = Baggage::extract(reader, baggage_opts_);
   if (maybe_baggage) {
     telemetry::counter::increment(metrics::tracer::trace_context::extracted,
                                   {"header_style:baggage"});
