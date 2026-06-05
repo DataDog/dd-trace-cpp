@@ -36,9 +36,7 @@ std::map<std::string, std::string> to_map(const char** kv) {
 OTEL_CTX_TEST("Tracer construction publishes OTel process context") {
 #ifndef __linux__
   SUCCEED("OpenTelemetry process context is Linux-only");
-  return;
-#endif
-
+#else
   std::string expected_container_id;
   if (auto id = container::get_id()) {
     expected_container_id = id->value;
@@ -105,4 +103,5 @@ OTEL_CTX_TEST("Tracer construction publishes OTel process context") {
   if (post_read.success) {
     otel_process_ctx_read_drop(&post_read);
   }
+#endif
 }
