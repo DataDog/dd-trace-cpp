@@ -69,7 +69,7 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
     {"config", {
       {"dd_service", tracer_cfg["defaults"]["service"]},
       {"dd_env", tracer_cfg["defaults"]["environment"]},
-      {"dd_version", tracer_cfg["environment_variables"]["version"]},
+      {"dd_version", tracer_cfg["defaults"]["version"]},
       {"dd_trace_enabled", tracer_cfg["environment_variables"]["report_traces"]},
       {"dd_trace_agent_url", agent_url}
     }}
