@@ -80,7 +80,8 @@ OTEL_CTX_TEST("Tracer construction publishes OTel process context") {
     CHECK(std::string(data.service_name) == "otel-ctx-svc");
     CHECK(std::string(data.deployment_environment_name) == "otel-ctx-env");
     CHECK(std::string(data.service_version) == "1.2.3");
-    CHECK(std::string(data.service_instance_id) == expected_runtime_id.string());
+    CHECK(std::string(data.service_instance_id) ==
+          expected_runtime_id.string());
     CHECK(std::string(data.telemetry_sdk_language) == "cpp");
     CHECK(std::string(data.telemetry_sdk_name) == "dd-trace-cpp");
     CHECK(std::string(data.telemetry_sdk_version) == tracer_version);
