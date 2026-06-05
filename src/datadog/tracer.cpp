@@ -121,9 +121,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   store_config(process_tags);
 }
 
-Tracer::~Tracer() {
-  otel_process_ctx_drop_current();
-}
+Tracer::~Tracer() { otel_process_ctx_drop_current(); }
 
 std::string Tracer::config() const {
   // clang-format off
@@ -206,8 +204,7 @@ void Tracer::store_config(
 #ifdef __linux__
   // Publish the same metadata as an OpenTelemetry process context.
   const char* resource_attrs[] = {
-      "host.name",    hostname_value.c_str(),
-      "container.id", container_id.c_str(),
+      "host.name", hostname_value.c_str(), "container.id", container_id.c_str(),
       nullptr,
   };
   const char* extra_attrs[] = {
