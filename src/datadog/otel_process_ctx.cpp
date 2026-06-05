@@ -29,17 +29,19 @@
 #define ADD_QUOTES_HELPER(x) #x
 #define ADD_QUOTES(x) ADD_QUOTES_HELPER(x)
 
+// Positional aggregate init (no designated initializers) so this file's NOOP
+// path compiles on MSVC at /std:c++17.
 static const otel_process_ctx_data empty_data = {
-  .deployment_environment_name = NULL,
-  .service_instance_id = NULL,
-  .service_name = NULL,
-  .service_version = NULL,
-  .telemetry_sdk_language = NULL,
-  .telemetry_sdk_version = NULL,
-  .telemetry_sdk_name = NULL,
-  .resource_attributes = NULL,
-  .extra_attributes = NULL,
-  .thread_ctx_config = NULL
+  NULL,  // deployment_environment_name
+  NULL,  // service_instance_id
+  NULL,  // service_name
+  NULL,  // service_version
+  NULL,  // telemetry_sdk_language
+  NULL,  // telemetry_sdk_version
+  NULL,  // telemetry_sdk_name
+  NULL,  // resource_attributes
+  NULL,  // extra_attributes
+  NULL   // thread_ctx_config
 };
 
 #if (defined(OTEL_PROCESS_CTX_NOOP) && OTEL_PROCESS_CTX_NOOP) || !defined(__linux__)
@@ -47,7 +49,8 @@ static const otel_process_ctx_data empty_data = {
 
   otel_process_ctx_result otel_process_ctx_publish(const otel_process_ctx_data *data) {
     (void) data; // Suppress unused parameter warning
-    return (otel_process_ctx_result) {.success = false, .error_message = "OTEL_PROCESS_CTX_NOOP mode is enabled - no-op implementation (" __FILE__ ":" ADD_QUOTES(__LINE__) ")"};
+    otel_process_ctx_result result = {false, "OTEL_PROCESS_CTX_NOOP mode is enabled - no-op implementation (" __FILE__ ":" ADD_QUOTES(__LINE__) ")"};
+    return result;
   }
 
   bool otel_process_ctx_drop_current(void) {
@@ -56,7 +59,8 @@ static const otel_process_ctx_data empty_data = {
 
   #ifndef OTEL_PROCESS_CTX_NO_READ
     otel_process_ctx_read_result otel_process_ctx_read(void) {
-      return (otel_process_ctx_read_result) {.success = false, .error_message = "OTEL_PROCESS_CTX_NOOP mode is enabled - no-op implementation (" __FILE__ ":" ADD_QUOTES(__LINE__) ")", .data = empty_data};
+      otel_process_ctx_read_result result = {false, "OTEL_PROCESS_CTX_NOOP mode is enabled - no-op implementation (" __FILE__ ":" ADD_QUOTES(__LINE__) ")", empty_data};
+      return result;
     }
 
     bool otel_process_ctx_read_drop(otel_process_ctx_read_result *result) {
