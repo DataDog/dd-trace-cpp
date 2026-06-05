@@ -15,8 +15,9 @@
   // This file uses C99 compound literals with designated initializers
   // throughout. They are standard in C (since C99) and in C++ (since C++20),
   // but trigger -Wpedantic (older GCC) or -Wc++20-extensions (newer GCC) when
-  // compiled as C++17 or older. Silence both at translation-unit scope so the
-  // file builds cleanly under strict flags.
+  // compiled as C++17 or older. Silencing -Wpragmas first lets GCC versions
+  // that don't know -Wc++20-extensions accept the pragma silently.
+  #pragma GCC diagnostic ignored "-Wpragmas"
   #pragma GCC diagnostic ignored "-Wpedantic"
   #pragma GCC diagnostic ignored "-Wc++20-extensions"
 #endif
