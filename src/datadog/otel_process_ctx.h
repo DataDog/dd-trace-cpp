@@ -2,6 +2,9 @@
 // This file is a verbatim copy of an upstream reference implementation; do
 // not let clang-format rewrite it.
 
+// The upstream home for this file is
+// https://github.com/open-telemetry/sig-profiling/blob/main/process-context/c-and-cpp/otel_process_ctx.h
+
 // Unless explicitly stated otherwise all files in this repository are licensed under the Apache License (Version 2.0).
 // This product includes software developed at Datadog (https://www.datadoghq.com/) Copyright 2025 Datadog, Inc.
 
