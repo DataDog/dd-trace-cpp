@@ -54,8 +54,9 @@ void init(FinalizedConfiguration configuration,
 /// If other holders of the client remain, the Curl thread continues running
 /// and requests may still complete and fire their callbacks after this call
 /// returns (the callbacks guard against this with weak_from_this()). After
-/// this call all telemetry send functions become no-ops. Idempotent — safe
-/// to call even if telemetry was never initialized.
+/// this call all telemetry send functions become no-ops. Safe to call even if
+/// telemetry was never initialized, but must be called at most once after a
+/// successful init.
 ///
 /// Call this from the worker process exit path (e.g. before destroying the
 /// tracer) so that telemetry's reference to the HTTP client is released
