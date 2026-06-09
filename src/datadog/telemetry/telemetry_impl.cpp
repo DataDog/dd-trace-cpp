@@ -222,24 +222,46 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       http_client_(client),
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
-      host_info_(get_host_info()) {
-  app_started();
-  schedule_tasks();
+      host_info_(get_host_info()) {}
+
+std::shared_ptr<Telemetry> Telemetry::create(
+    FinalizedConfiguration config, TracerSignature tracer_signature,
+    std::shared_ptr<tracing::Logger> logger,
+    std::shared_ptr<tracing::HTTPClient> client,
+    std::shared_ptr<tracing::EventScheduler> event_scheduler,
+    HTTPClient::URL agent_url, Clock clock) {
+  std::shared_ptr<Telemetry> t(new Telemetry(
+      std::move(config), std::move(tracer_signature), std::move(logger),
+      std::move(client), std::move(event_scheduler), std::move(agent_url),
+      std::move(clock)));
+  t->app_started();
+  t->schedule_tasks();
+  return t;
 }
 
 void Telemetry::schedule_tasks() {
   tasks_.emplace_back(scheduler_->schedule_recurring_event(
-      config_.heartbeat_interval,
-      [this]() { send_payload("app-heartbeat", heartbeat_and_telemetry()); }));
+      config_.heartbeat_interval, [weak = weak_from_this()]() {
+        if (auto self = weak.lock()) {
+          self->send_payload("app-heartbeat", self->heartbeat_and_telemetry());
+        }
+      }));
 
   if (config_.report_metrics) {
     tasks_.emplace_back(scheduler_->schedule_recurring_event(
-        config_.metrics_interval, [this]() mutable { capture_metrics(); }));
+        config_.metrics_interval, [weak = weak_from_this()]() {
+          if (auto self = weak.lock()) {
+            self->capture_metrics();
+          }
+        }));
   }
 
   tasks_.emplace_back(scheduler_->schedule_recurring_event(
-      config_.extended_heartbeat_interval, [this]() {
-        send_payload("app-extended-heartbeat", extended_heartbeat_payload());
+      config_.extended_heartbeat_interval, [weak = weak_from_this()]() {
+        if (auto self = weak.lock()) {
+          self->send_payload("app-extended-heartbeat",
+                             self->extended_heartbeat_payload());
+        }
       }));
 }
 
@@ -248,52 +270,6 @@ Telemetry::~Telemetry() {
     cancel_tasks(tasks_);
     app_closing();
   }
-}
-
-Telemetry::Telemetry(Telemetry&& rhs)
-    : config_(std::move(rhs.config_)),
-      logger_(std::move(rhs.logger_)),
-      telemetry_endpoint_(std::move(rhs.telemetry_endpoint_)),
-      tracer_signature_(std::move(rhs.tracer_signature_)),
-      http_client_(rhs.http_client_),
-      clock_(std::move(rhs.clock_)),
-      scheduler_(std::move(rhs.scheduler_)),
-      counters_(std::move(rhs.counters_)),
-      counters_snapshot_(std::move(rhs.counters_snapshot_)),
-      rates_(std::move(rhs.rates_)),
-      rates_snapshot_(std::move(rhs.rates_snapshot_)),
-      distributions_(std::move(rhs.distributions_)),
-      seq_id_(rhs.seq_id_),
-      config_seq_ids_(rhs.config_seq_ids_),
-      all_configurations_(rhs.all_configurations_),
-      host_info_(rhs.host_info_) {
-  cancel_tasks(rhs.tasks_);
-  schedule_tasks();
-}
-
-Telemetry& Telemetry::operator=(Telemetry&& rhs) {
-  if (&rhs != this) {
-    cancel_tasks(rhs.tasks_);
-    std::swap(config_, rhs.config_);
-    std::swap(logger_, rhs.logger_);
-    std::swap(telemetry_endpoint_, rhs.telemetry_endpoint_);
-    std::swap(http_client_, rhs.http_client_);
-    std::swap(tracer_signature_, rhs.tracer_signature_);
-    std::swap(http_client_, rhs.http_client_);
-    std::swap(clock_, rhs.clock_);
-    std::swap(scheduler_, rhs.scheduler_);
-    std::swap(counters_, rhs.counters_);
-    std::swap(counters_snapshot_, rhs.counters_snapshot_);
-    std::swap(rates_, rhs.rates_);
-    std::swap(rates_snapshot_, rhs.rates_snapshot_);
-    std::swap(distributions_, rhs.distributions_);
-    std::swap(seq_id_, rhs.seq_id_);
-    std::swap(config_seq_ids_, rhs.config_seq_ids_);
-    std::swap(all_configurations_, rhs.all_configurations_);
-    std::swap(host_info_, rhs.host_info_);
-    schedule_tasks();
-  }
-  return *this;
 }
 
 void Telemetry::log_error(std::string message) {
@@ -364,6 +340,14 @@ void Telemetry::app_started() {
   }
 }
 
+void Telemetry::shutdown() {
+  // cancel_tasks clears tasks_, so ~Telemetry() becomes a no-op after this.
+  cancel_tasks(tasks_);
+  app_closing();
+  std::lock_guard l{http_client_mutex_};
+  http_client_.reset();
+}
+
 void Telemetry::app_closing() {
   // Capture metrics in-between two ticks to be sent with the last payload.
   capture_metrics();
@@ -373,6 +357,13 @@ void Telemetry::app_closing() {
 }
 
 void Telemetry::send_payload(StringView request_type, std::string payload) {
+  std::shared_ptr<tracing::HTTPClient> client;
+  {
+    std::lock_guard l{http_client_mutex_};
+    client = http_client_;
+  }
+  if (!client) return;
+
   auto set_telemetry_headers = [request_type, payload_size = payload.size(),
                                 debug_enabled = config_.debug,
                                 &signature =
@@ -389,26 +380,27 @@ void Telemetry::send_payload(StringView request_type, std::string payload) {
     }
   };
 
-  auto on_response = [this, logger = logger_](int response_status,
-                                              const DictReader&,
-                                              std::string response_body) {
-    if (response_status >= 500) {
-      increment_counter(internal_metrics::responses,
-                        {"status_code:5xx", "endpoint:agent"});
-    } else if (response_status >= 400) {
-      increment_counter(internal_metrics::responses,
-                        {"status_code:4xx", "endpoint:agent"});
-    } else if (response_status >= 300) {
-      increment_counter(internal_metrics::responses,
-                        {"status_code:3xx", "endpoint:agent"});
-    } else if (response_status >= 200) {
-      increment_counter(internal_metrics::responses,
-                        {"status_code:2xx", "endpoint:agent"});
-    } else if (response_status >= 100) {
-      increment_counter(internal_metrics::responses,
-                        {"status_code:1xx", "endpoint:agent"});
+  auto on_response = [weak = weak_from_this(), logger = logger_](
+                         int response_status, const DictReader&,
+                         std::string response_body) {
+    if (auto self = weak.lock()) {
+      if (response_status >= 500) {
+        self->increment_counter(internal_metrics::responses,
+                                {"status_code:5xx", "endpoint:agent"});
+      } else if (response_status >= 400) {
+        self->increment_counter(internal_metrics::responses,
+                                {"status_code:4xx", "endpoint:agent"});
+      } else if (response_status >= 300) {
+        self->increment_counter(internal_metrics::responses,
+                                {"status_code:3xx", "endpoint:agent"});
+      } else if (response_status >= 200) {
+        self->increment_counter(internal_metrics::responses,
+                                {"status_code:2xx", "endpoint:agent"});
+      } else if (response_status >= 100) {
+        self->increment_counter(internal_metrics::responses,
+                                {"status_code:1xx", "endpoint:agent"});
+      }
     }
-
     if (response_status < 200 || response_status >= 300) {
       logger->log_error([&](auto& stream) {
         stream << "Unexpected telemetry response status " << response_status
@@ -419,9 +411,11 @@ void Telemetry::send_payload(StringView request_type, std::string payload) {
   };
 
   // Callback for unsuccessful telemetry HTTP requests.
-  auto on_error = [this, logger = logger_](Error error) {
-    increment_counter(internal_metrics::errors,
-                      {"type:network", "endpoint:agent"});
+  auto on_error = [weak = weak_from_this(), logger = logger_](Error error) {
+    if (auto self = weak.lock()) {
+      self->increment_counter(internal_metrics::errors,
+                              {"type:network", "endpoint:agent"});
+    }
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for telemetry: "));
   };
@@ -431,9 +425,9 @@ void Telemetry::send_payload(StringView request_type, std::string payload) {
                 payload.size());
 
   auto post_result =
-      http_client_->post(telemetry_endpoint_, set_telemetry_headers,
-                         std::move(payload), std::move(on_response),
-                         std::move(on_error), clock_().tick + request_timeout);
+      client->post(telemetry_endpoint_, set_telemetry_headers,
+                   std::move(payload), std::move(on_response),
+                   std::move(on_error), clock_().tick + request_timeout);
   if (auto* error = post_result.if_error()) {
     increment_counter(internal_metrics::errors,
                       {"type:network", "endpoint:agent"});
