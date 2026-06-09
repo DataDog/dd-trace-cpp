@@ -79,12 +79,13 @@ void shutdown() {
 }
 
 void send_configuration_change() {
-  std::visit(
-      details::Overload{
-          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->send_configuration_change(); },
-          [](NoopTelemetry) {},
-      },
-      instance());
+  std::visit(details::Overload{
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->send_configuration_change();
+                 },
+                 [](NoopTelemetry) {},
+             },
+             instance());
 }
 
 void capture_configuration_change(
@@ -101,7 +102,9 @@ void capture_configuration_change(
 namespace log {
 void warning(std::string message) {
   std::visit(details::Overload{
-                 [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->log_warning(message); },
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->log_warning(message);
+                 },
                  [](NoopTelemetry) {},
              },
              instance());
@@ -109,7 +112,9 @@ void warning(std::string message) {
 
 void error(std::string message) {
   std::visit(details::Overload{
-                 [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->log_error(message); },
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->log_error(message);
+                 },
                  [](NoopTelemetry) {},
              },
              instance());
@@ -128,12 +133,13 @@ void error(std::string message, std::string stacktrace) {
 
 namespace counter {
 void increment(const Counter& counter) {
-  std::visit(
-      details::Overload{
-          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->increment_counter(counter); },
-          [](auto&&) {},
-      },
-      instance());
+  std::visit(details::Overload{
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->increment_counter(counter);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
 }
 
 void increment(const Counter& counter, const std::vector<std::string>& tags) {
@@ -147,12 +153,13 @@ void increment(const Counter& counter, const std::vector<std::string>& tags) {
 }
 
 void decrement(const Counter& counter) {
-  std::visit(
-      details::Overload{
-          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->decrement_counter(counter); },
-          [](auto&&) {},
-      },
-      instance());
+  std::visit(details::Overload{
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->decrement_counter(counter);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
 }
 
 void decrement(const Counter& counter, const std::vector<std::string>& tags) {
@@ -166,12 +173,13 @@ void decrement(const Counter& counter, const std::vector<std::string>& tags) {
 }
 
 void set(const Counter& counter, uint64_t value) {
-  std::visit(
-      details::Overload{
-          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->set_counter(counter, value); },
-          [](auto&&) {},
-      },
-      instance());
+  std::visit(details::Overload{
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->set_counter(counter, value);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
 }
 
 void set(const Counter& counter, const std::vector<std::string>& tags,
@@ -190,7 +198,9 @@ void set(const Counter& counter, const std::vector<std::string>& tags,
 namespace rate {
 void set(const Rate& rate, uint64_t value) {
   std::visit(details::Overload{
-                 [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->set_rate(rate, value); },
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->set_rate(rate, value);
+                 },
                  [](auto&&) {},
              },
              instance());
@@ -198,12 +208,13 @@ void set(const Rate& rate, uint64_t value) {
 
 void set(const Rate& rate, const std::vector<std::string>& tags,
          uint64_t value) {
-  std::visit(
-      details::Overload{
-          [&](std::shared_ptr<Telemetry>& telemetry) { telemetry->set_rate(rate, tags, value); },
-          [](auto&&) {},
-      },
-      instance());
+  std::visit(details::Overload{
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->set_rate(rate, tags, value);
+                 },
+                 [](auto&&) {},
+             },
+             instance());
 }
 }  // namespace rate
 

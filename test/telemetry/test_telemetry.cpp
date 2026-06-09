@@ -111,12 +111,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
 
   SECTION("ctor send app-started message") {
     SECTION("Without a defined integration") {
-      auto telemetry = Telemetry::create(*finalize_config(),
-                          tracer_signature,
-                          logger,
-                          client,
-                          scheduler,
-                          *url);
+      auto telemetry = Telemetry::create(*finalize_config(), tracer_signature,
+                                         logger, client, scheduler, *url);
       /// By default the integration is `datadog` with the tracer version.
       /// TODO: remove the default because these datadog are already part of the
       /// request header.
@@ -136,12 +132,9 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
       Configuration cfg;
       cfg.integration_name = "nginx";
       cfg.integration_version = "1.25.2";
-      auto telemetry2 = Telemetry::create(*finalize_config(cfg),
-                           tracer_signature,
-                           logger,
-                           client,
-                           scheduler,
-                           *url);
+      auto telemetry2 =
+          Telemetry::create(*finalize_config(cfg), tracer_signature, logger,
+                            client, scheduler, *url);
 
       auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
@@ -166,12 +159,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
       ddtest::EnvGuard install_time_env("DD_INSTRUMENTATION_INSTALL_TIME",
                                         "1703188212");
 
-      auto telemetry4 = Telemetry::create(*finalize_config(),
-                           tracer_signature,
-                           logger,
-                           client,
-                           scheduler,
-                           *url);
+      auto telemetry4 = Telemetry::create(*finalize_config(), tracer_signature,
+                                          logger, client, scheduler, *url);
 
       auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
@@ -218,12 +207,9 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
       Configuration cfg;
       cfg.products.emplace_back(std::move(product));
 
-      auto telemetry3 = Telemetry::create(*finalize_config(cfg),
-                           tracer_signature,
-                           logger,
-                           client,
-                           scheduler,
-                           *url);
+      auto telemetry3 =
+          Telemetry::create(*finalize_config(cfg), tracer_signature, logger,
+                            client, scheduler, *url);
 
       auto app_started = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(app_started) == true);
@@ -347,12 +333,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
 
   SECTION("dtor send app-closing message") {
     {
-      auto telemetry = Telemetry::create(*finalize_config(),
-                          tracer_signature,
-                          logger,
-                          client,
-                          scheduler,
-                          *url);
+      auto telemetry = Telemetry::create(*finalize_config(), tracer_signature,
+                                         logger, client, scheduler, *url);
       client->clear();
     }
 
@@ -376,8 +358,8 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
     auto session_rid = RuntimeID::generate();
     const TracerSignature tracer_signature(session_rid, "testsvc", "test");
 
-    auto telemetry = Telemetry::create(
-        *finalize_config(), tracer_signature, logger, client, scheduler, *url);
+    auto telemetry = Telemetry::create(*finalize_config(), tracer_signature,
+                                       logger, client, scheduler, *url);
 
     auto it = client->request_headers.items.find("DD-Session-ID");
     REQUIRE(it != client->request_headers.items.end());
@@ -393,8 +375,8 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
     const TracerSignature tracer_signature(session_rid, root_rid.string(),
                                            "testsvc", "test");
 
-    auto telemetry = Telemetry::create(
-        *finalize_config(), tracer_signature, logger, client, scheduler, *url);
+    auto telemetry = Telemetry::create(*finalize_config(), tracer_signature,
+                                       logger, client, scheduler, *url);
 
     auto session_it = client->request_headers.items.find("DD-Session-ID");
     REQUIRE(session_it != client->request_headers.items.end());
@@ -411,8 +393,8 @@ TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {
     const TracerSignature tracer_signature(session_rid, root_rid.string(),
                                            "testsvc", "test");
 
-    auto telemetry = Telemetry::create(
-        *finalize_config(), tracer_signature, logger, client, scheduler, *url);
+    auto telemetry = Telemetry::create(*finalize_config(), tracer_signature,
+                                       logger, client, scheduler, *url);
 
     client->clear();
     scheduler->trigger_heartbeat();
@@ -445,13 +427,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
   auto url = HTTPClient::URL::parse("http://localhost:8000");
 
-  auto telemetry = Telemetry::create(*finalize_config(),
-                      tracer_signature,
-                      logger,
-                      client,
-                      scheduler,
-                      *url,
-                      clock);
+  auto telemetry = Telemetry::create(*finalize_config(), tracer_signature,
+                                     logger, client, scheduler, *url, clock);
 
   SECTION("generates a heartbeat message") {
     client->clear();
@@ -483,12 +460,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     cfg.products.emplace_back(std::move(product));
 
     auto scheduler2 = std::make_shared<FakeEventScheduler>();
-    auto telemetry2 = Telemetry::create(*finalize_config(cfg),
-                         tracer_signature,
-                         logger,
-                         client,
-                         scheduler2,
-                         *url);
+    auto telemetry2 = Telemetry::create(*finalize_config(cfg), tracer_signature,
+                                        logger, client, scheduler2, *url);
 
     client->clear();
     scheduler2->trigger_extended_heartbeat();
@@ -528,12 +501,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     cfg.products.emplace_back(std::move(product));
 
     auto scheduler2 = std::make_shared<FakeEventScheduler>();
-    auto telemetry2 = Telemetry::create(*finalize_config(cfg),
-                         tracer_signature,
-                         logger,
-                         client,
-                         scheduler2,
-                         *url);
+    auto telemetry2 = Telemetry::create(*finalize_config(cfg), tracer_signature,
+                                        logger, client, scheduler2, *url);
 
     // Simulate a remote config update overriding SERVICE_NAME
     telemetry2->capture_configuration_change(
@@ -778,7 +747,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
       // Add a tag, this will add a new serie to the distribution payload.
       telemetry->add_datapoint(response_time, {"status:200", "method:GET"},
-                              6530);
+                               6530);
 
       Distribution request_size{"request_size", "dist-test-2", true};
       telemetry->add_datapoint(request_size, 1843);
@@ -851,13 +820,9 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       const Rate rps{"request", "rate-test", true};
       const Counter my_counter{"my_counter", "counter-test", true};
       {
-        auto tmp_telemetry = Telemetry::create(*finalize_config(),
-                                tracer_signature,
-                                logger,
-                                client,
-                                scheduler,
-                                *url,
-                                clock);
+        auto tmp_telemetry =
+            Telemetry::create(*finalize_config(), tracer_signature, logger,
+                              client, scheduler, *url, clock);
         tmp_telemetry->increment_counter(my_counter);  // = 1
         tmp_telemetry->add_datapoint(response_time, 128);
         tmp_telemetry->set_rate(rps, 1000);
@@ -1004,13 +969,9 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
     SECTION("dtor sends logs in `app-closing` message") {
       {
-        auto tmp_telemetry = Telemetry::create(*finalize_config(),
-                                tracer_signature,
-                                logger,
-                                client,
-                                scheduler,
-                                *url,
-                                clock);
+        auto tmp_telemetry =
+            Telemetry::create(*finalize_config(), tracer_signature, logger,
+                              client, scheduler, *url, clock);
         tmp_telemetry->log_warning("Be careful!");
         client->clear();
       }
@@ -1056,8 +1017,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
     auto final_cfg = finalize_config(cfg);
     REQUIRE(final_cfg);
 
-    auto telemetry = Telemetry::create(*final_cfg, tracer_signature, logger, client, scheduler,
-                        *url);
+    auto telemetry = Telemetry::create(*final_cfg, tracer_signature, logger,
+                                       client, scheduler, *url);
     CHECK(scheduler->metrics_callback == nullptr);
     CHECK(scheduler->metrics_interval == nullopt);
   }
@@ -1070,8 +1031,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
     auto final_cfg = finalize_config(cfg);
     REQUIRE(final_cfg);
 
-    auto telemetry = Telemetry::create(*final_cfg, tracer_signature, logger, client, scheduler,
-                        *url);
+    auto telemetry = Telemetry::create(*final_cfg, tracer_signature, logger,
+                                       client, scheduler, *url);
     CHECK(scheduler->metrics_callback != nullptr);
     CHECK(scheduler->metrics_interval == 500ms);
 
@@ -1088,8 +1049,8 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry configuration") {
     auto final_cfg = finalize_config(cfg);
     REQUIRE(final_cfg);
 
-    auto telemetry = Telemetry::create(*final_cfg, tracer_signature, logger, client, scheduler,
-                        *url);
+    auto telemetry = Telemetry::create(*final_cfg, tracer_signature, logger,
+                                       client, scheduler, *url);
     telemetry->log_error("error");
 
     // NOTE(@dmehala): logs are sent with an heartbeat.

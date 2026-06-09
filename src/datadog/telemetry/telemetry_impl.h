@@ -97,7 +97,6 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
             tracing::Clock clock = tracing::default_clock);
 
  public:
-
   /// Capture and report internal error message to Datadog.
   ///
   /// @param message The error message.
