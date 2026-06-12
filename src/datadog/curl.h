@@ -11,10 +11,7 @@
 #include <datadog/clock.h>
 #include <datadog/http_client.h>
 
-#include <chrono>
-#include <functional>
 #include <memory>
-#include <string>
 #include <thread>
 
 namespace datadog::tracing {

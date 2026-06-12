@@ -1,20 +1,11 @@
-#include <curl/curl.h>
 #include <datadog/curl.h>
-#include <datadog/dict_reader.h>
-#include <datadog/error.h>
-#include <datadog/optional.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
-#include <chrono>
-#include <exception>
 #include <list>
-#include <string>
-#include <system_error>
 #include <unordered_set>
 
 #include "common/environment.h"
-#include "datadog/clock.h"
 #include "mocks/loggers.h"
 #include "null_logger.h"
 #include "test.h"

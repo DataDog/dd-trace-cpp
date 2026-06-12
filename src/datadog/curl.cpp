@@ -2,19 +2,10 @@
 
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
-#include <datadog/http_client.h>
 #include <datadog/logger.h>
-#include <datadog/optional.h>
-#include <datadog/string_view.h>
 
-#include <algorithm>
-#include <cctype>
-#include <chrono>
 #include <condition_variable>
-#include <cstddef>
-#include <cstdlib>
 #include <list>
-#include <memory>
 #include <mutex>
 #include <system_error>
 #include <unordered_map>
