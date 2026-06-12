@@ -282,6 +282,7 @@ class CurlImpl {
   };
 
   void run();
+  void configure_handle(CURL *handle, Request &request, const URL &url);
   void handle_message(const CURLMsg &);
   CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
@@ -419,39 +420,7 @@ Expected<void> CurlImpl::post(
                  "unable to initialize a curl handle for request sending"};
   }
 
-  throw_on_error(
-      curl_.easy_setopt_httpheader(handle.get(), request->request_headers));
-  throw_on_error(curl_.easy_setopt_private(handle.get(), request.get()));
-  throw_on_error(
-      curl_.easy_setopt_errorbuffer(handle.get(), request->error_buffer));
-  throw_on_error(curl_.easy_setopt_post(handle.get(), 1));
-  throw_on_error(curl_.easy_setopt_postfieldsize(
-      handle.get(), static_cast<long>(request->request_body.size())));
-  throw_on_error(
-      curl_.easy_setopt_postfields(handle.get(), request->request_body.data()));
-  throw_on_error(
-      curl_.easy_setopt_headerfunction(handle.get(), &on_read_header));
-  throw_on_error(curl_.easy_setopt_headerdata(handle.get(), request.get()));
-  throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
-  throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
-
-  throw_on_error(curl_.easy_setopt_noproxy(
-      handle.get(),
-      proxy_config_.no_proxy ? proxy_config_.no_proxy->c_str() : ""));
-  const StringView proxy = resolve_proxy(url, proxy_config_);
-  throw_on_error(curl_.easy_setopt_proxy(handle.get(), proxy.data()));
-
-  if (is_unix_socket(url)) {
-    throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
-                                                      url.authority.c_str()));
-    // The authority section of the URL is ignored when a unix domain socket is
-    // to be used.
-    throw_on_error(curl_.easy_setopt_url(
-        handle.get(), ("http://localhost" + url.path).c_str()));
-  } else {
-    throw_on_error(curl_.easy_setopt_url(
-        handle.get(), (url.scheme + "://" + url.authority + url.path).c_str()));
-  }
+  configure_handle(handle.get(), *request, url);
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -466,6 +435,39 @@ Expected<void> CurlImpl::post(
   return nullopt;
 } catch (CURLcode error) {
   return Error{Error::CURL_REQUEST_SETUP_FAILED, curl_.easy_strerror(error)};
+}
+
+void CurlImpl::configure_handle(CURL *handle, Request &request,
+                                const URL &url) {
+  throw_on_error(curl_.easy_setopt_httpheader(handle, request.request_headers));
+  throw_on_error(curl_.easy_setopt_private(handle, &request));
+  throw_on_error(curl_.easy_setopt_errorbuffer(handle, request.error_buffer));
+  throw_on_error(curl_.easy_setopt_post(handle, 1));
+  throw_on_error(curl_.easy_setopt_postfieldsize(
+      handle, static_cast<long>(request.request_body.size())));
+  throw_on_error(
+      curl_.easy_setopt_postfields(handle, request.request_body.data()));
+  throw_on_error(curl_.easy_setopt_headerfunction(handle, &on_read_header));
+  throw_on_error(curl_.easy_setopt_headerdata(handle, &request));
+  throw_on_error(curl_.easy_setopt_writefunction(handle, &on_read_body));
+  throw_on_error(curl_.easy_setopt_writedata(handle, &request));
+
+  throw_on_error(curl_.easy_setopt_noproxy(
+      handle, proxy_config_.no_proxy ? proxy_config_.no_proxy->c_str() : ""));
+  const StringView proxy = resolve_proxy(url, proxy_config_);
+  throw_on_error(curl_.easy_setopt_proxy(handle, proxy.data()));
+
+  if (is_unix_socket(url)) {
+    throw_on_error(
+        curl_.easy_setopt_unix_socket_path(handle, url.authority.c_str()));
+    // The authority section of the URL is ignored when a unix domain socket is
+    // to be used.
+    throw_on_error(
+        curl_.easy_setopt_url(handle, ("http://localhost" + url.path).c_str()));
+  } else {
+    throw_on_error(curl_.easy_setopt_url(
+        handle, (url.scheme + "://" + url.authority + url.path).c_str()));
+  }
 }
 
 void CurlImpl::clear_requests() {
