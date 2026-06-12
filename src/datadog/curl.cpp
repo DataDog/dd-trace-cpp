@@ -66,6 +66,22 @@ bool is_unix_socket(const HTTPClient::URL &url) {
          url.scheme == "https+unix";
 }
 
+StringView resolve_proxy(const HTTPClient::URL &url,
+                         const ProxyConfiguration &config) {
+  if (is_unix_socket(url)) {
+    return "";
+  }
+  const Optional<std::string> &scheme_proxy =
+      url.scheme == "https" ? config.https_proxy : config.http_proxy;
+  if (scheme_proxy) {
+    return *scheme_proxy;
+  }
+  if (config.all_proxy) {
+    return *config.all_proxy;
+  }
+  return "";
+}
+
 void throw_on_error(CURLcode result) {
   if (result != CURLE_OK) {
     throw result;
@@ -422,20 +438,8 @@ Expected<void> CurlImpl::post(
   throw_on_error(curl_.easy_setopt_noproxy(
       handle.get(),
       proxy_config_.no_proxy ? proxy_config_.no_proxy->c_str() : ""));
-
-  const std::string *proxy = nullptr;
-  if (!is_unix_socket(url)) {
-    const Optional<std::string> &scheme_proxy = url.scheme == "https"
-                                                    ? proxy_config_.https_proxy
-                                                    : proxy_config_.http_proxy;
-    if (scheme_proxy) {
-      proxy = &*scheme_proxy;
-    } else if (proxy_config_.all_proxy) {
-      proxy = &*proxy_config_.all_proxy;
-    }
-  }
-  throw_on_error(
-      curl_.easy_setopt_proxy(handle.get(), proxy ? proxy->c_str() : ""));
+  const StringView proxy = resolve_proxy(url, proxy_config_);
+  throw_on_error(curl_.easy_setopt_proxy(handle.get(), proxy.data()));
 
   if (is_unix_socket(url)) {
     throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
