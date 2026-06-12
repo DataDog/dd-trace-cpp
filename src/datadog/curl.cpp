@@ -61,6 +61,11 @@ ProxyConfiguration load_proxy_configuration() {
   return config;
 }
 
+bool is_unix_socket(const HTTPClient::URL &url) {
+  return url.scheme == "unix" || url.scheme == "http+unix" ||
+         url.scheme == "https+unix";
+}
+
 void throw_on_error(CURLcode result) {
   if (result != CURLE_OK) {
     throw result;
@@ -414,16 +419,12 @@ Expected<void> CurlImpl::post(
   throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
   throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
 
-  const bool is_unix_socket = url.scheme == "unix" ||
-                              url.scheme == "http+unix" ||
-                              url.scheme == "https+unix";
-
   throw_on_error(curl_.easy_setopt_noproxy(
       handle.get(),
       proxy_config_.no_proxy ? proxy_config_.no_proxy->c_str() : ""));
 
   const std::string *proxy = nullptr;
-  if (!is_unix_socket) {
+  if (!is_unix_socket(url)) {
     const Optional<std::string> &scheme_proxy = url.scheme == "https"
                                                     ? proxy_config_.https_proxy
                                                     : proxy_config_.http_proxy;
@@ -436,7 +437,7 @@ Expected<void> CurlImpl::post(
   throw_on_error(
       curl_.easy_setopt_proxy(handle.get(), proxy ? proxy->c_str() : ""));
 
-  if (is_unix_socket) {
+  if (is_unix_socket(url)) {
     throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
                                                       url.authority.c_str()));
     // The authority section of the URL is ignored when a unix domain socket is
