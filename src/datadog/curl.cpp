@@ -4,6 +4,7 @@
 #include <datadog/dict_writer.h>
 #include <datadog/http_client.h>
 #include <datadog/logger.h>
+#include <datadog/optional.h>
 #include <datadog/string_view.h>
 
 #include <algorithm>
@@ -11,6 +12,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <cstdlib>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -61,6 +63,10 @@ CURLcode CurlLibrary::easy_setopt_httpheader(CURL *handle,
   return curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
 }
 
+CURLcode CurlLibrary::easy_setopt_noproxy(CURL *handle, const char *no_proxy) {
+  return curl_easy_setopt(handle, CURLOPT_NOPROXY, no_proxy);
+}
+
 CURLcode CurlLibrary::easy_setopt_post(CURL *handle, long post) {
   return curl_easy_setopt(handle, CURLOPT_POST, post);
 }
@@ -75,6 +81,10 @@ CURLcode CurlLibrary::easy_setopt_postfieldsize(CURL *handle, long size) {
 
 CURLcode CurlLibrary::easy_setopt_private(CURL *handle, void *pointer) {
   return curl_easy_setopt(handle, CURLOPT_PRIVATE, pointer);
+}
+
+CURLcode CurlLibrary::easy_setopt_proxy(CURL *handle, const char *proxy) {
+  return curl_easy_setopt(handle, CURLOPT_PROXY, proxy);
 }
 
 CURLcode CurlLibrary::easy_setopt_unix_socket_path(CURL *handle,
@@ -162,6 +172,49 @@ using HeadersSetter = HTTPClient::HeadersSetter;
 using ResponseHandler = HTTPClient::ResponseHandler;
 using URL = HTTPClient::URL;
 
+struct ProxyConfiguration {
+  Optional<std::string> all_proxy;
+  Optional<std::string> http_proxy;
+  Optional<std::string> https_proxy;
+  Optional<std::string> no_proxy;
+};
+
+namespace {
+
+Optional<std::string> environment_variable(const char *name) {
+  const char *const value = std::getenv(name);
+  if (value == nullptr || *value == '\0') {
+    return nullopt;
+  }
+  return std::string{value};
+}
+
+ProxyConfiguration load_proxy_configuration() {
+  ProxyConfiguration config;
+
+  config.all_proxy = environment_variable("all_proxy");
+  if (!config.all_proxy) {
+    config.all_proxy = environment_variable("ALL_PROXY");
+  }
+
+  // Only the lowercase form for http, to avoid httpoxy (CVE-2016-5385).
+  config.http_proxy = environment_variable("http_proxy");
+
+  config.https_proxy = environment_variable("https_proxy");
+  if (!config.https_proxy) {
+    config.https_proxy = environment_variable("HTTPS_PROXY");
+  }
+
+  config.no_proxy = environment_variable("no_proxy");
+  if (!config.no_proxy) {
+    config.no_proxy = environment_variable("NO_PROXY");
+  }
+
+  return config;
+}
+
+}  // namespace
+
 class CurlImpl {
   std::mutex mutex_;
   CurlLibrary &curl_;
@@ -172,6 +225,7 @@ class CurlImpl {
   std::list<CURL *> new_handles_;
   bool shutting_down_;
   int num_active_handles_;
+  const ProxyConfiguration proxy_config_;
   std::condition_variable no_requests_;
   std::thread event_loop_;
 
@@ -283,7 +337,8 @@ CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger, const Clock &clock,
       logger_(logger),
       clock_(clock),
       shutting_down_(false),
-      num_active_handles_(0) {
+      num_active_handles_(0),
+      proxy_config_(load_proxy_configuration()) {
   curl_.global_init(CURL_GLOBAL_ALL);
   multi_handle_ = curl_.multi_init();
   if (multi_handle_ == nullptr) {
@@ -375,8 +430,30 @@ Expected<void> CurlImpl::post(
   throw_on_error(curl_.easy_setopt_headerdata(handle.get(), request.get()));
   throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
   throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
-  if (url.scheme == "unix" || url.scheme == "http+unix" ||
-      url.scheme == "https+unix") {
+
+  const bool is_unix_socket = url.scheme == "unix" ||
+                              url.scheme == "http+unix" ||
+                              url.scheme == "https+unix";
+
+  throw_on_error(curl_.easy_setopt_noproxy(
+      handle.get(),
+      proxy_config_.no_proxy ? proxy_config_.no_proxy->c_str() : ""));
+
+  const std::string *proxy = nullptr;
+  if (!is_unix_socket) {
+    const Optional<std::string> &scheme_proxy = url.scheme == "https"
+                                                    ? proxy_config_.https_proxy
+                                                    : proxy_config_.http_proxy;
+    if (scheme_proxy) {
+      proxy = &*scheme_proxy;
+    } else if (proxy_config_.all_proxy) {
+      proxy = &*proxy_config_.all_proxy;
+    }
+  }
+  throw_on_error(
+      curl_.easy_setopt_proxy(handle.get(), proxy ? proxy->c_str() : ""));
+
+  if (is_unix_socket) {
     throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
                                                       url.authority.c_str()));
     // The authority section of the URL is ignored when a unix domain socket is
