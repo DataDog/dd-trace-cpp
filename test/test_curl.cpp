@@ -551,11 +551,13 @@ CURL_TEST("proxy is taken from the environment and forwarded to libcurl") {
     REQUIRE(library.no_proxy_ == "agent,localhost");
   }
 
+#ifndef _WIN32  // Windows environment variable names are case-insensitive
   SECTION("uppercase HTTP_PROXY is ignored (httpoxy)") {
     EnvGuard env{"HTTP_PROXY", "http://attacker:8080"};
     post_to("http");
     REQUIRE(library.proxy_ == "");
   }
+#endif
 
   SECTION("absent proxy environment yields empty options") {
     post_to("http");
