@@ -14,13 +14,58 @@
 #include "json.hpp"
 #include "string_util.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
+
 namespace {
 
 // `libcurl` is the default implementation: it calls `curl_*` functions under
 // the hood.
 CurlLibrary libcurl;
+
+struct ProxyConfiguration {
+  Optional<std::string> all_proxy;
+  Optional<std::string> http_proxy;
+  Optional<std::string> https_proxy;
+  Optional<std::string> no_proxy;
+};
+
+Optional<std::string> environment_variable(const char *name) {
+  const char *const value = std::getenv(name);
+  if (value == nullptr || *value == '\0') {
+    return nullopt;
+  }
+  return std::string{value};
+}
+
+ProxyConfiguration load_proxy_configuration() {
+  ProxyConfiguration config;
+
+  config.all_proxy = environment_variable("all_proxy");
+  if (!config.all_proxy) {
+    config.all_proxy = environment_variable("ALL_PROXY");
+  }
+
+  // Only the lowercase form for http, to avoid httpoxy (CVE-2016-5385).
+  config.http_proxy = environment_variable("http_proxy");
+
+  config.https_proxy = environment_variable("https_proxy");
+  if (!config.https_proxy) {
+    config.https_proxy = environment_variable("HTTPS_PROXY");
+  }
+
+  config.no_proxy = environment_variable("no_proxy");
+  if (!config.no_proxy) {
+    config.no_proxy = environment_variable("NO_PROXY");
+  }
+
+  return config;
+}
+
+void throw_on_error(CURLcode result) {
+  if (result != CURLE_OK) {
+    throw result;
+  }
+}
 
 }  // namespace
 
@@ -163,49 +208,6 @@ using HeadersSetter = HTTPClient::HeadersSetter;
 using ResponseHandler = HTTPClient::ResponseHandler;
 using URL = HTTPClient::URL;
 
-struct ProxyConfiguration {
-  Optional<std::string> all_proxy;
-  Optional<std::string> http_proxy;
-  Optional<std::string> https_proxy;
-  Optional<std::string> no_proxy;
-};
-
-namespace {
-
-Optional<std::string> environment_variable(const char *name) {
-  const char *const value = std::getenv(name);
-  if (value == nullptr || *value == '\0') {
-    return nullopt;
-  }
-  return std::string{value};
-}
-
-ProxyConfiguration load_proxy_configuration() {
-  ProxyConfiguration config;
-
-  config.all_proxy = environment_variable("all_proxy");
-  if (!config.all_proxy) {
-    config.all_proxy = environment_variable("ALL_PROXY");
-  }
-
-  // Only the lowercase form for http, to avoid httpoxy (CVE-2016-5385).
-  config.http_proxy = environment_variable("http_proxy");
-
-  config.https_proxy = environment_variable("https_proxy");
-  if (!config.https_proxy) {
-    config.https_proxy = environment_variable("HTTPS_PROXY");
-  }
-
-  config.no_proxy = environment_variable("no_proxy");
-  if (!config.no_proxy) {
-    config.no_proxy = environment_variable("NO_PROXY");
-  }
-
-  return config;
-}
-
-}  // namespace
-
 class CurlImpl {
   std::mutex mutex_;
   CurlLibrary &curl_;
@@ -282,16 +284,6 @@ class CurlImpl {
 
   void clear_requests();
 };
-
-namespace {
-
-void throw_on_error(CURLcode result) {
-  if (result != CURLE_OK) {
-    throw result;
-  }
-}
-
-}  // namespace
 
 Curl::Curl(const std::shared_ptr<Logger> &logger, const Clock &clock)
     : Curl(logger, clock, libcurl) {}
@@ -718,5 +710,4 @@ void CurlImpl::HeaderReader::visit(
   }
 }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
