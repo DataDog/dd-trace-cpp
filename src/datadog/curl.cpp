@@ -2,17 +2,10 @@
 
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
-#include <datadog/http_client.h>
 #include <datadog/logger.h>
-#include <datadog/string_view.h>
 
-#include <algorithm>
-#include <cctype>
-#include <chrono>
 #include <condition_variable>
-#include <cstddef>
 #include <list>
-#include <memory>
 #include <mutex>
 #include <system_error>
 #include <unordered_map>
@@ -21,13 +14,79 @@
 #include "json.hpp"
 #include "string_util.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
+
 namespace {
 
 // `libcurl` is the default implementation: it calls `curl_*` functions under
 // the hood.
 CurlLibrary libcurl;
+
+struct ProxyConfiguration {
+  Optional<std::string> all_proxy;
+  Optional<std::string> http_proxy;
+  Optional<std::string> https_proxy;
+  Optional<std::string> no_proxy;
+};
+
+Optional<std::string> environment_variable(const char *name) {
+  const char *const value = std::getenv(name);
+  if (value == nullptr || *value == '\0') {
+    return nullopt;
+  }
+  return std::string{value};
+}
+
+ProxyConfiguration load_proxy_configuration() {
+  ProxyConfiguration config;
+
+  config.all_proxy = environment_variable("all_proxy");
+  if (!config.all_proxy) {
+    config.all_proxy = environment_variable("ALL_PROXY");
+  }
+
+  // Only the lowercase form for http, to avoid httpoxy (CVE-2016-5385).
+  config.http_proxy = environment_variable("http_proxy");
+
+  config.https_proxy = environment_variable("https_proxy");
+  if (!config.https_proxy) {
+    config.https_proxy = environment_variable("HTTPS_PROXY");
+  }
+
+  config.no_proxy = environment_variable("no_proxy");
+  if (!config.no_proxy) {
+    config.no_proxy = environment_variable("NO_PROXY");
+  }
+
+  return config;
+}
+
+bool is_unix_socket(const HTTPClient::URL &url) {
+  return url.scheme == "unix" || url.scheme == "http+unix" ||
+         url.scheme == "https+unix";
+}
+
+StringView resolve_proxy(const HTTPClient::URL &url,
+                         const ProxyConfiguration &config) {
+  if (is_unix_socket(url)) {
+    return "";
+  }
+  const Optional<std::string> &scheme_proxy =
+      url.scheme == "https" ? config.https_proxy : config.http_proxy;
+  if (scheme_proxy) {
+    return *scheme_proxy;
+  }
+  if (config.all_proxy) {
+    return *config.all_proxy;
+  }
+  return "";
+}
+
+void throw_on_error(CURLcode result) {
+  if (result != CURLE_OK) {
+    throw result;
+  }
+}
 
 }  // namespace
 
@@ -61,6 +120,10 @@ CURLcode CurlLibrary::easy_setopt_httpheader(CURL *handle,
   return curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
 }
 
+CURLcode CurlLibrary::easy_setopt_noproxy(CURL *handle, const char *no_proxy) {
+  return curl_easy_setopt(handle, CURLOPT_NOPROXY, no_proxy);
+}
+
 CURLcode CurlLibrary::easy_setopt_post(CURL *handle, long post) {
   return curl_easy_setopt(handle, CURLOPT_POST, post);
 }
@@ -75,6 +138,10 @@ CURLcode CurlLibrary::easy_setopt_postfieldsize(CURL *handle, long size) {
 
 CURLcode CurlLibrary::easy_setopt_private(CURL *handle, void *pointer) {
   return curl_easy_setopt(handle, CURLOPT_PRIVATE, pointer);
+}
+
+CURLcode CurlLibrary::easy_setopt_proxy(CURL *handle, const char *proxy) {
+  return curl_easy_setopt(handle, CURLOPT_PROXY, proxy);
 }
 
 CURLcode CurlLibrary::easy_setopt_unix_socket_path(CURL *handle,
@@ -172,6 +239,7 @@ class CurlImpl {
   std::list<CURL *> new_handles_;
   bool shutting_down_;
   int num_active_handles_;
+  const ProxyConfiguration proxy_config_;
   std::condition_variable no_requests_;
   std::thread event_loop_;
 
@@ -214,6 +282,7 @@ class CurlImpl {
   };
 
   void run();
+  void configure_handle(CURL *handle, Request &request, const URL &url);
   void handle_message(const CURLMsg &);
   CURLcode log_on_error(CURLcode result);
   CURLMcode log_on_error(CURLMcode result);
@@ -237,16 +306,6 @@ class CurlImpl {
 
   void clear_requests();
 };
-
-namespace {
-
-void throw_on_error(CURLcode result) {
-  if (result != CURLE_OK) {
-    throw result;
-  }
-}
-
-}  // namespace
 
 Curl::Curl(const std::shared_ptr<Logger> &logger, const Clock &clock)
     : Curl(logger, clock, libcurl) {}
@@ -283,7 +342,8 @@ CurlImpl::CurlImpl(const std::shared_ptr<Logger> &logger, const Clock &clock,
       logger_(logger),
       clock_(clock),
       shutting_down_(false),
-      num_active_handles_(0) {
+      num_active_handles_(0),
+      proxy_config_(load_proxy_configuration()) {
   curl_.global_init(CURL_GLOBAL_ALL);
   multi_handle_ = curl_.multi_init();
   if (multi_handle_ == nullptr) {
@@ -360,33 +420,7 @@ Expected<void> CurlImpl::post(
                  "unable to initialize a curl handle for request sending"};
   }
 
-  throw_on_error(
-      curl_.easy_setopt_httpheader(handle.get(), request->request_headers));
-  throw_on_error(curl_.easy_setopt_private(handle.get(), request.get()));
-  throw_on_error(
-      curl_.easy_setopt_errorbuffer(handle.get(), request->error_buffer));
-  throw_on_error(curl_.easy_setopt_post(handle.get(), 1));
-  throw_on_error(curl_.easy_setopt_postfieldsize(
-      handle.get(), static_cast<long>(request->request_body.size())));
-  throw_on_error(
-      curl_.easy_setopt_postfields(handle.get(), request->request_body.data()));
-  throw_on_error(
-      curl_.easy_setopt_headerfunction(handle.get(), &on_read_header));
-  throw_on_error(curl_.easy_setopt_headerdata(handle.get(), request.get()));
-  throw_on_error(curl_.easy_setopt_writefunction(handle.get(), &on_read_body));
-  throw_on_error(curl_.easy_setopt_writedata(handle.get(), request.get()));
-  if (url.scheme == "unix" || url.scheme == "http+unix" ||
-      url.scheme == "https+unix") {
-    throw_on_error(curl_.easy_setopt_unix_socket_path(handle.get(),
-                                                      url.authority.c_str()));
-    // The authority section of the URL is ignored when a unix domain socket is
-    // to be used.
-    throw_on_error(curl_.easy_setopt_url(
-        handle.get(), ("http://localhost" + url.path).c_str()));
-  } else {
-    throw_on_error(curl_.easy_setopt_url(
-        handle.get(), (url.scheme + "://" + url.authority + url.path).c_str()));
-  }
+  configure_handle(handle.get(), *request, url);
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -401,6 +435,39 @@ Expected<void> CurlImpl::post(
   return nullopt;
 } catch (CURLcode error) {
   return Error{Error::CURL_REQUEST_SETUP_FAILED, curl_.easy_strerror(error)};
+}
+
+void CurlImpl::configure_handle(CURL *handle, Request &request,
+                                const URL &url) {
+  throw_on_error(curl_.easy_setopt_httpheader(handle, request.request_headers));
+  throw_on_error(curl_.easy_setopt_private(handle, &request));
+  throw_on_error(curl_.easy_setopt_errorbuffer(handle, request.error_buffer));
+  throw_on_error(curl_.easy_setopt_post(handle, 1));
+  throw_on_error(curl_.easy_setopt_postfieldsize(
+      handle, static_cast<long>(request.request_body.size())));
+  throw_on_error(
+      curl_.easy_setopt_postfields(handle, request.request_body.data()));
+  throw_on_error(curl_.easy_setopt_headerfunction(handle, &on_read_header));
+  throw_on_error(curl_.easy_setopt_headerdata(handle, &request));
+  throw_on_error(curl_.easy_setopt_writefunction(handle, &on_read_body));
+  throw_on_error(curl_.easy_setopt_writedata(handle, &request));
+
+  throw_on_error(curl_.easy_setopt_noproxy(
+      handle, proxy_config_.no_proxy ? proxy_config_.no_proxy->c_str() : ""));
+  const StringView proxy = resolve_proxy(url, proxy_config_);
+  throw_on_error(curl_.easy_setopt_proxy(handle, proxy.data()));
+
+  if (is_unix_socket(url)) {
+    throw_on_error(
+        curl_.easy_setopt_unix_socket_path(handle, url.authority.c_str()));
+    // The authority section of the URL is ignored when a unix domain socket is
+    // to be used.
+    throw_on_error(
+        curl_.easy_setopt_url(handle, ("http://localhost" + url.path).c_str()));
+  } else {
+    throw_on_error(curl_.easy_setopt_url(
+        handle, (url.scheme + "://" + url.authority + url.path).c_str()));
+  }
 }
 
 void CurlImpl::clear_requests() {
@@ -650,5 +717,4 @@ void CurlImpl::HeaderReader::visit(
   }
 }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
