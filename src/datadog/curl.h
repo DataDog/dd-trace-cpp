@@ -1,26 +1,20 @@
 #pragma once
 
 // This component provides a `class`, `Curl`, that implements the `HTTPClient`
-// interface in terms of [libcurl][1].  `class Curl` manages a thread that is
-// used as the event loop for libcurl.
+// interface in terms of [libcurl](https://curl.se/libcurl)].  `class Curl`
+// manages a thread that is used as the event loop for libcurl.
 //
 // If this library was built in a mode that does not include libcurl, then this
 // file and its implementation, `curl.cpp`, will not be included.
-//
-// [1]: https://curl.se/libcurl/
 
 #include <curl/curl.h>
 #include <datadog/clock.h>
 #include <datadog/http_client.h>
 
-#include <chrono>
-#include <functional>
 #include <memory>
-#include <string>
 #include <thread>
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 // `class CurlLibrary` has one member function for every libcurl function used
 // in the implementation of this component.
@@ -50,10 +44,12 @@ class CurlLibrary {
   virtual CURLcode easy_setopt_headerdata(CURL *handle, void *data);
   virtual CURLcode easy_setopt_headerfunction(CURL *handle, HeaderCallback);
   virtual CURLcode easy_setopt_httpheader(CURL *handle, curl_slist *headers);
+  virtual CURLcode easy_setopt_noproxy(CURL *handle, const char *no_proxy);
   virtual CURLcode easy_setopt_post(CURL *handle, long post);
   virtual CURLcode easy_setopt_postfields(CURL *handle, const char *data);
   virtual CURLcode easy_setopt_postfieldsize(CURL *handle, long size);
   virtual CURLcode easy_setopt_private(CURL *handle, void *pointer);
+  virtual CURLcode easy_setopt_proxy(CURL *handle, const char *proxy);
   virtual CURLcode easy_setopt_unix_socket_path(CURL *handle, const char *path);
   virtual CURLcode easy_setopt_url(CURL *handle, const char *url);
   virtual CURLcode easy_setopt_writedata(CURL *handle, void *data);
@@ -104,5 +100,4 @@ class Curl : public HTTPClient {
   std::string config() const override;
 };
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing

@@ -1,17 +1,11 @@
-#include <curl/curl.h>
 #include <datadog/curl.h>
-#include <datadog/dict_reader.h>
-#include <datadog/error.h>
-#include <datadog/optional.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
-#include <chrono>
-#include <exception>
-#include <system_error>
+#include <list>
 #include <unordered_set>
 
-#include "datadog/clock.h"
+#include "common/environment.h"
 #include "mocks/loggers.h"
 #include "null_logger.h"
 #include "test.h"
@@ -494,4 +488,86 @@ CURL_TEST("post() deadline exceeded before request start") {
   REQUIRE(error_delivered);
   REQUIRE(error_delivered->code ==
           Error::CURL_DEADLINE_EXCEEDED_BEFORE_REQUEST_START);
+}
+
+CURL_TEST("proxy is taken from the environment and forwarded to libcurl") {
+  using datadog::test::EnvGuard;
+
+  class ProxyCapturingCurlLibrary : public SingleRequestMockCurlLibrary {
+   public:
+    Optional<std::string> proxy_;
+    Optional<std::string> no_proxy_;
+
+    CURLcode easy_setopt_proxy(CURL *, const char *proxy) override {
+      proxy_ = proxy;
+      return CURLE_OK;
+    }
+    CURLcode easy_setopt_noproxy(CURL *, const char *no_proxy) override {
+      no_proxy_ = no_proxy;
+      return CURLE_OK;
+    }
+  };
+
+  std::list<EnvGuard> cleared;
+  for (const char *name :
+       {"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY", "all_proxy",
+        "ALL_PROXY", "no_proxy", "NO_PROXY"}) {
+    cleared.emplace_back(name, "");
+  }
+
+  const auto clock = default_clock;
+  const auto logger = std::make_shared<NullLogger>();
+  ProxyCapturingCurlLibrary library;
+
+  const auto post_to = [&](const std::string &scheme) {
+    Curl client{logger, clock, library};
+    const HTTPClient::URL url{scheme, "agent:8126", "/", ""};
+    REQUIRE(
+        client.post(url, ignore, "body", ignore, ignore, clock().tick + 10s));
+    client.drain(clock().tick + 1s);
+  };
+
+  SECTION("http scheme uses http_proxy") {
+    EnvGuard env{"http_proxy", "http://proxy:8080"};
+    post_to("http");
+    REQUIRE(library.proxy_ == "http://proxy:8080");
+  }
+
+  SECTION("https scheme uses https_proxy") {
+    EnvGuard env{"https_proxy", "http://secure:8080"};
+    post_to("https");
+    REQUIRE(library.proxy_ == "http://secure:8080");
+  }
+
+  SECTION("scheme-specific proxy falls back to all_proxy") {
+    EnvGuard env{"all_proxy", "http://any:8080"};
+    post_to("http");
+    REQUIRE(library.proxy_ == "http://any:8080");
+  }
+
+  SECTION("no_proxy is forwarded") {
+    EnvGuard env{"no_proxy", "agent,localhost"};
+    post_to("http");
+    REQUIRE(library.no_proxy_ == "agent,localhost");
+  }
+
+#ifndef _WIN32  // Windows environment variable names are case-insensitive
+  SECTION("uppercase HTTP_PROXY is ignored (httpoxy)") {
+    EnvGuard env{"HTTP_PROXY", "http://attacker:8080"};
+    post_to("http");
+    REQUIRE(library.proxy_ == "");
+  }
+#endif
+
+  SECTION("absent proxy environment yields empty options") {
+    post_to("http");
+    REQUIRE(library.proxy_ == "");
+    REQUIRE(library.no_proxy_ == "");
+  }
+
+  SECTION("unix sockets are never proxied") {
+    EnvGuard env{"http_proxy", "http://proxy:8080"};
+    post_to("unix");
+    REQUIRE(library.proxy_ == "");
+  }
 }
