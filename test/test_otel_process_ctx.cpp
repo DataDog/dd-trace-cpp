@@ -1,12 +1,4 @@
-#include <datadog/runtime_id.h>
 #include <datadog/tracer.h>
-#include <datadog/tracer_config.h>
-#include <datadog/version.h>
-
-#include <filesystem>
-#include <map>
-#include <string>
-#include <unordered_map>
 
 #include "mocks/collectors.h"
 #include "mocks/loggers.h"
