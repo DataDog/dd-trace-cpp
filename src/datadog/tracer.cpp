@@ -220,7 +220,7 @@ void Tracer::store_config(
   otel_data.service_version = service_version.c_str();
   otel_data.telemetry_sdk_language = tracer_language.c_str();
   otel_data.telemetry_sdk_version = tracer_version_value.c_str();
-  otel_data.telemetry_sdk_name = "dd-trace-cpp";
+  otel_data.telemetry_sdk_name = tracer_library_name;
   otel_data.resource_attributes = resource_attrs;
   otel_data.extra_attributes = extra_attrs;
   otel_data.thread_ctx_config = nullptr;
