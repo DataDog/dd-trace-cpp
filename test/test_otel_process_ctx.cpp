@@ -4,7 +4,6 @@
 #include "mocks/loggers.h"
 #include "otel_process_ctx.h"
 #include "platform_util.h"
-#include "string_util.h"
 #include "test.h"
 
 namespace fs = std::filesystem;
@@ -23,6 +22,16 @@ std::map<std::string, std::string> to_map(const char** kv) {
   return out;
 }
 
+std::map<std::string, std::string> parse_joined_tags(const std::string& s) {
+  std::map<std::string, std::string> out;
+  std::istringstream in(s);
+  for (std::string pair; std::getline(in, pair, ',');) {
+    const auto colon = pair.find(':');
+    out.emplace(pair.substr(0, colon), pair.substr(colon + 1));
+  }
+  return out;
+}
+
 }  // namespace
 
 OTEL_CTX_TEST("Tracer construction publishes OTel process context") {
@@ -35,7 +44,7 @@ OTEL_CTX_TEST("Tracer construction publishes OTel process context") {
   }
   const RuntimeID expected_runtime_id = RuntimeID::generate();
 
-  std::unordered_map<std::string, std::string> expected_process_tags = {
+  std::map<std::string, std::string> expected_process_tags = {
       {"custom.tag", "custom-value"},
   };
   expected_process_tags.emplace("entrypoint.name", get_process_name());
@@ -82,10 +91,11 @@ OTEL_CTX_TEST("Tracer construction publishes OTel process context") {
     };
     CHECK(to_map(data.resource_attributes) == expected_resource);
 
-    const std::map<std::string, std::string> expected_extra = {
-        {"datadog.process_tags", join_tags(expected_process_tags)},
-    };
-    CHECK(to_map(data.extra_attributes) == expected_extra);
+    const auto extra = to_map(data.extra_attributes);
+    REQUIRE(extra.size() == 1);
+    REQUIRE(extra.count("datadog.process_tags") == 1);
+    CHECK(parse_joined_tags(extra.at("datadog.process_tags")) ==
+          expected_process_tags);
 
     REQUIRE(otel_process_ctx_read_drop(&read_result));
   }
