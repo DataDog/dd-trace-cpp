@@ -164,13 +164,13 @@ void Tracer::store_config(
   metadata_file_ = std::make_unique<InMemoryFile>(std::move(*maybe_file));
 
   const auto defaults = config_manager_->span_defaults();
-  const std::string runtime_id_string = runtime_id_.string();
-  const std::string tracer_version_value = signature_.library_version;
+  const std::string& runtime_id_string = runtime_id_.string();
+  const std::string& tracer_version_value = signature_.library_version;
   const std::string tracer_language(signature_.library_language);
   const std::string hostname_value = hostname_.value_or("");
-  const std::string service_name = defaults->service;
-  const std::string service_env = defaults->environment;
-  const std::string service_version = defaults->version;
+  const std::string& service_name = defaults->service;
+  const std::string& service_env = defaults->environment;
+  const std::string& service_version = defaults->version;
   const std::string process_tags_joined = join_tags(process_tags);
   std::string container_id;
   if (auto maybe_container_id = container::get_id()) {
