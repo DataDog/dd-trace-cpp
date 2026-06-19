@@ -33,6 +33,7 @@ class TraceSampler;
 class SpanSampler;
 class IDGenerator;
 class InMemoryFile;
+class OtelCtxGuard;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
@@ -51,6 +52,8 @@ class Tracer {
   // read to determine if the process is instrumented with a tracer and to
   // retrieve relevant tracing information.
   std::shared_ptr<InMemoryFile> metadata_file_;
+  // Owns the published OpenTelemetry process context, if any.
+  std::unique_ptr<OtelCtxGuard> otel_guard_;
   Baggage::Options baggage_opts_;
   bool baggage_injection_enabled_;
   bool baggage_extraction_enabled_;
@@ -65,8 +68,15 @@ class Tracer {
   Tracer(const FinalizedTracerConfig& config,
          const std::shared_ptr<const IDGenerator>& generator);
 
-  // Drop all state, including process discovery and process context.
   ~Tracer();
+
+  // Move-only. The otel context guarded by OtelCtxGuard is a process-wide
+  // singleton; duplicating ownership would lead to spurious drops, so copies
+  // are disallowed.
+  Tracer(Tracer&&) noexcept;
+  Tracer& operator=(Tracer&&) noexcept;
+  Tracer(const Tracer&) = delete;
+  Tracer& operator=(const Tracer&) = delete;
 
   // Create a new trace and return the root span of the trace.  Optionally
   // specify a `config` indicating the attributes of the root span.
