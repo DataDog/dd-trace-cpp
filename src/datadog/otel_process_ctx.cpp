@@ -827,7 +827,7 @@ static otel_process_ctx_result otel_process_ctx_encode_protobuf_payload(char **o
            data_out->telemetry_sdk_name != NULL;
   }
 
-  void otel_process_ctx_read_data_drop(otel_process_ctx_data data) {
+  static void otel_process_ctx_read_data_drop(otel_process_ctx_data data) {
     if (data.deployment_environment_name) free((void *)data.deployment_environment_name);
     if (data.service_instance_id) free((void *)data.service_instance_id);
     if (data.service_name) free((void *)data.service_name);
