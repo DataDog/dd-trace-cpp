@@ -22,7 +22,7 @@
 #include "hex.h"
 #include "json.hpp"
 #include "msgpack.h"
-#include "otel_process_ctx.h"
+#include "otel_process_ctx_guard.h"
 #include "platform_util.h"
 #include "random.h"
 #include "root_session_id.h"
@@ -121,7 +121,9 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   store_config(process_tags);
 }
 
-Tracer::~Tracer() { otel_process_ctx_drop_current(); }
+Tracer::~Tracer() = default;
+Tracer::Tracer(Tracer&&) noexcept = default;
+Tracer& Tracer::operator=(Tracer&&) noexcept = default;
 
 std::string Tracer::config() const {
   // clang-format off
@@ -231,13 +233,7 @@ void Tracer::store_config(
   otel_data.extra_attributes = extra_attrs;
   otel_data.thread_ctx_config = nullptr;
 
-  const auto otel_result = otel_process_ctx_publish(&otel_data);
-  if (!otel_result.success) {
-    logger_->log_error([&](std::ostream& log) {
-      log << "Failed to publish OpenTelemetry process context: "
-          << otel_result.error_message;
-    });
-  }
+  otel_guard_ = publish_otel_process_ctx(otel_data, *logger_);
 #endif
 }
 
