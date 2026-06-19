@@ -203,10 +203,16 @@ void Tracer::store_config(
 
 #ifdef __linux__
   // Publish the same metadata as an OpenTelemetry process context.
-  const char* resource_attrs[] = {
+
+  // Make sure to leave host.name first...
+  const char* all_resource_attrs[] = {
       "host.name", hostname_value.c_str(), "container.id", container_id.c_str(),
       nullptr,
   };
+  // ...so that we can omit it when it's not available.
+  const char** resource_attrs =
+      hostname_ ? all_resource_attrs : all_resource_attrs + 2;
+
   const char* extra_attrs[] = {
       "datadog.process_tags",
       process_tags_joined.c_str(),
