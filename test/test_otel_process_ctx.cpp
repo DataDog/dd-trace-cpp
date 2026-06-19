@@ -107,3 +107,30 @@ OTEL_CTX_TEST("Tracer construction publishes OTel process context") {
   }
 #endif
 }
+
+OTEL_CTX_TEST("host.name is omitted when report_hostname is false") {
+#ifndef __linux__
+  SUCCEED("OpenTelemetry process context is Linux-only");
+#else
+  TracerConfig config;
+  config.service = "otel-ctx-svc";
+  config.report_hostname = false;
+  config.collector = std::make_shared<MockCollector>();
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+
+  Tracer tracer{*finalized};
+  auto read_result = otel_process_ctx_read();
+  REQUIRE(read_result.success);
+
+  // Sanity check that context is not empty
+  CHECK(std::string(read_result.data.service_name) == "otel-ctx-svc");
+
+  const auto resource = to_map(read_result.data.resource_attributes);
+  CHECK(resource.count("host.name") == 0);
+
+  REQUIRE(otel_process_ctx_read_drop(&read_result));
+#endif
+}
