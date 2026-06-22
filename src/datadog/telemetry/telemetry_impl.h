@@ -9,6 +9,7 @@
 #include <datadog/telemetry/metrics.h>
 #include <datadog/tracer_signature.h>
 
+#include <memory>
 #include <mutex>
 
 #include "json.hpp"
@@ -28,7 +29,7 @@ using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
 /// indeed a bottleneck, I'll embrace KISS principle. However, in a future
 /// iteration we could use multiple producer single consumer queue or
 /// lock-free queue.
-class Telemetry final {
+class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   /// Configuration object containing the validated settings for telemetry
   FinalizedConfiguration config_;
   /// Shared pointer to the user logger instance.
@@ -72,12 +73,21 @@ class Telemetry final {
 
   tracing::HostInfo host_info_;
 
+  std::mutex http_client_mutex_;
+
  public:
-  /// Constructor for the Telemetry class
-  ///
-  /// @param configuration The finalized configuration settings.
-  /// @param logger User logger instance.
-  /// @param metrics A vector user metrics to report.
+  static std::shared_ptr<Telemetry> create(
+      FinalizedConfiguration configuration,
+      tracing::TracerSignature tracer_signature,
+      std::shared_ptr<tracing::Logger> logger,
+      std::shared_ptr<tracing::HTTPClient> client,
+      std::shared_ptr<tracing::EventScheduler> event_scheduler,
+      tracing::HTTPClient::URL agent_url,
+      tracing::Clock clock = tracing::default_clock);
+
+  ~Telemetry();
+
+ private:
   Telemetry(FinalizedConfiguration configuration,
             tracing::TracerSignature tracer_signature,
             std::shared_ptr<tracing::Logger> logger,
@@ -86,15 +96,7 @@ class Telemetry final {
             tracing::HTTPClient::URL agent_url,
             tracing::Clock clock = tracing::default_clock);
 
-  /// Destructor
-  ///
-  /// Send last metrics snapshot and `app-closing` event.
-  ~Telemetry();
-
-  /// Move semantics.
-  Telemetry(Telemetry&& rhs);
-  Telemetry& operator=(Telemetry&&);
-
+ public:
   /// Capture and report internal error message to Datadog.
   ///
   /// @param message The error message.
@@ -110,6 +112,12 @@ class Telemetry final {
 
   void capture_configuration_change(
       const std::vector<tracing::ConfigMetadata>& new_configuration);
+
+  // Deterministic shutdown: cancels scheduled tasks, sends the app-closing
+  // payload, drains in-flight HTTP requests, and releases the HTTP client
+  // (joining the background thread if this is the last reference).
+  // After this call the Telemetry object is inert and safe to destroy.
+  void shutdown();
 
   /// Counter
   void increment_counter(const Counter& counter);

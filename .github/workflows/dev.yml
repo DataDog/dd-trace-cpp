@@ -123,7 +123,7 @@ jobs:
       matrix:
         arch: ["arm64", "amd64"]
         include:
-          - runner: windows-11-arm 
+          - runner: windows-11-arm
             arch: arm64
           - runner: windows-2022
             arch: amd64
@@ -149,7 +149,7 @@ jobs:
         run: scoop install main/cmake@4.0.1 main/ninja
       - name: Build
         run: |
-          & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }} 
+          & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }}
           cmake --preset=ci-msvc -B build -DCMAKE_BUILD_TYPE=Debug .
           cmake --build build -j $env:MAKE_JOB_COUNT -v
       - name: Test
@@ -163,7 +163,7 @@ jobs:
           ./datadog-ci.exe junit upload --service dd-trace-cpp --tags test.source.file:test/*.cpp report.xml
 
   coverage:
-    needs: build-linux-cmake 
+    needs: build-linux-cmake
     runs-on: ubuntu-22.04-arm
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-arm64
@@ -172,27 +172,26 @@ jobs:
     permissions:
       contents: read
       packages: read
-    env:
-      DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - run: bin/test --coverage --verbose
-      - name: Report Datadog coverage
-        run: |
-          curl -L --fail "https://github.com/DataDog/datadog-ci/releases/latest/download/datadog-ci_linux-arm64" --output "/usr/local/bin/datadog-ci" && chmod +x /usr/local/bin/datadog-ci
-          cd .coverage
-          cp filtered.info lcov.info
-          datadog-ci coverage upload lcov.info
+      - name: Upload code coverage report to Datadog
+        # See https://github.com/DataDog/coverage-upload-github-action/releases
+        uses: DataDog/coverage-upload-github-action@2ba057033351887422f8eb0203d1990c3acbc8c5 # v1.0.4
+        with:
+          api_key: ${{ secrets.DD_CI_VIS_API_KEY }}
+          files: .coverage/filtered.info
+          format: lcov
 
   build-system-tests-artifact:
     runs-on: ubuntu-22.04
     steps:
-      - run: mkdir binaries 
+      - run: mkdir binaries
       - run: echo "https://github.com/DataDog/dd-trace-cpp@${BRANCH_NAME}" > binaries/cpp-load-from-git
         env:
-          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}          
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
       - name: Save artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: system_tests_binaries
           path: ./binaries/**/*

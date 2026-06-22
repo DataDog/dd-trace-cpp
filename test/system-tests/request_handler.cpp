@@ -12,6 +12,22 @@
 #include "httplib.h"
 #include "utils.h"
 
+namespace {
+
+std::string get_agent_url_from_traces_url(std::string traces_url) {
+  // Strip the API path from the traces URL to get the agent URL
+  // This API path is defined in src/datadog/datadog_agent.cpp.
+  constexpr std::string_view traces_api_path = "/v0.4/traces";
+  if (traces_url.size() >= traces_api_path.size() &&
+      traces_url.compare(traces_url.size() - traces_api_path.size(),
+                         traces_api_path.size(), traces_api_path) == 0) {
+    traces_url.resize(traces_url.size() - traces_api_path.size());
+  }
+  return traces_url;
+}
+
+}  // namespace
+
 RequestHandler::RequestHandler(
     datadog::tracing::FinalizedTracerConfig& tracerConfig,
     std::shared_ptr<ManualScheduler> scheduler,
@@ -47,17 +63,19 @@ void RequestHandler::on_trace_config(const httplib::Request& /* req */,
                                      httplib::Response& res) {
   auto tracer_cfg = nlohmann::json::parse(tracer_.config());
 
+  const std::string agent_url = get_agent_url_from_traces_url(
+      tracer_cfg["collector"]["config"]["traces_url"]);
+
   // clang-format off
-    auto response_body = nlohmann::json{
-      { "config", {
-          { "dd_service", tracer_cfg["defaults"]["service"]},
-          { "dd_env", tracer_cfg["defaults"]["environment"]},
-          { "dd_version", tracer_cfg["environment_variables"]["version"]},
-          { "dd_trace_enabled", tracer_cfg["environment_variables"]["report_traces"]},
-          { "dd_trace_agent_url", tracer_cfg["environment_variables"]["DD_TRACE_AGENT_URL"]}
-        }
-      }
-    };
+  auto response_body = nlohmann::json{
+    {"config", {
+      {"dd_service", tracer_cfg["defaults"]["service"]},
+      {"dd_env", tracer_cfg["defaults"]["environment"]},
+      {"dd_version", tracer_cfg["defaults"]["version"]},
+      {"dd_trace_enabled", tracer_cfg["report_traces"]},
+      {"dd_trace_agent_url", agent_url}
+    }}
+  };
   // clang-format on
 
   if (tracer_cfg.contains("trace_sampler")) {
