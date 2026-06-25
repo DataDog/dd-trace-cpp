@@ -203,6 +203,13 @@
         "type": "boolean"
       }
     ],
+    "DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT": [
+      {
+        "default": "continue",
+        "implementation": "B",
+        "type": "string"
+      }
+    ],
     "DD_TRACE_PROPAGATION_STYLE": [
       {
         "default": "datadog,tracecontext,baggage",
