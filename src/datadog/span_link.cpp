@@ -1,42 +1,12 @@
-#include <datadog/extracted_context.h>
-#include <datadog/span.h>
 #include <datadog/span_link.h>
 
 #include <cstddef>
-#include <cstdint>
 #include <string>
 
 #include "msgpack.h"
 
 namespace datadog {
 namespace tracing {
-
-SpanLink::SpanLink(const Span& linked, const SpanLinkAttributes& attrs)
-    : trace_id(linked.trace_id()), span_id(linked.id()), attributes(attrs) {
-  const auto headers = linked.inject();
-
-  if (auto it = headers.find("tracestate"); it != headers.end()) {
-    tracestate = it->second;
-  }
-  if (auto it = headers.find("traceparent"); it != headers.end()) {
-    const auto& tp = it->second;
-    const auto pos = tp.rfind('-');
-    if (pos != std::string::npos && pos + 1 < tp.size()) {
-      try {
-        flags = static_cast<std::uint32_t>(
-            std::stoul(tp.substr(pos + 1), nullptr, 16));
-      } catch (...) {
-      }
-    }
-  }
-}
-
-SpanLink::SpanLink(const ExtractedContext& ctx, const SpanLinkAttributes& attrs)
-    : trace_id(ctx.trace_id),
-      span_id(ctx.span_id),
-      tracestate(ctx.tracestate),
-      attributes(attrs),
-      flags(ctx.flags) {}
 
 
 Expected<void> msgpack_encode(std::string& destination, const SpanLink& link) {

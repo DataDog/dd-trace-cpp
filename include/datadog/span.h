@@ -181,8 +181,6 @@ class Span {
   // using all of the configured injection propagation styles.
   void inject(DictWriter& writer) const;
   void inject(DictWriter& writer, const InjectionOptions& options) const;
-  // Return the injected headers as a map.
-  std::unordered_map<std::string, std::string> inject() const;
 
   // Return a reference to this span's trace segment.  The trace segment has
   // member functions that affect the trace as a whole, such as

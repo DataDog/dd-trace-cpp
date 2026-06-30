@@ -1,3 +1,4 @@
+#include <datadog/dict_writer.h>
 #include <datadog/extracted_context.h>
 #include <datadog/optional.h>
 #include <datadog/span.h>
@@ -62,16 +63,6 @@ void Span::inject(DictWriter& writer) const {
   trace_segment_->inject(writer, *data_);
 }
 
-std::unordered_map<std::string, std::string> Span::inject() const {
-  struct MapWriter : DictWriter {
-    std::unordered_map<std::string, std::string> map;
-    void set(StringView k, StringView v) override {
-      map[std::string(k)] = std::string(v);
-    }
-  } writer;
-  inject(writer);
-  return std::move(writer.map);
-}
 
 void Span::inject(DictWriter& writer, const InjectionOptions& options) const {
   trace_segment_->inject(writer, *data_, options);
@@ -177,12 +168,46 @@ void Span::set_source(Source source) {
 }
 
 void Span::add_link(const Span& linked, const SpanLinkAttributes& attrs) {
-  data_->span_links.emplace_back(linked, attrs);
+  SpanLink link;
+  link.trace_id = linked.trace_id();
+  link.span_id = linked.id();
+  link.attributes = attrs;
+
+  // Capture injected headers (tracestate, traceparent flags) into a map.
+  struct : DictWriter {
+    std::unordered_map<std::string, std::string> map;
+    void set(StringView k, StringView v) override {
+      map[std::string(k)] = std::string(v);
+    }
+  } w;
+  linked.inject(w);
+  if (auto it = w.map.find("tracestate"); it != w.map.end()) {
+    link.tracestate = it->second;
+  }
+  if (auto it = w.map.find("traceparent"); it != w.map.end()) {
+    const auto& tp = it->second;
+    const auto pos = tp.rfind('-');
+    if (pos != std::string::npos && pos + 1 < tp.size()) {
+      try {
+        link.flags = static_cast<std::uint32_t>(
+            std::stoul(tp.substr(pos + 1), nullptr, 16));
+      } catch (...) {
+      }
+    }
+  }
+
+  data_->span_links.push_back(std::move(link));
 }
 
 void Span::add_link(const ExtractedContext& ctx,
                     const SpanLinkAttributes& attrs) {
-  data_->span_links.emplace_back(ctx, attrs);
+  SpanLink link;
+  link.trace_id = ctx.trace_id;
+  link.span_id = ctx.span_id;
+  link.tracestate = ctx.tracestate;
+  link.attributes = attrs;
+  link.flags = ctx.flags;
+  data_->span_links.push_back(std::move(link));
 }
 
 TraceSegment& Span::trace_segment() { return *trace_segment_; }
