@@ -3,6 +3,7 @@
 #include <datadog/optional.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
+#include <datadog/span_link.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
@@ -233,6 +234,66 @@ void RequestHandler::on_set_meta(const httplib::Request& req,
   span.set_tag(request_json.at("key").get<std::string_view>(),
                request_json.at("value").get<std::string_view>());
 
+  res.status = 200;
+}
+
+void RequestHandler::on_add_link(const httplib::Request& req,
+                                 httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+
+  auto span_id = utils::get_if_exists<uint64_t>(request_json, "span_id");
+  if (!span_id) {
+    VALIDATION_ERROR(res, "on_add_link: missing `span_id` field.");
+  }
+
+  auto parent_id = utils::get_if_exists<uint64_t>(request_json, "parent_id");
+  if (!parent_id) {
+    VALIDATION_ERROR(res, "on_add_link: missing `parent_id` field.");
+  }
+
+  auto span_it = active_spans_.find(*span_id);
+  if (span_it == active_spans_.cend()) {
+    const auto msg =
+        "on_add_link: span not found for id " + std::to_string(*span_id);
+    VALIDATION_ERROR(res, msg);
+  }
+
+  datadog::tracing::SpanLink link;
+
+  // The linked context is either another active span or a previously extracted
+  // propagation context, both keyed by `parent_id`.
+  auto linked_it = active_spans_.find(*parent_id);
+  if (linked_it != active_spans_.cend()) {
+    link.trace_id = linked_it->second.trace_id();
+    link.span_id = linked_it->second.id();
+  } else {
+    auto context_it = tracing_context_.find(*parent_id);
+    if (context_it == tracing_context_.cend()) {
+      const auto msg = "on_add_link: linked context not found for parent_id " +
+                       std::to_string(*parent_id);
+      VALIDATION_ERROR(res, msg);
+    }
+    auto linked = tracer_.extract_span(utils::HeaderReader(context_it->second));
+    if (!linked) {
+      VALIDATION_ERROR(res,
+                       "on_add_link: unable to extract linked context for "
+                       "parent_id " +
+                           std::to_string(*parent_id));
+    }
+    link.trace_id = linked->trace_id();
+    link.span_id = linked->parent_id().value_or(0);
+  }
+
+  if (auto attributes = request_json.find("attributes");
+      attributes != request_json.cend() && attributes->is_object()) {
+    for (const auto& [key, value] : attributes->items()) {
+      if (value.is_string()) {
+        link.attributes.emplace(key, value.get<std::string>());
+      }
+    }
+  }
+
+  span_it->second.add_link(link);
   res.status = 200;
 }
 

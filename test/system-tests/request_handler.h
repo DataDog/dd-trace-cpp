@@ -24,6 +24,7 @@ class RequestHandler final {
   void on_span_start(const httplib::Request& req, httplib::Response& res);
   void on_span_end(const httplib::Request& req, httplib::Response& res);
   void on_set_meta(const httplib::Request& req, httplib::Response& res);
+  void on_add_link(const httplib::Request& req, httplib::Response& res);
   void on_set_metric(const httplib::Request& /* req */, httplib::Response& res);
   void on_manual_keep(const httplib::Request& req, httplib::Response& res);
   void on_manual_drop(const httplib::Request& req, httplib::Response& res);
