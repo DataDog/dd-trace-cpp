@@ -47,6 +47,7 @@
 
 #include "clock.h"
 #include "optional.h"
+#include "span_link.h"
 #include "string_view.h"
 #include "trace_id.h"
 #include "trace_source.h"
@@ -54,12 +55,12 @@
 namespace datadog {
 namespace tracing {
 
+struct ExtractedContext;
 struct InjectionOptions;
 class DictReader;
 class DictWriter;
 struct SpanConfig;
 struct SpanData;
-struct SpanLink;
 class TraceSegment;
 
 class Span {
@@ -167,14 +168,21 @@ class Span {
   // Specifies the product (AppSec, DBM) that created this span.
   void set_source(Source);
 
-  // Add a link to this span. The link is serialized with this span under
-  // `span_links`.
-  void add_link(const SpanLink& link);
+  // Add a span link to this span, filled from the specified live span.
+  // The linked span's trace ID, span ID, tracestate, and trace flags are
+  // populated automatically. `attrs` is optional user-supplied attributes.
+  void add_link(const Span& linked, const SpanLinkAttributes& attrs = {});
+  // Add a span link to this span, filled from the specified extracted
+  // distributed-tracing context.
+  void add_link(const ExtractedContext& ctx,
+                const SpanLinkAttributes& attrs = {});
 
   // Write information about this span and its trace into the specified `writer`
   // using all of the configured injection propagation styles.
   void inject(DictWriter& writer) const;
   void inject(DictWriter& writer, const InjectionOptions& options) const;
+  // Return the injected headers as a map.
+  std::unordered_map<std::string, std::string> inject() const;
 
   // Return a reference to this span's trace segment.  The trace segment has
   // member functions that affect the trace as a whole, such as

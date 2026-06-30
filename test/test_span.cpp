@@ -1097,20 +1097,34 @@ TEST_SPAN("add_link records links on the span data") {
   REQUIRE(finalized_config);
   Tracer tracer{*finalized_config};
 
+  TraceID linked_trace_id;
+  std::uint64_t linked_span_id = 0;
+
   {
     auto span = tracer.create_span();
+    auto linked = tracer.create_span();
+    linked_trace_id = linked.trace_id();
+    linked_span_id = linked.id();
 
-    SpanLink link;
-    link.trace_id = TraceID(/*low=*/0xABC, /*high=*/0xDEF);
-    link.span_id = 99;
-    link.attributes = {{"link.key", "value"}};
-    span.add_link(link);
+    const SpanLinkAttributes attrs{{"link.key", "value"}};
+    span.add_link(linked, attrs);
   }
 
-  REQUIRE(collector->chunks.size() == 1);
-  const auto& span_data = collector->first_span();
-  REQUIRE(span_data.span_links.size() == 1);
-  REQUIRE(span_data.span_links[0].trace_id == TraceID(0xABC, 0xDEF));
-  REQUIRE(span_data.span_links[0].span_id == 99);
-  REQUIRE(span_data.span_links[0].attributes.at("link.key") == "value");
+  // Find the span that carries the link across all chunks.
+  const SpanData* span_with_link = nullptr;
+  for (const auto& chunk : collector->chunks) {
+    for (const auto& sd : chunk) {
+      if (!sd->span_links.empty()) {
+        span_with_link = sd.get();
+      }
+    }
+  }
+  REQUIRE(span_with_link != nullptr);
+  REQUIRE(span_with_link->span_links.size() == 1);
+  const auto& link = span_with_link->span_links[0];
+  REQUIRE(link.trace_id == linked_trace_id);
+  REQUIRE(link.span_id == linked_span_id);
+  REQUIRE(link.attributes.at("link.key") == "value");
+  // traceparent is always injected with W3C propagation, so flags must be set.
+  REQUIRE(link.flags.has_value());
 }

@@ -17,6 +17,12 @@
 namespace datadog {
 namespace tracing {
 
+class Span;
+struct ExtractedContext;
+
+// Convenience alias: the map type used for span link user attributes.
+using SpanLinkAttributes = std::unordered_map<std::string, std::string>;
+
 struct SpanLink {
   // 128-bit trace ID of the linked span.
   TraceID trace_id;
@@ -28,6 +34,10 @@ struct SpanLink {
   std::unordered_map<std::string, std::string> attributes;
   // W3C trace flags from the linked context, if any.
   Optional<std::uint32_t> flags;
+
+  SpanLink() = default;
+  SpanLink(const Span& linked, const SpanLinkAttributes& attrs = {});
+  SpanLink(const ExtractedContext& ctx, const SpanLinkAttributes& attrs = {});
 };
 
 // Append to the specified `destination` the MessagePack representation of the

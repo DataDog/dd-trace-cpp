@@ -1,5 +1,6 @@
 #include "request_handler.h"
 
+#include <datadog/extracted_context.h>
 #include <datadog/optional.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
@@ -258,58 +259,66 @@ void RequestHandler::on_add_link(const httplib::Request& req,
     VALIDATION_ERROR(res, msg);
   }
 
-  datadog::tracing::SpanLink link;
-
-  // The linked context is either another active span or a previously extracted
-  // propagation context, both keyed by `parent_id`.
-  auto linked_it = active_spans_.find(*parent_id);
-  if (linked_it != active_spans_.cend()) {
-    link.trace_id = linked_it->second.trace_id();
-    link.span_id = linked_it->second.id();
-  } else {
-    auto context_it = tracing_context_.find(*parent_id);
-    if (context_it == tracing_context_.cend()) {
-      const auto msg = "on_add_link: linked context not found for parent_id " +
-                       std::to_string(*parent_id);
-      VALIDATION_ERROR(res, msg);
-    }
-    auto linked = tracer_.extract_span(utils::HeaderReader(context_it->second));
-    if (!linked) {
-      VALIDATION_ERROR(res,
-                       "on_add_link: unable to extract linked context for "
-                       "parent_id " +
-                           std::to_string(*parent_id));
-    }
-    link.trace_id = linked->trace_id();
-    link.span_id = linked->parent_id().value_or(0);
-  }
-
+  // Parse optional attributes, supporting flat strings and arrays.
+  datadog::tracing::SpanLinkAttributes attrs;
   if (auto attributes = request_json.find("attributes");
       attributes != request_json.cend() && attributes->is_object()) {
     for (const auto& [key, value] : attributes->items()) {
       if (value.is_string()) {
-        link.attributes.emplace(key, value.get<std::string>());
+        attrs.emplace(key, value.get<std::string>());
       } else if (value.is_array()) {
         std::size_t idx = 0;
         for (const auto& elem : value) {
           std::string flat_key = key + "." + std::to_string(idx++);
           if (elem.is_string()) {
-            link.attributes.emplace(flat_key, elem.get<std::string>());
+            attrs.emplace(flat_key, elem.get<std::string>());
           } else if (elem.is_boolean()) {
-            link.attributes.emplace(flat_key, elem.get<bool>() ? "true" : "false");
+            attrs.emplace(flat_key, elem.get<bool>() ? "true" : "false");
           } else if (elem.is_number_integer()) {
-            link.attributes.emplace(flat_key,
-                                    std::to_string(elem.get<int64_t>()));
+            attrs.emplace(flat_key, std::to_string(elem.get<int64_t>()));
           } else if (elem.is_number_float()) {
-            link.attributes.emplace(flat_key,
-                                    std::to_string(elem.get<double>()));
+            attrs.emplace(flat_key, std::to_string(elem.get<double>()));
           }
         }
       }
     }
   }
 
-  span_it->second.add_link(link);
+  // The linked context is either another active span or a previously extracted
+  // propagation context, both keyed by `parent_id`.
+  auto linked_it = active_spans_.find(*parent_id);
+  if (linked_it != active_spans_.cend()) {
+    // Propagate sampling priority from the linked span's trace.
+    nlohmann::json linked_hdrs = nlohmann::json::array();
+    utils::HeaderWriter linked_writer(linked_hdrs);
+    linked_it->second.inject(linked_writer);
+    for (const auto& hdr : linked_hdrs) {
+      if (hdr.size() == 2 &&
+          hdr[0].get<std::string>() == "x-datadog-sampling-priority") {
+        try {
+          span_it->second.trace_segment().override_sampling_priority(
+              std::stoi(hdr[1].get<std::string>()));
+        } catch (...) {
+        }
+        break;
+      }
+    }
+    span_it->second.add_link(linked_it->second, attrs);
+  } else {
+    auto context_it = link_contexts_.find(*parent_id);
+    if (context_it == link_contexts_.cend()) {
+      const auto msg = "on_add_link: linked context not found for parent_id " +
+                       std::to_string(*parent_id);
+      VALIDATION_ERROR(res, msg);
+    }
+    const auto& ctx = context_it->second;
+    if (ctx.sampling_priority.has_value()) {
+      span_it->second.trace_segment().override_sampling_priority(
+          *ctx.sampling_priority);
+    }
+    span_it->second.add_link(ctx, attrs);
+  }
+
   res.status = 200;
 }
 
@@ -422,18 +431,41 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   auto span = tracer_.extract_span(utils::HeaderReader(*http_headers));
 
   if (span.if_error()) {
-    const auto response_body_fail = nlohmann::json{
-        {"span_id", nullptr},
-    };
+    const auto response_body_fail = nlohmann::json{{"span_id", nullptr}};
     res.set_content(response_body_fail.dump(), "application/json");
     return;
   }
 
-  const auto response_body = nlohmann::json{
-      {"span_id", span->parent_id().value()},
-  };
+  const auto upstream_id = span->parent_id().value_or(0);
+  datadog::tracing::ExtractedContext ctx;
+  ctx.trace_id = span->trace_id();
+  ctx.span_id = upstream_id;
+  for (const auto& hdr : *http_headers) {
+    if (hdr.size() != 2) continue;
+    const auto name = hdr[0].get<std::string>();
+    if (name == "tracestate") {
+      ctx.tracestate = hdr[1].get<std::string>();
+    } else if (name == "traceparent") {
+      const auto tp = hdr[1].get<std::string>();
+      const auto pos = tp.rfind('-');
+      if (pos != std::string::npos && pos + 1 < tp.size()) {
+        try {
+          ctx.flags = static_cast<std::uint32_t>(
+              std::stoul(tp.substr(pos + 1), nullptr, 16));
+        } catch (...) {
+        }
+      }
+    } else if (name == "x-datadog-sampling-priority") {
+      try {
+        ctx.sampling_priority = std::stoi(hdr[1].get<std::string>());
+      } catch (...) {
+      }
+    }
+  }
 
-  tracing_context_[*span->parent_id()] = std::move(*http_headers);
+  const auto response_body = nlohmann::json{{"span_id", upstream_id}};
+  tracing_context_[upstream_id] = std::move(*http_headers);
+  link_contexts_[upstream_id] = ctx;
 
   // The span below will not be finished and flushed.
   blackhole_.emplace_back(std::move(*span));
@@ -446,6 +478,7 @@ void RequestHandler::on_span_flush(const httplib::Request& /* req */,
   scheduler_->flush_telemetry();
   active_spans_.clear();
   tracing_context_.clear();
+  link_contexts_.clear();
   res.status = 200;
 }
 

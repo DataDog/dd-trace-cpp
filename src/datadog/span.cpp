@@ -1,14 +1,13 @@
-#include <datadog/dict_writer.h>
+#include <datadog/extracted_context.h>
 #include <datadog/optional.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
+#include <datadog/span_link.h>
 #include <datadog/string_view.h>
 #include <datadog/trace_segment.h>
 
 #include <cassert>
 #include <string>
-
-#include <datadog/span_link.h>
 
 #include "span_data.h"
 #include "tags.h"
@@ -61,6 +60,17 @@ Span Span::create_child() const { return create_child(SpanConfig{}); }
 
 void Span::inject(DictWriter& writer) const {
   trace_segment_->inject(writer, *data_);
+}
+
+std::unordered_map<std::string, std::string> Span::inject() const {
+  struct MapWriter : DictWriter {
+    std::unordered_map<std::string, std::string> map;
+    void set(StringView k, StringView v) override {
+      map[std::string(k)] = std::string(v);
+    }
+  } writer;
+  inject(writer);
+  return std::move(writer.map);
 }
 
 void Span::inject(DictWriter& writer, const InjectionOptions& options) const {
@@ -166,8 +176,13 @@ void Span::set_source(Source source) {
                                             to_tag(source));
 }
 
-void Span::add_link(const SpanLink& link) {
-  data_->span_links.push_back(link);
+void Span::add_link(const Span& linked, const SpanLinkAttributes& attrs) {
+  data_->span_links.emplace_back(linked, attrs);
+}
+
+void Span::add_link(const ExtractedContext& ctx,
+                    const SpanLinkAttributes& attrs) {
+  data_->span_links.emplace_back(ctx, attrs);
 }
 
 TraceSegment& Span::trace_segment() { return *trace_segment_; }

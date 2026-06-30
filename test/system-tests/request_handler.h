@@ -1,5 +1,6 @@
 #pragma once
 
+#include <datadog/extracted_context.h>
 #include <datadog/optional.h>
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
@@ -41,6 +42,8 @@ class RequestHandler final {
   std::shared_ptr<DeveloperNoiseLogger> logger_;
   std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
   std::unordered_map<uint64_t, nlohmann::json::array_t> tracing_context_;
+  std::unordered_map<uint64_t, datadog::tracing::ExtractedContext>
+      link_contexts_;
 
   // Previously, `/trace/span/start` was used to create new spans or create
   // child spans from the extracted tracing context.
