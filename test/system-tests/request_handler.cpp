@@ -289,6 +289,22 @@ void RequestHandler::on_add_link(const httplib::Request& req,
     for (const auto& [key, value] : attributes->items()) {
       if (value.is_string()) {
         link.attributes.emplace(key, value.get<std::string>());
+      } else if (value.is_array()) {
+        std::size_t idx = 0;
+        for (const auto& elem : value) {
+          std::string flat_key = key + "." + std::to_string(idx++);
+          if (elem.is_string()) {
+            link.attributes.emplace(flat_key, elem.get<std::string>());
+          } else if (elem.is_boolean()) {
+            link.attributes.emplace(flat_key, elem.get<bool>() ? "true" : "false");
+          } else if (elem.is_number_integer()) {
+            link.attributes.emplace(flat_key,
+                                    std::to_string(elem.get<int64_t>()));
+          } else if (elem.is_number_float()) {
+            link.attributes.emplace(flat_key,
+                                    std::to_string(elem.get<double>()));
+          }
+        }
       }
     }
   }
