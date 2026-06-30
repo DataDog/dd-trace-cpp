@@ -75,7 +75,13 @@ void SpanData::apply_config(const SpanDefaults& defaults,
 
 Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
   // clang-format off
-  msgpack::pack_map(
+  const bool has_links = !span.span_links.empty();
+
+  // 12 always-present fields, plus span_links when there are any.
+  auto result = msgpack::pack_map(destination, has_links ? 13u : 12u);
+  if (!result) return result;
+
+  result = msgpack::pack_map_suffix(
       destination,
       "service", [&](auto& destination) {
          return msgpack::pack_string(destination, span.service);
@@ -131,6 +137,18 @@ Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
        }, "type", [&](auto& destination) {
          return msgpack::pack_string(destination, span.service_type);
        });
+  if (!result) return result;
+
+  if (has_links) {
+    result = msgpack::pack_string(destination, "span_links");
+    if (!result) return result;
+    result = msgpack::pack_array(
+        destination, span.span_links,
+        [](std::string& destination, const SpanLink& link) {
+          return msgpack_encode(destination, link);
+        });
+    if (!result) return result;
+  }
   // clang-format on
 
   return nullopt;
