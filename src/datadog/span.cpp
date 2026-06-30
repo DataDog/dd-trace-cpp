@@ -205,7 +205,11 @@ void Span::add_link(const ExtractedContext& ctx,
   link.span_id = ctx.span_id;
   link.tracestate = ctx.tracestate;
   link.attributes = attrs;
-  link.flags = ctx.flags;
+  if (ctx.flags.has_value()) {
+    link.flags = ctx.flags;
+  } else if (ctx.sampling_priority.has_value()) {
+    link.flags = *ctx.sampling_priority > 0 ? 1u : 0u;
+  }
   data_->span_links.push_back(std::move(link));
 }
 
