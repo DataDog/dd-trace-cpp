@@ -59,6 +59,7 @@ class DictReader;
 class DictWriter;
 struct SpanConfig;
 struct SpanData;
+struct SpanLink;
 class TraceSegment;
 
 class Span {
@@ -165,6 +166,10 @@ class Span {
   void set_end_time(std::chrono::steady_clock::time_point);
   // Specifies the product (AppSec, DBM) that created this span.
   void set_source(Source);
+
+  // Add a link to this span. The link is serialized with this span under
+  // `span_links`.
+  void add_link(const SpanLink& link);
 
   // Write information about this span and its trace into the specified `writer`
   // using all of the configured injection propagation styles.

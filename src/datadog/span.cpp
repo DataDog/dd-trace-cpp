@@ -8,6 +8,8 @@
 #include <cassert>
 #include <string>
 
+#include <datadog/span_link.h>
+
 #include "span_data.h"
 #include "tags.h"
 
@@ -162,6 +164,10 @@ void Span::set_end_time(std::chrono::steady_clock::time_point end_time) {
 void Span::set_source(Source source) {
   trace_segment_->local_root().tags.emplace(tags::internal::trace_source,
                                             to_tag(source));
+}
+
+void Span::add_link(const SpanLink& link) {
+  data_->span_links.push_back(link);
 }
 
 TraceSegment& Span::trace_segment() { return *trace_segment_; }

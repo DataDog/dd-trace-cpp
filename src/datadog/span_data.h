@@ -7,6 +7,7 @@
 #include <datadog/expected.h>
 #include <datadog/optional.h>
 #include <datadog/string_view.h>
+#include <datadog/span_link.h>
 #include <datadog/trace_id.h>
 
 #include <memory>
@@ -33,6 +34,7 @@ struct SpanData {
   bool error = false;
   std::unordered_map<std::string, std::string> tags;
   std::unordered_map<std::string, double> numeric_tags;
+  std::vector<SpanLink> span_links;
 
   Optional<StringView> environment() const;
   Optional<StringView> version() const;
