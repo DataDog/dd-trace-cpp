@@ -8,7 +8,6 @@
 namespace datadog {
 namespace tracing {
 
-
 Expected<void> msgpack_encode(std::string& destination, const SpanLink& link) {
   const bool has_trace_id_high = link.trace_id.high != 0;
   const bool has_attributes = !link.attributes.empty();
@@ -42,11 +41,11 @@ Expected<void> msgpack_encode(std::string& destination, const SpanLink& link) {
   if (has_attributes) {
     result = msgpack::pack_string(destination, "attributes");
     if (!result) return result;
-    result = msgpack::pack_map(
-        destination, link.attributes,
-        [](std::string& destination, const auto& value) {
-          return msgpack::pack_string(destination, value);
-        });
+    result =
+        msgpack::pack_map(destination, link.attributes,
+                          [](std::string& destination, const auto& value) {
+                            return msgpack::pack_string(destination, value);
+                          });
     if (!result) return result;
   }
 
@@ -62,8 +61,7 @@ Expected<void> msgpack_encode(std::string& destination, const SpanLink& link) {
     if (!result) return result;
     // The high bit marks "flags is present" so a receiver can distinguish an
     // explicit value of 0 from an omitted field.
-    msgpack::pack_integer(destination,
-                          std::uint64_t(*link.flags | (1u << 31)));
+    msgpack::pack_integer(destination, std::uint64_t(*link.flags | (1u << 31)));
   }
 
   return nullopt;

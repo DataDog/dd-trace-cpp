@@ -6,8 +6,8 @@
 #include <datadog/clock.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
-#include <datadog/string_view.h>
 #include <datadog/span_link.h>
+#include <datadog/string_view.h>
 #include <datadog/trace_id.h>
 
 #include <memory>

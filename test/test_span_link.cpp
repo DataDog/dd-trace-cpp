@@ -4,9 +4,8 @@
 #include <datadog/span_link.h>
 
 #include <cstdint>
-#include <string>
-
 #include <datadog/json.hpp>
+#include <string>
 
 #include "test.h"
 

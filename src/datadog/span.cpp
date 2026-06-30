@@ -63,7 +63,6 @@ void Span::inject(DictWriter& writer) const {
   trace_segment_->inject(writer, *data_);
 }
 
-
 void Span::inject(DictWriter& writer, const InjectionOptions& options) const {
   trace_segment_->inject(writer, *data_, options);
 }
