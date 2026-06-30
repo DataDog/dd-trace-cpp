@@ -9,6 +9,7 @@
 #include <datadog/optional.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
+#include <datadog/span_link.h>
 #include <datadog/tag_propagation.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
@@ -1083,4 +1084,33 @@ TEST_SPAN("injection behaviour when apm tracing is disabled") {
     span.inject(writer);
     CHECK(contains_tracing_context(writer.items));
   }
+}
+
+TEST_SPAN("add_link records links on the span data") {
+  TracerConfig config;
+  config.service = "testsvc";
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  {
+    auto span = tracer.create_span();
+
+    SpanLink link;
+    link.trace_id = TraceID(/*low=*/0xABC, /*high=*/0xDEF);
+    link.span_id = 99;
+    link.attributes = {{"link.key", "value"}};
+    span.add_link(link);
+  }
+
+  REQUIRE(collector->chunks.size() == 1);
+  const auto& span_data = collector->first_span();
+  REQUIRE(span_data.span_links.size() == 1);
+  REQUIRE(span_data.span_links[0].trace_id == TraceID(0xABC, 0xDEF));
+  REQUIRE(span_data.span_links[0].span_id == 99);
+  REQUIRE(span_data.span_links[0].attributes.at("link.key") == "value");
 }
