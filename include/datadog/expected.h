@@ -1,7 +1,7 @@
 #pragma once
 
 // This component provides a class template, `Expected<T>`, that is either an
-// instance of `T` or an instance of `Error`.  `Expected<void>` is either
+// instance of `T` or an instance of `Error`. `Expected<void>` is either
 // `nullopt` or an instance of `Error`.
 //
 // `Expected` is inspired by, but incompatible with, C++23's `std::expected`.
@@ -66,7 +66,7 @@ class Expected {
   bool has_value() const noexcept;
   explicit operator bool() const noexcept;
 
-  // Return a reference to the `Value` held by this object.  If this object is
+  // Return a reference to the `Value` held by this object. If this object is
   // an `Error`, throw a `std::bad_variant_access`.
   Value& value() &;
   const Value& value() const&;
@@ -77,12 +77,12 @@ class Expected {
   Value&& operator*() &&;
   const Value&& operator*() const&&;
 
-  // Return a pointer to the `Value` held by this object.  If this object is an
+  // Return a pointer to the `Value` held by this object. If this object is an
   // `Error`, throw a `std::bad_variant_access`.
   Value* operator->();
   const Value* operator->() const;
 
-  // Return a reference to the `Error` held by this object.  If this object is
+  // Return a reference to the `Error` held by this object. If this object is
   // not an `Error`, throw a `std::bad_variant_access`.
   Error& error() &;
   const Error& error() const&;

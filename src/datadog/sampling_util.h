@@ -1,6 +1,6 @@
 #pragma once
 
-// This component provides sampling-related miscellanea.  It's used by both
+// This component provides sampling-related miscellanea. It's used by both
 // `TraceSampler` and `SpanSampler`.
 
 #include <datadog/rate.h>
@@ -11,7 +11,7 @@
 namespace datadog {
 namespace tracing {
 
-// Return a hash value for the specified `value`.  `value` is one of the
+// Return a hash value for the specified `value`. `value` is one of the
 // following:
 //
 // - a 64-bit span ID

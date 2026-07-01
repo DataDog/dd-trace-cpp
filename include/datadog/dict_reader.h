@@ -1,7 +1,7 @@
 #pragma once
 
 // This component provides an interface, `DictReader`, that represents a
-// read-only key/value mapping of strings.  It's used when extracting trace
+// read-only key/value mapping of strings. It's used when extracting trace
 // context from externalized formats: HTTP headers, gRPC metadata, etc.
 
 #include <functional>

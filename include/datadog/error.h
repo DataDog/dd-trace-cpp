@@ -7,7 +7,7 @@
 // consistent across library versions, so integer values in error diagnostics
 // can always be looked up here.
 //
-// `struct Error` is the error type used by the `Expected` class template.  See
+// `struct Error` is the error type used by the `Expected` class template. See
 // `expected.h`.
 
 #include <iosfwd>

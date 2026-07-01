@@ -3,7 +3,7 @@
 // This component defines an enumeration of "sampling priority" values.
 //
 // Sampling priority is a hybrid between a sampling decision ("keep" versus
-// "drop") and a sampling reason ("user-specified rule").  Values less than or
+// "drop") and a sampling reason ("user-specified rule"). Values less than or
 // equal to zero indicate a decision to "drop," while positive values indicate
 // a decision to "keep."
 //
