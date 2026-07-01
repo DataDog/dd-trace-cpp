@@ -1,5 +1,4 @@
-Datadog C++ Tracing Library
-===========================
+# Datadog C++ Tracing Library
 
 ```c++
 #include <datadog/span_config.h>
@@ -37,26 +36,30 @@ int main() {
     std::this_thread::sleep_for(std::chrono::seconds(2));
 }
 ```
+
 See the [examples](examples) directory for more extensive usage examples.
 
 ## Platform Support
-The library has been tested and is compatible on the following CPU architecture, OS and compiler combinations:
-- x86_64 and arm64 Linux with GCC 11.4.
-- x86_64 and arm64 Linux with Clang 14.
-- x86_64 Windows with MSVC 2022.
-- arm64 macOS with Apple Clang 15.
 
+The library has been tested and is compatible on the following CPU architecture, OS and compiler
+combinations:
+
+- x86_64 and arm64 Linux with GCC 11.4;
+- x86_64 and arm64 Linux with Clang 14;
+- x86_64 Windows with MSVC 2022;
+- arm64 macOS with Apple Clang 15.
 
 ## Building and Installation
 
 ### Requirements
+
 `dd-trace-cpp` requires a [supported](#platform-support) C++17 compiler.
 
-A recent version of CMake is required (`3.28`), which might not be in your
-system's package manager. [bin/install-cmake](bin/install-cmake) is an installer
-for a recent CMake, on Linux.
+A recent version of CMake is required (`3.28`), which might not be in your system's package manager.
+[bin/install-cmake](bin/install-cmake) is an installer for a recent CMake, on Linux.
 
 ### Building
+
 Build this library from source using [CMake](https://cmake.org).
 
 ```shell
@@ -74,6 +77,7 @@ cmake -B build -DBUILD_SHARED_LIBS=1 .
 ```
 
 ### Installation
+
 Installation places a shared library and public headers into the appropriate system directories
 (`/usr/local/[…]`), or to a specified installation prefix. Example:
 
@@ -83,12 +87,13 @@ cmake --install build --prefix=.install
 ```
 
 ### Optional: Linking to the shared library
+
 In case you decided to build the shared library:
 
-When building an executable that uses `dd-trace-cpp`, specify the path to
-the installed headers using an appropriate `-I` option.  If the library was
-installed into the default system directories, then the `-I` option is not
-needed.
+When building an executable that uses `dd-trace-cpp`, specify the path to the installed headers
+using an appropriate `-I` option.  If the library was installed into the default system directories,
+then the `-I` option is not needed.
+
 ```shell
 c++ -I/path/to/dd-trace-cpp/.install/include -c -o my_app.o my_app.cpp
 ```
@@ -97,15 +102,17 @@ When linking an executable that uses `dd-trace-cpp`, specify linkage to the
 built library using the `-ldd_trace_cpp` option and an appropriate `-L` option.
 If the library was installed into the default system directories, then the `-L`
 options is not needed. The `-ldd_trace_cpp` option is always needed.
+
 ```shell
 c++ -o my_app my_app.o -L/path/to/dd-trace-cpp/.install/lib -ldd_trace_cpp
 ```
 
-Test
-----
+## Test
+
 Pass `-DDD_TRACE_BUILD_TESTING=1` to `cmake` to include the unit tests in the build.
 
 The resulting unit test executable is `test/tests` within the build directory.
+
 ```shell
 cmake -B build -DDD_TRACE_BUILD_TESTING=1 .
 cmake --build build -j
@@ -114,7 +121,7 @@ cmake --build build -j
 
 Alternatively, [bin/test](bin/test) is provided for convenience.
 
-Contributing
-------------
-See the [contributing guidelines](CONTRIBUTING.md) and the [maintainer docs](doc/maintainers.md)
-for information on the overall structure of the repository.
+## Contributing
+
+See the [contributing guidelines](CONTRIBUTING.md) and the [maintainer docs](doc/maintainers.md) for
+information on the overall structure of the repository.
