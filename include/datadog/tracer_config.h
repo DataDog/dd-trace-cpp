@@ -16,6 +16,7 @@
 #include "datadog_agent_config.h"
 #include "expected.h"
 #include "http_endpoint_calculation_mode.h"
+#include "propagation_behavior_extract.h"
 #include "propagation_style.h"
 #include "runtime_id.h"
 #include "span_defaults.h"
@@ -106,6 +107,13 @@ struct TracerConfig {
   // `DD_TRACE_PROPAGATION_STYLE_EXTRACT` and `DD_TRACE_PROPAGATION_STYLE`
   // environment variables.
   Optional<std::vector<PropagationStyle>> extraction_styles;
+
+  // `propagation_behavior_extract` indicates how to handle incoming trace context.
+  // `continue`: default behavior, all trace contexts are propagated.
+  // `restart`: restart a new trace (new sampling decision) with a span link to the remote one. baggage is propagated.
+  // `ignore`: discard entirely any existing trace context and start a new trace.
+  // Overridden by DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT
+  Optional<PropagationBehaviorExtract> propagation_behavior_extract;
 
   // `report_hostname` indicates whether the tracer will include the result of
   // `gethostname` with traces sent to the collector.
@@ -223,6 +231,8 @@ class FinalizedTracerConfig final {
 
   std::vector<PropagationStyle> injection_styles;
   std::vector<PropagationStyle> extraction_styles;
+
+  Optional<PropagationBehaviorExtract> propagation_behavior_extract;
 
   bool report_hostname;
   std::size_t tags_header_size;
