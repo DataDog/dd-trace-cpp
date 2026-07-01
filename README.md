@@ -91,7 +91,7 @@ cmake --install build --prefix=.install
 In case you decided to build the shared library:
 
 When building an executable that uses `dd-trace-cpp`, specify the path to the installed headers
-using an appropriate `-I` option.  If the library was installed into the default system directories,
+using an appropriate `-I` option. If the library was installed into the default system directories,
 then the `-I` option is not needed.
 
 ```shell

@@ -79,7 +79,7 @@ replace it with another, i.e. there would always be two spans.
 
 This could be avoided if we could guarantee that the two `Span`s belong to the same `TraceSegment`.
 Then move-assigning a `Span` could be defined as move-assigning its `SpanData` and somehow
-annotating the moved-from `SpanData` as being invalid.  However, if the two `Span`s belong to
+annotating the moved-from `SpanData` as being invalid. However, if the two `Span`s belong to
 different `TraceSegment`s, then it could be that the moved-to `Span`'s `TraceSegment` consists of
 only that one `Span`. Now we have to account for empty `TraceSegment` states. This could all be
 dealt with, but no matter what we decide, it would always be the case that `Span::operator=(Span&&)`
