@@ -11,10 +11,11 @@
 namespace datadog {
 namespace tracing {
 
-// The following [eBNF](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form) grammar
-// describes the tag propagation encoding.
-// The grammar was copied from
-// [an internal design document](https://docs.google.com/document/d/1zeO6LGnvxk5XweObHAwJbK3SfK23z7jQzp7ozWJTa2A/edit#heading=h.yp07yuixga36).
+// The following
+// [eBNF](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form)
+// grammar describes the tag propagation encoding. The grammar was copied from
+// [an internal design
+// document](https://docs.google.com/document/d/1zeO6LGnvxk5XweObHAwJbK3SfK23z7jQzp7ozWJTa2A/edit#heading=h.yp07yuixga36).
 //
 //     tagset = ( tag, { ",", tag } ) | "";
 //     tag = ( identifier - space or equal ), "=", identifier;

@@ -1,6 +1,7 @@
 #pragma once
 
-// This component provides encoding routines for [MessagePack](https://msgpack.org/index.html).
+// This component provides encoding routines for
+// [MessagePack](https://msgpack.org/index.html).
 //
 // Each function is in `namespace msgpack` and appends a specified value to a
 // `std::string`. For example, `msgpack::pack_integer(destination, -42)`
