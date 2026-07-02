@@ -7,7 +7,7 @@
 // from a provided key/value source (see `extract_span`).
 //
 // `Tracer` is instantiated with a `FinalizedTracerConfig`, which can be
-// obtained from a `TracerConfig` via the `finalize_config` function.  See
+// obtained from a `TracerConfig` via the `finalize_config` function. See
 // `tracer_config.h`.
 
 #include <cstddef>
@@ -65,15 +65,15 @@ class Tracer {
   Tracer(const FinalizedTracerConfig& config,
          const std::shared_ptr<const IDGenerator>& generator);
 
-  // Create a new trace and return the root span of the trace.  Optionally
+  // Create a new trace and return the root span of the trace. Optionally
   // specify a `config` indicating the attributes of the root span.
   Span create_span();
   Span create_span(const SpanConfig& config);
 
   // Return a span whose parent and other context is parsed from the specified
   // `reader`, and whose attributes are determined by the optionally specified
-  // `config`.  If there is no tracing information in `reader`, then return an
-  // error with code `Error::NO_SPAN_TO_EXTRACT`.  If a failure occurs, then
+  // `config`. If there is no tracing information in `reader`, then return an
+  // error with code `Error::NO_SPAN_TO_EXTRACT`. If a failure occurs, then
   // return an error with some other code.
   Expected<Span> extract_span(const DictReader& reader);
   Expected<Span> extract_span(const DictReader& reader,

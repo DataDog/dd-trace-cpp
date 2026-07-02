@@ -29,23 +29,23 @@ namespace details {
 //   Dec 31 2011: beta, improved Mix, tested it for 2-bit deltas
 //   Feb  2 2012: production, same bits as beta
 //   Feb  5 2012: adjusted definitions of uint* to be more portable
-//   Mar 30 2012: 3 bytes/cycle, not 4.  Alpha was 4 but wasn't thorough enough.
+//   Mar 30 2012: 3 bytes/cycle, not 4. Alpha was 4 but wasn't thorough enough.
 //   August 5 2012: SpookyV2 (different results)
 //
-// Up to 3 bytes/cycle for long messages.  Reasonably fast for short messages.
+// Up to 3 bytes/cycle for long messages. Reasonably fast for short messages.
 // All 1 or 2 bit deltas achieve avalanche within 1% bias per output bit.
 //
 // This was developed for and tested on 64-bit x86-compatible processors.
-// It assumes the processor is little-endian.  There is a macro
+// It assumes the processor is little-endian. There is a macro
 // controlling whether unaligned reads are allowed (by default they are).
 // This should be an equally good hash on big-endian machines, but it will
 // compute different results on them than on little-endian machines.
 //
 // Google's CityHash has similar specs to SpookyHash, and CityHash is faster
-// on new Intel boxes.  MD4 and MD5 also have similar specs, but they are orders
-// of magnitude slower.  CRCs are two or more times slower, but unlike
+// on new Intel boxes. MD4 and MD5 also have similar specs, but they are orders
+// of magnitude slower. CRCs are two or more times slower, but unlike
 // SpookyHash, they have nice math for combining the CRCs of pieces to form
-// the CRCs of wholes.  There are also cryptographic hashes, but those are even
+// the CRCs of wholes. There are also cryptographic hashes, but those are even
 // slower than MD5.
 //
 // Source: <https://burtleburtle.net/bob/hash/spooky.html>
@@ -377,7 +377,7 @@ class SpookyHash {
   //
   // Short is used for messages under 192 bytes in length
   // Short has a low startup cost, the normal mode is good for long
-  // keys, the cost crossover is at about 192 bytes.  The two modes were
+  // keys, the cost crossover is at about 192 bytes. The two modes were
   // held to the same quality bar.
   //
   static void Short(

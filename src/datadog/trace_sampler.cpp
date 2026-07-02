@@ -71,7 +71,7 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
     return decision;
   }
 
-  // No sampling rule matched.  Find the appropriate collector-controlled
+  // No sampling rule matched. Find the appropriate collector-controlled
   // sample rate.
   auto found_rate = collector_sample_rates_.find(
       CollectorResponse::key(span.service, span.environment().value_or("")));
@@ -83,7 +83,7 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
       decision.configured_rate = *collector_default_sample_rate_;
       decision.mechanism = int(SamplingMechanism::AGENT_RATE);
     } else {
-      // We have yet to receive a default rate from the collector.  This
+      // We have yet to receive a default rate from the collector. This
       // corresponds to the `DEFAULT` sampling mechanism.
       decision.configured_rate = Rate::one();
       decision.mechanism = int(SamplingMechanism::DEFAULT);

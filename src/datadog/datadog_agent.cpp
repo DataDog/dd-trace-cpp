@@ -63,7 +63,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
   if (type != "object") {
     std::string message;
     message +=
-        "Parsing the Datadog Agent's response to traces we sent it failed.  "
+        "Parsing the Datadog Agent's response to traces we sent it failed. "
         "The response is expected to be a JSON object, but instead it's a JSON "
         "value with type \"";
     append(message, type);
@@ -83,7 +83,7 @@ std::variant<CollectorResponse, std::string> parse_agent_traces_response(
   if (type != "object") {
     std::string message;
     message +=
-        "Parsing the Datadog Agent's response to traces we sent it failed.  "
+        "Parsing the Datadog Agent's response to traces we sent it failed. "
         "The \"";
     append(message, sample_rates_property);
     message +=
@@ -289,7 +289,7 @@ void DatadogAgent::flush() {
     }
   };
 
-  // This is the callback for the HTTP response.  It's invoked
+  // This is the callback for the HTTP response. It's invoked
   // asynchronously.
   auto on_response = [samplers = std::move(response_handlers),
                       logger = logger_](int response_status,
@@ -344,7 +344,7 @@ void DatadogAgent::flush() {
   };
 
   // This is the callback for if something goes wrong sending the
-  // request or retrieving the response.  It's invoked
+  // request or retrieving the response. It's invoked
   // asynchronously.
   auto on_error = [logger = logger_](Error error) {
     telemetry::counter::increment(metrics::tracer::api::errors,

@@ -72,7 +72,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
           append(message, name(environment::DD_TRACE_SAMPLING_RULES));
           message += " value ";
           append(message, *rules_env);
-          message += ".  The \"sample_rate\" property of the rule ";
+          message += ". The \"sample_rate\" property of the rule ";
           message += json_rule.dump();
           message += " is not a number, but instead has type \"";
           message += type;
@@ -95,7 +95,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
         message += value.dump();
         message += " in trace sampling rule ";
         message += json_rule.dump();
-        message += ".  Error occurred while parsing ";
+        message += ". Error occurred while parsing ";
         append(message, name(environment::DD_TRACE_SAMPLING_RULES));
         message += ": ";
         append(message, *rules_env);
