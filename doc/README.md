@@ -1,11 +1,20 @@
 # Logical Component Relationships
 
 - Vertices are components.
-- Edges are ownership relationships between components. Each edge is labeled by the kind of "smart
-  pointer" that could implement that kind of relationship.
-- Components containing a padlock are protected by a mutex.
+- Edges are ownership relationships between components. Each edge is labeled by the kind of pointer
+  that is used to implement the relationship.
+- Components with a padlock are protected by a mutex.
 
-![diagram](ownership.svg)
+```mermaid
+---
+title: Components Relationships
+---
+graph LR;
+  Tracer(Tracer) & TraceSegment("TraceSegment 🔒")-- shared -->Collector("Collector 🔒") & SpanSampler("SpanSampler 🔒") & TraceSampler("TraceSampler 🔒")
+  TraceSegment-- "`**unique**`" -->SpanData(SpanData)
+  Span(Span)-- shared -->TraceSegment
+  Span-- "`**raw**`" -->SpanData
+```
 
 ## Objects
 
