@@ -1,6 +1,5 @@
 #include "request_handler.h"
 
-#include <datadog/extracted_context.h>
 #include <datadog/optional.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
@@ -311,12 +310,14 @@ void RequestHandler::on_add_link(const httplib::Request& req,
                        std::to_string(*parent_id);
       VALIDATION_ERROR(res, msg);
     }
-    const auto& ctx = context_it->second;
-    if (ctx.sampling_priority.has_value()) {
+    const auto& stored = context_it->second;
+    if (stored.sampling_priority.has_value()) {
       span_it->second.trace_segment().override_sampling_priority(
-          *ctx.sampling_priority);
+          *stored.sampling_priority);
     }
-    span_it->second.add_link(ctx, attrs);
+    datadog::tracing::SpanLink link = stored.link;
+    link.attributes.insert(attrs.begin(), attrs.end());
+    span_it->second.add_link(link);
   }
 
   res.status = 200;
@@ -437,35 +438,40 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   }
 
   const auto upstream_id = span->parent_id().value_or(0);
-  datadog::tracing::ExtractedContext ctx;
-  ctx.trace_id = span->trace_id();
-  ctx.span_id = upstream_id;
+
+  StoredLinkContext stored;
+  stored.link.trace_id = span->trace_id();
+  stored.link.span_id = upstream_id;
   for (const auto& hdr : *http_headers) {
     if (hdr.size() != 2) continue;
     const auto name = hdr[0].get<std::string>();
     if (name == "tracestate") {
-      ctx.tracestate = hdr[1].get<std::string>();
+      stored.link.tracestate = hdr[1].get<std::string>();
     } else if (name == "traceparent") {
       const auto tp = hdr[1].get<std::string>();
       const auto pos = tp.rfind('-');
       if (pos != std::string::npos && pos + 1 < tp.size()) {
         try {
-          ctx.flags = static_cast<std::uint32_t>(
+          stored.link.flags = static_cast<std::uint32_t>(
               std::stoul(tp.substr(pos + 1), nullptr, 16));
         } catch (...) {
         }
       }
     } else if (name == "x-datadog-sampling-priority") {
       try {
-        ctx.sampling_priority = std::stoi(hdr[1].get<std::string>());
+        stored.sampling_priority = std::stoi(hdr[1].get<std::string>());
       } catch (...) {
       }
     }
   }
+  // Derive W3C flags from sampling priority when no traceparent flags present.
+  if (!stored.link.flags.has_value() && stored.sampling_priority.has_value()) {
+    stored.link.flags = *stored.sampling_priority > 0 ? 1u : 0u;
+  }
 
   const auto response_body = nlohmann::json{{"span_id", upstream_id}};
   tracing_context_[upstream_id] = std::move(*http_headers);
-  link_contexts_[upstream_id] = ctx;
+  link_contexts_[upstream_id] = std::move(stored);
 
   // The span below will not be finished and flushed.
   blackhole_.emplace_back(std::move(*span));

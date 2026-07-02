@@ -1,5 +1,4 @@
 #include <datadog/dict_writer.h>
-#include <datadog/extracted_context.h>
 #include <datadog/optional.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
@@ -198,20 +197,7 @@ void Span::add_link(const Span& linked, const SpanLinkAttributes& attrs) {
   data_->span_links.push_back(std::move(link));
 }
 
-void Span::add_link(const ExtractedContext& ctx,
-                    const SpanLinkAttributes& attrs) {
-  SpanLink link;
-  link.trace_id = ctx.trace_id;
-  link.span_id = ctx.span_id;
-  link.tracestate = ctx.tracestate;
-  link.attributes = attrs;
-  if (ctx.flags.has_value()) {
-    link.flags = ctx.flags;
-  } else if (ctx.sampling_priority.has_value()) {
-    link.flags = *ctx.sampling_priority > 0 ? 1u : 0u;
-  }
-  data_->span_links.push_back(std::move(link));
-}
+void Span::add_link(const SpanLink& link) { data_->span_links.push_back(link); }
 
 TraceSegment& Span::trace_segment() { return *trace_segment_; }
 

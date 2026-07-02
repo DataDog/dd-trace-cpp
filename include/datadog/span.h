@@ -55,7 +55,6 @@
 namespace datadog {
 namespace tracing {
 
-struct ExtractedContext;
 struct InjectionOptions;
 class DictReader;
 class DictWriter;
@@ -172,10 +171,8 @@ class Span {
   // The linked span's trace ID, span ID, tracestate, and trace flags are
   // populated automatically. `attrs` is optional user-supplied attributes.
   void add_link(const Span& linked, const SpanLinkAttributes& attrs = {});
-  // Add a span link to this span, filled from the specified extracted
-  // distributed-tracing context.
-  void add_link(const ExtractedContext& ctx,
-                const SpanLinkAttributes& attrs = {});
+  // Add a pre-built span link to this span.
+  void add_link(const SpanLink& link);
 
   // Write information about this span and its trace into the specified `writer`
   // using all of the configured injection propagation styles.

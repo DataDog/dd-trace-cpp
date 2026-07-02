@@ -113,7 +113,6 @@ cc_library(
         "include/datadog/environment.h",
         "include/datadog/error.h",
         "include/datadog/event_scheduler.h",
-        "include/datadog/extracted_context.h",
         "include/datadog/expected.h",
         "include/datadog/http_client.h",
         "include/datadog/http_endpoint_calculation_mode.h",
