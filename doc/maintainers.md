@@ -106,8 +106,8 @@ that accompany handle-to-interface are avoided.
 
 A "trace" is the entire tree of spans having the same trace ID.
 
-Within one process/worker/service, though, typically there is not an entire trace but only part of
-the trace. Let's call the process/worker/service a "tracer."
+Within one process / worker / service, though, typically there is not an entire trace but only part
+of the trace. Let's call the process / worker / service a "tracer."
 
 One portion of a trace that's passing through the tracer is called a "trace segment." A trace
 segment begins either at the trace's root span or at a span extracted from trace context, e.g. a
@@ -117,12 +117,20 @@ without children or descendant spans that were used to inject trace context out-
 outgoing HTTP request headers.
 
 There might be more than one trace segment for the _same trace_ within a tracer at the same time.
-Consider the diagram below.
+For example, in the diagram below, the trace passes through the "Service X" tracer twice. So for
+this trace, this tracer has two trace segments:
 
-<img src="segments.jpg" width="400" alt="flame graph"/>
-
-If our tracer is "service X," then this trace passes through the tracer twice. We would have two
-concurrent trace segments for the same trace.
+```mermaid
+block
+  columns 11
+  a["root"]:11
+  space b[" "]:2 c[" "]:7 space
+  space:3 d["Service X - Trace segment 1"]:6 space:2
+  space:4 e["X - segment 1"] f["X - segment 1"]:4 space:2
+  space:5 g[" "]:3 space:3
+  space:6 h["Service X - Trace segment 2"]:2 space:3
+  space:6 i["X - segment 2"] j["X - segment 2"] space:3
+```
 
 `class TraceSegment` is defined in [trace_segment.h](../include/datadog/trace_segment.h).
 `TraceSegment` objects are managed internally by the library. That is to say, a user never creates a
