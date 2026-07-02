@@ -1,7 +1,7 @@
 #pragma once
 
 // This component provides a `class`, `Curl`, that implements the `HTTPClient`
-// interface in terms of [libcurl](https://curl.se/libcurl)].  `class Curl`
+// interface in terms of [libcurl](https://curl.se/libcurl)]. `class Curl`
 // manages a thread that is used as the event loop for libcurl.
 //
 // If this library was built in a mode that does not include libcurl, then this
@@ -25,7 +25,7 @@ namespace datadog::tracing {
 // corresponding member functions -- one for each `CURLINFO` value or
 // `CURLoption` value, respectively.
 //
-// The default implementations forward to their libcurl counterparts.  Unit
+// The default implementations forward to their libcurl counterparts. Unit
 // tests override some of the member functions.
 class CurlLibrary {
  public:

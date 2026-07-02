@@ -6,7 +6,7 @@
 // `HTTPClient` is used by `DatadogAgent` to send traces to the Datadog Agent.
 //
 // If this library was built with support for libcurl, then `Curl` implements
-// `HTTPClient` in terms of libcurl.  See `curl.h`.
+// `HTTPClient` in terms of libcurl. See `curl.h`.
 
 #include <chrono>
 #include <functional>
@@ -38,12 +38,12 @@ class HTTPClient {
   // error-indicating HTTP responses.
   using ErrorHandler = std::function<void(Error)>;
 
-  // Send a POST request to the specified `url`.  Set request headers by calling
-  // the specified `set_headers` callback.  Include the specified `body` at the
-  // end of the request.  Invoke the specified `on_response` callback if/when
+  // Send a POST request to the specified `url`. Set request headers by calling
+  // the specified `set_headers` callback. Include the specified `body` at the
+  // end of the request. Invoke the specified `on_response` callback if/when
   // a response is delivered (even if that response contains an error HTTP
-  // response status).  Invoke the specified `on_error` if an error occurs
-  // outside of HTTP, such as a connection failure.  If an error occurs while
+  // response status). Invoke the specified `on_error` if an error occurs
+  // outside of HTTP, such as a connection failure. If an error occurs while
   // preparing the request, return an `Error`. The behavior is undefined if
   // either of `on_response` or `on_error` throws an exception.
   virtual Expected<void> post(

@@ -11,7 +11,7 @@
 // is dropped.
 //
 // As with the `TraceSampler`, spans are matched by rules that indicate the
-// sample rate at which the spans will be sent to Datadog.  Each rule is
+// sample rate at which the spans will be sent to Datadog. Each rule is
 // additionally associated with an optional limiter that prevents the sent
 // volume of spans from exceeding a specified number of spans per second.
 //

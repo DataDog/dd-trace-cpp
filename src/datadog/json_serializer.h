@@ -85,7 +85,7 @@ inline Expected<SpanMatcher> from_json(const nlohmann::json& json) {
       }
     } else {
       // Unknown properties are OK. `SpanMatcher` is used as a base class for
-      // trace sampling rules and span sampling rules.  Those derived types
+      // trace sampling rules and span sampling rules. Those derived types
       // will have additional properties in their JSON representations.
     }
   }

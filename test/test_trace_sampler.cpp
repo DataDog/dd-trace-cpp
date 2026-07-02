@@ -103,7 +103,7 @@ TEST_CASE("trace sampling rule sample rate") {
   // priority 2 ("user keep"), but no other values.
   REQUIRE(priority_counts.size() <= 2);
   // I assume that there have been enough trials that not _all_ traces are kept
-  // or dropped purely due to chance.  That could happen only if the sample rate
+  // or dropped purely due to chance. That could happen only if the sample rate
   // were 0% or 100%, respectively.
   REQUIRE((test_case.sample_rate == 0.0 ||
            priority_counts.count(int(SamplingPriority::USER_KEEP))));
@@ -162,7 +162,7 @@ TEST_CASE("trace sampling rate limiter") {
           test_case.expected_kept_count);
 
   // Now verify that there is a "cooldown period" of one second, after which
-  // the limiter will permit some more traces.  How many it permits depends
+  // the limiter will permit some more traces. How many it permits depends
   // on how "over budget" it was, but it will allow at least one.
   collector->sampling_priority_count.clear();
   current_time += std::chrono::seconds(1);
