@@ -8,6 +8,8 @@
 ```mermaid
 ---
 title: Components Relationships
+config:
+  layout: elk
 ---
 graph LR;
   Tracer(Tracer) & TraceSegment("TraceSegment 🔒")-- shared -->Collector("Collector 🔒") & SpanSampler("SpanSampler 🔒") & TraceSampler("TraceSampler 🔒")
