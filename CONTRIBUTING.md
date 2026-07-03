@@ -1,4 +1,4 @@
-# Contributing to the Datadog C++ Tracing Library
+# Contributing to the Datadog C++ Tracer
 
 Pull requests for bug fixes are welcome.
 

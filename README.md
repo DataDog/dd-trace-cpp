@@ -1,7 +1,7 @@
-# Datadog C++ Tracing Library
+# Datadog C++ Tracer
 
-This repository contains the Datadog C++ Tracing Library, also known as the C++ Tracer or
-`dd-trace-cpp`.
+This `dd-trace-cpp` repository contains the Datadog C++ Tracer, which is the [Datadog Application
+Performance Monitoring (APM)](https://docs.datadoghq.com/tracing) C++ client library.
 
 ## Usage Example
 
@@ -115,9 +115,9 @@ c++ -o my_app my_app.o -L/path/to/dd-trace-cpp/.install/lib -ldd_trace_cpp
 ## Contributing
 
 See the [contributing guidelines](CONTRIBUTING.md) if you would like to contribute to the Datadog
-C++ Tracing Library.
+C++ Tracer.
 
 ## Security
 
-If you discover a security vulnerablity in this sofware component, please refer to the [Security
+If you discover a security vulnerablity in the Datadog C++ Tracer, please refer to the [Security
 Policy](SECURITY.md).

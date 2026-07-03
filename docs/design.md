@@ -1,7 +1,7 @@
-# Datadog C++ Tracing Library Design
+# Datadog C++ Tracer Design
 
-The primary purpose of this guide is to describe salient features of the library's design.
-`dd-trace-cpp` differs considerably from its [older
+The primary purpose of this guide is to describe salient features of the Datadog C++ Tracer's
+design. It differs considerably from its [older
 sibling](https://github.com/DataDog/dd-opentracing-cpp) and
 [peers](https://github.com/open-telemetry/opentelemetry-cpp).
 
