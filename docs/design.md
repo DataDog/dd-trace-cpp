@@ -1,16 +1,14 @@
-# Care and Feeding of Your New Tracing Library
+# Datadog C++ Tracer Design
 
-Congratulations! You are now the proud owner of a distributed tracing library.
-
-The primary purpose of this guide is to describe salient features of the library's design.
-`dd-trace-cpp` differs considerably from its [older
+The primary purpose of this guide is to describe salient features of the Datadog C++ Tracer's
+design. It differs considerably from its [older
 sibling](https://github.com/DataDog/dd-opentracing-cpp) and
 [peers](https://github.com/open-telemetry/opentelemetry-cpp).
 
 This guide will also cover operations performed by maintainers of the library, such as scooping the
 box, applying flea medication, and regular trips to the vet.
 
-## Design
+## Architecture
 
 ### Span
 
@@ -278,7 +276,55 @@ uses a different implementation, [class AgentHTTPClient : public HTTPClient,
 ...](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/agent_http_client.h),
 which uses Envoy's built-in HTTP facilities. libcurl is not involved at all.
 
-### EventScheduler
+### Logical Component Relationships
+
+- Vertices are components.
+- Edges are ownership relationships between components. Each edge is labeled by the kind of pointer
+  that is used to implement the relationship.
+- Components with a padlock are protected by a mutex.
+
+```mermaid
+---
+title: Components Relationships
+config:
+  layout: elk
+---
+graph LR;
+  Tracer(Tracer) & TraceSegment("TraceSegment 🔒")-- shared -->Collector("Collector 🔒") & SpanSampler("SpanSampler 🔒") & TraceSampler("TraceSampler 🔒")
+  TraceSegment-- "`**unique**`" -->SpanData(SpanData)
+  Span(Span)-- shared -->TraceSegment
+  Span-- "`**raw**`" -->SpanData
+```
+
+Objects:
+
+- `Span` has a beginning, end, and tags. It is associated with a `TraceSegment`.
+- `TraceSegment` is part of a trace. It makes sampling decisions, detects when it is finished, and
+  sends itself to the `Collector`.
+- `Collector` receives trace segments. It provides a callback to deliver sampler modifications, if
+  applicable.
+- `Tracer` is responsible for creating trace segments. It contains the instances of, and
+  configuration for, the `Collector`, `TraceSampler`, and `SpanSampler`. A tracer is created from a
+  `TracerConfig`.
+- `TraceSampler` is used by trace segments to decide when to keep or drop themselves.
+- `SpanSampler` is used by trace segments to decide which spans to keep when the segment is dropped.
+- `TracerConfig` contains all of the information needed to configure the collector, trace sampler,
+  and span sampler, as well as defaults for span properties.
+
+Intended usage is:
+
+1. Create a `TracerConfig`.
+2. Use the `TracerConfig` to create a `Tracer`.
+3. Use the `Tracer` to create and/or extract local root `Span`s.
+4. Use `Span` to create children and/or inject context.
+5. Use a `Span`'s `TraceSegment` to perform trace-wide operations.
+6. When all `Span`s in `TraceSegment` are finished, the segment is sent to the
+   `Collector`.
+
+Different instances of `Tracer` are independent of each other. If an application wishes to
+reconfigure tracing at runtime, it can create another `Tracer` using the new configuration.
+
+## EventScheduler
 
 As of this writing, `class DatadogAgent` flushes batches of finished trace segments to the Datadog
 Agent once every two second [by
@@ -314,7 +360,7 @@ also uses a different implementation, [class EventScheduler : public
 EventScheduler](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/event_scheduler.h),
 which uses Envoy's built-in event dispatch facilities.
 
-### Configuration
+## Configuration
 
 There's a good [blog post](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/) by
 [Alexis King](https://lexi-lambda.github.io/about.html) where she makes the case for encoding
@@ -362,7 +408,7 @@ is to prevent eventual intermixing between the "configuration representation" an
 representation." In part, `finalize_config` already mitigates the problem. Abstaining from storing
 the finalized config as a data member is a step further.
 
-### Error Handling
+## Error Handling
 
 Most error scenarios within this library are individually enumerated by `enum Error::Code`, defined
 in [error.h](../include/datadog/error.h).
@@ -514,7 +560,7 @@ operator bool` has the opposite meaning as it does in `Expected<T>`. I wanted er
 be the same in the two cases, and so I specialized `Expected<void>`. `Expected<void>` is implemented
 in terms of `std::optional<Error>`, but inverts the value of `explicit operator bool`.
 
-### Logging
+## Logging
 
 Can we write a tracing library that does not do any logging by itself? The previous section
 describes how errors are reported by the library, and no logging is involved there. Why not leave it
