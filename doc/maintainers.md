@@ -116,20 +116,19 @@ segment includes all local descendants of that span, and has as its "boundary" a
 without children or descendant spans that were used to inject trace context out-of-tracer, e.g. in
 outgoing HTTP request headers.
 
-There might be more than one trace segment for the _same trace_ within a tracer at the same time.
-For example, in the diagram below, the trace passes through the "Service X" tracer twice. So for
-this trace, this tracer has two trace segments:
+There might be more than one trace segment for the _same trace_ within a tracer. For example, in the
+diagram below, the trace passes through the "Service A" tracer twice. So for this trace, this tracer
+has two trace segments:
 
 ```mermaid
 block
-  columns 11
-  a["root"]:11
-  space b[" "]:2 c[" "]:7 space
-  space:3 d["Service X - Trace segment 1"]:6 space:2
-  space:4 e["X - segment 1"] f["X - segment 1"]:4 space:2
-  space:5 g[" "]:3 space:3
-  space:6 h["Service X - Trace segment 2"]:2 space:3
-  space:6 i["X - segment 2"] j["X - segment 2"] space:3
+  columns 8
+  a["root"]:8
+  space b["Service A - Trace segment A1 - Span A1"]:6 space
+  space:2 c["Service A - Trace segment A1 - Span A2"] d["Service A - Trace segment A1 - Span A3"]:4 space
+  space:3 e["Service B"]:3 space:2
+  space:4 f["Service A - Trace segment A2 - Span A4"]:2 space:2
+  space:4 g["Service A - Trace segment A2 - Span A5"] h["Service A - Trace segment A2 - Span A6"] space:2
 ```
 
 `class TraceSegment` is defined in [trace_segment.h](../include/datadog/trace_segment.h).
