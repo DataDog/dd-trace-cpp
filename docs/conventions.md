@@ -1,4 +1,4 @@
-Here are some topics that were discussed during the design of this library.
+# Datadog C++ Tracer Conventions and Rationale
 
 - Which version of C++ do we require?
   - C++17
