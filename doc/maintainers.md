@@ -106,8 +106,8 @@ that accompany handle-to-interface are avoided.
 
 A "trace" is the entire tree of spans having the same trace ID.
 
-Within one process/worker/service, though, typically there is not an entire trace but only part of
-the trace. Let's call the process/worker/service a "tracer."
+Within one process / worker / service, though, typically there is not an entire trace but only part
+of the trace. Let's call the process / worker / service a "tracer."
 
 One portion of a trace that's passing through the tracer is called a "trace segment." A trace
 segment begins either at the trace's root span or at a span extracted from trace context, e.g. a
@@ -116,13 +116,20 @@ segment includes all local descendants of that span, and has as its "boundary" a
 without children or descendant spans that were used to inject trace context out-of-tracer, e.g. in
 outgoing HTTP request headers.
 
-There might be more than one trace segment for the _same trace_ within a tracer at the same time.
-Consider the diagram below.
+There might be more than one trace segment for the _same trace_ within a tracer. For example, in the
+diagram below, the trace passes through the "Service A" tracer twice. So for this trace, this tracer
+has two trace segments:
 
-<img src="segments.jpg" width="400" alt="flame graph"/>
-
-If our tracer is "service X," then this trace passes through the tracer twice. We would have two
-concurrent trace segments for the same trace.
+```mermaid
+block
+  columns 8
+  a["root"]:8
+  space b["Service A - Trace segment A1 - Span A1"]:6 space
+  space:2 c["Service A - Trace segment A1 - Span A2"] d["Service A - Trace segment A1 - Span A3"]:4 space
+  space:3 e["Service B"]:3 space:2
+  space:4 f["Service A - Trace segment A2 - Span A4"]:2 space:2
+  space:4 g["Service A - Trace segment A2 - Span A5"] h["Service A - Trace segment A2 - Span A6"] space:2
+```
 
 `class TraceSegment` is defined in [trace_segment.h](../include/datadog/trace_segment.h).
 `TraceSegment` objects are managed internally by the library. That is to say, a user never creates a
