@@ -2,5 +2,5 @@
 
 This directory contains documentation of the Datadog C++ Tracing Library, including:
 
-- [Design](design)
-- [Development Processes](development)
+- [Design](design.md)
+- [Development Processes](development.md)

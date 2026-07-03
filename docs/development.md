@@ -12,7 +12,7 @@ cmake --build build -j
 ./build/test/tests
 ```
 
-Alternatively, [bin/test](bin/test) is provided for convenience.
+Alternatively, [bin/test](../bin/test) is provided for convenience.
 
 ## Code Style
 
