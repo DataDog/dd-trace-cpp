@@ -1,6 +1,4 @@
-# Care and Feeding of Your New Tracing Library
-
-Congratulations! You are now the proud owner of a distributed tracing library.
+# Datadog C++ Tracing Library Design
 
 The primary purpose of this guide is to describe salient features of the library's design.
 `dd-trace-cpp` differs considerably from its [older
