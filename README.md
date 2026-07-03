@@ -1,5 +1,10 @@
 # Datadog C++ Tracing Library
 
+This repository contains the Datadog C++ Tracing Library, also known as the C++ Tracer or
+`dd-trace-cpp`.
+
+## Usage Example
+
 ```c++
 #include <datadog/span_config.h>
 #include <datadog/tracer.h>
@@ -37,7 +42,7 @@ int main() {
 }
 ```
 
-See the [examples](examples) directory for more extensive usage examples.
+See the [examples](examples) for more extensive usage examples.
 
 ## Platform Support
 
@@ -107,21 +112,12 @@ options is not needed. The `-ldd_trace_cpp` option is always needed.
 c++ -o my_app my_app.o -L/path/to/dd-trace-cpp/.install/lib -ldd_trace_cpp
 ```
 
-## Test
-
-Pass `-DDD_TRACE_BUILD_TESTING=1` to `cmake` to include the unit tests in the build.
-
-The resulting unit test executable is `test/tests` within the build directory.
-
-```shell
-cmake -B build -DDD_TRACE_BUILD_TESTING=1 .
-cmake --build build -j
-./build/test/tests
-```
-
-Alternatively, [bin/test](bin/test) is provided for convenience.
-
 ## Contributing
 
-See the [contributing guidelines](CONTRIBUTING.md) and the [maintainer docs](doc/maintainers.md) for
-information on the overall structure of the repository.
+See the [contributing guidelines](CONTRIBUTING.md) if you would like to contribute to the Datadog
+C++ Tracing Library.
+
+## Security
+
+If you discover a security vulnerablity in this sofware component, please refer to the [Security
+Policy](SECURITY.md).
