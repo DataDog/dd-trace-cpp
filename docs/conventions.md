@@ -27,6 +27,10 @@ which is used in
 and
 [string_view.h](https://github.com/DataDog/dd-trace-cpp/blob/v2.1.1/include/datadog/string_view.h#L30-L45).
 
+## Header Files Organization
+
+We separate public and private APIs. Public headers live in `include/datadog` and are the only ones exported. Internal headers live in `src` and are not installed.
+
 ## Testing Frameworks
 
 **Catch2** is used for unit tests.
@@ -45,13 +49,8 @@ and
 - `enum Color { red, green, blue };`
 - `which_one<TraceId, TraceID>`
 
-## Header Files Organization
-
-We separate public and private APIs. Public headers live in `include/datadog` and are the only ones exported. Internal headers live in `src` and are not installed.
-
 ## To be Checked / Answered / Documented…
 
-- Is a `Span` RAII with respect to start/finish?
 - When we begin calculating trace metrics within the tracer, we'll need to hit a `/stats` HTTP
   endpoint.
   - Does it live on the same thread as the `Collector`?
