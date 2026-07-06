@@ -5,8 +5,7 @@
 
 #include "msgpack.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 Expected<void> msgpack_encode(std::string& destination, const SpanLink& link) {
   const bool has_trace_id_high = link.trace_id.high != 0;
@@ -67,5 +66,4 @@ Expected<void> msgpack_encode(std::string& destination, const SpanLink& link) {
   return nullopt;
 }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing

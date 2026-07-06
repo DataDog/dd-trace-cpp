@@ -14,8 +14,7 @@
 #include "optional.h"
 #include "trace_id.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 // Convenience alias: the map type used for span link user attributes.
 using SpanLinkAttributes = std::unordered_map<std::string, std::string>;
@@ -37,5 +36,4 @@ struct SpanLink {
 // specified `link`.
 Expected<void> msgpack_encode(std::string& destination, const SpanLink& link);
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
