@@ -45,6 +45,10 @@ and
 - `enum Color { red, green, blue };`
 - `which_one<TraceId, TraceID>`
 
+## Header Files Organization
+
+We separate public and private APIs. Public headers live in `include/datadog` and are the only ones exported. Internal headers live in `src` and are not installed.
+
 ## To be Checked / Answered / Documented…
 
 - Is a `Span` RAII with respect to start/finish?
@@ -58,4 +62,3 @@ and
 - Can multiple tracers share a collector?
 - Are rate limits per-tracer, per-process, or other?
 - Which clang-format version and configuration do we use?
-- Do we separate "public" and "private" APIs, or do we export all headers?
