@@ -1,13 +1,34 @@
 # Datadog C++ Tracer Conventions and Rationale
 
-- Which version of C++ do we require?
-  - C++17
-- Which C core libraries do we produce binaries for?
-  - glibc
-  - musl
-- Which build systems do we support?
-  - CMake
-  - Bazel
+## C++ Version
+
+We use **C++17** to ensure maximum compatibility.
+
+## Build Systems
+
+**CMake** is the primary build system supported, as documented in [the main Readme](../README.md). It is
+how downstreams consumers, such as the Datadog Nginx module, embed the library (see
+[nginx-datadog/CMakeLists.txt](https://github.com/DataDog/nginx-datadog/blob/c29a57f/CMakeLists.txt#L121)).
+
+**Bazel** is used internally for CI and by the Envoy integration (see
+[envoy/source/extensions/tracers/datadog/BUILD](https://github.com/envoyproxy/envoy/blob/9d47ea91cc/source/extensions/tracers/datadog/BUILD#L52)).
+
+## C Standard Libaries
+
+We support **glibc** (GUN C Library) and [**musl**](https://en.wikipedia.org/wiki/Musl) (notably used by Alpine Linux).
+
+## C++ Standard Library vs Abseil
+
+Envoy uses [**Abseil**](https://abseil.io) instead of the C++ `std` types. It builds `dd-trace-cpp`
+with the [-DDD_USE_ABSEIL_FOR_ENVOY
+flag](https://github.com/envoyproxy/envoy/blob/9d47ea91cc/source/extensions/tracers/datadog/BUILD#L35-L38),
+which is used in
+[optional.h](https://github.com/DataDog/dd-trace-cpp/blob/v2.1.1/include/datadog/optional.h#L28-L49)
+and
+[string_view.h](https://github.com/DataDog/dd-trace-cpp/blob/v2.1.1/include/datadog/string_view.h#L30-L45).
+
+## To be Checked / Answered / Documented…
+
 - Which unit testing framework?
   - Catch2
   - Google Test
