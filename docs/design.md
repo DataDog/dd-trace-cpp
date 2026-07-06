@@ -308,8 +308,10 @@ Objects:
 - `Tracer` is responsible for creating trace segments. It contains the instances of, and
   configuration for, the `Collector`, `TraceSampler`, and `SpanSampler`. A tracer is created from a
   `TracerConfig`.
-- `TraceSampler` is used by trace segments to decide when to keep or drop themselves.
+- `TraceSampler` is used by trace segments to decide when to keep or drop themselves. It is owned
+  exclusively by one `Tracer`.
 - `SpanSampler` is used by trace segments to decide which spans to keep when the segment is dropped.
+  It is owned exclusively by one `Tracer`.
 - `TracerConfig` contains all of the information needed to configure the collector, trace sampler,
   and span sampler, as well as defaults for span properties.
 

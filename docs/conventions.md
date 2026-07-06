@@ -48,7 +48,3 @@ We separate public and private APIs. Public headers live in `include/datadog` an
 - `int public_member;`
 - `enum Color { red, green, blue };`
 - `which_one<TraceId, TraceID>`
-
-## To be Checked / Answered / Documented…
-
-- Are rate limits per-tracer, per-process, or other?
