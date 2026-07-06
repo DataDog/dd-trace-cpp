@@ -27,11 +27,14 @@ which is used in
 and
 [string_view.h](https://github.com/DataDog/dd-trace-cpp/blob/v2.1.1/include/datadog/string_view.h#L30-L45).
 
+## Testing Frameworks
+
+**Catch2** is used for unit tests.
+
+**Google Benchmark** is used for performance benchmarks.
+
 ## To be Checked / Answered / Documented…
 
-- Which unit testing framework?
-  - Catch2
-  - Google Test
 - Error handling options:
   - `std::variant<T, Error>`
   - homebrew a `std::expected<T>`
