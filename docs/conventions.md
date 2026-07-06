@@ -33,6 +33,18 @@ and
 
 **Google Benchmark** is used for performance benchmarks.
 
+## Naming Conventions
+
+- `class TypeName;`
+- `.member_function();`
+- `free_function();`
+- `f(int func_arg);`
+- `int local_var;`
+- `int private_member_;`
+- `int public_member;`
+- `enum Color { red, green, blue };`
+- `which_one<TraceId, TraceID>`
+
 ## To be Checked / Answered / Documented…
 
 - Is a `Span` RAII with respect to start/finish?
@@ -42,16 +54,6 @@ and
   - Do we invent a library-specific `HTTPClient` interface?
 - Do we keep using cURL for the default `Collector`?
   - In-tree C++ library instead?
-- Naming conventions:
-  - `class TypeName;`
-  - `.member_function();`
-  - `free_function();`
-  - `f(int func_arg);`
-  - `int local_var;`
-  - `int private_member_;`
-  - `int public_member;`
-  - `enum Color { red, green, blue };`
-  - `which_one<TraceId, TraceID>`
 - Can tracing be reconfigured at runtime?
 - Can multiple tracers share a collector?
 - Are rate limits per-tracer, per-process, or other?
