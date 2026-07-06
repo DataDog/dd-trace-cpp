@@ -5,9 +5,6 @@ design. It differs considerably from its [older
 sibling](https://github.com/DataDog/dd-opentracing-cpp) and
 [peers](https://github.com/open-telemetry/opentelemetry-cpp).
 
-This guide will also cover operations performed by maintainers of the library, such as scooping the
-box, applying flea medication, and regular trips to the vet.
-
 ## Architecture
 
 ### Span
@@ -15,77 +12,48 @@ box, applying flea medication, and regular trips to the vet.
 [class Span](../include/datadog/span.h) is the component with which users will interact the most.
 Each span:
 
-- has an "ID,"
-- is associated with a "trace ID,"
-- is associated with a "service," which has a "service type," a "version," and an "environment,"
+- has an "ID",
+- is associated with a "trace ID",
+- is associated with a "service", which has a "service type", a "version", and an "environment",
 - has a "name" (sometimes called the "operation name"),
-- has a "resource name," which is a description of the thing that the span is about,
+- has a "resource name", which is a description of the thing that the span is about,
 - contains information about whether an error occurred during the represented operation, including
   an error message, error type, and stack trace,
-- includes an arbitrary name/value mapping of strings, called "tags,"
-- has a start time indicating when the represented operation began,
-- has a duration indicating how long the represented operation took to finish.
+- includes an arbitrary name/value mapping of strings, called "tags",
+- includes an arbritrary name/value mapping of numbers, called "metrics",
+- has a "start time" indicating when the represented operation began,
+- has a "duration", known only once it finishes, indicating how long the represented operation took
+  to finish.
 
 Aside from setting and retrieving its attributes, `Span` also has the following operations:
 
-- `parent.create_child(...)` returns a new `Span` that is a child of `parent`.
-- `span.inject(writer)` writes trace propagation information to a
+- `Span::create_child()` returns a new `Span` that is a child of this `Span`.
+- `Span::inject(writer)` writes trace propagation information to a
   [DictWriter](../include/datadog/dict_writer.h), which is an interface for setting a name/value
   mapping, e.g. in HTTP request headers.
 
 A `Span` does not own its data. `class Span` contains a raw pointer to a [class
-SpanData](../src/datadog/span_data.h), which contains the actual attributes of the span. The
+SpanData](../src/datadog/span_data.h), which contains the actual attributes of the `Span`. The
 `SpanData` is owned by a `TraceSegment`, which is described in the next section. The `Span` holds a
-`shared_ptr` to its `TraceSegment`.
+`shared_ptr` to its `TraceSegment`, retrievable via `Span::trace_segment()`.
 
-By default, a span's start time is when it is created, and its end time (from which its duration is
-calculated) is when it is destroyed. However, a span's start time can be specified when it is
+By default, a `Span`'s start time is when it is created, and its end time (from which its duration
+is calculated) is when it is destroyed. However, a `Span`'s start time can be specified when it is
 created, via `SpanConfig::start` (see [span_config.h](../include/datadog/span_config.h)), and a
-span's end time can be overridden via `Span::set_end_time`.
+span's end time can be overridden via `Span::set_end_time()`.
 
-When a span is destroyed, it is considered "finished" and notifies its `TraceSegment`. There is no
-way to "finish" a span without destroying it. You can override its end time throughout the lifetime
-of the `Span` object, but a `TraceSegment` does not consider the span finished until the `Span`
-object is destroyed. This allows us to avoid "finished" `Span` states.
+When a `Span` is destroyed, it is considered "finished" and notifies its `TraceSegment`. There is no
+way to "finish" a `Span` without destroying it. You can override its end time throughout the
+lifetime of the `Span` object, but a `TraceSegment` does not consider the `Span` finished until the
+`Span` object is destroyed. This allows us to avoid "finished" `Span` states.
 
 Along similar lines, `class Span` is move-only. Its copy constructor is deleted. Functions that
-produce spans return them by value, but only one copy of a span can exist at a time. In fact, `class
-Span` is even more strict than move-only: its assignment operator is deleted, including the
-move-assignment operator. To see why, consider the following (disallowed) example:
+produce `Span`s return them by value, but only one copy of a `Span` can exist at a time.
 
-```c++
-Span span = tracer.create_span();
-// ...
-// Let's reuse the variable `span`.
-span = tracer.create_span();
-```
-
-Move assignment begins with two objects and ends up with one object (and one empty shell of an
-object).
-
-Since destroying a `Span` has the side effect of finishing it, one sensible definition of
-`Span::operator=(Span&& other)` would be equivalent to:
-
-```c++
-this->~Span();
-new (this) Span(std::move(other));
-return *this;
-```
-
-This would have the potentially surprising feature of _finishing_ the first span when you wish to
-replace it with another, i.e. there would always be two spans.
-
-This could be avoided if we could guarantee that the two `Span`s belong to the same `TraceSegment`.
-Then move-assigning a `Span` could be defined as move-assigning its `SpanData` and somehow
-annotating the moved-from `SpanData` as being invalid. However, if the two `Span`s belong to
-different `TraceSegment`s, then it could be that the moved-to `Span`'s `TraceSegment` consists of
-only that one `Span`. Now we have to account for empty `TraceSegment` states. This could all be
-dealt with, but no matter what we decide, it would always be the case that `Span::operator=(Span&&)`
-has the effect of making the original span (`this`) either finish implicitly or _disappear
-entirely_, which is at odds with its otherwise
-[RAII](https://en.cppreference.com/w/cpp/language/raii) nature.
-
-To avoid these issues, assignment to `Span` objects is disallowed.
+`class Span` is even stricter than move-only: its assignment operator is deleted too, including
+move-assignment. Since destroying a `Span` finishes it, move-assignment would have to either finish
+the original `Span` early or leave two `Span`s referring to one finished state, both at odds with
+its otherwise [RAII](https://en.cppreference.com/w/cpp/language/raii) nature.
 
 Another opinionated property of `Span` is that it is not an interface, nor does it implement an
 interface. Usually it is considered polite for a C++ library to deal in handles (`unique_ptr` or
@@ -93,7 +61,7 @@ interface. Usually it is considered polite for a C++ library to deal in handles 
 the library can substitute an alternative implementation to the interface(s) for testing or for when
 the behavior of the library is not desired.
 
-At the risk of being impolite, dd-trace-cpp takes a different approach. `Span` is a concrete type
+At the risk of being impolite, `dd-trace-cpp` takes a different approach. `Span` is a concrete type
 whose behavior cannot be substituted. Instead, there are other places in the library where
 dependency injection can be used to restrict or alter the behavior of the library. The trade-off is
 that `Span` and related components must always "go through the motions" of their definitions and
