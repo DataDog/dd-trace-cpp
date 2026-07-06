@@ -444,7 +444,7 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   stored.link.span_id = upstream_id;
   for (const auto& hdr : *http_headers) {
     if (hdr.size() != 2) continue;
-    const auto name = hdr[0].get<std::string>();
+    const auto name = utils::tolower(hdr[0].get<std::string>());
     if (name == "tracestate") {
       stored.link.tracestate = hdr[1].get<std::string>();
     } else if (name == "traceparent") {
