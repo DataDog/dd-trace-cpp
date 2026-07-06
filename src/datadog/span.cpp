@@ -171,24 +171,29 @@ void Span::add_link(const Span& linked, const SpanLinkAttributes& attrs) {
   link.span_id = linked.id();
   link.attributes = attrs;
 
-  // Capture injected headers (tracestate, traceparent flags) into a map.
+  // inject linked span to get its tracestate, traceparent flags)
   struct : DictWriter {
     std::unordered_map<std::string, std::string> map;
     void set(StringView k, StringView v) override {
-      map[std::string(k)] = std::string(v);
+      if (k == "tracestate" || k == "traceparent") {
+        map[std::string(k)] = std::string(v);
+      }
     }
-  } w;
-  linked.inject(w);
-  if (auto it = w.map.find("tracestate"); it != w.map.end()) {
+  } injected_headers;
+  linked.inject(injected_headers);
+
+  if (auto it = injected_headers.map.find("tracestate");
+      it != injected_headers.map.end()) {
     link.tracestate = it->second;
   }
-  if (auto it = w.map.find("traceparent"); it != w.map.end()) {
-    const auto& tp = it->second;
-    const auto pos = tp.rfind('-');
-    if (pos != std::string::npos && pos + 1 < tp.size()) {
+  if (auto it = injected_headers.map.find("traceparent");
+      it != injected_headers.map.end()) {
+    const auto& traceparent = it->second;
+    const auto pos = traceparent.rfind('-');
+    if (pos != std::string::npos && pos + 1 < traceparent.size()) {
       try {
         link.flags = static_cast<std::uint32_t>(
-            std::stoul(tp.substr(pos + 1), nullptr, 16));
+            std::stoul(traceparent.substr(pos + 1), nullptr, 16));
       } catch (...) {
       }
     }
