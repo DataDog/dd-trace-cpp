@@ -185,11 +185,13 @@ in a subsequent section.
 `class Collector` is an interface for sending a `TraceSegment`'s spans somewhere once they're all
 done. It's defined in [collector.h](../include/datadog/collector.h).
 
-It's just one function: `send`. More of a callback than an interface.
+It's just one function: `send()`. More of a callback than an interface.
 
 A `Collector` is either created by `Tracer` or injected into its configuration. The `Collector`
 instance is then shared with all `TraceSegment`s created by the `Tracer`. The only thing that a
-`TraceSegment` does with the `Collector` is call `send` once the segment is finished.
+`TraceSegment` does with the `Collector` is call `send()` once the segment is finished.
+
+A `Collector` can also be shared by several `Tracer`s.
 
 The default implementation is `DatadogAgent`, which is described in the next section.
 
@@ -306,8 +308,10 @@ Objects:
 - `Tracer` is responsible for creating trace segments. It contains the instances of, and
   configuration for, the `Collector`, `TraceSampler`, and `SpanSampler`. A tracer is created from a
   `TracerConfig`.
-- `TraceSampler` is used by trace segments to decide when to keep or drop themselves.
+- `TraceSampler` is used by trace segments to decide when to keep or drop themselves. It is owned
+  exclusively by one `Tracer`.
 - `SpanSampler` is used by trace segments to decide which spans to keep when the segment is dropped.
+  It is owned exclusively by one `Tracer`.
 - `TracerConfig` contains all of the information needed to configure the collector, trace sampler,
   and span sampler, as well as defaults for span properties.
 
@@ -321,8 +325,11 @@ Intended usage is:
 6. When all `Span`s in `TraceSegment` are finished, the segment is sent to the
    `Collector`.
 
-Different instances of `Tracer` are independent of each other. If an application wishes to
-reconfigure tracing at runtime, it can create another `Tracer` using the new configuration.
+Different instances of `Tracer` are independent of each other.
+
+If an application wishes to reconfigure tracing at runtime, it can create another `Tracer` using the
+new configuration. Some behavior (sampling rate / rules, trace reporting, tags) is reconfigurable at
+runtime via Remote Config, through `ConfigManager`.
 
 ## EventScheduler
 

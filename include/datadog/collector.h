@@ -15,18 +15,18 @@
 
 #include "expected.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 struct SpanData;
 class TraceSampler;
 
 class Collector {
  public:
-  // Submit ownership of the specified `spans` to the collector. If the
-  // collector delivers a response relevant to trace sampling, reconfigure the
-  // sampler using the specified `response_handler`. Return an error if one
-  // occurs.
+  // Submit ownership of the specified `spans` to the collector.
+  // If the collector delivers a response relevant to trace sampling,
+  // reconfigure the sampler using the specified `response_handler`. Return an
+  // error if one occurs. This must be safe to call from multiple threads
+  // concurrently.
   virtual Expected<void> send(
       std::vector<std::unique_ptr<SpanData>>&& spans,
       const std::shared_ptr<TraceSampler>& response_handler) = 0;
@@ -43,5 +43,4 @@ class Collector {
   virtual ~Collector() {}
 };
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
