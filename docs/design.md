@@ -185,11 +185,13 @@ in a subsequent section.
 `class Collector` is an interface for sending a `TraceSegment`'s spans somewhere once they're all
 done. It's defined in [collector.h](../include/datadog/collector.h).
 
-It's just one function: `send`. More of a callback than an interface.
+It's just one function: `send()`. More of a callback than an interface.
 
 A `Collector` is either created by `Tracer` or injected into its configuration. The `Collector`
 instance is then shared with all `TraceSegment`s created by the `Tracer`. The only thing that a
-`TraceSegment` does with the `Collector` is call `send` once the segment is finished.
+`TraceSegment` does with the `Collector` is call `send()` once the segment is finished.
+
+A `Collector` can also be shared by several `Tracer`s.
 
 The default implementation is `DatadogAgent`, which is described in the next section.
 
