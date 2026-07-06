@@ -51,6 +51,5 @@ We separate public and private APIs. Public headers live in `include/datadog` an
 
 ## To be Checked / Answered / Documented…
 
-- Can tracing be reconfigured at runtime?
 - Can multiple tracers share a collector?
 - Are rate limits per-tracer, per-process, or other?

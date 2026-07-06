@@ -321,8 +321,11 @@ Intended usage is:
 6. When all `Span`s in `TraceSegment` are finished, the segment is sent to the
    `Collector`.
 
-Different instances of `Tracer` are independent of each other. If an application wishes to
-reconfigure tracing at runtime, it can create another `Tracer` using the new configuration.
+Different instances of `Tracer` are independent of each other.
+
+If an application wishes to reconfigure tracing at runtime, it can create another `Tracer` using the
+new configuration. Some behavior (sampling rate / rules, trace reporting, tags) is reconfigurable at
+runtime via Remote Config, through `ConfigManager`.
 
 ## EventScheduler
 
