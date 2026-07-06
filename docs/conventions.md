@@ -51,10 +51,6 @@ We separate public and private APIs. Public headers live in `include/datadog` an
 
 ## To be Checked / Answered / Documented…
 
-- When we begin calculating trace metrics within the tracer, we'll need to hit a `/stats` HTTP
-  endpoint.
-  - Does it live on the same thread as the `Collector`?
-  - Do we invent a library-specific `HTTPClient` interface?
 - Do we keep using cURL for the default `Collector`?
   - In-tree C++ library instead?
 - Can tracing be reconfigured at runtime?
