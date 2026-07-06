@@ -35,12 +35,6 @@ and
 
 ## To be Checked / Answered / Documented…
 
-- Error handling options:
-  - `std::variant<T, Error>`
-  - homebrew a `std::expected<T>`
-  - `throw Error(...)`
-  - `RCode do_thing(T& output)`
-  - `struct Result { Error error; T value; }`
 - Is a `Span` RAII with respect to start/finish?
 - When we begin calculating trace metrics within the tracer, we'll need to hit a `/stats` HTTP
   endpoint.
