@@ -22,8 +22,7 @@ Each span:
 - includes an arbitrary name/value mapping of strings, called "tags",
 - includes an arbritrary name/value mapping of numbers, called "metrics",
 - has a "start time" indicating when the represented operation began,
-- has a "duration", known only once it finishes, indicating how long the represented operation took
-  to finish.
+- has a "duration", known only once it finishes, indicating how long the represented operation took.
 
 Aside from setting and retrieving its attributes, `Span` also has the following operations:
 
