@@ -7,6 +7,8 @@
 
 #include <cassert>
 #include <cstddef>
+#include <string>
+#include <vector>
 
 #include "msgpack.h"
 #include "tags.h"
@@ -74,84 +76,86 @@ void SpanData::apply_config(const SpanDefaults& defaults,
 }
 
 Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
-  // clang-format off
-  const bool has_links = !span.span_links.empty();
+  auto pack_service = [&](auto& destination) {
+    return msgpack::pack_string(destination, span.service);
+  };
+  auto pack_name = [&](auto& destination) {
+    return msgpack::pack_string(destination, span.name);
+  };
+  auto pack_resource = [&](auto& destination) {
+    return msgpack::pack_string(destination, span.resource);
+  };
+  auto pack_trace_id = [&](auto& destination) {
+    msgpack::pack_integer(destination, span.trace_id.low);
+    return Expected<void>{};
+  };
+  auto pack_span_id = [&](auto& destination) {
+    msgpack::pack_integer(destination, span.span_id);
+    return Expected<void>{};
+  };
+  auto pack_parent_id = [&](auto& destination) {
+    msgpack::pack_integer(destination, span.parent_id);
+    return Expected<void>{};
+  };
+  auto pack_start = [&](auto& destination) {
+    msgpack::pack_integer(
+        destination,
+        std::uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                          span.start.wall.time_since_epoch())
+                          .count()));
+    return Expected<void>{};
+  };
+  auto pack_duration = [&](auto& destination) {
+    msgpack::pack_integer(
+        destination,
+        std::uint64_t(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(span.duration)
+                .count()));
+    return Expected<void>{};
+  };
+  auto pack_error = [&](auto& destination) {
+    msgpack::pack_integer(destination, std::int32_t(span.error));
+    return Expected<void>{};
+  };
+  auto pack_meta = [&](auto& destination) {
+    return msgpack::pack_map(destination, span.tags,
+                             [](std::string& destination, const auto& value) {
+                               return msgpack::pack_string(destination, value);
+                             });
+  };
+  auto pack_metrics = [&](auto& destination) {
+    return msgpack::pack_map(destination, span.numeric_tags,
+                             [](std::string& destination, const auto& value) {
+                               msgpack::pack_double(destination, value);
+                               return Expected<void>{};
+                             });
+  };
+  auto pack_type = [&](auto& destination) {
+    return msgpack::pack_string(destination, span.service_type);
+  };
 
-  // 12 always-present fields, plus span_links when there are any.
-  auto result = msgpack::pack_map(destination, has_links ? 13u : 12u);
-  if (!result) return result;
-
-  result = msgpack::pack_map_suffix(
-      destination,
-      "service", [&](auto& destination) {
-         return msgpack::pack_string(destination, span.service);
-       },
-      "name", [&](auto& destination) {
-         return msgpack::pack_string(destination, span.name);
-       },
-      "resource", [&](auto& destination) {
-         return msgpack::pack_string(destination, span.resource);
-       },
-      "trace_id", [&](auto& destination) {
-         msgpack::pack_integer(destination, span.trace_id.low);
-         return Expected<void>{};
-       },
-      "span_id", [&](auto& destination) {
-         msgpack::pack_integer(destination, span.span_id);
-         return Expected<void>{};
-       },
-      "parent_id", [&](auto& destination) {
-         msgpack::pack_integer(destination, span.parent_id);
-         return Expected<void>{};
-       },
-      "start", [&](auto& destination) {
-         msgpack::pack_integer(
-             destination, std::uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                              span.start.wall.time_since_epoch())
-                              .count()));
-         return Expected<void>{};
-       },
-      "duration", [&](auto& destination) {
-         msgpack::pack_integer(
-             destination,
-             std::uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(span.duration)
-                 .count()));
-        return Expected<void>{};
-       },
-      "error", [&](auto& destination) {
-         msgpack::pack_integer(destination, std::int32_t(span.error));
-         return Expected<void>{};
-       },
-      "meta", [&](auto& destination) {
-         return msgpack::pack_map(destination, span.tags,
-                           [](std::string& destination, const auto& value) {
-                             return msgpack::pack_string(destination, value);
-                           });
-       }, "metrics",
-       [&](auto& destination) {
-         return msgpack::pack_map(destination, span.numeric_tags,
-                           [](std::string& destination, const auto& value) {
-                             msgpack::pack_double(destination, value);
-                             return Expected<void>{};
-                           });
-       }, "type", [&](auto& destination) {
-         return msgpack::pack_string(destination, span.service_type);
-       });
-  if (!result) return result;
-
-  if (has_links) {
-    result = msgpack::pack_string(destination, "span_links");
-    if (!result) return result;
-    result = msgpack::pack_array(
-        destination, span.span_links,
-        [](std::string& destination, const SpanLink& link) {
-          return msgpack_encode(destination, link);
-        });
-    if (!result) return result;
+  if (span.span_links.empty()) {
+    return msgpack::pack_map(
+        destination, "service", pack_service, "name", pack_name, "resource",
+        pack_resource, "trace_id", pack_trace_id, "span_id", pack_span_id,
+        "parent_id", pack_parent_id, "start", pack_start, "duration",
+        pack_duration, "error", pack_error, "meta", pack_meta, "metrics",
+        pack_metrics, "type", pack_type);
+  } else {
+    auto pack_span_links = [&](auto& destination) {
+      return msgpack::pack_array(
+          destination, span.span_links,
+          [](std::string& destination, const SpanLink& link) {
+            return msgpack_encode(destination, link);
+          });
+    };
+    return msgpack::pack_map(
+        destination, "service", pack_service, "name", pack_name, "resource",
+        pack_resource, "trace_id", pack_trace_id, "span_id", pack_span_id,
+        "parent_id", pack_parent_id, "start", pack_start, "duration",
+        pack_duration, "error", pack_error, "meta", pack_meta, "metrics",
+        pack_metrics, "type", pack_type, "span_links", pack_span_links);
   }
-  // clang-format on
-
-  return nullopt;
 }
 
 Expected<void> msgpack_encode(
