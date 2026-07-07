@@ -237,6 +237,41 @@ void RequestHandler::on_set_meta(const httplib::Request& req,
   res.status = 200;
 }
 
+// Parse optional attributes, supporting flat strings and arrays.
+static datadog::tracing::SpanLinkAttributes parse_link_attributes(
+    nlohmann::basic_json<> request_json) {
+  datadog::tracing::SpanLinkAttributes link_attributes;
+
+  auto attributes = request_json.find("attributes");
+  if (attributes == request_json.cend() || attributes->is_object()) {
+    return link_attributes;
+  }
+
+  for (const auto& [key, value] : attributes->items()) {
+    if (value.is_string()) {
+      link_attributes.emplace(key, value.get<std::string>());
+    } else if (value.is_array()) {
+      std::size_t idx = 0;
+      for (const auto& elem : value) {
+        std::string flat_key = key + "." + std::to_string(idx++);
+        if (elem.is_string()) {
+          link_attributes.emplace(flat_key, elem.get<std::string>());
+        } else if (elem.is_boolean()) {
+          link_attributes.emplace(flat_key,
+                                  elem.get<bool>() ? "true" : "false");
+        } else if (elem.is_number_integer()) {
+          link_attributes.emplace(flat_key,
+                                  std::to_string(elem.get<int64_t>()));
+        } else if (elem.is_number_float()) {
+          link_attributes.emplace(flat_key, std::to_string(elem.get<double>()));
+        }
+      }
+    }
+  }
+
+  return link_attributes;
+}
+
 void RequestHandler::on_add_link(const httplib::Request& req,
                                  httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);
@@ -251,36 +286,13 @@ void RequestHandler::on_add_link(const httplib::Request& req,
     VALIDATION_ERROR(res, "on_add_link: missing `parent_id` field.");
   }
 
-  auto span_it = active_spans_.find(*span_id);
-  if (span_it == active_spans_.cend()) {
+  auto span_link_attributes = parse_link_attributes(request_json);
+
+  auto span = active_spans_.find(*span_id);
+  if (span == active_spans_.cend()) {
     const auto msg =
         "on_add_link: span not found for id " + std::to_string(*span_id);
     VALIDATION_ERROR(res, msg);
-  }
-
-  // Parse optional attributes, supporting flat strings and arrays.
-  datadog::tracing::SpanLinkAttributes attrs;
-  if (auto attributes = request_json.find("attributes");
-      attributes != request_json.cend() && attributes->is_object()) {
-    for (const auto& [key, value] : attributes->items()) {
-      if (value.is_string()) {
-        attrs.emplace(key, value.get<std::string>());
-      } else if (value.is_array()) {
-        std::size_t idx = 0;
-        for (const auto& elem : value) {
-          std::string flat_key = key + "." + std::to_string(idx++);
-          if (elem.is_string()) {
-            attrs.emplace(flat_key, elem.get<std::string>());
-          } else if (elem.is_boolean()) {
-            attrs.emplace(flat_key, elem.get<bool>() ? "true" : "false");
-          } else if (elem.is_number_integer()) {
-            attrs.emplace(flat_key, std::to_string(elem.get<int64_t>()));
-          } else if (elem.is_number_float()) {
-            attrs.emplace(flat_key, std::to_string(elem.get<double>()));
-          }
-        }
-      }
-    }
   }
 
   // The linked context is either another active span or a previously extracted
@@ -295,14 +307,14 @@ void RequestHandler::on_add_link(const httplib::Request& req,
       if (hdr.size() == 2 &&
           hdr[0].get<std::string>() == "x-datadog-sampling-priority") {
         try {
-          span_it->second.trace_segment().override_sampling_priority(
+          span->second.trace_segment().override_sampling_priority(
               std::stoi(hdr[1].get<std::string>()));
         } catch (...) {
         }
         break;
       }
     }
-    span_it->second.add_link(linked_it->second, attrs);
+    span->second.add_link(linked_it->second, span_link_attributes);
   } else {
     auto context_it = link_contexts_.find(*parent_id);
     if (context_it == link_contexts_.cend()) {
@@ -312,12 +324,13 @@ void RequestHandler::on_add_link(const httplib::Request& req,
     }
     const auto& stored = context_it->second;
     if (stored.sampling_priority.has_value()) {
-      span_it->second.trace_segment().override_sampling_priority(
+      span->second.trace_segment().override_sampling_priority(
           *stored.sampling_priority);
     }
     datadog::tracing::SpanLink link = stored.link;
-    link.attributes.insert(attrs.begin(), attrs.end());
-    span_it->second.add_link(link);
+    link.attributes.insert(span_link_attributes.begin(),
+                           span_link_attributes.end());
+    span->second.add_link(link);
   }
 
   res.status = 200;
