@@ -71,8 +71,8 @@ that accompany handle-to-interface are avoided.
 
 A "trace" is the entire tree of spans having the same trace ID.
 
-Within one process / worker / service, though, typically there is not an entire trace but only part
-of the trace. Let's call the process / worker / service a "tracer."
+Within one process/worker/service, though, typically there is not an entire trace but only part
+of the trace. Let's call the process/worker/service a "tracer."
 
 One portion of a trace that's passing through the tracer is called a "trace segment." A trace
 segment begins either at the trace's root span or at a span extracted from trace context, e.g. a
@@ -103,23 +103,23 @@ block
 The library creates a `TraceSegment` whenever a new trace is created or when trace context is
 extracted. This is the job of `class Tracer`, described in the next section.
 
-Primarily, `TraceSegment` is a bag of spans. It contains a `vector<unique_ptr<SpanData>>`. `Span`
-objects then refer to the `SpanData` objects via raw pointers. Now that I think about it,
-`deque<SpanData>` would work just as well.
+Primarily, `TraceSegment` is a bag of `Span`s. It contains a `vector<unique_ptr<SpanData>>`. `Span`
+objects then refer to the `SpanData`s via raw pointers.
 
-When one of a trace segment's spans creates a child, the child is registered with the trace segment.
-When a span is finished, the trace segment is notified. The trace segment keeps track of how many
-spans it contains (the size of its `vector`) and how many spans are finished. When the two numbers
-are equal, the trace segment is finished.
+When one of a `TraceSegment`'s `Span`s creates a child, the child is registered with the
+`TraceSegment`. When a `Span` is finished, the `TraceSegment` is notified. The `TraceSegment` keeps
+track of how many `Span`s it contains (the size of its `vector`) and how many `Span`s are finished.
+When the two numbers are equal, the `TraceSegment` is finished.
 
-When a trace segment is finished, it performs some finalization logic in order to prepare its spans
-for submission to the `Collector`. Then it moves its spans into the collector via `Collector::send`,
-and a short time later the trace segment is destroyed. See `TraceSegment::span_finished` in
-[trace_segment.cpp](../src/datadog/trace_segment.cpp). `Collector` is described in a subsequent
-section.
+When a `TraceSegment` is finished, it uses a `TraceSampler` to decide whether to keep or drop
+itself, and, if it is dropped, a `SpanSampler` to decide which `Span`s to keep anyway. It then
+performs finalization logic in order to prepare its `Span`s for submission to the `Collector`. Then
+it moves its `Span`s into the `Collector` via `Collector::send()`, and a short time later the
+`TraceSegment` is destroyed. See `TraceSegment::span_finished()`. `Collector` is described in a
+subsequent section.
 
-A `TraceSegment` contains `shared_ptr`s to everything that it needs in order to do its job. Those
-objects are created by `class Tracer` when the tracer is configured, and then shared with
+A `TraceSegment` contains `shared_ptr`s to the main objects it needs in order to do its job. Those
+objects are created by `class Tracer` when the `Tracer` is configured, and then shared with
 `TraceSegment` when the `TraceSegment` is created.
 
 ### Tracer
@@ -127,14 +127,8 @@ objects are created by `class Tracer` when the tracer is configured, and then sh
 `class Tracer` is what users configure, and it is how `Span`s are extracted from trace context or
 created as a trace's root. See [tracer.h](../include/datadog/tracer.h).
 
-`Tracer` has two member functions:
-
-- `create_span(...)`
-- `extract_span(...)`
-
-and another that combines them:
-
-- `extract_or_create_span(...)`.
+`Tracer` has two main member functions: `Tracer::create_span()` and  `Tracer::extract_span()`, and
+another that combines them: `Tracer::extract_or_create_span()`.
 
 All of these result in the creation of a new `TraceSegment` (or otherwise return an error). The
 `Tracer`'s data members, which were initialized based on the tracer's configuration, are copied into
