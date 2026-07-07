@@ -60,5 +60,9 @@ class RequestHandler final {
   // explaining the name :)
   std::vector<datadog::tracing::Span> blackhole_;
 
+  static StoredLinkContext make_link_context(
+      const datadog::tracing::Expected<datadog::tracing::Span>& span,
+      const datadog::tracing::Optional<nlohmann::json::array_t>& headers);
+
 #undef VALIDATION_ERROR
 };

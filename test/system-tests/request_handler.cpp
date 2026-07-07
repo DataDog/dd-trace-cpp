@@ -433,29 +433,15 @@ void RequestHandler::on_inject_headers(const httplib::Request& req,
   res.set_content(response_json.dump(), "application/json");
 }
 
-void RequestHandler::on_extract_headers(const httplib::Request& req,
-                                        httplib::Response& res) {
-  const auto request_json = nlohmann::json::parse(req.body);
-  auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
-      request_json, "http_headers");
-  if (!http_headers) {
-    VALIDATION_ERROR(res, "on_extract_headers: missing `http_headers` field.");
-  }
-
-  auto span = tracer_.extract_span(utils::HeaderReader(*http_headers));
-
-  if (span.if_error()) {
-    const auto response_body_fail = nlohmann::json{{"span_id", nullptr}};
-    res.set_content(response_body_fail.dump(), "application/json");
-    return;
-  }
-
+RequestHandler::StoredLinkContext RequestHandler::make_link_context(
+    const datadog::tracing::Expected<datadog::tracing::Span>& span,
+    const datadog::tracing::Optional<nlohmann::json::array_t>& headers) {
   const auto upstream_id = span->parent_id().value_or(0);
 
   StoredLinkContext stored;
   stored.link.trace_id = span->trace_id();
   stored.link.span_id = upstream_id;
-  for (const auto& hdr : *http_headers) {
+  for (const auto& hdr : *headers) {
     if (hdr.size() != 2) continue;
     const auto name = utils::tolower(hdr[0].get<std::string>());
     if (name == "tracestate") {
@@ -481,10 +467,31 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   if (!stored.link.flags.has_value() && stored.sampling_priority.has_value()) {
     stored.link.flags = *stored.sampling_priority > 0 ? 1u : 0u;
   }
+  return stored;
+}
+
+void RequestHandler::on_extract_headers(const httplib::Request& req,
+                                        httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+  auto http_headers = utils::get_if_exists<nlohmann::json::array_t>(
+      request_json, "http_headers");
+  if (!http_headers) {
+    VALIDATION_ERROR(res, "on_extract_headers: missing `http_headers` field.");
+  }
+
+  auto span = tracer_.extract_span(utils::HeaderReader(*http_headers));
+
+  if (span.if_error()) {
+    const auto response_body_fail = nlohmann::json{{"span_id", nullptr}};
+    res.set_content(response_body_fail.dump(), "application/json");
+    return;
+  }
+
+  const auto upstream_id = span->parent_id().value_or(0);
 
   const auto response_body = nlohmann::json{{"span_id", upstream_id}};
+  link_contexts_[upstream_id] = make_link_context(span, http_headers);
   tracing_context_[upstream_id] = std::move(*http_headers);
-  link_contexts_[upstream_id] = std::move(stored);
 
   // The span below will not be finished and flushed.
   blackhole_.emplace_back(std::move(*span));
