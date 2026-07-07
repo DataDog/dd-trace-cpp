@@ -78,8 +78,8 @@ One portion of a trace that's passing through the tracer is called a "trace segm
 segment begins either at the trace's root span or at a span extracted from trace context, e.g. a
 span created from the `X-Datadog-Trace-Id` and `X-Datadog-Parent-Id` HTTP request headers. The trace
 segment includes all local descendants of that span, and has as its "boundary" any descendant spans
-without children or descendant spans that were used to inject trace context out-of-tracer, e.g. in
-outgoing HTTP request headers.
+without children or descendant spans that were used to inject trace context out-of-tracer (described
+in a subsequent section).
 
 There might be more than one trace segment for the _same trace_ within a tracer. For example, in the
 diagram below, the trace passes through the "Service A" tracer twice. So for this trace, this tracer
@@ -140,6 +140,29 @@ The bulk of `Tracer`'s implementation is `extract_span`. The other substantial w
 configuration, which is handled by `finalize_config(const TracerConfig&)`, declared in
 [tracer_config.h](../include/datadog/tracer_config.h). Configuration will be described in more depth
 in a subsequent section.
+
+### Trace Context Propagation
+
+Trace context propagation is how spans in different tracers become part of the same trace. When a
+trace crosses a tracer boundary (e.g. an outgoing HTTP request), the trace ID, the ID of the span
+that initiated the request, and the trace's sampling decision must travel with it, so that the
+receiving tracer can create spans belonging to the same trace.
+
+There are two directions:
+
+- Injection: `Span::inject()` writes the current trace context into a carrier (e.g. outgoing HTTP
+  headers).
+- Extraction: `Tracer::extract_span()` reads trace context from a carrier (e.g. incoming HTTP
+  headers), and uses it to create a `Span` that continues the trace.
+
+Several wire formats, "propagation styles", are supported. A `Tracer… can be configured with
+multiple stlyes for both injection and extraction.
+
+A trace's sampling decision, once made, is part of what gets propagated: every tracer the trace
+passes through agrees on whether it's kept or dropped, rather than deciding independently.
+
+Propagation can also be suppressed: if tracing is disabled for a trace and no other product depends
+on it continuing, context is not injected at all.
 
 ### Collector
 
