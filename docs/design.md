@@ -72,9 +72,9 @@ that accompany handle-to-interface are avoided.
 A "trace" is the entire tree of spans having the same trace ID.
 
 Within one process/worker/service, though, typically there is not an entire trace but only part
-of the trace. Let's call the process/worker/service a "tracer."
+of the trace. Let's call the process/worker/service a "tracer".
 
-One portion of a trace that's passing through the tracer is called a "trace segment." A trace
+One portion of a trace that's passing through the tracer is called a "trace segment". A trace
 segment begins either at the trace's root span or at a span extracted from trace context, e.g. a
 span created from the `X-Datadog-Trace-Id` and `X-Datadog-Parent-Id` HTTP request headers. The trace
 segment includes all local descendants of that span, and has as its "boundary" any descendant spans
@@ -324,51 +324,37 @@ which uses Envoy's built-in event dispatch facilities.
 
 ## Configuration
 
-There's a good [blog post](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/) by
-[Alexis King](https://lexi-lambda.github.io/about.html) where she makes the case for encoding
-configuration validation into the type system. Forbid invalid states by making configurable
-components accept a different type than that which is used to specify configuration.
+This library encodes configuration validation into the type system (see ["Parse, don't validate" by
+Alexis King](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate)). Invalid states
+are forbidden by making configurable components accept a different, validated type than the one used
+to specify configuration.
 
-This is not a new idea. It's been used, for example, to "taint" strings that originate as program
-inputs. Then you can't accidentally pass user-influenced inputs to, say, `std::system`, because
-`std::system` takes a `const char*`, not a `class UserTaintedString`. There's still ample
-opportunity to cast away the taint and sneak it into some string building operation, but at least
-`class UserTaintedString` gives hope that a static analysis tool could be used to fill in some gaps
-in human code review.
-
-This library adopts that approach for configuration. The configuration of `class Tracer` is `class
-TracerConfig`, but in order to construct a `Tracer` you must first convert the `TracerConfig` into a
-`FinalizedTracerConfig` by calling `finalize_config`. If there is anything wrong with the
-`TracerConfig` or with environment variables that would override it, `finalize_config` will return
-an `Error` instead of a `FinalizedTracerConfig`. In that case, you can't create a `Tracer` at all.
+The configuration of `Tracer` is `TracerConfig`, but in order to construct a `Tracer` you must first
+convert the `TracerConfig` into a `FinalizedTracerConfig` by calling `finalize_config()`. If there
+is anything wrong with the `TracerConfig` or with environment variables that would override it,
+`finalize_config()` will return an `Error` instead of a `FinalizedTracerConfig`. In that case, you
+can't create a `Tracer` at all.
 
 This technique applies to multiple components:
 
 | Component | Unvalidated | Validated | Parser |
-| --------------- | ----------- | --------- | ----------------- |
-| `Tracer` | `TracerConfig` | `FinalizedTracerConfig` | `finalize_config` in [tracer_config.h](../include/datadog/tracer_config.h) |
-| `DatadogAgent` | `DatadogAgentConfig` | `FinalizedDatadogAgentConfig` |  `finalize_config` in [datadog_agent_config.h](../include/datadog/datadog_agent_config.h) |
-| `TraceSampler` | `TraceSamplerConfig` | `FinalizedTraceSamplerConfig` |  `finalize_config` in [trace_sampler_config.h](../include/datadog/trace_sampler_config.h) |
-| `SpanSampler` | `SpanSamplerConfig` | `FinalizedSpanSamplerConfig` |  `finalize_config` in [span_sampler_config.h](../include/datadog/span_sampler_config.h) |
-| multiple | `double` | `Rate` | `Rate::from` in [rate.h](../include/datadog/rate.h) |
-
-An alternative approach, that Caleb espouses, is to accept invalid configuration quietly. When
-invalid configuration is detected, the library could substitute a reasonable default and then send
-notice of the configuration issue to Datadog, e.g. as a hidden span tag. That information would then
-be available to Support should the customer raise an issue due to a difference in behavior between
-what they see and what they think they configured. This approach is also resilient to dynamic
-configuration changes. Rather than a "bad config update" causing tracing to cease completely,
-instead tracing could continue to operate in the defaulted mode.
-
-This library uses the stricter approach. The downside is that a user of the library has to decide
-what to do when even the slightest part of the configuration or environment is deemed invalid.
+| --------- | ----------- | --------- | ------ |
+| `Tracer` | `TracerConfig` | `FinalizedTracerConfig` | `finalize_config()` in [tracer_config.h](../include/datadog/tracer_config.h) |
+| `DatadogAgent` | `DatadogAgentConfig` | `FinalizedDatadogAgentConfig` |  `finalize_config()` in [datadog_agent_config.h](../include/datadog/datadog_agent_config.h) |
+| `TraceSampler` | `TraceSamplerConfig` | `FinalizedTraceSamplerConfig` |  `finalize_config()` in [trace_sampler_config.h](../include/datadog/trace_sampler_config.h) |
+| `SpanSampler` | `SpanSamplerConfig` | `FinalizedSpanSamplerConfig` |  `finalize_config()` in [span_sampler_config.h](../include/datadog/span_sampler_config.h) |
+| multiple | `double` | `Rate` | `Rate::from()` in [rate.h](../include/datadog/rate.h) |
 
 One other convention of the library is that `FinalizedFooConfig` (for some `Foo`) is never a data
 member of the configured component class. That is, `FinalizedTracerConfig` is not stored in
 `Tracer`. Instead, a constructor might individually copy the finalized config's data members. This
 is to prevent eventual intermixing between the "configuration representation" and the "runtime
-representation." In part, `finalize_config` already mitigates the problem. Abstaining from storing
+representation". In part, `finalize_config()` already mitigates the problem. Abstaining from storing
 the finalized config as a data member is a step further.
+
+This static validation happens once, at construction. `ConfigManager`, which is a `Tracer` member,
+separately allows some configuration to change afterward, via Remote Configuration update, rather
+than through `finalize_config()`. This path is also validated, by a different parser.
 
 ## Error Handling
 
@@ -513,7 +499,7 @@ Why bother with `if_error`? Because I like it! I'm a sucker for structured bindi
 matching.
 
 `template <typename T> class Expected` has one specialization: `Expected<void>`. `Expected<void>` is
-"either an `Error` or nothing." It's used to convey the result of an operation that might fail but
+"either an `Error` or nothing". It's used to convey the result of an operation that might fail but
 that doesn't yield a value when it succeeds. It behaves in the same way as `Expected<T>`, except
 that `value()` and `operator*()` are not defined.
 
@@ -555,8 +541,8 @@ We could do that. Here are three reasons why this library has a logging interfac
 3. A logging interface allows warnings to be logged, notifying a user of a potentially problematic,
    but valid, configuration. Sometimes these warnings are a matter of taste, and sometimes they are
    required by the specification of the feature being configured. Logging is not the only way to
-   handle this — imagine if the return value of `finalize_config` included a list of warnings. But,
-   as with the previous two points, a logging interface allows for the default behavior to be a
+   handle this — imagine if the return value of `finalize_config()` included a list of warnings.
+   But, as with the previous two points, a logging interface allows for the default behavior to be a
    logged message.
 
 On the other hand, the primary clients of this library are Ngix and Envoy, where Datadog engineers
@@ -577,7 +563,7 @@ The design of `class Logger` is informed by three constraints:
 
 (1) and (3) work well together.
 
-On account of (1), `Logger` has only two "severities": "error" and "startup." `log_startup` is
+On account of (1), `Logger` has only two "severities": "error" and "startup". `log_startup` is
 called once by a `Tracer` when it is initialized. `log_error` is called in all other logging
 circumstances.
 

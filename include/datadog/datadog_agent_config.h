@@ -2,7 +2,7 @@
 
 // This component provides facilities for configuring a `DatadogAgent`.
 //
-// `struct DatadogAgentConfig` contains fields that are used to configure
+// The `DatadogAgentConfig` struct contains fields that are used to configure
 // `DatadogAgent`. The configuration must first be finalized before it can be
 // used by `DatadogAgent`. The function `finalize_config` produces either an
 // error or a `FinalizedDatadogAgentConfig`. The latter can be used by

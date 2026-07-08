@@ -1,7 +1,7 @@
 #pragma once
 
-// This component provides a `class`, `Rate`, that is a `double` whose value is
-// between zero and one, inclusive.
+// The `Rate` clarr is a `double` whose value is between zero and one,
+// inclusive.
 //
 // `Rate` objects are obtained by calling the static member function
 // `Rate::from` with a `double` argument. A default-constructed `Rate` has the
