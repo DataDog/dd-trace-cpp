@@ -171,32 +171,11 @@ void Span::add_link(const Span& linked, const SpanLinkAttributes& attrs) {
   link.span_id = linked.id();
   link.attributes = attrs;
 
-  // inject linked span to get its tracestate, traceparent flags)
-  struct : DictWriter {
-    std::unordered_map<std::string, std::string> map;
-    void set(StringView k, StringView v) override {
-      if (k == "tracestate" || k == "traceparent") {
-        map[std::string(k)] = std::string(v);
-      }
-    }
-  } injected_headers;
-  linked.inject(injected_headers);
-
-  if (auto it = injected_headers.map.find("tracestate");
-      it != injected_headers.map.end()) {
-    link.tracestate = it->second;
-  }
-  if (auto it = injected_headers.map.find("traceparent");
-      it != injected_headers.map.end()) {
-    const auto& traceparent = it->second;
-    const auto pos = traceparent.rfind('-');
-    if (pos != std::string::npos && pos + 1 < traceparent.size()) {
-      try {
-        link.flags = static_cast<std::uint32_t>(
-            std::stoul(traceparent.substr(pos + 1), nullptr, 16));
-      } catch (...) {
-      }
-    }
+  // Populate tracestate/flags from the linked trace's sampling decision, if
+  // one has already been made. Do not force a decision here
+  if (auto context = linked.trace_segment().w3c_link_context(*linked.data_)) {
+    link.tracestate = std::move(context->first);
+    link.flags = context->second;
   }
 
   data_->span_links.push_back(std::move(link));

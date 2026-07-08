@@ -7,6 +7,7 @@
 #include <datadog/injection_options.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>
+#include <datadog/sampling_priority.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
 #include <datadog/span_link.h>
@@ -1086,7 +1087,9 @@ TEST_SPAN("injection behaviour when apm tracing is disabled") {
   }
 }
 
-TEST_SPAN("add_link records links on the span data") {
+TEST_SPAN(
+    "add_link records links on the span data, without forcing the linked "
+    "trace's sampling decision") {
   TracerConfig config;
   config.service = "testsvc";
   const auto collector = std::make_shared<MockCollector>();
@@ -1108,6 +1111,12 @@ TEST_SPAN("add_link records links on the span data") {
 
     const SpanLinkAttributes attrs{{"link.key", "value"}};
     span.add_link(linked, attrs);
+
+    // `linked`'s trace hasn't been sampled yet (its trace segment is still
+    // open), and `add_link` must not force that decision as a side effect of
+    // recording the link -- doing so would permanently finalize sampling for
+    // `linked`'s trace before it's actually finished.
+    REQUIRE_FALSE(linked.trace_segment().sampling_decision().has_value());
   }
 
   // Find the span that carries the link across all chunks.
@@ -1125,6 +1134,48 @@ TEST_SPAN("add_link records links on the span data") {
   REQUIRE(link.trace_id == linked_trace_id);
   REQUIRE(link.span_id == linked_span_id);
   REQUIRE(link.attributes.at("link.key") == "value");
-  // traceparent is always injected with W3C propagation, so flags must be set.
+  // Sampling hadn't been decided for the linked trace yet, so the link
+  // carries no flags/tracestate rather than ones derived from a forced,
+  // premature decision.
+  REQUIRE_FALSE(link.flags.has_value());
+  REQUIRE_FALSE(link.tracestate.has_value());
+}
+
+TEST_SPAN(
+    "add_link populates flags/tracestate when the linked trace's sampling "
+    "decision is already made") {
+  TracerConfig config;
+  config.service = "testsvc";
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  {
+    auto span = tracer.create_span();
+    auto linked = tracer.create_span();
+    linked.trace_segment().override_sampling_priority(
+        SamplingPriority::USER_KEEP);
+
+    const SpanLinkAttributes attrs{{"link.key", "value"}};
+    span.add_link(linked, attrs);
+  }
+
+  // Find the span that carries the link across all chunks.
+  const SpanData* span_with_link = nullptr;
+  for (const auto& chunk : collector->chunks) {
+    for (const auto& sd : chunk) {
+      if (!sd->span_links.empty()) {
+        span_with_link = sd.get();
+      }
+    }
+  }
+  REQUIRE(span_with_link != nullptr);
+  REQUIRE(span_with_link->span_links.size() == 1);
+  const auto& link = span_with_link->span_links[0];
   REQUIRE(link.flags.has_value());
+  REQUIRE(*link.flags == 1u);
 }

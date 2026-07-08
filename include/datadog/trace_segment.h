@@ -29,6 +29,7 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -107,6 +108,15 @@ class TraceSegment {
   const Optional<std::string>& hostname() const;
   const Optional<std::string>& origin() const;
   Optional<SamplingDecision> sampling_decision() const;
+
+  // Return the W3C tracestate encoding and derived trace flags for `span`,
+  // based on this segment's sampling decision. Unlike `inject`, this never
+  // makes a sampling decision if one hasn't been made yet -- it returns
+  // `nullopt` instead of forcing (and thereby permanently finalizing) one.
+  // Used by `Span::add_link` to populate a `SpanLink` without prematurely
+  // deciding sampling for the linked trace.
+  Optional<std::pair<std::string, std::uint32_t>> w3c_link_context(
+      const SpanData& span) const;
 
   Logger& logger() const;
 

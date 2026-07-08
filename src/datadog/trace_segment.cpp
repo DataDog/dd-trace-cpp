@@ -202,6 +202,35 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
   return sampling_decision_;
 }
 
+Optional<std::pair<std::string, std::uint32_t>> TraceSegment::w3c_link_context(
+    const SpanData& span) const {
+  int sampling_priority;
+  std::vector<std::pair<std::string, std::string>> trace_tags;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!sampling_decision_) {
+      return nullopt;
+    }
+    sampling_priority = sampling_decision_->priority;
+    trace_tags = trace_tags_;
+
+    auto& local_root_tags = spans_.front()->tags;
+    auto ts_tag_found = std::find_if(
+        local_root_tags.cbegin(), local_root_tags.cend(),
+        [](const auto& p) { return p.first == tags::internal::trace_source; });
+    if (ts_tag_found != local_root_tags.cend()) {
+      trace_tags.emplace_back(tags::internal::trace_source,
+                              ts_tag_found->second);
+    }
+  }
+
+  return std::make_pair(
+      encode_tracestate(span.span_id, sampling_priority, origin_, trace_tags,
+                        additional_datadog_w3c_tracestate_,
+                        additional_w3c_tracestate_),
+      sampling_priority > 0 ? 1u : 0u);
+}
+
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {

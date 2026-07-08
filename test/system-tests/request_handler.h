@@ -62,7 +62,8 @@ class RequestHandler final {
 
   static StoredLinkContext make_link_context(
       const datadog::tracing::Expected<datadog::tracing::Span>& span,
-      const datadog::tracing::Optional<nlohmann::json::array_t>& headers);
+      const datadog::tracing::Optional<nlohmann::json::array_t>& headers,
+      std::uint64_t upstream_id);
 
 #undef VALIDATION_ERROR
 };
