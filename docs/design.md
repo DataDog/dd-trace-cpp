@@ -1,9 +1,7 @@
 # Datadog C++ Tracer Design
 
 The primary purpose of this guide is to describe salient features of the Datadog C++ Tracer's
-design. It differs considerably from its [older
-sibling](https://github.com/DataDog/dd-opentracing-cpp) and
-[peers](https://github.com/open-telemetry/opentelemetry-cpp).
+design.
 
 ## Architecture
 
@@ -20,7 +18,7 @@ Each span:
 - contains information about whether an error occurred during the represented operation, including
   an error message, error type, and stack trace,
 - includes an arbitrary name/value mapping of strings, called "tags",
-- includes an arbritrary name/value mapping of numbers, called "metrics",
+- includes an arbitrary name/value mapping of numbers, called "metrics",
 - has a "start time" indicating when the represented operation began,
 - has a "duration", known only once it finishes, indicating how long the represented operation took.
 
@@ -57,8 +55,8 @@ its otherwise [RAII](https://en.cppreference.com/w/cpp/language/raii) nature.
 Another opinionated property of `Span` is that it is not an interface, nor does it implement an
 interface. Usually it is considered polite for a C++ library to deal in handles (`unique_ptr` or
 `shared_ptr`) to interfaces, i.e. classes that contain pure virtual functions. This way, a client of
-the library can substitute an alternative implementation to the interface(s) for testing or for when
-the behavior of the library is not desired.
+the library can substitute an alternative implementation for the interface(s) for testing or for
+when the behavior of the library is not desired.
 
 At the risk of being impolite, `dd-trace-cpp` takes a different approach. `Span` is a concrete type
 whose behavior cannot be substituted. Instead, there are other places in the library where
@@ -134,8 +132,8 @@ A `Tracer` owns a `Collector`, a `SpanSampler`, and a `ConfigManager`. `SpanSamp
 Different `Tracer` instances are independent of each other, even if they share a `Collector`.
 
 A `Tracer` is constructed from a `TracerConfig`, which configures these objects and many other
-aspects of a `Tracer`'s behavior (span defaults, propagation styles, telemetry…; see
-[tracer_config.h](../include/datadog/tracer_config.h)). To change most of a `Tracer`s behavior, an
+aspects of a `Tracer`'s behavior (span defaults, propagation styles, telemetry, and more; see
+[tracer_config.h](../include/datadog/tracer_config.h)). To change most of a `Tracer`'s behavior, an
 application constructs a new `Tracer` from a new `TracerConfig`.
 
 `Tracer` has two main member functions: `Tracer::create_span()` and `Tracer::extract_span()`, and
@@ -166,8 +164,8 @@ There are two directions:
 - Extraction: `Tracer::extract_span()` reads trace context from a carrier (e.g. incoming HTTP
   headers), and uses it to create a `Span` that continues the trace.
 
-Several wire formats, "propagation styles", are supported. A `Tracer… can be configured with
-multiple stlyes for both injection and extraction.
+Several wire formats, "propagation styles", are supported. A `Tracer` can be configured with
+multiple styles for both injection and extraction.
 
 A trace's sampling decision, once made, is part of what gets propagated: every tracer the trace
 passes through agrees on whether it's kept or dropped, rather than deciding independently.
@@ -220,7 +218,7 @@ specified, then default implementations are used:
 - [class ThreadedEventScheduler : public EventScheduler](../src/datadog/threaded_event_scheduler.h),
   which uses a dedicated thread for executing scheduled events at the correct time.
 
-`DatadogAgent::flush()` is periodically called by `EventScheduler`. `flush()` uses the HTTP
+`DatadogAgent::flush()` is periodically called by an `EventScheduler`. `flush()` uses the HTTP
 client to send a `POST` request to the Datadog Agent's `/v0.4/traces` endpoint. It's all
 callback-based.
 
@@ -234,7 +232,7 @@ reconfigured at runtime (without creating a new `Tracer`).
 `class HTTPClient` is an interface for sending HTTP requests. It's defined in
 [http_client.h](../include/datadog/http_client.h).
 
-The only needed HTTP Method is `POST` (for requests to the Datadog Agent's endpoints). `HTTPClient`
+The only needed HTTP method is `POST` (for requests to the Datadog Agent's endpoints). `HTTPClient`
 has one member function for each HTTP method needed, so, currently just `HTTPClient::post()`. It's
 callback-based and returns almost immediately.
 
@@ -248,7 +246,7 @@ The default implementation of `HTTPClient` is `class Curl`, defined in
 interface](https://curl.se/libcurl/c/libcurl-multi.html) together with a dedicated thread as an
 event loop.
 
-`Curl` is also used within Nginx in Datadog's Nginx module,
+`Curl` is also used in Datadog's Nginx module,
 [nginx-datadog](https://github.com/DataDog/nginx-datadog). This is explicitly
 [discouraged](https://nginx.org/en/docs/dev/development_guide.html#http_requests_to_ext) in Nginx's
 developer documentation, but libcurl-with-a-thread is widely used within Nginx modules regardless.
@@ -293,8 +291,7 @@ Intended usage is:
 3. Use the `Tracer` to create and/or extract local root `Span`s.
 4. Use `Span` to create children and/or inject context.
 5. Use a `Span`'s `TraceSegment` to perform trace-wide operations.
-6. When all `Span`s in `TraceSegment` are finished, the segment is sent to the
-   `Collector`.
+6. When all `Span`s in a `TraceSegment` are finished, the segment is sent to the `Collector`.
 
 ## EventScheduler
 
@@ -353,7 +350,7 @@ representation". In part, `finalize_config()` already mitigates the problem. Abs
 the finalized config as a data member is a step further.
 
 This static validation happens once, at construction. `ConfigManager`, which is a `Tracer` member,
-separately allows some configuration to change afterward, via Remote Configuration update, rather
+separately allows some configuration to change afterward, via a Remote Configuration update, rather
 than through `finalize_config()`. This path is also validated, by a different parser.
 
 ## Error Handling
@@ -417,11 +414,11 @@ non-`Error`, and `false` if the `Expected` contains an `Error`. There is also `h
 returns the same thing. Then the `Error` can be obtained via `error()`, or the non-`Error` can be
 obtained via `value()`, `operator*()`, or `operator->()`.
 
-`template <typename T> class Expected` has one specialization: `Expected<void>`, which is "either an
-`Error` or nothing". It's used to convey the result of an operation that might fail but that doesn't
-yield a value when it succeeds. It behaves in the same way as `Expected<T>`, except that `value()`
-and `operator*()` are not defined. `Expected<void>` is implemented in terms of
-`std::optional<Error>`, but inverts the value of `explicit operator bool`.
+`template <T> class Expected` has one specialization: `Expected<void>`, which is "either an `Error`
+or nothing". It's used to convey the result of an operation that might fail but that doesn't yield a
+value when it succeeds. It behaves in the same way as `Expected<T>`, except that `value()` and
+`operator*()` are not defined. `Expected<void>` is implemented in terms of `std::optional<Error>`,
+but inverts the value of `explicit operator bool`.
 
 ## Logging
 
