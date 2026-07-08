@@ -1,7 +1,6 @@
 #pragma once
 
-// This component provides an interface, `Logger`, that allows for the
-// customization of how the library logs diagnostic and startup messages.
+// The `Logger` interface allows for the customization of how the library logs diagnostic and startup messages.
 //
 // Errors, when they occur, are typically returned as `Error` values (often as
 // part of an `Expected` value). However, in "async" contexts where there is
