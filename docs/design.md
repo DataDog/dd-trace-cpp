@@ -127,16 +127,24 @@ objects are created by `class Tracer` when the `Tracer` is configured, and then 
 `class Tracer` is what users configure, and it is how `Span`s are extracted from trace context or
 created as a trace's root. See [tracer.h](../include/datadog/tracer.h).
 
-`Tracer` has two main member functions: `Tracer::create_span()` and  `Tracer::extract_span()`, and
+A `Tracer` owns a `Collector`, a `SpanSampler`, and a `ConfigManager`. `SpanSampler` and
+`ConfigManager` are owned exclusively by one `Tracer`. `ConfigManager` in turn owns a
+`TraceSampler`.
+
+A `Tracer` is constructed from a `TracerConfig`, which configures these objects and many other
+aspects of a `Tracer`'s behavior (span defaults, propagation styles, telemetry…; see
+[tracer_config.h](../include/datadog/tracer_config.h)).
+
+`Tracer` has two main member functions: `Tracer::create_span()` and `Tracer::extract_span()`, and
 another that combines them: `Tracer::extract_or_create_span()`.
 
 All of these result in the creation of a new `TraceSegment` (or otherwise return an error). The
-`Tracer`'s data members, which were initialized based on the tracer's configuration, are copied into
+`Tracer`'s data members, which were initialized based on the tracer's configuration, are passed to
 the `TraceSegment` so that the `TraceSegment` can operate independently.
 
-Note how `create_span` never fails. This is a nice property. `extract_span` _can_ fail.
+Note how `Tracer::create_span()` never fails, whereas `Tracer::extract_span()` can fail.
 
-The bulk of `Tracer`'s implementation is `extract_span`. The other substantial work is
+The bulk of `Tracer`'s implementation is `Tracer::extract_span()`. The other substantial work is
 configuration, which is handled by `finalize_config(const TracerConfig&)`, declared in
 [tracer_config.h](../include/datadog/tracer_config.h). Configuration will be described in more depth
 in a subsequent section.
@@ -276,28 +284,16 @@ config:
   layout: elk
 ---
 graph LR;
-  Tracer(Tracer) & TraceSegment("TraceSegment 🔒")-- shared -->Collector("Collector 🔒") & SpanSampler("SpanSampler 🔒") & TraceSampler("TraceSampler 🔒")
+  Tracer(Tracer) & TraceSegment("TraceSegment 🔒")-- shared -->Collector("Collector 🔒") & SpanSampler("SpanSampler 🔒")
+  Tracer & TraceSegment-- shared -->ConfigManager("ConfigManager 🔒")
+  ConfigManager & TraceSegment-- shared -->TraceSampler("TraceSampler 🔒")
   TraceSegment-- "`**unique**`" -->SpanData(SpanData)
   Span(Span)-- shared -->TraceSegment
   Span-- "`**raw**`" -->SpanData
 ```
 
-Objects:
-
-- `Span` has a beginning, end, and tags. It is associated with a `TraceSegment`.
-- `TraceSegment` is part of a trace. It makes sampling decisions, detects when it is finished, and
-  sends itself to the `Collector`.
-- `Collector` receives trace segments. It provides a callback to deliver sampler modifications, if
+`Collector` receives trace segments. It provides a callback to deliver sampler modifications, if
   applicable.
-- `Tracer` is responsible for creating trace segments. It contains the instances of, and
-  configuration for, the `Collector`, `TraceSampler`, and `SpanSampler`. A tracer is created from a
-  `TracerConfig`.
-- `TraceSampler` is used by trace segments to decide when to keep or drop themselves. It is owned
-  exclusively by one `Tracer`.
-- `SpanSampler` is used by trace segments to decide which spans to keep when the segment is dropped.
-  It is owned exclusively by one `Tracer`.
-- `TracerConfig` contains all of the information needed to configure the collector, trace sampler,
-  and span sampler, as well as defaults for span properties.
 
 Intended usage is:
 
@@ -576,7 +572,7 @@ We could do that. Here are three reasons why this library has a logging interfac
 
 1. Logging a `Tracer`'s configuration when it's initialized is a helpful diagnostic tool. A logging
    interface allows `Tracer` to do this explicitly, as opposed to counting on client code to log
-   `Tracer::config_json()` itself. A client library can still suppress the startup message in its
+   `Tracer::config()` itself. A client library can still suppress the startup message in its
    implementation of the logging interface, but this is more opt-out than opt-in.
 2. Along the same lines, reporting errors that occur on a background thread by invoking a logging
    interface allows for the library's default behavior to be to print an error message to a log, as

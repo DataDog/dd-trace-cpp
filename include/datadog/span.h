@@ -1,8 +1,7 @@
 #pragma once
 
-// This component defines a class, `Span`, that represents an extent of time in
-// which some operation of interest occurs, such as an RPC request, database
-// query, calculation, etc.
+// The `Span` class represents an extent of time in which some operation of
+// interest occurs, such as an RPC request, database query, calculation, etc.
 //
 // `Span` objects are created by calling member functions on `Tracer` or on
 // another `Span` object. They are not instantiated directly.
