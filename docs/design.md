@@ -224,10 +224,10 @@ specified, then default implementations are used:
 client to send a `POST` request to the Datadog Agent's `/v0.4/traces` endpoint. It's all
 callback-based.
 
-`DatadogAgent` also periodically polls the Agent's `/v0.7/config` endpoint for remote configuration
+`DatadogAgent` also periodically polls the Agent's `/v0.7/config` endpoint for Remote Configuration
 updates, via `EventScheduler`. Responses are dispatched to registered `remote_config::Listener`s,
 including `ConfigManager`, which is how sampling rate/rules, trace reporting, and tags can be
-reconfigured at runtime by modifying the `Tracer`.
+reconfigured at runtime (without creating a new `Tracer`).
 
 ### HTTPClient
 
@@ -298,36 +298,27 @@ Intended usage is:
 
 ## EventScheduler
 
-`class DatadogAgent` flushes batches of finished trace segments to the Datadog Agent once every two
-second [by
-default](https://github.com/DataDog/dd-trace-cpp/blob/ca155b3da65c2dc235cf64a28f8e0d8fdab3700c/src/datadog/datadog_agent_config.h#L50-L51).
-It does this by scheduling a recurring event with an `EventScheduler`, which is an interface defined
-in [event_scheduler.h](../include/datadog/event_scheduler.h).
+`DatadogAgent` uses an `EventScheduler` to schedule its recurring work, at fixed intervals:
 
-`EventScheduler` has one member function:
+- flushing batches of finished trace segments;
+- polling for Remote Configuration updates.
 
-```c++
-virtual Cancel schedule_recurring_event(
-    std::chrono::steady_clock::duration interval,
-    std::function<void()> callback) = 0;
-```
+`EventScheduler` is an interface defined in
+[event_scheduler.h](../include/datadog/event_scheduler.h). It has one main member function,
+`EventScheduler::schedule_recurring_event()`, which registers a callback to be invoked repeatedly.
 
-Every `interval`, the scheduler will invoke `callback`, starting an initial `interval` after
-`schedule_recurring_event` is called. The caller can invoke the returned `Cancel` to prevent
-subsequent invocations of `callback`.
+The default implementation of `EventScheduler` is `class ThreadedEventScheduler`, defined in
+[threaded_event_scheduler.h](../src/datadog/threaded_event_scheduler.h), which uses a dedicated
+thread for executing scheduled events at the correct time.
 
-The default implementation of `EventScheduler` is [class ThreadedEventScheduler : public
-EventScheduler](../src/datadog/threaded_event_scheduler.h), which uses a dedicated thread for
-executing scheduled events at the correct time. It was a fun piece of code to write.
-
-Datadog's Nginx module, [nginx-datadog](https://github.com/DataDog/nginx-datadog) uses a different
-implementation, [class NgxEventScheduler : public
-EventScheduler](https://github.com/DataDog/nginx-datadog/blob/master/src/ngx_event_scheduler.h),
+[Datadog Nginx module](https://github.com/DataDog/nginx-datadog) uses a different implementation,
+[class
+NgxEventScheduler](https://github.com/DataDog/nginx-datadog/blob/master/src/ngx_event_scheduler.h),
 which uses Nginx's own event loop instead of a dedicated thread.
 
 [Envoy's Datadog tracing
 integration](https://github.com/envoyproxy/envoy/tree/main/source/extensions/tracers/datadog#datadog-tracer)
-also uses a different implementation, [class EventScheduler : public
+also uses a different implementation, [class
 EventScheduler](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/event_scheduler.h),
 which uses Envoy's built-in event dispatch facilities.
 
