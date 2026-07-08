@@ -1,9 +1,9 @@
 #pragma once
 
-// This component provides an interface, `HTTPClient`, that represents an
-// asynchronous HTTP client.
+// The `HTTPClient` class represents an asynchronous HTTP client.
 //
-// `HTTPClient` is used by `DatadogAgent` to send traces to the Datadog Agent.
+// `HTTPClient` is used by `DatadogAgent` to send traces to the Datadog Agent
+// and to poll it for remote configuration updates.
 //
 // If this library was built with support for libcurl, then `Curl` implements
 // `HTTPClient` in terms of libcurl. See `curl.h`.
@@ -43,9 +43,11 @@ class HTTPClient {
   // end of the request. Invoke the specified `on_response` callback if/when
   // a response is delivered (even if that response contains an error HTTP
   // response status). Invoke the specified `on_error` if an error occurs
-  // outside of HTTP, such as a connection failure. If an error occurs while
-  // preparing the request, return an `Error`. The behavior is undefined if
-  // either of `on_response` or `on_error` throws an exception.
+  // outside of HTTP, such as a connection failure, or if `deadline` is exceeded
+  // before a response is received. If an error occurs while preparing the
+  // request, return an `Error`, without calling either of the callbacks. The
+  // behavior is undefined if either of `on_response` or `on_error` throws an
+  // exception.
   virtual Expected<void> post(
       const URL& url, HeadersSetter set_headers, std::string body,
       ResponseHandler on_response, ErrorHandler on_error,
@@ -57,7 +59,6 @@ class HTTPClient {
 
   // Return a JSON representation of this object's configuration. The JSON
   // representation is an object with the following properties:
-  //
   // - "type" is the unmangled, qualified name of the most-derived class, e.g.
   //   "datadog::tracing::Curl".
   // - "config" is an object containing this object's configuration. "config"

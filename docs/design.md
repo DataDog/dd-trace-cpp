@@ -229,55 +229,34 @@ updates, via `EventScheduler`. Responses are dispatched to registered `remote_co
 `class HTTPClient` is an interface for sending HTTP requests. It's defined in
 [http_client.h](../include/datadog/http_client.h).
 
-The only kind of HTTP request that the library needs to make, currently, is a `POST` to the Datadog
-Agent's traces endpoint. `HTTPClient` has one member function for each HTTP method needed, so,
-currently just the one:
+The only needed HTTP Method is `POST` (for requests to the Datadog Agent's endpoints). `HTTPClient`
+has one member function for each HTTP method needed, so, currently just `HTTPClient::post()`. It's
+callback-based and returns almost immediately.
 
-```c++
-virtual Expected<void> post(const URL& url, HeadersSetter set_headers,
-                            std::string body, ResponseHandler on_response,
-                            ErrorHandler on_error) = 0;
-```
+`HTTPClient` also has another method, `HTTPClient::drain()`, which waits for any in-flight requests
+to finish. It's used to ensure "clean shutdown". Without it, on average the last one second of
+traces would be lost on shutdown. Implementations of `HTTPClient` that don't have a dedicated thread
+need not support `drain()`; in those cases, `drain()` returns immediately.
 
-It's callback-based. `post()` returns almost immediately. It invokes `set_headers` before returning,
-in order to get the HTTP request headers. The request `body` is moved elsewhere for later
-processing. One of `on_response` or `on_error` will eventually be called, depending on whether a
-response was received or if an error occurred before a response was received. If something goes
-wrong setting up the request, then `post` returns an error. If `post` returns an error, then neither
-of `on_response` nor `on_error` will be called.
-
-`HTTPClient` also has another member function:
-
-```c++
-virtual void drain(std::chrono::steady_clock::time_point deadline) = 0;
-```
-
-`drain()` waits for any in-flight requests to finish, blocking up until no later than `deadline`.
-It's used to ensure "clean shutdown." Without it, on average the last one second of traces would be
-lost on shutdown. Implementations of `HTTPClient` that don't have a dedicated thread need not
-support `drain()`; in those cases, `drain()` returns immediately.
-
-The default implementation of `HTTPClient` is [class Curl : public
-HTTPClient](../src/datadog/curl.h), which uses libcurl's [multi
+The default implementation of `HTTPClient` is `class Curl`, defined in
+[curl.h](../src/datadog/curl.h), which uses libcurl's [multi
 interface](https://curl.se/libcurl/c/libcurl-multi.html) together with a dedicated thread as an
 event loop.
 
-`class Curl` is also used within Nginx in Datadog's Nginx module,
+`Curl` is also used within Nginx in Datadog's Nginx module,
 [nginx-datadog](https://github.com/DataDog/nginx-datadog). This is explicitly
 [discouraged](https://nginx.org/en/docs/dev/development_guide.html#http_requests_to_ext) in Nginx's
 developer documentation, but libcurl-with-a-thread is widely used within Nginx modules regardless.
-One improvement that I am exploring is to use libcurl's
+One possible improvement would be using libcurl's
 "[multi_socket](https://curl.se/libcurl/c/curl_multi_socket_action.html)" mode, which allows libcurl
 to utilize someone else's event loop, obviating the need for another thread. libcurl can then be
 made to use Nginx's event loop, as is done in [an example
 library](https://github.com/dgoffredo/nginx-curl).
 
-For now, though, `nginx-datadog` uses the threaded `class Curl`.
-
 [Envoy's Datadog tracing
 integration](https://github.com/envoyproxy/envoy/tree/main/source/extensions/tracers/datadog#datadog-tracer)
-uses a different implementation, [class AgentHTTPClient : public HTTPClient,
-...](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/agent_http_client.h),
+uses a different implementation, [class
+AgentHTTPClient](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/agent_http_client.h),
 which uses Envoy's built-in HTTP facilities. libcurl is not involved at all.
 
 ### Logical Component Relationships
