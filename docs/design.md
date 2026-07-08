@@ -177,13 +177,15 @@ on it continuing, context is not injected at all.
 `class Collector` is an interface for sending a `TraceSegment`'s spans somewhere once they're all
 done. It's defined in [collector.h](../include/datadog/collector.h).
 
-It's just one function: `send()`. More of a callback than an interface.
+It has one main function: `Collector::send()`. More of a callback than an interface. `send()` also
+takes a `TraceSampler` as a `response_handler`, which an implementation may use to update the trace
+sampling rates based on the response it gets back when delivering spans (e.g. from the Datadog
+Agent).
 
-A `Collector` is either created by `Tracer` or injected into its configuration. The `Collector`
-instance is then shared with all `TraceSegment`s created by the `Tracer`. The only thing that a
-`TraceSegment` does with the `Collector` is call `send()` once the segment is finished.
-
-A `Collector` can also be shared by several `Tracer`s.
+A `Collector` is either created by `Tracer` or injected into its configuration. A `Collector` can be
+shared by several `Tracer`s. The `Collector` is then shared with all `TraceSegment`s created by the
+`Tracer`. The only thing that a `TraceSegment` does with the `Collector` is call `Collector::send()`
+once the segment is finished.
 
 The default implementation is `DatadogAgent`, which is described in the next section.
 
@@ -192,7 +194,7 @@ The default implementation is `DatadogAgent`, which is described in the next sec
 `class DatadogAgent` is the default implementation of `Collector`. It's defined in
 [datadog_agent.h](../src/datadog/datadog_agent.h).
 
-`DatadogAgent` sends trace segments to the [Datadog Agent](../include/datadog/http_client.h) in
+`DatadogAgent` sends trace segments to the [Datadog Agent](https://docs.datadoghq.com/agent) in
 batches that are flushed periodically. In order to do this, `DatadogAgent` needs a means to make
 HTTP requests and a means to set a timer for the flush operation. So, there are two interfaces:
 [HTTPClient](../include/datadog/http_client.h) and
@@ -207,10 +209,10 @@ specified, then default implementations are used:
   interface](https://curl.se/libcurl/c/libcurl-multi.html) together with a dedicated thread as an
   event loop.
 - [class ThreadedEventScheduler : public EventScheduler](../src/datadog/threaded_event_scheduler.h),
-- which uses a dedicated thread for executing scheduled events at the correct time.
+  which uses a dedicated thread for executing scheduled events at the correct time.
 
-`DatadogAgent::flush` is periodically called by the event scheduler. `flush` uses the HTTP client to
-send a POST request to the Datadog Agent's
+`DatadogAgent::flush()` is periodically called by the event scheduler. `flush()` uses the HTTP
+client to send a `POST` request to the Datadog Agent's
 [/v0.4/traces](https://github.com/DataDog/datadog-agent/blob/9d57c10a9eeb3916e661d35dbd23c6e36395a99d/pkg/trace/api/version.go#L22)
 endpoint. It's all callback-based.
 
@@ -219,8 +221,8 @@ endpoint. It's all callback-based.
 `class HTTPClient` is an interface for sending HTTP requests. It's defined in
 [http_client.h](../include/datadog/http_client.h).
 
-The only kind of HTTP request that the library needs to make, currently, is a POST to the Datadog
-Agent's traces endpoint. `HTTPClient` has one member function for each HTTP method needed — so,
+The only kind of HTTP request that the library needs to make, currently, is a `POST` to the Datadog
+Agent's traces endpoint. `HTTPClient` has one member function for each HTTP method needed, so,
 currently just the one:
 
 ```c++
@@ -229,7 +231,7 @@ virtual Expected<void> post(const URL& url, HeadersSetter set_headers,
                             ErrorHandler on_error) = 0;
 ```
 
-It's callback-based. `post` returns almost immediately. It invokes `set_headers` before returning,
+It's callback-based. `post()` returns almost immediately. It invokes `set_headers` before returning,
 in order to get the HTTP request headers. The request `body` is moved elsewhere for later
 processing. One of `on_response` or `on_error` will eventually be called, depending on whether a
 response was received or if an error occurred before a response was received. If something goes
@@ -242,27 +244,27 @@ of `on_response` nor `on_error` will be called.
 virtual void drain(std::chrono::steady_clock::time_point deadline) = 0;
 ```
 
-`drain` waits for any in-flight requests to finish, blocking up until no later than `deadline`. It's
-used to ensure "clean shutdown." Without it, on average the last one second of traces would be lost
-on shutdown. Implementations of `HTTPClient` that don't have a dedicated thread need not support
-`drain`; in those cases, `drain` returns immediately.
+`drain()` waits for any in-flight requests to finish, blocking up until no later than `deadline`.
+It's used to ensure "clean shutdown." Without it, on average the last one second of traces would be
+lost on shutdown. Implementations of `HTTPClient` that don't have a dedicated thread need not
+support `drain()`; in those cases, `drain()` returns immediately.
 
 The default implementation of `HTTPClient` is [class Curl : public
 HTTPClient](../src/datadog/curl.h), which uses libcurl's [multi
 interface](https://curl.se/libcurl/c/libcurl-multi.html) together with a dedicated thread as an
 event loop.
 
-`class Curl` is also used within NGINX in Datadog's Nginx module,
+`class Curl` is also used within Nginx in Datadog's Nginx module,
 [nginx-datadog](https://github.com/DataDog/nginx-datadog). This is explicitly
 [discouraged](https://nginx.org/en/docs/dev/development_guide.html#http_requests_to_ext) in Nginx's
-developer documentation, but libcurl-with-a-thread is widely used within NGINX modules regardless.
+developer documentation, but libcurl-with-a-thread is widely used within Nginx modules regardless.
 One improvement that I am exploring is to use libcurl's
 "[multi_socket](https://curl.se/libcurl/c/curl_multi_socket_action.html)" mode, which allows libcurl
 to utilize someone else's event loop, obviating the need for another thread. libcurl can then be
-made to use NGINX's event loop, as is done in [an example
+made to use Nginx's event loop, as is done in [an example
 library](https://github.com/dgoffredo/nginx-curl).
 
-For now, though, nginx-datadog uses the threaded `class Curl`.
+For now, though, `nginx-datadog` uses the threaded `class Curl`.
 
 [Envoy's Datadog tracing
 integration](https://github.com/envoyproxy/envoy/tree/main/source/extensions/tracers/datadog#datadog-tracer)
@@ -291,9 +293,6 @@ graph LR;
   Span(Span)-- shared -->TraceSegment
   Span-- "`**raw**`" -->SpanData
 ```
-
-`Collector` receives trace segments. It provides a callback to deliver sampler modifications, if
-  applicable.
 
 Intended usage is:
 
