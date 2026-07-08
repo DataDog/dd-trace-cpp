@@ -217,10 +217,12 @@ specified, then default implementations are used:
 - [class ThreadedEventScheduler : public EventScheduler](../src/datadog/threaded_event_scheduler.h),
   which uses a dedicated thread for executing scheduled events at the correct time.
 
-`DatadogAgent::flush()` is periodically called by the event scheduler. `flush()` uses the HTTP
-client to send a `POST` request to the Datadog Agent's
-[/v0.4/traces](https://github.com/DataDog/datadog-agent/blob/9d57c10a9eeb3916e661d35dbd23c6e36395a99d/pkg/trace/api/version.go#L22)
-endpoint. It's all callback-based.
+`DatadogAgent::flush()` is periodically called by `EventScheduler`. `flush()` uses the HTTP
+client to send a `POST` request to the Datadog Agent's `/v0.4/traces` endpoint. It's all
+callback-based.
+
+`DatadogAgent` also periodically polls the Agent's `/v0.7/config` endpoint for remote configuration
+updates, via `EventScheduler`. Responses are dispatched to registered `remote_config::Listener`s.
 
 ### HTTPClient
 
