@@ -166,19 +166,16 @@ void Span::set_source(Source source) {
 }
 
 void Span::add_link(const Span& linked, const SpanLinkAttributes& attrs) {
-  SpanLink link;
-  link.trace_id = linked.trace_id();
-  link.span_id = linked.id();
-  link.attributes = attrs;
+  Optional<std::string> tracestate = nullopt;
+  Optional<std::uint32_t> flags = nullopt;
 
   // Populate tracestate/flags from the linked trace's sampling decision, if
   // one has already been made. Do not force a decision here
   if (auto context = linked.trace_segment().w3c_link_context(*linked.data_)) {
-    link.tracestate = std::move(context->first);
-    link.flags = context->second;
+    tracestate = std::move(context->first);
+    flags = context->second;
   }
-
-  data_->span_links.push_back(std::move(link));
+  add_link(SpanLink{linked.trace_id(), linked.id(), tracestate, attrs, flags});
 }
 
 void Span::add_link(const SpanLink& link) { data_->span_links.push_back(link); }

@@ -18,6 +18,7 @@
 #include "expected.h"
 #include "id_generator.h"
 #include "optional.h"
+#include "propagation_behavior_extract.h"
 #include "span.h"
 #include "span_config.h"
 #include "tracer_config.h"
@@ -45,6 +46,7 @@ class Tracer {
   Clock clock_;
   std::vector<PropagationStyle> injection_styles_;
   std::vector<PropagationStyle> extraction_styles_;
+  PropagationBehaviorExtract propagation_behavior_extract_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
   // Store the tracer configuration in an in-memory file, allowing it to be
@@ -75,6 +77,9 @@ class Tracer {
   // `config`.  If there is no tracing information in `reader`, then return an
   // error with code `Error::NO_SPAN_TO_EXTRACT`.  If a failure occurs, then
   // return an error with some other code.
+  // Depending of the propagation_behavior_restart config, it can continue the
+  // trace, restart a new trace (with link), or discard the span (returning
+  // `Error::NO_SPAN_TO_EXTRACT`)
   Expected<Span> extract_span(const DictReader& reader);
   Expected<Span> extract_span(const DictReader& reader,
                               const SpanConfig& config);

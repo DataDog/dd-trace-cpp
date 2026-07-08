@@ -19,10 +19,12 @@ StringView to_string_view(PropagationBehaviorExtract behavior) {
   }
 }
 
-nlohmann::json to_json(PropagationBehaviorExtract behavior) { return to_string_view(behavior); }
+nlohmann::json to_json(PropagationBehaviorExtract behavior) {
+  return to_string_view(behavior);
+}
 
-
-Optional<PropagationBehaviorExtract> parse_propagation_behavior_extract(StringView text) {
+Optional<PropagationBehaviorExtract> parse_propagation_behavior_extract(
+    StringView text) {
   auto token = std::string{text};
   to_lower(token);
 

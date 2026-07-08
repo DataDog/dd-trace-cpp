@@ -40,6 +40,7 @@ struct ExtractedData {
   Optional<std::string> additional_datadog_w3c_tracestate;
   // `style` is the extraction style used to obtain this `ExtractedData`. It's
   // for diagnostics.
+  Optional<std::string> tracestate_full;
   Optional<PropagationStyle> style;
   // `headers_examined` are the name/value pairs of HTTP headers (or equivalent
   // request meta-data) that were looked up and had values during the

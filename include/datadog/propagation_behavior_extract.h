@@ -24,7 +24,8 @@ enum class PropagationBehaviorExtract {
 StringView to_string_view(PropagationBehaviorExtract behavior);
 
 // defaults to CONTINUE if empty or unsupported
-Optional<PropagationBehaviorExtract> parse_propagation_behavior_extract(StringView text);
+Optional<PropagationBehaviorExtract> parse_propagation_behavior_extract(
+    StringView text);
 
 }  // namespace tracing
 }  // namespace datadog

@@ -61,6 +61,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       clock_(config.clock),
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
+      propagation_behavior_extract_(config.propagation_behavior_extract),
       tags_header_max_size_(config.tags_header_size),
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
@@ -86,10 +87,12 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     collector_ = agent;
   }
 
-  for (const auto style : extraction_styles_) {
-    if (style == PropagationStyle::BAGGAGE) {
-      baggage_extraction_enabled_ = true;
-      break;
+  if (propagation_behavior_extract_ != PropagationBehaviorExtract::IGNORE) {
+    for (const auto style : extraction_styles_) {
+      if (style == PropagationStyle::BAGGAGE) {
+        baggage_extraction_enabled_ = true;
+        break;
+      }
     }
   }
 
@@ -172,7 +175,7 @@ void Tracer::store_config(
 
   // clang-format off
   msgpack::pack_map(
-    buffer, 
+    buffer,
     "schema_version", [&](auto& buffer) { msgpack::pack_integer(buffer, std::uint64_t(2)); return Expected<void>{}; },
     "runtime_id", [&](auto& buffer) { return msgpack::pack_string(buffer, runtime_id_.string()); },
     "tracer_version", [&](auto& buffer) { return msgpack::pack_string(buffer, signature_.library_version); },
@@ -229,6 +232,13 @@ Expected<Span> Tracer::extract_span(const DictReader& reader) {
 
 Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
+  // ignore: Discard incoming context, new span with new sampling decision
+  if (propagation_behavior_extract_ == PropagationBehaviorExtract::IGNORE) {
+    return Error{
+        Error::NO_SPAN_TO_EXTRACT,
+        "Ignoring context extraction (propagation_behavior_extract=ignore)"};
+  }
+
   assert(!extraction_styles_.empty());
 
   AuditedReader audited_reader{reader};
@@ -417,37 +427,63 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     merged_context.trace_tags.erase(found);
   }
 
-  // When APM Tracing is disabled, the incoming sampling decision MAY be
-  // overridden based on locally generated spans. As such, the received sampling
-  // decision is intentionally ignored, and the tracer is expected to make its
-  // own decision in accordance with the locally enabled product configuration.
-  Optional<SamplingDecision> sampling_decision;
-  if (tracing_enabled_ && merged_context.sampling_priority) {
-    SamplingDecision decision;
-    decision.priority = *merged_context.sampling_priority;
-    // `decision.mechanism` is null.  We might be able to infer it once we
-    // extract `trace_tags`, but we would have no use for it, so we won't.
-    decision.origin = SamplingDecision::Origin::EXTRACTED;
+  switch (propagation_behavior_extract_) {
+    case PropagationBehaviorExtract::CONTINUE: {
+      // When APM Tracing is disabled, the incoming sampling decision MAY be
+      // overridden based on locally generated spans. As such, the received
+      // sampling decision is intentionally ignored, and the tracer is expected
+      // to make its own decision in accordance with the locally enabled product
+      // configuration.
+      Optional<SamplingDecision> sampling_decision;
+      if (tracing_enabled_ && merged_context.sampling_priority) {
+        SamplingDecision decision;
+        decision.priority = *merged_context.sampling_priority;
+        // `decision.mechanism` is null.  We might be able to infer it once we
+        // extract `trace_tags`, but we would have no use for it, so we won't.
+        decision.origin = SamplingDecision::Origin::EXTRACTED;
+        sampling_decision = decision;
+      }
 
-    sampling_decision = decision;
+      const auto span_data_ptr = span_data.get();
+      telemetry::counter::increment(metrics::tracer::trace_segments_created,
+                                    {"new_continued:continued"});
+      const auto segment = std::make_shared<TraceSegment>(
+          logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
+          config_manager_->span_defaults(), config_manager_, runtime_id_,
+          injection_styles_, hostname_, std::move(merged_context.origin),
+          tags_header_max_size_, std::move(merged_context.trace_tags),
+          std::move(sampling_decision),
+          std::move(merged_context.additional_w3c_tracestate),
+          std::move(merged_context.additional_datadog_w3c_tracestate),
+          std::move(span_data), resource_renaming_mode_, tracing_enabled_);
+
+      Span span{span_data_ptr, segment,
+                [generator = generator_]() { return generator->span_id(); },
+                clock_};
+      return span;
+    }
+    case PropagationBehaviorExtract::RESTART: {
+      // restart: create a new trace, with a span link to the previous one
+
+      auto link_attributes = SpanLinkAttributes{};
+      link_attributes.emplace("reason", "propagation_behavior_extract");
+      link_attributes.emplace("context_headers", "todo");
+
+      auto tracestate =
+          extracted_contexts[PropagationStyle::W3C].tracestate_full;
+
+      auto restarted_span = create_span(config);
+      restarted_span.add_link(SpanLink{span_data->trace_id, span_data->span_id,
+                                       tracestate, link_attributes,
+                                       nullopt});  // TODO: flags
+      return restarted_span;
+    }
+    default:
+      // Should be unreachable
+      return Error{
+          Error::NO_SPAN_TO_EXTRACT,
+          "Ignoring context extraction (propagation_behavior_extract=ignore)"};
   }
-
-  const auto span_data_ptr = span_data.get();
-  telemetry::counter::increment(metrics::tracer::trace_segments_created,
-                                {"new_continued:continued"});
-  const auto segment = std::make_shared<TraceSegment>(
-      logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
-      config_manager_->span_defaults(), config_manager_, runtime_id_,
-      injection_styles_, hostname_, std::move(merged_context.origin),
-      tags_header_max_size_, std::move(merged_context.trace_tags),
-      std::move(sampling_decision),
-      std::move(merged_context.additional_w3c_tracestate),
-      std::move(merged_context.additional_datadog_w3c_tracestate),
-      std::move(span_data), resource_renaming_mode_, tracing_enabled_);
-  Span span{span_data_ptr, segment,
-            [generator = generator_]() { return generator->span_id(); },
-            clock_};
-  return span;
 }
 
 Span Tracer::extract_or_create_span(const DictReader& reader) {

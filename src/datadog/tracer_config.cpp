@@ -403,6 +403,10 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     final_config.injection_styles.erase(it);
   }
 
+  final_config.propagation_behavior_extract =
+      value_or(user_config.propagation_behavior_extract,
+               PropagationBehaviorExtract::CONTINUE);
+
   final_config.runtime_id = user_config.runtime_id;
   final_config.root_session_id = user_config.root_session_id;
   final_config.process_tags = user_config.process_tags;

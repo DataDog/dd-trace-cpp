@@ -287,6 +287,8 @@ void extract_tracestate(
   }
 
   const auto tracestate = trim(*maybe_tracestate);
+  result.tracestate_full = tracestate;
+
   auto maybe_parsed = parse_tracestate(tracestate);
   if (!maybe_parsed) {
     // No "dd" entry in `tracestate`, so there's nothing to extract.
