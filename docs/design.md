@@ -172,6 +172,12 @@ passes through agrees on whether it's kept or dropped, rather than deciding inde
 Propagation can also be suppressed: if tracing is disabled for a trace and no other product depends
 on it continuing, context is not injected at all.
 
+`Tracer` can also propagate `Baggage`, an OpenTelemetry-like key/value store for application data.
+It is defined in [baggage.h](../src/datadog/baggage.h). It is enabled by a trace context propagation
+style, and it uses the same carrier abstraction. `Tracer::create_baggage()` creates one,
+`Tracer::extract_baggage()` / `Tracer::extract_or_create_baggage()` read one from a carrier, and
+`Tracer::inject()` writes one to a carrier.
+
 ### Collector
 
 `class Collector` is an interface for sending a `TraceSegment`'s spans somewhere once they're all
