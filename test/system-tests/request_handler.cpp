@@ -487,11 +487,13 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   }
 
   const auto upstream_id = span->parent_id().value_or(0);
-
   const auto response_body = nlohmann::json{{"span_id", upstream_id}};
-  link_contexts_[upstream_id] =
-      make_link_context(span, http_headers, upstream_id);
-  tracing_context_[upstream_id] = std::move(*http_headers);
+
+  // Fall back to the extracted span's own id when there's no parent id
+  // (e.g. root-context extraction), avoiding collisions.
+  const auto handle = span->parent_id().value_or(span->id());
+  link_contexts_[handle] = make_link_context(span, http_headers, upstream_id);
+  tracing_context_[handle] = std::move(*http_headers);
 
   // The span below will not be finished and flushed.
   blackhole_.emplace_back(std::move(*span));
