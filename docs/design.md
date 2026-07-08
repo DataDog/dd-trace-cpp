@@ -131,9 +131,12 @@ A `Tracer` owns a `Collector`, a `SpanSampler`, and a `ConfigManager`. `SpanSamp
 `ConfigManager` are owned exclusively by one `Tracer`. `ConfigManager` in turn owns a
 `TraceSampler`.
 
+Different `Tracer` instances are independent of each other, even if they share a `Collector`.
+
 A `Tracer` is constructed from a `TracerConfig`, which configures these objects and many other
 aspects of a `Tracer`'s behavior (span defaults, propagation styles, telemetry…; see
-[tracer_config.h](../include/datadog/tracer_config.h)).
+[tracer_config.h](../include/datadog/tracer_config.h)). To change most of a `Tracer`s behavior, an
+application constructs a new `Tracer` from a new `TracerConfig`.
 
 `Tracer` has two main member functions: `Tracer::create_span()` and `Tracer::extract_span()`, and
 another that combines them: `Tracer::extract_or_create_span()`.
@@ -222,7 +225,9 @@ client to send a `POST` request to the Datadog Agent's `/v0.4/traces` endpoint. 
 callback-based.
 
 `DatadogAgent` also periodically polls the Agent's `/v0.7/config` endpoint for remote configuration
-updates, via `EventScheduler`. Responses are dispatched to registered `remote_config::Listener`s.
+updates, via `EventScheduler`. Responses are dispatched to registered `remote_config::Listener`s,
+including `ConfigManager`, which is how sampling rate/rules, trace reporting, and tags can be
+reconfigured at runtime by modifying the `Tracer`.
 
 ### HTTPClient
 
@@ -291,18 +296,11 @@ Intended usage is:
 6. When all `Span`s in `TraceSegment` are finished, the segment is sent to the
    `Collector`.
 
-Different instances of `Tracer` are independent of each other.
-
-If an application wishes to reconfigure tracing at runtime, it can create another `Tracer` using the
-new configuration. Some behavior (sampling rate / rules, trace reporting, tags) is reconfigurable at
-runtime via Remote Config, through `ConfigManager`.
-
 ## EventScheduler
 
-As of this writing, `class DatadogAgent` flushes batches of finished trace segments to the Datadog
-Agent once every two second [by
+`class DatadogAgent` flushes batches of finished trace segments to the Datadog Agent once every two
+second [by
 default](https://github.com/DataDog/dd-trace-cpp/blob/ca155b3da65c2dc235cf64a28f8e0d8fdab3700c/src/datadog/datadog_agent_config.h#L50-L51).
-
 It does this by scheduling a recurring event with an `EventScheduler`, which is an interface defined
 in [event_scheduler.h](../include/datadog/event_scheduler.h).
 
