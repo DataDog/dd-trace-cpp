@@ -9,36 +9,49 @@ This guide describes salient features of the Datadog C++ Tracer's design.
 ```mermaid
 ---
 title: Datadog C++ Tracer Architecture Overview
-config:
-  layout: elk
 ---
 classDiagram
-  class Span
-  Span o-- TraceSegment
-  Span o-- SpanData
+  class Span {
+    create_child() Span
+    inject(writer)
+  }
+  Span "0..n" o-- TraceSegment
+  Span "1" o-- "1" SpanData
 
   class SpanData
 
   class TraceSegment {
     mutex_ 🔒
   }
-  TraceSegment *-- SpanData
+  TraceSegment *-- "0..n" SpanData
   TraceSegment o-- Collector
   TraceSegment o-- SpanSampler
   TraceSegment o-- ConfigManager
+  TraceSegment o-- TraceSampler
 
-  class Tracer
-  Tracer o-- Collector
-  Tracer o-- SpanSampler
-  Tracer o-- ConfigManager
+  class Tracer {
+    create_span(config) Span
+    extract_span(reader) Span
+  }
+  Tracer "1..n" o-- Collector
+  Tracer "1" o-- "1" SpanSampler
+  Tracer "1" o-- "1" ConfigManager
 
   class SpanSampler {
     mutex_ 🔒
   }
 
   class Collector {
-    mutex_ 🔒
+    send(spans)
   }
+
+  class DatadogAgent {
+    mutex_ 🔒
+    flush()
+  }
+  DatadogAgent ..|> Collector
+  DatadogAgent o-- HTTPClient
+  DatadogAgent o-- EventScheduler
 
   class ConfigManager {
     mutex_ 🔒
@@ -48,6 +61,21 @@ classDiagram
   class TraceSampler {
     mutex_ 🔒
   }
+
+  class HTTPClient {
+    post()
+  }
+
+  class Curl
+  Curl ..|> HTTPClient
+
+  class EventScheduler
+
+  class ThreadedEventScheduler {
+    mutex_ 🔒
+  }
+  ThreadedEventScheduler ..|> EventScheduler
+
 ```
 
 Intended usage is:
