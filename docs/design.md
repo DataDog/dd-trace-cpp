@@ -6,24 +6,48 @@ This guide describes salient features of the Datadog C++ Tracer's design.
 
 ### Overview
 
-- Vertices are components.
-- Edges are ownership relationships between components. Each edge is labeled by the kind of pointer
-  that is used to implement the relationship.
-- Components with a padlock are protected by a mutex.
-
 ```mermaid
 ---
-title: Components Relationships
+title: Datadog C++ Tracer Architecture Overview
 config:
   layout: elk
 ---
-graph LR;
-  Tracer(Tracer) & TraceSegment("TraceSegment 🔒")-- shared -->Collector("Collector 🔒") & SpanSampler("SpanSampler 🔒")
-  Tracer & TraceSegment-- shared -->ConfigManager("ConfigManager 🔒")
-  ConfigManager & TraceSegment-- shared -->TraceSampler("TraceSampler 🔒")
-  TraceSegment-- "`**unique**`" -->SpanData(SpanData)
-  Span(Span)-- shared -->TraceSegment
-  Span-- "`**raw**`" -->SpanData
+classDiagram
+  class Span
+  Span o-- TraceSegment
+  Span o-- SpanData
+
+  class SpanData
+
+  class TraceSegment {
+    mutex_ 🔒
+  }
+  TraceSegment *-- SpanData
+  TraceSegment o-- Collector
+  TraceSegment o-- SpanSampler
+  TraceSegment o-- ConfigManager
+
+  class Tracer
+  Tracer o-- Collector
+  Tracer o-- SpanSampler
+  Tracer o-- ConfigManager
+
+  class SpanSampler {
+    mutex_ 🔒
+  }
+
+  class Collector {
+    mutex_ 🔒
+  }
+
+  class ConfigManager {
+    mutex_ 🔒
+  }
+  ConfigManager o-- TraceSampler
+
+  class TraceSampler {
+    mutex_ 🔒
+  }
 ```
 
 Intended usage is:
