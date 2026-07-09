@@ -289,10 +289,7 @@ Intended usage is:
 
 ## EventScheduler
 
-`DatadogAgent` uses an `EventScheduler` to schedule its recurring work, at fixed intervals:
-
-- flushing batches of finished trace segments;
-- polling for Remote Configuration updates.
+`DatadogAgent` uses an `EventScheduler` to schedule its recurring work, at fixed intervals.
 
 `EventScheduler` is an interface defined in
 [event_scheduler.h](../include/datadog/event_scheduler.h). It has one main member function,
