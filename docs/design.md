@@ -7,8 +7,8 @@ design.
 
 ### Span
 
-[class Span](../include/datadog/span.h) is the component with which users will interact the most.
-Each span:
+[Span](../include/datadog/span.h) is the component with which users will interact the most. Each
+span:
 
 - has an "ID",
 - is associated with a "trace ID",
@@ -29,8 +29,8 @@ Aside from setting and retrieving its attributes, `Span` also has the following 
   [DictWriter](../include/datadog/dict_writer.h), which is an interface for setting a name/value
   mapping, e.g. in HTTP request headers.
 
-A `Span` does not own its data. `class Span` contains a raw pointer to a [class
-SpanData](../src/datadog/span_data.h), which contains the actual attributes of the `Span`. The
+A `Span` does not own its data. `Span` contains a raw pointer to a
+[SpanData](../src/datadog/span_data.h), which contains the actual attributes of the `Span`. The
 `SpanData` is owned by a `TraceSegment`, which is described in the next section. The `Span` holds a
 `shared_ptr` to its `TraceSegment`, retrievable via `Span::trace_segment()`.
 
@@ -44,10 +44,10 @@ way to "finish" a `Span` without destroying it. You can override its end time th
 lifetime of the `Span` object, but a `TraceSegment` does not consider the `Span` finished until the
 `Span` object is destroyed. This allows us to avoid "finished" `Span` states.
 
-Along similar lines, `class Span` is move-only. Its copy constructor is deleted. Functions that
-produce `Span`s return them by value, but only one copy of a `Span` can exist at a time.
+Along similar lines, `Span` is move-only. Its copy constructor is deleted. Functions that produce
+`Span`s return them by value, but only one copy of a `Span` can exist at a time.
 
-`class Span` is even stricter than move-only: its assignment operator is deleted too, including
+`Span` is even stricter than move-only: its assignment operator is deleted too, including
 move-assignment. Since destroying a `Span` finishes it, move-assignment would have to either finish
 the original `Span` early or leave two `Span`s referring to one finished state, both at odds with
 its otherwise [RAII](https://en.cppreference.com/w/cpp/language/raii) nature.
@@ -94,12 +94,12 @@ block
   space:4 g["Service A - Trace segment A2 - Span A5"] h["Service A - Trace segment A2 - Span A6"] space:2
 ```
 
-`class TraceSegment` is defined in [trace_segment.h](../include/datadog/trace_segment.h).
-`TraceSegment` objects are managed internally by the library. That is to say, a user never creates a
+`TraceSegment` is defined in [trace_segment.h](../include/datadog/trace_segment.h). `TraceSegment`
+objects are managed internally by the library. That is to say, a user never creates a
 `TraceSegment`.
 
 The library creates a `TraceSegment` whenever a new trace is created or when trace context is
-extracted. This is the job of `class Tracer`, described in the next section.
+extracted. This is the job of `Tracer`, described in the next section.
 
 Primarily, `TraceSegment` is a bag of `Span`s. It contains a `vector<unique_ptr<SpanData>>`. `Span`
 objects then refer to the `SpanData`s via raw pointers.
@@ -117,13 +117,13 @@ it moves its `Span`s into the `Collector` via `Collector::send()`, and a short t
 subsequent section.
 
 A `TraceSegment` contains `shared_ptr`s to the main objects it needs in order to do its job. Those
-objects are created by `class Tracer` when the `Tracer` is configured, and then shared with
-`TraceSegment` when the `TraceSegment` is created.
+objects are created by `Tracer` when it is configured, and then shared with `TraceSegment` when the
+`TraceSegment` is created.
 
 ### Tracer
 
-`class Tracer` is what users configure, and it is how `Span`s are extracted from trace context or
-created as a trace's root. See [tracer.h](../include/datadog/tracer.h).
+`Tracer` is what users configure, and it is how `Span`s are extracted from trace context or created
+as a trace's root. See [tracer.h](../include/datadog/tracer.h).
 
 A `Tracer` owns a `Collector`, a `SpanSampler`, and a `ConfigManager`. `SpanSampler` and
 `ConfigManager` are owned exclusively by one `Tracer`. `ConfigManager` in turn owns a
@@ -181,8 +181,8 @@ style, and it uses the same carrier abstraction. `Tracer::create_baggage()` crea
 
 ### Collector
 
-`class Collector` is an interface for sending a `TraceSegment`'s spans somewhere once they're all
-done. It's defined in [collector.h](../include/datadog/collector.h).
+`Collector` is an interface for sending a `TraceSegment`'s spans somewhere once they're all done.
+It's defined in [collector.h](../include/datadog/collector.h).
 
 It has one main function: `Collector::send()`. More of a callback than an interface. `send()` also
 takes a `TraceSampler` as a `response_handler`, which an implementation may use to update the trace
@@ -198,7 +198,7 @@ The default implementation is `DatadogAgent`, which is described in the next sec
 
 ### DatadogAgent
 
-`class DatadogAgent` is the default implementation of `Collector`. It's defined in
+`DatadogAgent` is the default implementation of `Collector`. It's defined in
 [datadog_agent.h](../src/datadog/datadog_agent.h).
 
 `DatadogAgent` sends trace segments to the [Datadog Agent](https://docs.datadoghq.com/agent) in
@@ -210,13 +210,8 @@ HTTP requests and a means to set a timer for the flush operation. So, there are 
 The `HTTPClient` and `EventScheduler` can be injected as part of `DatadogAgent`'s
 [configuration](../include/datadog/datadog_agent_config.h), which is usually specified via the
 `agent` member of `Tracer`'s [configuration](../include/datadog/tracer_config.h). If they're not
-specified, then default implementations are used:
-
-- [class Curl : public HTTPClient](../src/datadog/curl.h), which uses libcurl's [multi
-  interface](https://curl.se/libcurl/c/libcurl-multi.html) together with a dedicated thread as an
-  event loop.
-- [class ThreadedEventScheduler : public EventScheduler](../src/datadog/threaded_event_scheduler.h),
-  which uses a dedicated thread for executing scheduled events at the correct time.
+specified, then default implementations are used: `Curl` and `ThreadedEventScheduler` (described in
+subsequent sections).
 
 `DatadogAgent::flush()` is periodically called by an `EventScheduler`. `flush()` uses the HTTP
 client to send a `POST` request to the Datadog Agent's `/v0.4/traces` endpoint. It's all
@@ -229,7 +224,7 @@ reconfigured at runtime (without creating a new `Tracer`).
 
 ### HTTPClient
 
-`class HTTPClient` is an interface for sending HTTP requests. It's defined in
+`HTTPClient` is an interface for sending HTTP requests. It's defined in
 [http_client.h](../include/datadog/http_client.h).
 
 The only needed HTTP method is `POST` (for requests to the Datadog Agent's endpoints). `HTTPClient`
@@ -241,10 +236,9 @@ to finish. It's used to ensure "clean shutdown". Without it, on average the last
 traces would be lost on shutdown. Implementations of `HTTPClient` that don't have a dedicated thread
 need not support `drain()`; in those cases, `drain()` returns immediately.
 
-The default implementation of `HTTPClient` is `class Curl`, defined in
-[curl.h](../src/datadog/curl.h), which uses libcurl's [multi
-interface](https://curl.se/libcurl/c/libcurl-multi.html) together with a dedicated thread as an
-event loop.
+The default implementation of `HTTPClient` is `Curl`, defined in [curl.h](../src/datadog/curl.h),
+which uses libcurl's [multi interface](https://curl.se/libcurl/c/libcurl-multi.html) together with a
+dedicated thread as an event loop.
 
 `Curl` is also used in Datadog's Nginx module,
 [nginx-datadog](https://github.com/DataDog/nginx-datadog). This is explicitly
@@ -258,8 +252,8 @@ library](https://github.com/dgoffredo/nginx-curl).
 
 [Envoy's Datadog tracing
 integration](https://github.com/envoyproxy/envoy/tree/main/source/extensions/tracers/datadog#datadog-tracer)
-uses a different implementation, [class
-AgentHTTPClient](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/agent_http_client.h),
+uses a different implementation,
+[AgentHTTPClient](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/agent_http_client.h),
 which uses Envoy's built-in HTTP facilities. libcurl is not involved at all.
 
 ### Logical Component Relationships
@@ -304,19 +298,18 @@ Intended usage is:
 [event_scheduler.h](../include/datadog/event_scheduler.h). It has one main member function,
 `EventScheduler::schedule_recurring_event()`, which registers a callback to be invoked repeatedly.
 
-The default implementation of `EventScheduler` is `class ThreadedEventScheduler`, defined in
+The default implementation of `EventScheduler` is `ThreadedEventScheduler`, defined in
 [threaded_event_scheduler.h](../src/datadog/threaded_event_scheduler.h), which uses a dedicated
 thread for executing scheduled events at the correct time.
 
 [Datadog Nginx module](https://github.com/DataDog/nginx-datadog) uses a different implementation,
-[class
-NgxEventScheduler](https://github.com/DataDog/nginx-datadog/blob/master/src/ngx_event_scheduler.h),
+[NgxEventScheduler](https://github.com/DataDog/nginx-datadog/blob/master/src/ngx_event_scheduler.h),
 which uses Nginx's own event loop instead of a dedicated thread.
 
 [Envoy's Datadog tracing
 integration](https://github.com/envoyproxy/envoy/tree/main/source/extensions/tracers/datadog#datadog-tracer)
-also uses a different implementation, [class
-EventScheduler](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/event_scheduler.h),
+also uses a different implementation,
+[EventScheduler](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/event_scheduler.h),
 which uses Envoy's built-in event dispatch facilities.
 
 ## Configuration
@@ -428,7 +421,7 @@ with no caller to hand them to. A logging interface lets those errors, startup d
 configuration warnings be logged by default, rather than requiring client code to opt in via an
 `on_error` callback.
 
-The logging interface is `class Logger`, defined in [logger.h](../include/datadog/logger.h).
+The logging interface is `Logger`, defined in [logger.h](../include/datadog/logger.h).
 
 `Logger` has only two severities, "error" and "startup":
 
