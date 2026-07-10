@@ -1544,6 +1544,46 @@ TEST_TRACER("span extraction") {
   }
 }
 
+TEST_TRACER("restart extraction links to the extracted context") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"x-datadog-parent-id", "1"},
+      {"x-datadog-sampling-priority", "2"},
+      {"x-datadog-tags", "_dd.p.tid=1111111111111111"},
+      {"traceparent", "00-11111111111111110000000000000001-0000000000000001-01"},
+  };
+
+  {
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+    REQUIRE_FALSE(span->parent_id());
+  }
+
+  REQUIRE(collector->span_count() == 1);
+  const auto& span = collector->first_span();
+  REQUIRE(span.span_links.size() == 1);
+  const auto& link = span.span_links.front();
+  REQUIRE(link.trace_id.low == 1);
+  REQUIRE(link.trace_id.high == 0x1111111111111111);
+  REQUIRE(link.span_id == 1);
+  REQUIRE(link.attributes == SpanLinkAttributes{
+                                 {"reason", "propagation_behavior_extract"},
+                                 {"context_headers", "datadog"},
+                             });
+}
+
 TEST_TRACER("baggage usage") {
   TracerConfig config;
   config.logger = std::make_shared<NullLogger>();

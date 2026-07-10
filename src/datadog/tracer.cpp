@@ -27,6 +27,7 @@
 #include "root_session_id.h"
 #include "span_data.h"
 #include "span_sampler.h"
+#include "string_util.h"
 #include "tags.h"
 #include "telemetry_metrics.h"
 #include "trace_sampler.h"
@@ -465,17 +466,19 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     case PropagationBehaviorExtract::RESTART: {
       // restart: create a new trace, with a span link to the previous one
 
+      std::string context_headers{to_string_view(*first_style_with_trace_id)};
+      to_lower(context_headers);
       auto link_attributes = SpanLinkAttributes{};
       link_attributes.emplace("reason", "propagation_behavior_extract");
-      link_attributes.emplace("context_headers", "todo");
+      link_attributes.emplace("context_headers", std::move(context_headers));
 
       auto tracestate =
           extracted_contexts[PropagationStyle::W3C].tracestate_full;
 
       auto restarted_span = create_span(config);
-      restarted_span.add_link(SpanLink{span_data->trace_id, span_data->span_id,
-                                       tracestate, link_attributes,
-                                       nullopt});  // TODO: flags
+      restarted_span.add_link(
+          SpanLink{span_data->trace_id, span_data->parent_id, tracestate,
+                   link_attributes, nullopt});  // TODO: flags
       return restarted_span;
     }
     default:
