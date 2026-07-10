@@ -1293,6 +1293,86 @@ TRACER_CONFIG_TEST("TracerConfig propagation styles") {
   }
 }
 
+TRACER_CONFIG_TEST("TracerConfig propagation behavior extract") {
+  TracerConfig config;
+  config.service = "testsvc";
+
+  const auto behavior_metadata = [](const FinalizedTracerConfig& finalized) {
+    return finalized.metadata.at(ConfigName::PROPAGATION_BEHAVIOR_EXTRACT);
+  };
+
+  SECTION("defaults to continue") {
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::CONTINUE);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 1);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(metadata.back().value == "continue");
+  }
+
+  SECTION("uses programmatic configuration") {
+    config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::RESTART);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 2);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::CODE);
+    CHECK(metadata.back().value == "restart");
+  }
+
+  SECTION("environment configuration overrides programmatic configuration") {
+    const EnvGuard guard{"DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT", "ignore"};
+    config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::IGNORE);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 3);
+    CHECK(metadata.back().origin ==
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(metadata.back().value == "ignore");
+  }
+
+  SECTION("invalid environment configuration falls through to code") {
+    const EnvGuard guard{"DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT", "invalid"};
+    config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::RESTART);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 2);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::CODE);
+    CHECK(metadata.back().value == "restart");
+  }
+
+  SECTION("invalid environment configuration falls through to the default") {
+    const EnvGuard guard{"DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT", "invalid"};
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::CONTINUE);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 1);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(metadata.back().value == "continue");
+  }
+}
+
 TRACER_CONFIG_TEST("configure 128-bit trace IDs") {
   TracerConfig config;
   config.service = "testsvc";
