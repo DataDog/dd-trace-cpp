@@ -1,5 +1,7 @@
 #include "request_handler.h"
 
+#include <atomic>
+
 #include <datadog/optional.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
@@ -14,6 +16,16 @@
 #include "utils.h"
 
 namespace {
+
+// Return an opaque key for an extracted context without a remote parent span
+// (for example, in propagation restart mode). C++-generated span IDs have
+// their most significant bit cleared, so setting it prevents collisions with
+// IDs in active_spans_.
+std::uint64_t next_synthetic_span_id() {
+  static std::atomic<std::uint64_t> counter{0};
+  return (std::uint64_t{1} << 63) |
+         counter.fetch_add(1, std::memory_order_relaxed);
+}
 
 std::string get_agent_url_from_traces_url(std::string traces_url) {
   // Strip the API path from the traces URL to get the agent URL
@@ -487,11 +499,11 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   }
 
   const auto upstream_id = span->parent_id().value_or(0);
-  const auto response_body = nlohmann::json{{"span_id", upstream_id}};
 
-  // Fall back to the extracted span's own id when there's no parent id
-  // (e.g. root-context extraction), avoiding collisions.
-  const auto handle = span->parent_id().value_or(span->id());
+  // Keep a remote parent span ID when extraction has one. Otherwise, return a
+  // synthetic key so a restart context can still be used as a parent_id.
+  const auto handle = span->parent_id().value_or(next_synthetic_span_id());
+  const auto response_body = nlohmann::json{{"span_id", handle}};
   link_contexts_[handle] = make_link_context(span, http_headers, upstream_id);
   tracing_context_[handle] = std::move(*http_headers);
 
