@@ -109,13 +109,15 @@ span:
 
 - has an "ID",
 - is associated with a "trace ID",
-- is associated with a "service", which has a "service type", a "version", and an "environment",
+- is associated with a "service", which has a "version", and an "environment",
 - has a "name" (sometimes called the "operation name"),
 - has a "resource name", which is a description of the thing that the span is about,
 - contains information about whether an error occurred during the represented operation, including
   an error message, error type, and stack trace,
 - includes an arbitrary name/value mapping of strings, called "tags",
-- includes an arbitrary name/value mapping of numbers, called "metrics",
+- includes an arbitrary name/value mapping of numbers, called "metrics" (we may change this to a map
+  of primitives, as in [OpenTelemetry span
+  attributes](https://opentelemetry.io/docs/specs/otel/common/#attribute-collections)),
 - has a "start time" indicating when the represented operation began,
 - has a "duration", known only once it finishes, indicating how long the represented operation took.
 
@@ -169,12 +171,12 @@ A "trace" is the entire tree of spans having the same trace ID.
 Within one process/worker/service, though, typically there is not an entire trace but only part
 of the trace. Let's call the process/worker/service a "tracer".
 
-One portion of a trace that's passing through the tracer is called a "trace segment". A trace
-segment begins either at the trace's root span or at a span extracted from trace context, e.g. a
-span created from the `X-Datadog-Trace-Id` and `X-Datadog-Parent-Id` HTTP request headers. The trace
-segment includes all local descendants of that span, and has as its "boundary" any descendant spans
-without children or descendant spans that were used to inject trace context out-of-tracer (described
-in a subsequent section).
+One portion of a trace that's passing through the tracer is called a "trace segment". This is a
+Datadog-specific concept. A trace segment begins either at the trace's root span or at a span
+extracted from trace context, e.g. a span created from the `X-Datadog-Trace-Id` and
+`X-Datadog-Parent-Id` HTTP request headers. The trace segment includes all local descendants of that
+span, and has as its "boundary" any descendant spans without children or descendant spans that were
+used to inject trace context out-of-tracer (described in a subsequent section).
 
 There might be more than one trace segment for the _same trace_ within a tracer. For example, in the
 diagram below, the trace passes through the "Service A" tracer twice. So for this trace, this tracer
@@ -256,10 +258,10 @@ receiving tracer can create spans belonging to the same trace.
 
 There are two directions:
 
-- Injection: `Span::inject()` writes the current trace context into a carrier (e.g. outgoing HTTP
-  headers).
 - Extraction: `Tracer::extract_span()` reads trace context from a carrier (e.g. incoming HTTP
   headers), and uses it to create a `Span` that continues the trace.
+- Injection: `Span::inject()` writes the current trace context into a carrier (e.g. outgoing HTTP
+  headers).
 
 Several wire formats, "propagation styles", are supported. A `Tracer` can be configured with
 multiple styles for both injection and extraction.
@@ -270,8 +272,9 @@ passes through agrees on whether it's kept or dropped, rather than deciding inde
 Propagation can also be suppressed: if tracing is disabled for a trace and no other product depends
 on it continuing, context is not injected at all.
 
-`Tracer` can also propagate `Baggage`, an OpenTelemetry-like key/value store for application data.
-It is defined in [baggage.h](../src/datadog/baggage.h). It is enabled by a trace context propagation
+`Tracer` can also propagate W3C `Baggage`, a key/value store for application data that is not
+inherently part of a distributed trace, but is propagated across services alongside it. It is
+defined in [baggage.h](../src/datadog/baggage.h). It is enabled by a trace context propagation
 style, and it uses the same carrier abstraction. `Tracer::create_baggage()` creates one,
 `Tracer::extract_baggage()` / `Tracer::extract_or_create_baggage()` read one from a carrier, and
 `Tracer::inject()` writes one to a carrier.

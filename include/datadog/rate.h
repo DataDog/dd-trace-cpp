@@ -1,6 +1,6 @@
 #pragma once
 
-// The `Rate` clarr is a `double` whose value is between zero and one,
+// The `Rate` class is a `double` whose value is between zero and one,
 // inclusive.
 //
 // `Rate` objects are obtained by calling the static member function
