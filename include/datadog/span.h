@@ -1,14 +1,13 @@
 #pragma once
 
-// This component defines a class, `Span`, that represents an extent of time in
-// which some operation of interest occurs, such as an RPC request, database
-// query, calculation, etc.
+// The `Span` class represents an extent of time in which some operation of
+// interest occurs, such as an RPC request, database query, calculation, etc.
 //
 // `Span` objects are created by calling member functions on `Tracer` or on
 // another `Span` object. They are not instantiated directly.
 //
 // A `Span` has a start time, an end time, and a name (sometimes called its
-// "operation name"). A span is associated with a service, a resource (such as
+// "operation name"). A `Span` is associated with a service, a resource (such as
 // the URL endpoint in an HTTP request), and arbitrary key/value string pairs
 // known as tags.
 //
@@ -26,19 +25,19 @@
 // handler. That child might itself have children, such as a database query or
 // a request to an authentication service.
 //
-// The complete set of spans that are related to each other via the parent/child
-// relationship is called a trace.
+// The complete set of `Span`s that are related to each other via the
+// parent/child relationship is called a trace.
 //
 // A trace can extend across processes and networks via trace context
 // propagation. A `Span` can be _extracted_ from its external parent via
-// `Tracer::extract_span`, and a `Span` can be _injected_ via `Span::inject`
+// `Tracer::extract_span()`, and a `Span` can be _injected_ via `Span::inject()`
 // into an outside context from which its external children might be extracted.
 //
-// If an error occurs during the operation that a span represents, the error can
-// be noted in the span via the `set_error` family of member functions.
+// If an error occurs during the operation that a `Span` represents, the error
+// can be noted in the `Span` via the `set_error()` family of member functions.
 //
 // A `Span` is finished when it is destroyed. The end time can be overridden
-// via the `set_end_time` member function prior to the span's destruction.
+// via the `set_end_time()` member function prior to the `Span`'s destruction.
 
 #include <chrono>
 #include <cstdint>

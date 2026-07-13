@@ -1,13 +1,13 @@
 #pragma once
 
-// This component provides a class, `Tracer`, that instantiates the mechanisms
-// necessary for tracing, and provides member functions for creating spans.
-// Each span created by `Tracer` is either the root of a new trace (see
-// `create_span`) or part of an existing trace whose information is extracted
-// from a provided key/value source (see `extract_span`).
+// The `Tracer` class instantiates the mechanisms necessary for tracing, and
+// provides member functions for creating `Span`s. Each `Span` created by
+// `Tracer` is either the root of a new trace (see `Tracer::create_span()`) or
+// part of an existing trace whose information is extracted from a provided
+// key/value source (see `Tracer::extract_span()`).
 //
 // `Tracer` is instantiated with a `FinalizedTracerConfig`, which can be
-// obtained from a `TracerConfig` via the `finalize_config` function. See
+// obtained from a `TracerConfig` via the `finalize_config()` function. See
 // `tracer_config.h`.
 
 #include <cstddef>
@@ -79,9 +79,9 @@ class Tracer {
   Expected<Span> extract_span(const DictReader& reader,
                               const SpanConfig& config);
 
-  // Return a span extracted from the specified `reader` (see `extract_span`).
+  // Return a span extracted from the specified `reader` (see `extract_span()`).
   // If there is no span to extract, or if an error occurs during extraction,
-  // then return a span that is the root of a new trace (see `create_span`).
+  // then return a span that is the root of a new trace (see `create_span()`).
   // Optionally specify a `config` indicating the attributes of the span.
   Span extract_or_create_span(const DictReader& reader);
   Span extract_or_create_span(const DictReader& reader,

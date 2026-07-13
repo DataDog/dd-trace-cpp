@@ -1,7 +1,7 @@
 #pragma once
 
-// This component provides a `class`, `DatadogAgent`, that implements the
-// `Collector` interface in terms of periodic HTTP requests to a Datadog Agent.
+// The `DatadogAgent` class implements the `Collector` interface in terms of
+// periodic HTTP requests to a Datadog Agent.
 //
 // `DatadogAgent` is configured by `DatadogAgentConfig`. See
 // `datadog_agent_config.h`.

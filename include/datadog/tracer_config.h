@@ -1,8 +1,8 @@
 #pragma once
 
-// This component provides a struct, `TracerConfig`, used to configure a
-// `Tracer`. `Tracer` is instantiated with a `FinalizedTracerConfig`, which
-// must be obtained from the result of a call to `finalize_config`.
+// `TracerConfig` is a struct used to configure a `Tracer`. `Tracer` is
+// instantiated with a `FinalizedTracerConfig`, which must be obtained from the
+// result of a call to `finalize_config()`.
 
 #include <datadog/telemetry/configuration.h>
 
@@ -204,7 +204,7 @@ struct TracerConfig {
 
 // `FinalizedTracerConfig` contains `Tracer` implementation details derived from
 // a valid `TracerConfig` and accompanying environment.
-// `FinalizedTracerConfig` must be obtained by calling `finalize_config`.
+// `FinalizedTracerConfig` must be obtained by calling `finalize_config()`.
 class FinalizedTracerConfig final {
   friend Expected<FinalizedTracerConfig> finalize_config(
       const TracerConfig& config, const Clock& clock);
