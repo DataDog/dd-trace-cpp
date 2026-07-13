@@ -1,7 +1,5 @@
 #include "request_handler.h"
 
-#include <atomic>
-
 #include <datadog/optional.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
@@ -10,6 +8,7 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <atomic>
 #include <datadog/json.hpp>
 
 #include "httplib.h"

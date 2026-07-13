@@ -481,15 +481,14 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
       Optional<std::uint32_t> flags =
           merged_context.sampling_priority
-              ? Optional<std::uint32_t>(*merged_context.sampling_priority > 0
-                                            ? 1u
-                                            : 0u)
+              ? Optional<std::uint32_t>(
+                    *merged_context.sampling_priority > 0 ? 1u : 0u)
               : nullopt;
 
       auto restarted_span = create_span(config);
-      restarted_span.add_link(
-          SpanLink{span_data->trace_id, span_data->parent_id, tracestate,
-                   link_attributes, flags});
+      restarted_span.add_link(SpanLink{span_data->trace_id,
+                                       span_data->parent_id, tracestate,
+                                       link_attributes, flags});
       return restarted_span;
     }
     default:

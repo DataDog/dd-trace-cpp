@@ -1561,7 +1561,8 @@ TEST_TRACER("restart extraction links to the extracted context") {
       {"x-datadog-parent-id", "1"},
       {"x-datadog-sampling-priority", "2"},
       {"x-datadog-tags", "_dd.p.tid=1111111111111111"},
-      {"traceparent", "00-11111111111111110000000000000001-0000000000000001-01"},
+      {"traceparent",
+       "00-11111111111111110000000000000001-0000000000000001-01"},
   };
 
   {
@@ -1630,8 +1631,7 @@ TEST_TRACER("restart extraction link preserves traceparent sampled flag") {
   }
 }
 
-TEST_TRACER(
-    "restart extraction link uses metadata from the selected context") {
+TEST_TRACER("restart extraction link uses metadata from the selected context") {
   TracerConfig config;
   config.service = "testsvc";
   config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
