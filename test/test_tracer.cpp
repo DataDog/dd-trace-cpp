@@ -1630,6 +1630,45 @@ TEST_TRACER("restart extraction link preserves traceparent sampled flag") {
   }
 }
 
+TEST_TRACER(
+    "restart extraction link uses metadata from the selected context") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  // Datadog is the default first extraction style. The W3C context is
+  // intentionally unrelated and must not contribute metadata to the link.
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"x-datadog-parent-id", "1"},
+      {"x-datadog-sampling-priority", "2"},
+      {"traceparent",
+       "00-00000000000000000000000000000002-0000000000000002-00"},
+      {"tracestate", "vendor=unrelated"},
+  };
+
+  {
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+  }
+
+  REQUIRE(collector->span_count() == 1);
+  const auto& link = collector->first_span().span_links.front();
+  REQUIRE(link.trace_id.low == 1);
+  REQUIRE(link.trace_id.high == 0);
+  REQUIRE(link.span_id == 1);
+  REQUIRE(link.tracestate == nullopt);
+  REQUIRE(link.flags == Optional<std::uint32_t>(1u));
+}
+
 TEST_TRACER("baggage usage") {
   TracerConfig config;
   config.logger = std::make_shared<NullLogger>();

@@ -472,13 +472,18 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       link_attributes.emplace("reason", "propagation_behavior_extract");
       link_attributes.emplace("context_headers", std::move(context_headers));
 
-      auto tracestate =
-          extracted_contexts[PropagationStyle::W3C].tracestate_full;
-      auto w3c_sampling_priority =
-          extracted_contexts[PropagationStyle::W3C].sampling_priority;
+      Optional<std::string> tracestate;
+      if (const auto w3c = extracted_contexts.find(PropagationStyle::W3C);
+          w3c != extracted_contexts.end() &&
+          w3c->second.trace_id == span_data->trace_id) {
+        tracestate = w3c->second.tracestate_full;
+      }
+
       Optional<std::uint32_t> flags =
-          w3c_sampling_priority
-              ? Optional<std::uint32_t>(*w3c_sampling_priority > 0 ? 1u : 0u)
+          merged_context.sampling_priority
+              ? Optional<std::uint32_t>(*merged_context.sampling_priority > 0
+                                            ? 1u
+                                            : 0u)
               : nullopt;
 
       auto restarted_span = create_span(config);
