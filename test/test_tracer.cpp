@@ -1582,6 +1582,52 @@ TEST_TRACER("restart extraction links to the extracted context") {
                                  {"reason", "propagation_behavior_extract"},
                                  {"context_headers", "datadog"},
                              });
+  REQUIRE(link.flags == Optional<std::uint32_t>(1u));
+}
+
+TEST_TRACER("restart extraction link preserves traceparent sampled flag") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  SECTION("sampled traceparent yields flags=1") {
+    const std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-11111111111111110000000000000001-0000000000000001-01"},
+    };
+    {
+      MockDictReader reader{headers};
+      const auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+    }
+
+    REQUIRE(collector->span_count() == 1);
+    const auto& link = collector->first_span().span_links.front();
+    REQUIRE(link.flags == Optional<std::uint32_t>(1u));
+  }
+
+  SECTION("unsampled traceparent yields flags=0") {
+    const std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-11111111111111110000000000000001-0000000000000001-00"},
+    };
+    {
+      MockDictReader reader{headers};
+      const auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+    }
+
+    REQUIRE(collector->span_count() == 1);
+    const auto& link = collector->first_span().span_links.front();
+    REQUIRE(link.flags == Optional<std::uint32_t>(0u));
+  }
 }
 
 TEST_TRACER("baggage usage") {

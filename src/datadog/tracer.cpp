@@ -474,11 +474,17 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
       auto tracestate =
           extracted_contexts[PropagationStyle::W3C].tracestate_full;
+      auto w3c_sampling_priority =
+          extracted_contexts[PropagationStyle::W3C].sampling_priority;
+      Optional<std::uint32_t> flags =
+          w3c_sampling_priority
+              ? Optional<std::uint32_t>(*w3c_sampling_priority > 0 ? 1u : 0u)
+              : nullopt;
 
       auto restarted_span = create_span(config);
       restarted_span.add_link(
           SpanLink{span_data->trace_id, span_data->parent_id, tracestate,
-                   link_attributes, nullopt});  // TODO: flags
+                   link_attributes, flags});
       return restarted_span;
     }
     default:
