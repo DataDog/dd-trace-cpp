@@ -18,7 +18,8 @@ enum class PropagationBehaviorExtract {
   // Reference previous trace through a span-link
   RESTART,
   // Discard entirely incoming context
-  IGNORE,
+  // (IGNORE without underscore breaks windows builds)
+  IGNORE_,
 };
 
 StringView to_string_view(PropagationBehaviorExtract behavior);
