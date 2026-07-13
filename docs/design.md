@@ -36,6 +36,11 @@ classDiagram
   Tracer "1..n" o-- Collector
   Tracer "1" o-- "1" SpanSampler
   Tracer "1" o-- "1" ConfigManager
+  Tracer -- FinalizedTracerConfig
+
+  class FinalizedTracerConfig {
+    finalize_config(TracerConfig) FinalizedTracerConfig
+  }
 
   class SpanSampler {
     mutex_ 🔒
@@ -76,6 +81,16 @@ classDiagram
   }
   ThreadedEventScheduler ..|> EventScheduler
 
+  class Logger {
+    log_startup()
+    log_error()
+  }
+
+  class NullLogger
+  NullLogger ..|> Logger
+
+  class CerrLogger
+  CerrLogger ..|> Logger
 ```
 
 Intended usage is:
