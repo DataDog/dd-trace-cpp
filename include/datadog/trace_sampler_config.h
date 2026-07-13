@@ -1,8 +1,8 @@
 #pragma once
 
-// This component provides a `struct`, `TraceSamplerConfig`, used to configure
-// `TraceSampler`. `TraceSampler` accepts a `FinalizedTraceSamplerConfig`, which
-// must be obtained from a call to `finalize_config`.
+// The `TraceSamplerConfig` struct is used to configure `TraceSampler`.
+// `TraceSampler` accepts a `FinalizedTraceSamplerConfig`, which must be
+// obtained from a call to `finalize_config()`.
 //
 // `TraceSamplerConfig` is specified as the `trace_sampler` property of
 // `TracerConfig`.
