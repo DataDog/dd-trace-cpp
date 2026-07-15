@@ -486,9 +486,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
               : nullopt;
 
       auto restarted_span = create_span(config);
-      restarted_span.add_link(SpanLink{span_data->trace_id,
-                                       span_data->parent_id, tracestate,
-                                       link_attributes, flags});
+      restarted_span.add_link(
+          SpanContext{span_data->trace_id, span_data->parent_id, tracestate,
+                      flags},
+          link_attributes);
       return restarted_span;
     }
     default:
