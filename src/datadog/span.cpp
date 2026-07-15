@@ -2,7 +2,6 @@
 #include <datadog/optional.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
-#include <datadog/span_link.h>
 #include <datadog/string_view.h>
 #include <datadog/trace_segment.h>
 
@@ -165,20 +164,30 @@ void Span::set_source(Source source) {
                                             to_tag(source));
 }
 
-void Span::add_link(const Span& linked, const SpanLinkAttributes& attrs) {
-  Optional<std::string> tracestate = nullopt;
-  Optional<std::uint32_t> flags = nullopt;
+SpanContext Span::context() const {
+  SpanContext context;
+  context.trace_id = trace_id();
+  context.span_id = id();
 
-  // Populate tracestate/flags from the linked trace's sampling decision, if
-  // one has already been made. Do not force a decision here
-  if (auto context = linked.trace_segment().w3c_link_context(*linked.data_)) {
-    tracestate = std::move(context->first);
-    flags = context->second;
+  if (auto w3c_context = trace_segment_->w3c_link_context(*data_)) {
+    context.tracestate = std::move(w3c_context->first);
+    context.flags = w3c_context->second;
   }
-  add_link(SpanLink{linked.trace_id(), linked.id(), tracestate, attrs, flags});
+
+  return context;
 }
 
-void Span::add_link(const SpanLink& link) { data_->span_links.push_back(link); }
+void Span::add_link(const SpanContext& context,
+                    const SpanLinkAttributes& attributes) {
+  SpanLink link;
+  link.trace_id = context.trace_id;
+  link.span_id = context.span_id;
+  link.tracestate = context.tracestate;
+  link.flags = context.flags;
+  link.attributes = attributes;
+
+  data_->span_links.push_back(std::move(link));
+}
 
 TraceSegment& Span::trace_segment() { return *trace_segment_; }
 

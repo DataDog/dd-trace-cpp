@@ -3,7 +3,7 @@
 #include <datadog/optional.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
-#include <datadog/span_link.h>
+#include <datadog/span_context.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
@@ -254,7 +254,7 @@ static datadog::tracing::SpanLinkAttributes parse_link_attributes(
   datadog::tracing::SpanLinkAttributes link_attributes;
 
   auto attributes = request_json.find("attributes");
-  if (attributes == request_json.cend() || attributes->is_object()) {
+  if (attributes == request_json.cend() || !attributes->is_object()) {
     return link_attributes;
   }
 
@@ -325,7 +325,7 @@ void RequestHandler::on_add_link(const httplib::Request& req,
         break;
       }
     }
-    span->second.add_link(linked_it->second, span_link_attributes);
+    span->second.add_link(linked_it->second.context(), span_link_attributes);
   } else {
     auto context_it = link_contexts_.find(*parent_id);
     if (context_it == link_contexts_.cend()) {
@@ -338,10 +338,7 @@ void RequestHandler::on_add_link(const httplib::Request& req,
       span->second.trace_segment().override_sampling_priority(
           *stored.sampling_priority);
     }
-    datadog::tracing::SpanLink link = stored.link;
-    link.attributes.insert(span_link_attributes.begin(),
-                           span_link_attributes.end());
-    span->second.add_link(link);
+    span->second.add_link(stored.context, span_link_attributes);
   }
 
   res.status = 200;
@@ -449,19 +446,19 @@ RequestHandler::StoredLinkContext RequestHandler::make_link_context(
     const datadog::tracing::Optional<nlohmann::json::array_t>& headers,
     std::uint64_t upstream_id) {
   StoredLinkContext stored;
-  stored.link.trace_id = span->trace_id();
-  stored.link.span_id = upstream_id;
+  stored.context.trace_id = span->trace_id();
+  stored.context.span_id = upstream_id;
   for (const auto& hdr : *headers) {
     if (hdr.size() != 2) continue;
     const auto name = utils::tolower(hdr[0].get<std::string>());
     if (name == "tracestate") {
-      stored.link.tracestate = hdr[1].get<std::string>();
+      stored.context.tracestate = hdr[1].get<std::string>();
     } else if (name == "traceparent") {
       const auto tp = hdr[1].get<std::string>();
       const auto pos = tp.rfind('-');
       if (pos != std::string::npos && pos + 1 < tp.size()) {
         try {
-          stored.link.flags = static_cast<std::uint32_t>(
+          stored.context.flags = static_cast<std::uint32_t>(
               std::stoul(tp.substr(pos + 1), nullptr, 16));
         } catch (...) {
         }
@@ -474,8 +471,9 @@ RequestHandler::StoredLinkContext RequestHandler::make_link_context(
     }
   }
   // Derive W3C flags from sampling priority when no traceparent flags present.
-  if (!stored.link.flags.has_value() && stored.sampling_priority.has_value()) {
-    stored.link.flags = *stored.sampling_priority > 0 ? 1u : 0u;
+  if (!stored.context.flags.has_value() &&
+      stored.sampling_priority.has_value()) {
+    stored.context.flags = *stored.sampling_priority > 0 ? 1u : 0u;
   }
   return stored;
 }

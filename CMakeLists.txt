@@ -160,8 +160,8 @@ target_sources(dd-trace-cpp-objects
       include/datadog/sampling_priority.h
       include/datadog/span.h
       include/datadog/span_config.h
+      include/datadog/span_context.h
       include/datadog/span_defaults.h
-      include/datadog/span_link.h
       include/datadog/span_matcher.h
       include/datadog/span_sampler_config.h
       include/datadog/string_view.h

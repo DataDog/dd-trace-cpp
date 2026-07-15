@@ -10,7 +10,7 @@
 #include <datadog/sampling_priority.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
-#include <datadog/span_link.h>
+#include <datadog/span_context.h>
 #include <datadog/tag_propagation.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
@@ -1109,13 +1109,13 @@ TEST_SPAN(
     linked_trace_id = linked.trace_id();
     linked_span_id = linked.id();
 
+    const auto linked_context = linked.context();
     const SpanLinkAttributes attrs{{"link.key", "value"}};
-    span.add_link(linked, attrs);
+    span.add_link(linked_context, attrs);
 
     // `linked`'s trace hasn't been sampled yet (its trace segment is still
-    // open), and `add_link` must not force that decision as a side effect of
-    // recording the link -- doing so would permanently finalize sampling for
-    // `linked`'s trace before it's actually finished.
+    // open), and obtaining its context must not force a decision -- doing so
+    // would permanently finalize sampling before the trace is finished.
     REQUIRE_FALSE(linked.trace_segment().sampling_decision().has_value());
   }
 
@@ -1160,8 +1160,9 @@ TEST_SPAN(
     linked.trace_segment().override_sampling_priority(
         SamplingPriority::USER_KEEP);
 
+    const auto linked_context = linked.context();
     const SpanLinkAttributes attrs{{"link.key", "value"}};
-    span.add_link(linked, attrs);
+    span.add_link(linked_context, attrs);
   }
 
   // Find the span that carries the link across all chunks.

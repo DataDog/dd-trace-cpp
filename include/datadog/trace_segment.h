@@ -113,8 +113,8 @@ class TraceSegment {
   // based on this segment's sampling decision. Unlike `inject`, this never
   // makes a sampling decision if one hasn't been made yet -- it returns
   // `nullopt` instead of forcing (and thereby permanently finalizing) one.
-  // Used by `Span::add_link` to populate a `SpanLink` without prematurely
-  // deciding sampling for the linked trace.
+  // Used by `Span::context` without prematurely deciding sampling for the
+  // trace.
   Optional<std::pair<std::string, std::uint32_t>> w3c_link_context(
       const SpanData& span) const;
 

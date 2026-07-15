@@ -47,7 +47,7 @@
 
 #include "clock.h"
 #include "optional.h"
-#include "span_link.h"
+#include "span_context.h"
 #include "string_view.h"
 #include "trace_id.h"
 #include "trace_source.h"
@@ -167,12 +167,14 @@ class Span {
   // Specifies the product (AppSec, DBM) that created this span.
   void set_source(Source);
 
-  // Add a span link to this span, filled from the specified live span.
-  // The linked span's trace ID, span ID, tracestate, and trace flags are
-  // populated automatically. `attrs` is optional user-supplied attributes.
-  void add_link(const Span& linked, const SpanLinkAttributes& attrs = {});
-  // Add a pre-built span link to this span.
-  void add_link(const SpanLink& link);
+  // Return this span's identifying and propagation state. This does not make a
+  // sampling decision when one has not already been made.
+  SpanContext context() const;
+
+  // Add a span link to this span using the specified context. `attributes` are
+  // optional user-supplied attributes associated with the link.
+  void add_link(const SpanContext& context,
+                const SpanLinkAttributes& attributes = {});
 
   // Write information about this span and its trace into the specified `writer`
   // using all of the configured injection propagation styles.

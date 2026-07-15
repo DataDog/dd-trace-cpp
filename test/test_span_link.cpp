@@ -1,12 +1,11 @@
 // Tests for `SpanLink` msgpack serialization. The on-the-wire field names and
 // omission rules must match the other Datadog tracers (dd-trace-go, -py, -rs).
 
-#include <datadog/span_link.h>
-
 #include <cstdint>
 #include <datadog/json.hpp>
 #include <string>
 
+#include "span_link.h"
 #include "test.h"
 
 using namespace datadog::tracing;
@@ -25,16 +24,16 @@ nlohmann::json encode_to_json(const SpanLink& link) {
 
 TEST_SPAN_LINK("minimal link encodes only trace_id and span_id") {
   SpanLink link;
-  link.trace_id = TraceID(0x1122334455667788ULL);  // high == 0
+  link.trace_id = TraceID(0x1122334455667788ULL, 0xBBBBBBBBBBBBBBBBULL);
   link.span_id = 42;
 
   const auto j = encode_to_json(link);
 
   REQUIRE(j.is_object());
-  REQUIRE(j.size() == 2);
+  REQUIRE(j.size() == 3);
   REQUIRE(j["trace_id"].get<std::uint64_t>() == 0x1122334455667788ULL);
+  REQUIRE(j["trace_id_high"].get<std::uint64_t>() == 0xBBBBBBBBBBBBBBBBULL);
   REQUIRE(j["span_id"].get<std::uint64_t>() == 42);
-  REQUIRE_FALSE(j.contains("trace_id_high"));
   REQUIRE_FALSE(j.contains("attributes"));
   REQUIRE_FALSE(j.contains("tracestate"));
   REQUIRE_FALSE(j.contains("flags"));

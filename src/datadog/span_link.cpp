@@ -1,4 +1,4 @@
-#include <datadog/span_link.h>
+#include "span_link.h"
 
 #include <algorithm>
 #include <array>
@@ -27,7 +27,7 @@ Expected<void> msgpack_encode(std::string& destination, const SpanLink& link) {
              msgpack::pack_integer(destination, link.span_id);
              return Expected<void>{};
            }},
-          {link.trace_id.high != 0, "trace_id_high",
+          {true, "trace_id_high",
            [&](std::string& destination) {
              msgpack::pack_integer(destination, link.trace_id.high);
              return Expected<void>{};

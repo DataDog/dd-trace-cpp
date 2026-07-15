@@ -6,7 +6,6 @@
 #include <datadog/clock.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
-#include <datadog/span_link.h>
 #include <datadog/string_view.h>
 #include <datadog/trace_id.h>
 
@@ -14,6 +13,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "span_link.h"
 
 namespace datadog {
 namespace tracing {
