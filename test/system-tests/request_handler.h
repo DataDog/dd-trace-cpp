@@ -2,7 +2,7 @@
 
 #include <datadog/optional.h>
 #include <datadog/span_config.h>
-#include <datadog/span_link.h>
+#include <datadog/span_context.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
@@ -43,7 +43,7 @@ class RequestHandler final {
   std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
   std::unordered_map<uint64_t, nlohmann::json::array_t> tracing_context_;
   struct StoredLinkContext {
-    datadog::tracing::SpanLink link;
+    datadog::tracing::SpanContext context;
     datadog::tracing::Optional<int> sampling_priority;
   };
   std::unordered_map<uint64_t, StoredLinkContext> link_contexts_;

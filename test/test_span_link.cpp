@@ -1,12 +1,11 @@
 // Tests for `SpanLink` msgpack serialization. The on-the-wire field names and
 // omission rules must match the other Datadog tracers (dd-trace-go, -py, -rs).
 
-#include <datadog/span_link.h>
-
 #include <cstdint>
 #include <datadog/json.hpp>
 #include <string>
 
+#include "span_link.h"
 #include "test.h"
 
 using namespace datadog::tracing;

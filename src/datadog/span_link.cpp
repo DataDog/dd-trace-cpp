@@ -1,4 +1,4 @@
-#include <datadog/span_link.h>
+#include "span_link.h"
 
 #include <algorithm>
 #include <array>
