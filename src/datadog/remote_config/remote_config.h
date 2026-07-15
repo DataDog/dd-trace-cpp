@@ -1,11 +1,11 @@
 #pragma once
 
 // Remote Configuration is a Datadog capability that allows a user to remotely
-// configure and change the behaviour of the tracing library.
+// configure and change the behavior of the tracing library.
 // The current implementation is restricted to Application Performance
 // Monitoring features.
 //
-// The `RemoteConfigurationManager` class implement the protocol to query,
+// The `RemoteConfigurationManager` class implements the protocol to query,
 // process and verify configuration from a remote source. It is also
 // responsible for handling configuration updates received from a remote source
 // and maintains the state of applied configuration.
