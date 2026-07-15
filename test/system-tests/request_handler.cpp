@@ -243,7 +243,7 @@ static datadog::tracing::SpanLinkAttributes parse_link_attributes(
   datadog::tracing::SpanLinkAttributes link_attributes;
 
   auto attributes = request_json.find("attributes");
-  if (attributes == request_json.cend() || attributes->is_object()) {
+  if (attributes == request_json.cend() || !attributes->is_object()) {
     return link_attributes;
   }
 
