@@ -104,12 +104,12 @@ c++ -I/path/to/dd-trace-cpp/.install/include -c -o my_app.o my_app.cpp
 ```
 
 When linking an executable that uses `dd-trace-cpp`, specify linkage to the
-built library using the `-ldd_trace_cpp` option and an appropriate `-L` option.
+built library using the `-ldd-trace-cpp` option and an appropriate `-L` option.
 If the library was installed into the default system directories, then the `-L`
-options is not needed. The `-ldd_trace_cpp` option is always needed.
+options is not needed. The `-ldd-trace-cpp` option is always needed.
 
 ```shell
-c++ -o my_app my_app.o -L/path/to/dd-trace-cpp/.install/lib -ldd_trace_cpp
+c++ -o my_app my_app.o -L/path/to/dd-trace-cpp/.install/lib -ldd-trace-cpp
 ```
 
 ## Contributing
