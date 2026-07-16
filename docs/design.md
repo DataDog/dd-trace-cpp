@@ -1,9 +1,106 @@
 # Datadog C++ Tracer Design
 
-The primary purpose of this guide is to describe salient features of the Datadog C++ Tracer's
-design.
+This guide describes salient features of the Datadog C++ Tracer's design.
 
 ## Architecture
+
+### Overview
+
+```mermaid
+---
+title: Datadog C++ Tracer Architecture Overview
+---
+classDiagram
+  class Span {
+    create_child() Span
+    inject(writer)
+  }
+  Span "0..n" o-- TraceSegment
+  Span "1" o-- "1" SpanData
+
+  class SpanData
+
+  class TraceSegment {
+    mutex_ 🔒
+  }
+  TraceSegment *-- "0..n" SpanData
+  TraceSegment o-- Collector
+  TraceSegment o-- SpanSampler
+  TraceSegment o-- ConfigManager
+  TraceSegment o-- TraceSampler
+
+  class Tracer {
+    create_span(config) Span
+    extract_span(reader) Span
+  }
+  Tracer "1..n" o-- Collector
+  Tracer "1" o-- "1" SpanSampler
+  Tracer "1" o-- "1" ConfigManager
+  Tracer -- FinalizedTracerConfig
+
+  class FinalizedTracerConfig {
+    finalize_config(TracerConfig) FinalizedTracerConfig
+  }
+
+  class SpanSampler {
+    mutex_ 🔒
+  }
+
+  class Collector {
+    send(spans)
+  }
+
+  class DatadogAgent {
+    mutex_ 🔒
+    flush()
+  }
+  DatadogAgent ..|> Collector
+  DatadogAgent o-- HTTPClient
+  DatadogAgent o-- EventScheduler
+
+  class ConfigManager {
+    mutex_ 🔒
+  }
+  ConfigManager o-- TraceSampler
+
+  class TraceSampler {
+    mutex_ 🔒
+  }
+
+  class HTTPClient {
+    post()
+  }
+
+  class Curl
+  Curl ..|> HTTPClient
+
+  class EventScheduler
+
+  class ThreadedEventScheduler {
+    mutex_ 🔒
+  }
+  ThreadedEventScheduler ..|> EventScheduler
+
+  class Logger {
+    log_startup()
+    log_error()
+  }
+
+  class NullLogger
+  NullLogger ..|> Logger
+
+  class CerrLogger
+  CerrLogger ..|> Logger
+```
+
+Intended usage is:
+
+1. Create a `TracerConfig`.
+2. Use the `TracerConfig` to create a `Tracer`.
+3. Use the `Tracer` to create and/or extract local root `Span`s.
+4. Use `Span` to create children and/or inject context.
+5. Use a `Span`'s `TraceSegment` to perform trace-wide operations.
+6. When all `Span`s in a `TraceSegment` are finished, the segment is sent to the `Collector`.
 
 ### Span
 
@@ -259,38 +356,7 @@ uses a different implementation,
 [AgentHTTPClient](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/agent_http_client.h),
 which uses Envoy's built-in HTTP facilities. libcurl is not involved at all.
 
-### Logical Component Relationships
-
-- Vertices are components.
-- Edges are ownership relationships between components. Each edge is labeled by the kind of pointer
-  that is used to implement the relationship.
-- Components with a padlock are protected by a mutex.
-
-```mermaid
----
-title: Components Relationships
-config:
-  layout: elk
----
-graph LR;
-  Tracer(Tracer) & TraceSegment("TraceSegment 🔒")-- shared -->Collector("Collector 🔒") & SpanSampler("SpanSampler 🔒")
-  Tracer & TraceSegment-- shared -->ConfigManager("ConfigManager 🔒")
-  ConfigManager & TraceSegment-- shared -->TraceSampler("TraceSampler 🔒")
-  TraceSegment-- "`**unique**`" -->SpanData(SpanData)
-  Span(Span)-- shared -->TraceSegment
-  Span-- "`**raw**`" -->SpanData
-```
-
-Intended usage is:
-
-1. Create a `TracerConfig`.
-2. Use the `TracerConfig` to create a `Tracer`.
-3. Use the `Tracer` to create and/or extract local root `Span`s.
-4. Use `Span` to create children and/or inject context.
-5. Use a `Span`'s `TraceSegment` to perform trace-wide operations.
-6. When all `Span`s in a `TraceSegment` are finished, the segment is sent to the `Collector`.
-
-## EventScheduler
+### EventScheduler
 
 `DatadogAgent` uses an `EventScheduler` to schedule its recurring work, at fixed intervals.
 
@@ -312,7 +378,9 @@ also uses a different implementation,
 [EventScheduler](https://github.com/envoyproxy/envoy/blob/main/source/extensions/tracers/datadog/event_scheduler.h),
 which uses Envoy's built-in event dispatch facilities.
 
-## Configuration
+## Operational Aspects
+
+### Configuration
 
 This library encodes configuration validation into the type system (see ["Parse, don't validate" by
 Alexis King](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate)). Invalid states
@@ -346,7 +414,7 @@ This static validation happens once, at construction. `ConfigManager`, which is 
 separately allows some configuration to change afterward, via a Remote Configuration update, rather
 than through `finalize_config()`. This path is also validated, by a different parser.
 
-## Error Handling
+### Error Handling
 
 Most error scenarios within this library are enumerated by `enum Error::Code`, defined in
 [error.h](../include/datadog/error.h). The integer values of the enumerated `Error::Code`s are
@@ -413,7 +481,7 @@ value when it succeeds. It behaves in the same way as `Expected<T>`, except that
 `operator*()` are not defined. `Expected<void>` is implemented in terms of `std::optional<Error>`,
 but inverts the value of `explicit operator bool`.
 
-## Logging
+### Logging
 
 This library has a logging interface alongside its `Expected`/`Error` reporting, because the default
 `HTTPClient`/`EventScheduler` implementations do work on background threads where errors can occur
