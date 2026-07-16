@@ -79,7 +79,7 @@ class Tracer {
   // return an error with some other code.
   // Depending of the propagation_behavior_restart config, it can continue the
   // trace, restart a new trace (with link), or discard the span (returning
-  // `Error::NO_SPAN_TO_EXTRACT`)
+  // the same result as if there was no tracing information)
   Expected<Span> extract_span(const DictReader& reader);
   Expected<Span> extract_span(const DictReader& reader,
                               const SpanConfig& config);
