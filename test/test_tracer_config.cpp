@@ -1334,7 +1334,7 @@ TRACER_CONFIG_TEST("TracerConfig propagation behavior extract") {
     const auto finalized = finalize_config(config);
     REQUIRE(finalized);
     CHECK(finalized->propagation_behavior_extract ==
-          PropagationBehaviorExtract::IGNORE_);
+          PropagationBehaviorExtract::IGNORE);
 
     const auto& metadata = behavior_metadata(*finalized);
     REQUIRE(metadata.size() == 3);

@@ -14,7 +14,7 @@ StringView to_string_view(PropagationBehaviorExtract behavior) {
       return "continue";
     case PropagationBehaviorExtract::RESTART:
       return "restart";
-    case PropagationBehaviorExtract::IGNORE_:
+    case PropagationBehaviorExtract::IGNORE:
       return "ignore";
     default:
       std::abort();
@@ -35,7 +35,7 @@ Optional<PropagationBehaviorExtract> parse_propagation_behavior_extract(
   } else if (token == "restart") {
     return PropagationBehaviorExtract::RESTART;
   } else if (token == "ignore") {
-    return PropagationBehaviorExtract::IGNORE_;
+    return PropagationBehaviorExtract::IGNORE;
   }
   return nullopt;
 }

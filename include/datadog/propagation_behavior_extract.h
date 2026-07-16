@@ -8,6 +8,11 @@
 #include "optional.h"
 #include "string_view.h"
 
+// Undefine legacy Windows macro so it can be a value in the enum
+#ifdef IGNORE
+#undef IGNORE
+#endif
+
 namespace datadog {
 namespace tracing {
 
@@ -18,8 +23,7 @@ enum class PropagationBehaviorExtract {
   // Reference previous trace through a span-link
   RESTART,
   // Discard entirely incoming context
-  // (IGNORE without underscore breaks windows builds)
-  IGNORE_,
+  IGNORE,
 };
 
 StringView to_string_view(PropagationBehaviorExtract behavior);

@@ -88,7 +88,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
     collector_ = agent;
   }
 
-  if (propagation_behavior_extract_ != PropagationBehaviorExtract::IGNORE_) {
+  if (propagation_behavior_extract_ != PropagationBehaviorExtract::IGNORE) {
     for (const auto style : extraction_styles_) {
       if (style == PropagationStyle::BAGGAGE) {
         baggage_extraction_enabled_ = true;
@@ -234,7 +234,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader) {
 Expected<Span> Tracer::extract_span(const DictReader& reader,
                                     const SpanConfig& config) {
   // ignore: Discard incoming context, new span with new sampling decision
-  if (propagation_behavior_extract_ == PropagationBehaviorExtract::IGNORE_) {
+  if (propagation_behavior_extract_ == PropagationBehaviorExtract::IGNORE) {
     return Error{
         Error::NO_SPAN_TO_EXTRACT,
         "Ignoring context extraction (propagation_behavior_extract=ignore)"};
