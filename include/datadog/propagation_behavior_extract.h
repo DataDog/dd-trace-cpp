@@ -12,7 +12,7 @@ namespace datadog {
 namespace tracing {
 
 enum class PropagationBehaviorExtract {
-  // Propagate extract4ed context normally
+  // Propagate extracted context normally
   CONTINUE,
   // Restart a new trace (new sampling decision, no parent)
   // Reference previous trace through a span-link
