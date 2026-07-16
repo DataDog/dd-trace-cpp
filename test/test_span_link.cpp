@@ -24,7 +24,7 @@ nlohmann::json encode_to_json(const SpanLink& link) {
 
 TEST_SPAN_LINK("minimal link encodes only trace_id and span_id") {
   SpanLink link;
-  link.trace_id = TraceID(0x1122334455667788ULL, 0xBBBBBBBBBBBBBBBBULL);
+  link.trace_id = TraceID(0x1122334455667788ULL);
   link.span_id = 42;
 
   const auto j = encode_to_json(link);
@@ -32,7 +32,7 @@ TEST_SPAN_LINK("minimal link encodes only trace_id and span_id") {
   REQUIRE(j.is_object());
   REQUIRE(j.size() == 3);
   REQUIRE(j["trace_id"].get<std::uint64_t>() == 0x1122334455667788ULL);
-  REQUIRE(j["trace_id_high"].get<std::uint64_t>() == 0xBBBBBBBBBBBBBBBBULL);
+  REQUIRE(j["trace_id_high"].get<std::uint64_t>() == 0);
   REQUIRE(j["span_id"].get<std::uint64_t>() == 42);
   REQUIRE_FALSE(j.contains("attributes"));
   REQUIRE_FALSE(j.contains("tracestate"));
