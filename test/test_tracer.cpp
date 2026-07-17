@@ -1544,6 +1544,39 @@ TEST_TRACER("span extraction") {
   }
 }
 
+TEST_TRACER("continue extraction resumes the extracted trace") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::CONTINUE;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"x-datadog-parent-id", "2"},
+      {"x-datadog-sampling-priority", "2"},
+  };
+
+  {
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+    REQUIRE(span->trace_id().low == 1);
+    REQUIRE(span->parent_id() == 2);
+  }
+
+  REQUIRE(collector->span_count() == 1);
+  const auto& span = collector->first_span();
+  REQUIRE(span.trace_id.low == 1);
+  REQUIRE(span.parent_id == 2);
+  REQUIRE(span.span_links.empty());
+}
+
 TEST_TRACER("restart extraction links to the extracted context") {
   TracerConfig config;
   config.service = "testsvc";
@@ -1707,6 +1740,44 @@ TEST_TRACER("baggage usage") {
 
     REQUIRE(writer.items.count("baggage") == 1);
     CHECK(writer.items["baggage"] == "data=dog");
+  }
+}
+
+TEST_TRACER("baggage extraction and propagation_behavior_extract") {
+  TracerConfig config;
+  config.logger = std::make_shared<NullLogger>();
+  config.collector = std::make_shared<NullCollector>();
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"baggage", "data=dog"},
+  };
+
+  SECTION("baggage extraction behaves identically for continue and restart") {
+    for (const auto behavior : {PropagationBehaviorExtract::CONTINUE,
+                                PropagationBehaviorExtract::RESTART}) {
+      config.propagation_behavior_extract = behavior;
+      auto finalized_config = finalize_config(config);
+      REQUIRE(finalized_config);
+
+      Tracer tracer(*finalized_config);
+
+      MockDictReader reader{headers};
+      auto maybe_baggage = tracer.extract_baggage(reader);
+      REQUIRE(maybe_baggage);
+      CHECK(maybe_baggage->get("data") == "dog");
+    }
+  }
+
+  SECTION("baggage extraction returns no result when ignoring context") {
+    config.propagation_behavior_extract = PropagationBehaviorExtract::IGNORE;
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+
+    Tracer tracer(*finalized_config);
+
+    MockDictReader reader{headers};
+    auto maybe_baggage = tracer.extract_baggage(reader);
+    CHECK(!maybe_baggage);
   }
 }
 
