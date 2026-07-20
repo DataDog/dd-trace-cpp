@@ -10,9 +10,6 @@
 
 namespace datadog::tracing {
 
-// The map type used for user-supplied span-link attributes.
-using SpanLinkAttributes = std::unordered_map<std::string, std::string>;
-
 class SpanContext {
  public:
   // 128-bit trace ID of the span.

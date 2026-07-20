@@ -62,6 +62,9 @@ struct SpanConfig;
 struct SpanData;
 class TraceSegment;
 
+// The map type used for user-supplied span-link attributes.
+using SpanLinkAttributes = std::unordered_map<std::string, std::string>;
+
 class Span {
   std::shared_ptr<TraceSegment> trace_segment_;
   SpanData* data_;

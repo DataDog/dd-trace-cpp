@@ -4,7 +4,7 @@
 // MessagePack serialization. Applications use `SpanContext` and
 // `Span::add_link` instead.
 
-#include <datadog/span_context.h>
+#include <datadog/span.h>
 
 namespace datadog::tracing {
 
