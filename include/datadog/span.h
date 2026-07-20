@@ -171,8 +171,7 @@ class Span {
   // sampling decision when one has not already been made.
   SpanContext context() const;
 
-  // Add a span link to this span using the specified context. `attributes` are
-  // optional user-supplied attributes associated with the link.
+  // Add a link to this span.
   void add_link(const SpanContext& context,
                 const SpanLinkAttributes& attributes = {});
 
