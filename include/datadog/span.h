@@ -44,6 +44,8 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "clock.h"
 #include "optional.h"
@@ -61,6 +63,9 @@ class DictWriter;
 struct SpanConfig;
 struct SpanData;
 class TraceSegment;
+
+// The map type used for user-supplied span-link attributes.
+using SpanLinkAttributes = std::unordered_map<std::string, std::string>;
 
 class Span {
   std::shared_ptr<TraceSegment> trace_segment_;
