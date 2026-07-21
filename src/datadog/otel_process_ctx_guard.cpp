@@ -9,8 +9,8 @@ namespace datadog::tracing {
 namespace {
 
 std::mutex& get_otel_context_mutex() {
-  static std::mutex m;
-  return m;
+  static std::mutex mutex;
+  return mutex;
 }
 
 }  // namespace
