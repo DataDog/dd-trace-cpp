@@ -4,8 +4,7 @@
 
 #include "otel_process_ctx.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 class Logger;
 
@@ -28,5 +27,4 @@ class OtelCtxGuard {
 std::unique_ptr<OtelCtxGuard> publish_otel_process_ctx(
     const otel_process_ctx_data& data, Logger& logger);
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
