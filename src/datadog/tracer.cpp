@@ -165,7 +165,8 @@ void Tracer::store_config(
 
   metadata_file_ = std::make_unique<InMemoryFile>(std::move(*maybe_file));
 
-  const auto defaults = config_manager_->span_defaults();
+  const std::shared_ptr<const SpanDefaults> defaults =
+      config_manager_->span_defaults();
   const std::string& runtime_id_string = runtime_id_.string();
   const std::string& tracer_version_value = signature_.library_version;
   const std::string tracer_language(signature_.library_language);
