@@ -53,7 +53,7 @@ class Tracer {
   // retrieve relevant tracing information.
   std::shared_ptr<InMemoryFile> metadata_file_;
   // Owns the published OpenTelemetry process context, if any.
-  std::unique_ptr<OtelCtxGuard> otel_guard_;
+  std::unique_ptr<OtelCtxGuard> otel_context_guard_;
   Baggage::Options baggage_opts_;
   bool baggage_injection_enabled_;
   bool baggage_extraction_enabled_;
