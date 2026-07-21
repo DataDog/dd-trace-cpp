@@ -8,7 +8,7 @@
 namespace datadog::tracing {
 namespace {
 
-std::mutex& otel_ctx_mutex() {
+std::mutex& get_otel_context_mutex() {
   static std::mutex m;
   return m;
 }
@@ -16,13 +16,13 @@ std::mutex& otel_ctx_mutex() {
 }  // namespace
 
 OtelCtxGuard::~OtelCtxGuard() {
-  std::lock_guard<std::mutex> lock(otel_ctx_mutex());
+  std::lock_guard<std::mutex> lock(get_otel_context_mutex());
   otel_process_ctx_drop_current();
 }
 
 std::unique_ptr<OtelCtxGuard> publish_otel_process_ctx(
     const otel_process_ctx_data& data, Logger& logger) {
-  std::lock_guard<std::mutex> lock(otel_ctx_mutex());
+  std::lock_guard<std::mutex> lock(get_otel_context_mutex());
   const auto result = otel_process_ctx_publish(&data);
   if (!result.success) {
     logger.log_error([&](std::ostream& log) {
