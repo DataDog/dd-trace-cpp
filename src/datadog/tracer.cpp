@@ -234,7 +234,7 @@ void Tracer::store_config(
   otel_data.extra_attributes = extra_attrs;
   otel_data.thread_ctx_config = nullptr;
 
-  otel_guard_ = publish_otel_process_ctx(otel_data, *logger_);
+  otel_context_guard_ = publish_otel_process_ctx(otel_data, *logger_);
 #endif
 }
 
