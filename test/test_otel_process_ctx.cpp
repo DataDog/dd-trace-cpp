@@ -13,20 +13,23 @@ using namespace datadog::tracing;
 
 namespace {
 
-std::map<std::string, std::string> to_map(const char** kv) {
+std::map<std::string, std::string> to_map(const char** key_value_array) {
   std::map<std::string, std::string> out;
-  if (kv == nullptr) return out;
-  for (std::size_t i = 0; kv[i] != nullptr && kv[i + 1] != nullptr; i += 2) {
-    out.emplace(kv[i], kv[i + 1]);
+  if (key_value_array == nullptr) return out;
+  for (std::size_t index = 0; key_value_array[index] != nullptr; index += 2) {
+    REQUIRE(key_value_array[index + 1] != nullptr);
+    out.emplace(key_value_array[index], key_value_array[index + 1]);
   }
   return out;
 }
 
-std::map<std::string, std::string> parse_joined_tags(const std::string& s) {
+std::map<std::string, std::string> parse_joined_tags(
+    const std::string& joined_tags) {
   std::map<std::string, std::string> out;
-  std::istringstream in(s);
+  std::istringstream in(joined_tags);
   for (std::string pair; std::getline(in, pair, ',');) {
     const auto colon = pair.find(':');
+    REQUIRE(colon != std::string::npos);
     out.emplace(pair.substr(0, colon), pair.substr(colon + 1));
   }
   return out;
