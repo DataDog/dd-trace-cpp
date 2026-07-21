@@ -3,7 +3,7 @@
 // One of the clients of this library is Envoy, a service (HTTP) proxy.
 //
 // Envoy uses Abseil as its base C++ library, and additionally builds in C++17
-// mode.  Abseil has a build option to forward its `std::string_view` and
+// mode. Abseil has a build option to forward its `std::string_view` and
 // `std::optional` equivalents to the actual standard types when C++17 is
 // available.
 //
@@ -17,9 +17,9 @@
 // and `std::optional` in the exported interface, i.e. in header files.
 //
 // As a workaround, Bazel (the build tool used by Envoy) builds of this library
-// will define the `DD_USE_ABSEIL_FOR_ENVOY` preprocessor macro.  When this
+// will define the `DD_USE_ABSEIL_FOR_ENVOY` preprocessor macro. When this
 // macro is defined, the library-specific `StringView` and `Optional` aliases
-// will refer to the Abseil types.  When the macro is not defined, the
+// will refer to the Abseil types. When the macro is not defined, the
 // library-specific aliases will refer to the standard types.
 //
 // This file defines `datadog::tracing::Optional`, a type template that is an
@@ -48,7 +48,7 @@ using Optional = std::optional<Value>;
 inline constexpr auto nullopt = std::nullopt;
 #endif  // defined DD_USE_ABSEIL_FOR_ENVOY
 
-// Return the first non-null argument value.  The last argument must not be
+// Return the first non-null argument value. The last argument must not be
 // `Optional`.
 template <typename Value>
 auto value_or(Value&& value) {

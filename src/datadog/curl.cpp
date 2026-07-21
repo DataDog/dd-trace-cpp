@@ -505,7 +505,7 @@ std::size_t CurlImpl::on_read_header(char *data, std::size_t,
   //         "    Foo-Bar  :   thingy, thingy, thing   \r\n"
   //    -> {"foo-bar", "thingy, thingy, thing"}
   //
-  // There isn't always a colon.  Inputs without a colon can be ignored:
+  // There isn't always a colon. Inputs without a colon can be ignored:
   //
   // > For an HTTP transfer, the status line and the blank line preceding the
   // > response body are both included as headers and passed to this
@@ -646,8 +646,8 @@ void CurlImpl::handle_message(const CURLMsg &message) {
   }
   auto &request = *reinterpret_cast<Request *>(user_data);
 
-  // `request` is done.  If we got a response, then call the response
-  // handler.  If an error occurred, then call the error handler.
+  // `request` is done. If we got a response, then call the response
+  // handler. If an error occurred, then call the error handler.
   const auto result = message.data.result;
   if (result != CURLE_OK) {
     std::string error_message;

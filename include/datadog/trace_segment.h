@@ -1,25 +1,25 @@
 #pragma once
 
-// This component provides a class, `TraceSegment`, that represents a portion of
-// a trace that is passing through this process.
+// The `TraceSegment` class represents a portion of a trace that is passing
+// through this process.
 //
-// `TraceSegment` is not instantiated directly.  It is an implementation detail
+// `TraceSegment` is not instantiated directly. It is an implementation detail
 // of this library.
 //
 // A trace might begin in this process, or it might have been propagated in from
-// outside (see `Tracer::extract_span`).  A trace might remain in this process,
-// or it might be propagated outward (see `Span::inject`) one or more times.
+// outside (see `Tracer::extract_span()`). A trace might remain in this process,
+// or it might be propagated outward (see `Span::inject()`) one or more times.
 //
-// A trace might pass through this process twice or more.  Consider an RPC
+// A trace might pass through this process twice or more. Consider an RPC
 // server that receives a request, in handling that request makes a request to a
 // different service, and in the course of the other service handling its
-// request, the original service is called again.  Both "passes" through this
-// process are part of the same trace, but each pass is a different _trace
-// segment_.
+// request, the original service is called again. Both "passes" through this
+// process are part of the same trace, but each pass is a different trace
+// segment.
 //
 // `TraceSegment` stores context and configuration shared among all spans within
-// the trace segment, and additionally owns the spans' data.  When `Tracer`
-// creates or extracts a span, it also creates a new `TraceSegment`.  When a
+// the trace segment, and additionally owns the spans' data. When `Tracer`
+// creates or extracts a `Span`, it also creates a new `TraceSegment`. When a
 // child `Span` is created from a `Span`, the child and the parent share the
 // same `TraceSegment`.
 //
@@ -110,16 +110,16 @@ class TraceSegment {
 
   Logger& logger() const;
 
-  // Inject trace context for the specified `span` into the specified `writer`.
-  // Return whether the trace sampling decision was delegated.
-  // This function is the implementation of `Span::inject`.
+  // Inject trace context for the specified `span` into the specified `writer`,
+  // using the configured injection styles. Return whether the injection
+  // happened. This function is the implementation of `Span::inject()`.
   bool inject(DictWriter& writer, const SpanData& span);
   bool inject(DictWriter& writer, const SpanData& span,
               const InjectionOptions& options);
 
   // Take ownership of the specified `span`.
   void register_span(std::unique_ptr<SpanData> span);
-  // Increment the number of finished spans.  If that number is equal to the
+  // Increment the number of finished spans. If that number is equal to the
   // number of registered spans, send all of the spans to the `Collector`.
   void span_finished();
 

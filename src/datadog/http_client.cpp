@@ -39,11 +39,11 @@ Expected<HTTPClient::URL> HTTPClient::URL::parse(StringView input) {
   const StringView authority_and_path =
       input.substr(after_scheme + k_scheme_separator.size());
   // If the scheme is for unix domain sockets, then there's no way to
-  // distinguish the path-to-socket from the path-to-resource.  Some
+  // distinguish the path-to-socket from the path-to-resource. Some
   // implementations require that the forward slashes in the path-to-socket
-  // are URL-encoded.  However, URLs that we will be parsing designate the
+  // are URL-encoded. However, URLs that we will be parsing designate the
   // location of the Datadog Agent service, and so do not have a resource
-  // location.  Thus, if the scheme is for a unix domain socket, assume that
+  // location. Thus, if the scheme is for a unix domain socket, assume that
   // the entire part after the "://" is the path to the socket, and that
   // there is no resource path.
   if (scheme == "unix" || scheme == "http+unix" || scheme == "https+unix") {
@@ -64,11 +64,11 @@ Expected<HTTPClient::URL> HTTPClient::URL::parse(StringView input) {
                            "", ""};
   }
 
-  // The scheme is either "http" or "https".  This means that the part after
+  // The scheme is either "http" or "https". This means that the part after
   // the "://" could be <resource>/<path>, e.g. "localhost:8080/api/v1".
   // Again, though, we're only parsing URLs that designate the location of
   // the Datadog Agent service, and so they will not have a resource
-  // location.  Still, let's parse it properly.
+  // location. Still, let's parse it properly.
   const auto after_authority = authority_and_path.find('/');
 
   std::string path;
