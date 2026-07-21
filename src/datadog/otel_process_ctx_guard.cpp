@@ -5,8 +5,7 @@
 #include <mutex>
 #include <ostream>
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 namespace {
 
 std::mutex& otel_ctx_mutex() {
@@ -35,5 +34,4 @@ std::unique_ptr<OtelCtxGuard> publish_otel_process_ctx(
   return std::make_unique<OtelCtxGuard>();
 }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
