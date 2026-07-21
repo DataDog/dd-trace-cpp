@@ -63,7 +63,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   if (!user_config.http_client) {
     result.http_client = default_http_client(logger, clock);
     // `default_http_client` might return a `Curl` instance depending on how
-    // this library was built.  If it returns `nullptr`, then there's no
+    // this library was built. If it returns `nullptr`, then there's no
     // built-in default, and so the user must provide a value.
     if (!result.http_client) {
       return Error{Error::DATADOG_AGENT_NULL_HTTP_CLIENT,

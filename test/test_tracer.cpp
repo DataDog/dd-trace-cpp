@@ -1,4 +1,4 @@
-// These are tests for `Tracer`.  `Tracer` is responsible for creating root
+// These are tests for `Tracer`. `Tracer` is responsible for creating root
 // spans and for extracting spans from propagated trace context.
 
 #include <datadog/error.h>
@@ -749,7 +749,7 @@ TEST_TRACER("span extraction") {
         {__LINE__, "invalid: trailing characters when version is zero",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-foo", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
-      
+
         {__LINE__, "invalid: non hex trace ID",
          "00-abcdefghijklmnopqrstuvxyzabcdefg-00f067aa0ba902b7-00", // traceparent
          "malformed_traceid"}, // expected_error_tag_value
@@ -793,7 +793,7 @@ TEST_TRACER("span extraction") {
     MockDictReader reader{headers};
 
     // We can't `span->lookup(tags::internal::w3c_extraction_error)`, because
-    // that tag is internal and will not be returned by `lookup`.  Instead, we
+    // that tag is internal and will not be returned by `lookup`. Instead, we
     // finish (destroy) the span to send it to a collector, and then inspect the
     // `SpanData` at the collector.
     Optional<SamplingDecision> decision;

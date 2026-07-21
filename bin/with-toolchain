@@ -9,7 +9,7 @@ usage:
     with-toolchain llvm [COMMAND ...]
         Execute COMMAND in an environment that uses either GNU's compilers (gcc
         and g++) or LLVM's compilers (clang and clang++).
-    
+
     with-toolchain --help
     with-toolchain -h
         Print this message.
@@ -33,7 +33,7 @@ case "$1" in
   llvm)
     toolchain=llvm ;;
   *)
-    >&2 echo "Invalid toolchain value \"$1\".  Expected \"gnu\" or \"llvm\"."
+    >&2 echo "Invalid toolchain value \"$1\". Expected \"gnu\" or \"llvm\"."
     exit 2 ;;
 esac
 

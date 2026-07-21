@@ -5,7 +5,7 @@
 //
 // Each `Span` has a start time and a duration. The start time ought to be
 // measured using a system clock, so that Network Time Protocol adjustments and
-// other time settings are accurately reflected in the span start time.  The
+// other time settings are accurately reflected in the span start time. The
 // span's duration, however, is better measured using a steady (monotonic) clock
 // so that adjustments to the system clock made during the extent of the span do
 // not skew the span's measured duration.

@@ -1,14 +1,13 @@
 #pragma once
 
-// This component defines a class, `Span`, that represents an extent of time in
-// which some operation of interest occurs, such as an RPC request, database
-// query, calculation, etc.
+// The `Span` class represents an extent of time in which some operation of
+// interest occurs, such as an RPC request, database query, calculation, etc.
 //
 // `Span` objects are created by calling member functions on `Tracer` or on
-// another `Span` object.  They are not instantiated directly.
+// another `Span` object. They are not instantiated directly.
 //
 // A `Span` has a start time, an end time, and a name (sometimes called its
-// "operation name").  A span is associated with a service, a resource (such as
+// "operation name"). A `Span` is associated with a service, a resource (such as
 // the URL endpoint in an HTTP request), and arbitrary key/value string pairs
 // known as tags.
 //
@@ -19,26 +18,26 @@
 //
 // For example, an HTTP server might create a `Span` for each request processed.
 // The `Span` begins when the server begins reading the request, and ends when
-// the server has finished writing the response or reporting an error.  The
+// the server has finished writing the response or reporting an error. The
 // first child of the request span might represent the reading and parsing of
-// the HTTP request's headers.  The second child of the request span might
+// the HTTP request's headers. The second child of the request span might
 // represent the dispatch of the request handling to an endpoint-specific
-// handler.  That child might itself have children, such as a database query or
+// handler. That child might itself have children, such as a database query or
 // a request to an authentication service.
 //
-// The complete set of spans that are related to each other via the parent/child
-// relationship is called a trace.
+// The complete set of `Span`s that are related to each other via the
+// parent/child relationship is called a trace.
 //
 // A trace can extend across processes and networks via trace context
-// propagation.  A `Span` can be _extracted_ from its external parent via
-// `Tracer::extract_span`, and a `Span` can be _injected_ via `Span::inject`
+// propagation. A `Span` can be _extracted_ from its external parent via
+// `Tracer::extract_span()`, and a `Span` can be _injected_ via `Span::inject()`
 // into an outside context from which its external children might be extracted.
 //
-// If an error occurs during the operation that a span represents, the error can
-// be noted in the span via the `set_error` family of member functions.
+// If an error occurs during the operation that a `Span` represents, the error
+// can be noted in the `Span` via the `set_error()` family of member functions.
 //
-// A `Span` is finished when it is destroyed.  The end time can be overridden
-// via the `set_end_time` member function prior to the span's destruction.
+// A `Span` is finished when it is destroyed. The end time can be overridden
+// via the `set_end_time()` member function prior to the `Span`'s destruction.
 
 #include <chrono>
 #include <cstdint>
@@ -81,18 +80,18 @@ class Span {
   Span& operator=(Span&&) = delete;
   Span& operator=(const Span&) = delete;
 
-  // Finish this span and submit it to the associated trace segment.  If
+  // Finish this span and submit it to the associated trace segment. If
   // `set_end_time` has not been called on this span, then set this span's end
   // time to the current time.
   // If this span was moved-from, then the destructor has no effect aside from
   // destroying data members.
   ~Span();
 
-  // Return a span that is a child of this span.  Use the optionally specified
-  // `config` to determine the properties of the child span.  If `config` is not
+  // Return a span that is a child of this span. Use the optionally specified
+  // `config` to determine the properties of the child span. If `config` is not
   // specified, then the child span's properties are determined by the
   // `SpanDefaults` that were used to configure the `Tracer` to which this span
-  // is related.  The child span's start time is the current time unless
+  // is related. The child span's start time is the current time unless
   // overridden in `config`.
   Span create_child(const SpanConfig& config) const;
   Span create_child() const;
@@ -148,19 +147,19 @@ class Span {
   // Set the name of the resource associated with the operation that this span
   // represents, e.g. "/api/v1/info" or "select count(*) from users".
   void set_resource_name(StringView);
-  // Set whether an error occurred during the extent of this span.  If `false`,
+  // Set whether an error occurred during the extent of this span. If `false`,
   // then error-related tags will be removed from this span as well.
   void set_error(bool);
   // Associate a message with the error that occurred during the extent of this
-  // span.  This also has the effect of calling `set_error(true)`.
+  // span. This also has the effect of calling `set_error(true)`.
   void set_error_message(StringView);
   // Associate an error type with the error that occurred during the extent of
-  // this span.  This also has the effect of calling `set_error(true)`.
+  // this span. This also has the effect of calling `set_error(true)`.
   void set_error_type(StringView);
   // Associate a call stack with the error that occurred during the extent of
-  // this span.  This also has the effect of calling `set_error(true)`.
+  // this span. This also has the effect of calling `set_error(true)`.
   void set_error_stack(StringView);
-  // Set end time of this span.  Doing so will override the default behavior of
+  // Set end time of this span. Doing so will override the default behavior of
   // using the current time in the destructor.
   void set_end_time(std::chrono::steady_clock::time_point);
   // Specifies the product (AppSec, DBM) that created this span.
@@ -171,7 +170,7 @@ class Span {
   void inject(DictWriter& writer) const;
   void inject(DictWriter& writer, const InjectionOptions& options) const;
 
-  // Return a reference to this span's trace segment.  The trace segment has
+  // Return a reference to this span's trace segment. The trace segment has
   // member functions that affect the trace as a whole, such as
   // `TraceSegment::override_sampling_priority`.
   TraceSegment& trace_segment();

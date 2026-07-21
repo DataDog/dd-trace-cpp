@@ -389,7 +389,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   }
 
   if (!merged_context.parent_id) {
-    // We have a trace ID, but not parent ID.  We're meant to be the root, and
+    // We have a trace ID, but not parent ID. We're meant to be the root, and
     // whoever called us already created a trace ID for us (to correlate with
     // whatever they're doing).
     merged_context.parent_id = 0;
@@ -405,7 +405,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
                                              merged_context.headers_examined));
   }
 
-  // We're done extracting fields.  Now create the span.
+  // We're done extracting fields. Now create the span.
   // This is similar to what we do in `create_span`.
   span_data->apply_config(*config_manager_->span_defaults(), config, clock_);
   span_data->span_id = generator_->span_id();
@@ -471,7 +471,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   if (tracing_enabled_ && merged_context.sampling_priority) {
     SamplingDecision decision;
     decision.priority = *merged_context.sampling_priority;
-    // `decision.mechanism` is null.  We might be able to infer it once we
+    // `decision.mechanism` is null. We might be able to infer it once we
     // extract `trace_tags`, but we would have no use for it, so we won't.
     decision.origin = SamplingDecision::Origin::EXTRACTED;
 
