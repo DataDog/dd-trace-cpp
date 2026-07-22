@@ -4,7 +4,8 @@
 // of a span. It can be supplied to `Span::add_link` to associate a span with a
 // span in this or another trace.
 
-#include <unordered_map>
+#include <cstdint>
+#include <string>
 
 #include "trace_id.h"
 

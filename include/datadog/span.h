@@ -44,6 +44,8 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "clock.h"
 #include "optional.h"
