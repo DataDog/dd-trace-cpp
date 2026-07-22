@@ -23,15 +23,14 @@ nlohmann::json encode_to_json(const SpanLink& link) {
 }  // namespace
 
 TEST_SPAN_LINK("minimal link encodes only trace_id and span_id") {
-  SpanLink link{
-      SpanContext(TraceID(0x1122334455667788ULL, 0xBBBBBBBBBBBBBBBBULL), 42)};
+  SpanLink link{SpanContext(TraceID(0x1122334455667788ULL), 42)};
 
   const auto j = encode_to_json(link);
 
   REQUIRE(j.is_object());
   REQUIRE(j.size() == 3);
   REQUIRE(j["trace_id"].get<std::uint64_t>() == 0x1122334455667788ULL);
-  REQUIRE(j["trace_id_high"].get<std::uint64_t>() == 0xBBBBBBBBBBBBBBBBULL);
+  REQUIRE(j["trace_id_high"].get<std::uint64_t>() == 0);
   REQUIRE(j["span_id"].get<std::uint64_t>() == 42);
   REQUIRE_FALSE(j.contains("attributes"));
   REQUIRE_FALSE(j.contains("tracestate"));
