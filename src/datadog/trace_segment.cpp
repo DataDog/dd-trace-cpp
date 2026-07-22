@@ -69,7 +69,7 @@ void inject_trace_tags(
   if (encoded_trace_tags.size() > tags_header_max_size) {
     std::string message;
     message +=
-        "Serialized x-datadog-tags header value is too large.  The configured "
+        "Serialized x-datadog-tags header value is too large. The configured "
         "maximum size is ";
     message += std::to_string(tags_header_max_size);
     message += " bytes, but the encoded value is ";
@@ -256,7 +256,7 @@ void TraceSegment::span_finished() {
 
   telemetry::counter::increment(metrics::tracer::trace_chunks_enqueued);
 
-  // We don't need the lock anymore.  There's nobody left to call our methods.
+  // We don't need the lock anymore. There's nobody left to call our methods.
   // On the other hand, there's nobody left to contend for the mutex, so it
   // doesn't make any difference.
   make_sampling_decision_if_null();

@@ -53,7 +53,7 @@ Expected<std::vector<PropagationStyle>> parse_propagation_styles(
       message += "\" in list \"";
       append(message, input);
       message +=
-          "\".  The following styles are supported: Datadog, B3, tracecontext.";
+          "\". The following styles are supported: Datadog, B3, tracecontext.";
       return Error{Error::UNKNOWN_PROPAGATION_STYLE, std::move(message)};
     }
 

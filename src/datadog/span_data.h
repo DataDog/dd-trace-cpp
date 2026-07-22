@@ -41,7 +41,7 @@ struct SpanData {
   Optional<StringView> version() const;
 
   // Modify the properties of this object to honor the specified `config` and
-  // `defaults`.  The properties of `config`, if set, override the properties of
+  // `defaults`. The properties of `config`, if set, override the properties of
   // `defaults`. Use the specified `clock` to provide a start none of none is
   // specified in `config`.
   void apply_config(const SpanDefaults& defaults, const SpanConfig& config,
@@ -53,7 +53,7 @@ struct SpanData {
 Expected<void> msgpack_encode(std::string& destination, const SpanData& span);
 
 // Append to the specified `destination` the MessagePack representation of an
-// array containing each of the specified `spans`.  The behavior is undefined
+// array containing each of the specified `spans`. The behavior is undefined
 // if any span is `nullptr`.
 Expected<void> msgpack_encode(
     std::string& destination,

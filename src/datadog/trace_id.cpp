@@ -38,7 +38,7 @@ Expected<TraceID> TraceID::parse_hex(StringView input) {
     return result;
   };
 
-  // A 64-bit integer is at most 16 hex characters.  If the input is no
+  // A 64-bit integer is at most 16 hex characters. If the input is no
   // longer than that, then it will all fit in `TraceID::low`.
   if (input.size() <= 16) {
     auto result = parse_hex_piece(input);

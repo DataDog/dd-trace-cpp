@@ -1118,7 +1118,7 @@ NLOHMANN_JSON_NAMESPACE_END
 #endif
 
 /* JSON_HEDLEY_DIAGNOSTIC_DISABLE_CPP98_COMPAT_WRAP_ is for
-   HEDLEY INTERNAL USE ONLY.  API subject to change without notice. */
+   HEDLEY INTERNAL USE ONLY. API subject to change without notice. */
 #if defined(JSON_HEDLEY_DIAGNOSTIC_DISABLE_CPP98_COMPAT_WRAP_)
     #undef JSON_HEDLEY_DIAGNOSTIC_DISABLE_CPP98_COMPAT_WRAP_
 #endif
@@ -2082,7 +2082,7 @@ JSON_HEDLEY_DIAGNOSTIC_POP
     #undef JSON_HEDLEY_REQUIRE_CONSTEXPR
 #endif
 /* JSON_HEDLEY_IS_CONSTEXPR_ is for
-   HEDLEY INTERNAL USE ONLY.  API subject to change without notice. */
+   HEDLEY INTERNAL USE ONLY. API subject to change without notice. */
 #if defined(JSON_HEDLEY_IS_CONSTEXPR_)
     #undef JSON_HEDLEY_IS_CONSTEXPR_
 #endif
@@ -6533,7 +6533,7 @@ Input adapter for a (caching) istream. Ignores a UFT Byte Order Mark at
 beginning of input. Does not support changing the underlying std::streambuf
 in mid-input. Maintains underlying std::istream and std::streambuf to support
 subsequent use of standard std::istream operations to process any input
-characters following those used in parsing the JSON input.  Clears the
+characters following those used in parsing the JSON input. Clears the
 std::istream flags; any input errors (e.g., EOF) will be detected by the first
 subsequent call for input from the std::istream.
 */
@@ -8355,7 +8355,7 @@ scan_number_done:
 
     This function provides the interface to the used input adapter. It does
     not throw in case the input reached EOF, but returns a
-    `char_traits<char>::eof()` in that case.  Stores the scanned characters
+    `char_traits<char>::eof()` in that case. Stores the scanned characters
     for use in error messages.
 
     @return character read from the input
@@ -8473,9 +8473,9 @@ scan_number_done:
         return position;
     }
 
-    /// return the last read token (for errors only).  Will never contain EOF
+    /// return the last read token (for errors only). Will never contain EOF
     /// (an arbitrary value that is not a valid char value, often -1), because
-    /// 255 may legitimately occur.  May contain NUL, which should be escaped.
+    /// 255 may legitimately occur. May contain NUL, which should be escaped.
     std::string get_token_string() const
     {
         // escape control characters

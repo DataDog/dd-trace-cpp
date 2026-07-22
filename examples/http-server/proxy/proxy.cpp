@@ -24,7 +24,7 @@ namespace dd = datadog::tracing;
 void hard_stop(int /*signal*/) { std::exit(0); }
 
 int main() {
-  // Set up the Datadog tracer.  See `src/datadog/tracer_config.h`.
+  // Set up the Datadog tracer. See `src/datadog/tracer_config.h`.
   dd::TracerConfig config;
   config.service = "dd-trace-cpp-http-server-example-proxy";
   config.service_type = "proxy";

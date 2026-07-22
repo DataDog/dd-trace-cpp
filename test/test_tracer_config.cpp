@@ -509,7 +509,7 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
           {"override port with default host", nullopt, "8080", nullopt, "http",
            "localhost:8080"},
           // A bogus port number will cause an error in the TCPClient, not
-          // during configuration.  For the purposes of configuration, any
+          // during configuration. For the purposes of configuration, any
           // value is accepted.
           {"we don't parse port", nullopt, "bogus", nullopt, "http",
            "localhost:bogus"},
@@ -1232,7 +1232,7 @@ TRACER_CONFIG_TEST("TracerConfig propagation styles") {
       }
 
       // It's the same as for injection styles, so let's omit most of the
-      // section.  Keep only an example where parsing fails, so we cover the
+      // section. Keep only an example where parsing fails, so we cover the
       // error handling code in `TracerConfig`.
       SECTION("parsing failure") {
         const EnvGuard guard{"DD_PROPAGATION_STYLE_EXTRACT", "b3,,datadog"};

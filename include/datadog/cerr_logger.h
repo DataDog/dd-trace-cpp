@@ -1,7 +1,7 @@
 #pragma once
 
 // This component provides a class, `CerrLogger`, that implements the `Logger`
-// interface from `logger.h`.  `CerrLogger` prints to `std::cerr`, which is
+// interface from `logger.h`. `CerrLogger` prints to `std::cerr`, which is
 // typically an unbuffered stream to the standard error file.
 
 #include <datadog/logger.h>

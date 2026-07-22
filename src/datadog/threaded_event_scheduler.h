@@ -1,9 +1,8 @@
 #pragma once
 
-// This component provides a `class`, `ThreadedEventScheduler`, that implements
-// the `EventScheduler` interface in terms of a dedicated event dispatching
-// thread. It is the default implementation used if
-// `DatadogAgent::event_scheduler` is not specified.
+// The `ThreadedEventScheduler` class implements the `EventScheduler` interface
+// in terms of a dedicated event dispatching thread. It is the default
+// implementation used if `DatadogAgent::event_scheduler` is not specified.
 
 #include <datadog/event_scheduler.h>
 
