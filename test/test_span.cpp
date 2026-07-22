@@ -7,8 +7,10 @@
 #include <datadog/injection_options.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>
+#include <datadog/sampling_priority.h>
 #include <datadog/span.h>
 #include <datadog/span_config.h>
+#include <datadog/span_context.h>
 #include <datadog/tag_propagation.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
@@ -1083,4 +1085,98 @@ TEST_SPAN("injection behaviour when apm tracing is disabled") {
     span.inject(writer);
     CHECK(contains_tracing_context(writer.items));
   }
+}
+
+TEST_SPAN(
+    "add_link records links on the span data, without forcing the linked "
+    "trace's sampling decision") {
+  TracerConfig config;
+  config.service = "testsvc";
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  TraceID linked_trace_id;
+  std::uint64_t linked_span_id = 0;
+
+  {
+    auto span = tracer.create_span();
+    auto linked = tracer.create_span();
+    linked_trace_id = linked.trace_id();
+    linked_span_id = linked.id();
+
+    const auto linked_context = linked.context();
+    const SpanLinkAttributes attrs{{"link.key", "value"}};
+    span.add_link(linked_context, attrs);
+
+    // `linked`'s trace hasn't been sampled yet (its trace segment is still
+    // open), and obtaining its context must not force a decision -- doing so
+    // would permanently finalize sampling before the trace is finished.
+    REQUIRE_FALSE(linked.trace_segment().sampling_decision().has_value());
+  }
+
+  // Find the span that carries the link across all chunks.
+  const SpanData* span_with_link = nullptr;
+  for (const auto& chunk : collector->chunks) {
+    for (const auto& sd : chunk) {
+      if (!sd->span_links.empty()) {
+        span_with_link = sd.get();
+      }
+    }
+  }
+  REQUIRE(span_with_link != nullptr);
+  REQUIRE(span_with_link->span_links.size() == 1);
+  const auto& link = span_with_link->span_links[0];
+  REQUIRE(link.context.trace_id == linked_trace_id);
+  REQUIRE(link.context.span_id == linked_span_id);
+  REQUIRE(link.attributes.at("link.key") == "value");
+  // Sampling hadn't been decided for the linked trace yet, so the link
+  // carries no flags/tracestate rather than ones derived from a forced,
+  // premature decision.
+  REQUIRE_FALSE(link.context.flags.has_value());
+  REQUIRE_FALSE(link.context.tracestate.has_value());
+}
+
+TEST_SPAN(
+    "add_link populates flags/tracestate when the linked trace's sampling "
+    "decision is already made") {
+  TracerConfig config;
+  config.service = "testsvc";
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  {
+    auto span = tracer.create_span();
+    auto linked = tracer.create_span();
+    linked.trace_segment().override_sampling_priority(
+        SamplingPriority::USER_KEEP);
+
+    const auto linked_context = linked.context();
+    const SpanLinkAttributes attrs{{"link.key", "value"}};
+    span.add_link(linked_context, attrs);
+  }
+
+  // Find the span that carries the link across all chunks.
+  const SpanData* span_with_link = nullptr;
+  for (const auto& chunk : collector->chunks) {
+    for (const auto& sd : chunk) {
+      if (!sd->span_links.empty()) {
+        span_with_link = sd.get();
+      }
+    }
+  }
+  REQUIRE(span_with_link != nullptr);
+  REQUIRE(span_with_link->span_links.size() == 1);
+  const auto& link = span_with_link->span_links[0];
+  REQUIRE(link.context.flags.has_value());
+  REQUIRE(*link.context.flags == 1u);
 }
