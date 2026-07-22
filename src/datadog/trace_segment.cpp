@@ -110,6 +110,22 @@ void maybe_calculate_http_endpoint(HttpEndpointCalculationMode renaming_mode,
   }
 }
 
+// If `local_root_tags` contains the `tags::internal::trace_source` tag,
+// return its value; otherwise return `nullopt`.
+Optional<std::string> find_trace_source_tag(
+    const std::unordered_map<std::string, std::string>& local_root_tags) {
+  const std::unordered_map<std::string, std::string>::const_iterator
+      trace_source_tag_found =
+          std::find_if(local_root_tags.cbegin(), local_root_tags.cend(),
+                       [](const std::pair<const std::string, std::string>& p) {
+                         return p.first == tags::internal::trace_source;
+                       });
+  if (trace_source_tag_found == local_root_tags.cend()) {
+    return nullopt;
+  }
+  return trace_source_tag_found->second;
+}
+
 // Convert rate to a fixed-point string with 6 decimal digits,
 // stripping trailing zeros and a decimal point. Examples:
 //   0.100000 -> "0.1"
@@ -214,13 +230,10 @@ Optional<std::pair<std::string, std::uint32_t>> TraceSegment::w3c_link_context(
     sampling_priority = sampling_decision_->priority;
     trace_tags = trace_tags_;
 
-    auto& local_root_tags = spans_.front()->tags;
-    auto ts_tag_found = std::find_if(
-        local_root_tags.cbegin(), local_root_tags.cend(),
-        [](const auto& p) { return p.first == tags::internal::trace_source; });
-    if (ts_tag_found != local_root_tags.cend()) {
-      trace_tags.emplace_back(tags::internal::trace_source,
-                              ts_tag_found->second);
+    const Optional<std::string> trace_source_tag =
+        find_trace_source_tag(spans_.front()->tags);
+    if (trace_source_tag) {
+      trace_tags.emplace_back(tags::internal::trace_source, *trace_source_tag);
     }
   }
 
@@ -448,18 +461,18 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     trace_tags = trace_tags_;
   }
 
-  auto& local_root_tags = spans_.front()->tags;
+  std::unordered_map<std::string, std::string>& local_root_tags =
+      spans_.front()->tags;
 
-  auto ts_tag_found = std::find_if(
-      local_root_tags.cbegin(), local_root_tags.cend(),
-      [](const auto& p) { return p.first == tags::internal::trace_source; });
+  const Optional<std::string> trace_source_tag =
+      find_trace_source_tag(local_root_tags);
 
   // When tracing (the product) is disabled, skip tracing context propagation
   // when:
   //  - the local root span is NOT created by another product (no `_dd.p.ts`)
   //  - sampling priority is DROP
   if (!tracing_enabled_) {
-    if (ts_tag_found == local_root_tags.cend() && sampling_priority <= 0) {
+    if (!trace_source_tag && sampling_priority <= 0) {
       writer.erase("x-datadog-trace-id");
       writer.erase("x-datadog-parent-id");
       writer.erase("x-datadog-sampling-priority");
@@ -477,8 +490,8 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
   }
 
   // Add `_dd.p.ts` to `trace_tags` for context propagation.
-  if (ts_tag_found != local_root_tags.cend()) {
-    trace_tags.emplace_back(tags::internal::trace_source, ts_tag_found->second);
+  if (trace_source_tag) {
+    trace_tags.emplace_back(tags::internal::trace_source, *trace_source_tag);
   }
 
   for (const auto style : injection_styles_) {
