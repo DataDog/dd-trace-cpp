@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
+#include <vector>
 
 #include "config_manager.h"
 #include "datadog_agent.h"
@@ -152,6 +153,24 @@ std::string Tracer::config() const {
   return config.dump();
 }
 
+namespace {
+
+std::vector<const char*> otel_resource_attrs(
+    const Optional<std::string>& hostname, const std::string& container_id) {
+  if (hostname) {
+    return {"host.name", hostname->c_str(), "container.id",
+            container_id.c_str(), nullptr};
+  }
+  return {"container.id", container_id.c_str(), nullptr};
+}
+
+std::vector<const char*> otel_extra_attrs(
+    const std::string& process_tags_joined) {
+  return {"datadog.process_tags", process_tags_joined.c_str(), nullptr};
+}
+
+}  // namespace
+
 void Tracer::store_config(
     const std::unordered_map<std::string, std::string>& process_tags) {
   auto maybe_file =
@@ -204,23 +223,8 @@ void Tracer::store_config(
     return;
   }
 
-#ifdef __linux__
-  // Publish the same metadata as an OpenTelemetry process context.
-
-  // Make sure to leave host.name first...
-  const char* all_resource_attrs[] = {
-      "host.name", hostname_value.c_str(), "container.id", container_id.c_str(),
-      nullptr,
-  };
-  // ...so that we can omit it when it's not available.
-  const char** resource_attrs =
-      hostname_ ? all_resource_attrs : all_resource_attrs + 2;
-
-  const char* extra_attrs[] = {
-      "datadog.process_tags",
-      process_tags_joined.c_str(),
-      nullptr,
-  };
+  auto resource_attrs = otel_resource_attrs(hostname_, container_id);
+  auto extra_attrs = otel_extra_attrs(process_tags_joined);
 
   otel_process_ctx_data otel_data = {};
   otel_data.deployment_environment_name = service_env.c_str();
@@ -230,12 +234,11 @@ void Tracer::store_config(
   otel_data.telemetry_sdk_language = tracer_language.c_str();
   otel_data.telemetry_sdk_version = tracer_version_value.c_str();
   otel_data.telemetry_sdk_name = tracer_library_name;
-  otel_data.resource_attributes = resource_attrs;
-  otel_data.extra_attributes = extra_attrs;
+  otel_data.resource_attributes = resource_attrs.data();
+  otel_data.extra_attributes = extra_attrs.data();
   otel_data.thread_ctx_config = nullptr;
 
   otel_context_guard_ = publish_otel_process_ctx(otel_data, *logger_);
-#endif
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }

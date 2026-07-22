@@ -22,6 +22,12 @@ OtelCtxGuard::~OtelCtxGuard() {
 
 std::unique_ptr<OtelCtxGuard> publish_otel_process_ctx(
     const otel_process_ctx_data& data, Logger& logger) {
+#ifndef __linux__
+  // Feature is Linux-only, nothing to do elsewhere
+  (void)data;
+  (void)logger;
+  return nullptr;
+#else
   std::lock_guard<std::mutex> lock(get_otel_context_mutex());
   const auto result = otel_process_ctx_publish(&data);
   if (!result.success) {
@@ -32,6 +38,7 @@ std::unique_ptr<OtelCtxGuard> publish_otel_process_ctx(
     return nullptr;
   }
   return std::make_unique<OtelCtxGuard>();
+#endif
 }
 
 }  // namespace datadog::tracing
