@@ -1131,14 +1131,14 @@ TEST_SPAN(
   REQUIRE(span_with_link != nullptr);
   REQUIRE(span_with_link->span_links.size() == 1);
   const auto& link = span_with_link->span_links[0];
-  REQUIRE(link.trace_id == linked_trace_id);
-  REQUIRE(link.span_id == linked_span_id);
+  REQUIRE(link.context.trace_id == linked_trace_id);
+  REQUIRE(link.context.span_id == linked_span_id);
   REQUIRE(link.attributes.at("link.key") == "value");
   // Sampling hadn't been decided for the linked trace yet, so the link
   // carries no flags/tracestate rather than ones derived from a forced,
   // premature decision.
-  REQUIRE_FALSE(link.flags.has_value());
-  REQUIRE_FALSE(link.tracestate.has_value());
+  REQUIRE_FALSE(link.context.flags.has_value());
+  REQUIRE_FALSE(link.context.tracestate.has_value());
 }
 
 TEST_SPAN(
@@ -1177,6 +1177,6 @@ TEST_SPAN(
   REQUIRE(span_with_link != nullptr);
   REQUIRE(span_with_link->span_links.size() == 1);
   const auto& link = span_with_link->span_links[0];
-  REQUIRE(link.flags.has_value());
-  REQUIRE(*link.flags == 1u);
+  REQUIRE(link.context.flags.has_value());
+  REQUIRE(*link.context.flags == 1u);
 }

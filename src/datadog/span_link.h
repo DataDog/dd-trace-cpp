@@ -8,12 +8,13 @@
 
 namespace datadog::tracing {
 
-struct SpanLink {
-  TraceID trace_id;
-  std::uint64_t span_id = 0;
-  Optional<std::string> tracestate;
+class SpanLink {
+ public:
+  SpanContext context;
   SpanLinkAttributes attributes;
-  Optional<std::uint32_t> flags;
+
+  SpanLink(SpanContext context, SpanLinkAttributes attributes = {})
+      : context(std::move(context)), attributes(std::move(attributes)) {}
 };
 
 Expected<void> msgpack_encode(std::string& destination, const SpanLink& link);

@@ -29,7 +29,6 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -57,6 +56,8 @@ class SpanSampler;
 class TraceSampler;
 class ConfigManager;
 
+using W3CLinkContext = std::pair<std::string, std::uint32_t>;
+
 class TraceSegment {
   mutable std::mutex mutex_;
 
@@ -76,8 +77,8 @@ class TraceSegment {
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   Optional<SamplingDecision> sampling_decision_;
-  Optional<std::string> additional_w3c_tracestate_;
-  Optional<std::string> additional_datadog_w3c_tracestate_;
+  const Optional<std::string> additional_w3c_tracestate_;
+  const Optional<std::string> additional_datadog_w3c_tracestate_;
 
   std::shared_ptr<ConfigManager> config_manager_;
 
@@ -115,8 +116,7 @@ class TraceSegment {
   // `nullopt` instead of forcing (and thereby permanently finalizing) one.
   // Used by `Span::context` without prematurely deciding sampling for the
   // trace.
-  Optional<std::pair<std::string, std::uint32_t>> w3c_link_context(
-      const SpanData& span) const;
+  Optional<W3CLinkContext> w3c_link_context(const SpanData& span) const;
 
   Logger& logger() const;
 
