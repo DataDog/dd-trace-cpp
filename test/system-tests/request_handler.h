@@ -42,11 +42,7 @@ class RequestHandler final {
   std::shared_ptr<DeveloperNoiseLogger> logger_;
   std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
   std::unordered_map<uint64_t, nlohmann::json::array_t> tracing_context_;
-  struct StoredLinkContext {
-    datadog::tracing::SpanContext context;
-    datadog::tracing::Optional<int> sampling_priority;
-  };
-  std::unordered_map<uint64_t, StoredLinkContext> link_contexts_;
+  std::unordered_map<uint64_t, datadog::tracing::SpanContext> link_contexts_;
 
   // Previously, `/trace/span/start` was used to create new spans or create
   // child spans from the extracted tracing context.
@@ -60,7 +56,7 @@ class RequestHandler final {
   // explaining the name :)
   std::vector<datadog::tracing::Span> blackhole_;
 
-  static StoredLinkContext make_link_context(
+  static datadog::tracing::SpanContext make_link_context(
       const datadog::tracing::Expected<datadog::tracing::Span>& span,
       const datadog::tracing::Optional<nlohmann::json::array_t>& headers,
       std::uint64_t upstream_id);

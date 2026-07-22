@@ -299,21 +299,6 @@ void RequestHandler::on_add_link(const httplib::Request& req,
   // propagation context, both keyed by `parent_id`.
   auto linked_it = active_spans_.find(*parent_id);
   if (linked_it != active_spans_.cend()) {
-    // Propagate sampling priority from the linked span's trace.
-    nlohmann::json linked_hdrs = nlohmann::json::array();
-    utils::HeaderWriter linked_writer(linked_hdrs);
-    linked_it->second.inject(linked_writer);
-    for (const auto& hdr : linked_hdrs) {
-      if (hdr.size() == 2 &&
-          hdr[0].get<std::string>() == "x-datadog-sampling-priority") {
-        try {
-          span->second.trace_segment().override_sampling_priority(
-              std::stoi(hdr[1].get<std::string>()));
-        } catch (...) {
-        }
-        break;
-      }
-    }
     span->second.add_link(linked_it->second.context(), span_link_attributes);
   } else {
     auto context_it = link_contexts_.find(*parent_id);
@@ -322,12 +307,7 @@ void RequestHandler::on_add_link(const httplib::Request& req,
                        std::to_string(*parent_id);
       VALIDATION_ERROR(res, msg);
     }
-    const auto& stored = context_it->second;
-    if (stored.sampling_priority.has_value()) {
-      span->second.trace_segment().override_sampling_priority(
-          *stored.sampling_priority);
-    }
-    span->second.add_link(stored.context, span_link_attributes);
+    span->second.add_link(context_it->second, span_link_attributes);
   }
 
   res.status = 200;
@@ -430,7 +410,7 @@ void RequestHandler::on_inject_headers(const httplib::Request& req,
   res.set_content(response_json.dump(), "application/json");
 }
 
-RequestHandler::StoredLinkContext RequestHandler::make_link_context(
+datadog::tracing::SpanContext RequestHandler::make_link_context(
     const datadog::tracing::Expected<datadog::tracing::Span>& span,
     const datadog::tracing::Optional<nlohmann::json::array_t>& headers,
     std::uint64_t upstream_id) {
@@ -463,7 +443,7 @@ RequestHandler::StoredLinkContext RequestHandler::make_link_context(
   if (!stored_context.flags.has_value() && sampling_priority.has_value()) {
     stored_context.flags = *sampling_priority > 0 ? 1u : 0u;
   }
-  return StoredLinkContext{stored_context, sampling_priority};
+  return stored_context;
 }
 
 void RequestHandler::on_extract_headers(const httplib::Request& req,
@@ -483,12 +463,13 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
     return;
   }
 
-  const auto upstream_id = span->parent_id().value_or(0);
+  const auto parent_id = span->parent_id();
+  const auto upstream_id = parent_id.value_or(0);
   const auto response_body = nlohmann::json{{"span_id", upstream_id}};
 
   // Fall back to the extracted span's own id when there's no parent id
   // (e.g. root-context extraction), avoiding collisions.
-  const auto handle = span->parent_id().value_or(span->id());
+  const auto handle = parent_id.value_or(span->id());
   link_contexts_.insert_or_assign(
       handle, make_link_context(span, http_headers, upstream_id));
   tracing_context_[handle] = std::move(*http_headers);
