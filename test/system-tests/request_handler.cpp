@@ -434,37 +434,36 @@ RequestHandler::StoredLinkContext RequestHandler::make_link_context(
     const datadog::tracing::Expected<datadog::tracing::Span>& span,
     const datadog::tracing::Optional<nlohmann::json::array_t>& headers,
     std::uint64_t upstream_id) {
-  StoredLinkContext stored;
-  stored.context.trace_id = span->trace_id();
-  stored.context.span_id = upstream_id;
+  datadog::tracing::SpanContext stored_context{span->trace_id(), upstream_id};
+  datadog::tracing::Optional<int> sampling_priority;
+
   for (const auto& hdr : *headers) {
     if (hdr.size() != 2) continue;
     const auto name = utils::tolower(hdr[0].get<std::string>());
     if (name == "tracestate") {
-      stored.context.tracestate = hdr[1].get<std::string>();
+      stored_context.tracestate = hdr[1].get<std::string>();
     } else if (name == "traceparent") {
       const auto tp = hdr[1].get<std::string>();
       const auto pos = tp.rfind('-');
       if (pos != std::string::npos && pos + 1 < tp.size()) {
         try {
-          stored.context.flags = static_cast<std::uint32_t>(
+          stored_context.flags = static_cast<std::uint32_t>(
               std::stoul(tp.substr(pos + 1), nullptr, 16));
         } catch (...) {
         }
       }
     } else if (name == "x-datadog-sampling-priority") {
       try {
-        stored.sampling_priority = std::stoi(hdr[1].get<std::string>());
+        sampling_priority = std::stoi(hdr[1].get<std::string>());
       } catch (...) {
       }
     }
   }
   // Derive W3C flags from sampling priority when no traceparent flags present.
-  if (!stored.context.flags.has_value() &&
-      stored.sampling_priority.has_value()) {
-    stored.context.flags = *stored.sampling_priority > 0 ? 1u : 0u;
+  if (!stored_context.flags.has_value() && sampling_priority.has_value()) {
+    stored_context.flags = *sampling_priority > 0 ? 1u : 0u;
   }
-  return stored;
+  return StoredLinkContext{stored_context, sampling_priority};
 }
 
 void RequestHandler::on_extract_headers(const httplib::Request& req,
@@ -490,7 +489,8 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   // Fall back to the extracted span's own id when there's no parent id
   // (e.g. root-context extraction), avoiding collisions.
   const auto handle = span->parent_id().value_or(span->id());
-  link_contexts_[handle] = make_link_context(span, http_headers, upstream_id);
+  link_contexts_.insert_or_assign(
+      handle, make_link_context(span, http_headers, upstream_id));
   tracing_context_[handle] = std::move(*http_headers);
 
   // The span below will not be finished and flushed.
