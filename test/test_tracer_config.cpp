@@ -5,6 +5,15 @@
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#if defined(__linux__)
+// Used to test writing to the `datadog-tracer-info` file; this is a Linux-only feature.
+#include <dirent.h>
+#include <unistd.h>
+
+#include <map>
+#include <msgpack.hpp>
+#endif
+
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -25,6 +34,13 @@
 #include "mocks/loggers.h"
 #include "null_logger.h"
 #include "test.h"
+
+#if defined(__linux__)
+// Used to test writing to the `datadog-tracer-info` file; this is a Linux-only feature.
+#include "common/ctx_sharing_helpers.h"
+#include "platform_util.h"
+#include "string_util.h"
+#endif
 
 namespace datadog {
 namespace tracing {
@@ -1539,4 +1555,92 @@ TRACER_CONFIG_TEST("telemetry products contain configuration precedence") {
     CHECK(configs[0].origin == ConfigMetadata::Origin::CODE);
     CHECK(configs[0].value == "1.2.3");
   }
+}
+
+TRACER_CONFIG_TEST("Tracer construction publishes tracer info file") {
+#ifndef __linux__
+  SUCCEED("In-memory tracer info file is Linux-only");
+#else
+  std::string expected_container_id;
+  if (auto id = container::get_id()) {
+    expected_container_id = id->value;
+  }
+  const RuntimeID expected_runtime_id = RuntimeID::generate();
+
+  TracerConfig config;
+  config.service = "tracer-info-svc";
+  config.environment = "tracer-info-env";
+  config.version = "4.5.6";
+  config.runtime_id = expected_runtime_id;
+  config.report_hostname = true;
+  config.process_tags = {{"custom.tag", "custom-value"}};
+  config.collector = std::make_shared<MockCollector>();
+  config.logger = std::make_shared<MockLogger>();
+
+  auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+
+  // Find the "/proc/self/fd/<n>" path of the memfd whose name starts with
+  // "datadog-tracer-info-", i.e. the file written by `Tracer::store_config`.
+  auto find_tracer_info_path = []() -> Optional<std::string> {
+    DIR* dir = opendir("/proc/self/fd");
+    if (dir == nullptr) return nullopt;
+
+    char target[PATH_MAX];
+    Optional<std::string> found;
+    for (struct dirent* entry = readdir(dir); entry != nullptr;
+         entry = readdir(dir)) {
+      if (entry->d_type != DT_LNK) continue;
+
+      const std::string link_path =
+          std::string("/proc/self/fd/") + entry->d_name;
+      auto len = readlink(link_path.c_str(), target, sizeof(target) - 1);
+      if (len == -1) continue;
+      target[len] = '\0';
+
+      if (starts_with(target, "/memfd:datadog-tracer-info-")) {
+        found = link_path;
+        break;
+      }
+    }
+
+    closedir(dir);
+    return found;
+  };
+
+  {
+    Tracer tracer{*finalized};
+
+    auto tracer_info_path = find_tracer_info_path();
+    REQUIRE(tracer_info_path);
+
+    std::ifstream file(*tracer_info_path, std::ios::binary);
+    REQUIRE(file.is_open());
+    const std::string buffer((std::istreambuf_iterator<char>(file)),
+                             std::istreambuf_iterator<char>());
+    REQUIRE(!buffer.empty());
+
+    const auto handle = ::msgpack::unpack(buffer.data(), buffer.size());
+    const auto fields =
+        handle.get().as<std::map<std::string, ::msgpack::object> >();
+
+    CHECK(fields.at("schema_version").as<int>() == 2);
+    CHECK(fields.at("runtime_id").as<std::string>() ==
+          expected_runtime_id.string());
+    CHECK(fields.at("tracer_version").as<std::string>() == tracer_version);
+    CHECK(fields.at("tracer_language").as<std::string>() == "cpp");
+    CHECK(fields.at("hostname").as<std::string>() == get_hostname());
+    CHECK(fields.at("service_name").as<std::string>() == "tracer-info-svc");
+    CHECK(fields.at("service_env").as<std::string>() == "tracer-info-env");
+    CHECK(fields.at("service_version").as<std::string>() == "4.5.6");
+    CHECK(fields.at("container_id").as<std::string>() == expected_container_id);
+    CHECK(datadog::test::parse_joined_tags(
+              fields.at("process_tags").as<std::string>()) ==
+          datadog::test::expected_published_process_tags(config.process_tags));
+
+    REQUIRE(find_tracer_info_path());
+  }
+
+  CHECK(!find_tracer_info_path());
+#endif
 }
