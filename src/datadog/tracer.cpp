@@ -496,7 +496,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       // Should be unreachable
       return Error{
           Error::NO_SPAN_TO_EXTRACT,
-          "Ignoring context extraction (propagation_behavior_extract=ignore)"};
+          "Ignoring context extraction (unexpected propagation_behavior_extract value)"};
   }
 }
 
