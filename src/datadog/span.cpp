@@ -165,11 +165,10 @@ void Span::set_source(Source source) {
 }
 
 SpanContext Span::context() const {
-  SpanContext context;
-  context.trace_id = trace_id();
-  context.span_id = id();
+  SpanContext context{trace_id(), id()};
 
-  if (auto w3c_context = trace_segment_->w3c_link_context(*data_)) {
+  if (Optional<W3CLinkContext> w3c_context =
+          trace_segment_->w3c_link_context(*data_)) {
     context.tracestate = std::move(w3c_context->first);
     context.flags = w3c_context->second;
   }
@@ -179,14 +178,7 @@ SpanContext Span::context() const {
 
 void Span::add_link(const SpanContext& context,
                     const SpanLinkAttributes& attributes) {
-  SpanLink link;
-  link.trace_id = context.trace_id;
-  link.span_id = context.span_id;
-  link.tracestate = context.tracestate;
-  link.flags = context.flags;
-  link.attributes = attributes;
-
-  data_->span_links.push_back(std::move(link));
+  data_->span_links.emplace_back(context, attributes);
 }
 
 TraceSegment& Span::trace_segment() { return *trace_segment_; }

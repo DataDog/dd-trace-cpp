@@ -23,9 +23,7 @@ nlohmann::json encode_to_json(const SpanLink& link) {
 }  // namespace
 
 TEST_SPAN_LINK("minimal link encodes only trace_id and span_id") {
-  SpanLink link;
-  link.trace_id = TraceID(0x1122334455667788ULL);
-  link.span_id = 42;
+  SpanLink link{SpanContext(TraceID(0x1122334455667788ULL), 42)};
 
   const auto j = encode_to_json(link);
 
@@ -40,10 +38,9 @@ TEST_SPAN_LINK("minimal link encodes only trace_id and span_id") {
 }
 
 TEST_SPAN_LINK("128-bit trace id emits trace_id_high") {
-  SpanLink link;
-  link.trace_id = TraceID(/*low=*/0xAAAAAAAAAAAAAAAAULL,
-                          /*high=*/0xBBBBBBBBBBBBBBBBULL);
-  link.span_id = 7;
+  SpanLink link{SpanContext(
+      TraceID(/*low=*/0xAAAAAAAAAAAAAAAAULL, /*high=*/0xBBBBBBBBBBBBBBBBULL),
+      7)};
 
   const auto j = encode_to_json(link);
 
@@ -53,9 +50,7 @@ TEST_SPAN_LINK("128-bit trace id emits trace_id_high") {
 }
 
 TEST_SPAN_LINK("attributes encode as a string map and omit when empty") {
-  SpanLink link;
-  link.trace_id = TraceID(1);
-  link.span_id = 2;
+  SpanLink link{SpanContext(TraceID(1), 2)};
 
   SECTION("present") {
     link.attributes = {{"link.key", "value"}, {"k2", "v2"}};
@@ -71,18 +66,16 @@ TEST_SPAN_LINK("attributes encode as a string map and omit when empty") {
 }
 
 TEST_SPAN_LINK("tracestate omitted when empty, present otherwise") {
-  SpanLink link;
-  link.trace_id = TraceID(1);
-  link.span_id = 2;
+  SpanLink link{SpanContext(TraceID(1), 2)};
 
   SECTION("non-empty") {
-    link.tracestate = "dd=s:1";
+    link.context.tracestate = "dd=s:1";
     const auto j = encode_to_json(link);
     REQUIRE(j["tracestate"].get<std::string>() == "dd=s:1");
   }
 
   SECTION("empty string -> omitted") {
-    link.tracestate = "";
+    link.context.tracestate = "";
     const auto j = encode_to_json(link);
     REQUIRE_FALSE(j.contains("tracestate"));
   }
@@ -94,18 +87,16 @@ TEST_SPAN_LINK("tracestate omitted when empty, present otherwise") {
 }
 
 TEST_SPAN_LINK("flags set the high bit when present") {
-  SpanLink link;
-  link.trace_id = TraceID(1);
-  link.span_id = 2;
+  SpanLink link{SpanContext(TraceID(1), 2)};
 
   SECTION("sampled") {
-    link.flags = 1u;
+    link.context.flags = 1u;
     const auto j = encode_to_json(link);
     REQUIRE(j["flags"].get<std::uint32_t>() == (1u | (1u << 31)));
   }
 
   SECTION("zero is still present with high bit") {
-    link.flags = 0u;
+    link.context.flags = 0u;
     const auto j = encode_to_json(link);
     REQUIRE(j["flags"].get<std::uint32_t>() == (1u << 31));
   }
@@ -132,9 +123,7 @@ TEST_SPAN_LINK("SpanData omits span_links when there are none") {
 TEST_SPAN_LINK("SpanData emits span_links array when present") {
   SpanData span;
 
-  SpanLink link;
-  link.trace_id = TraceID(/*low=*/0x99, /*high=*/0x11);
-  link.span_id = 123;
+  SpanLink link{SpanContext(TraceID(/*low=*/0x99, /*high=*/0x11), 123)};
   link.attributes = {{"link.key", "value"}};
   span.span_links.push_back(link);
 

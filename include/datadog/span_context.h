@@ -4,11 +4,8 @@
 // of a span. It can be supplied to `Span::add_link` to associate a span with a
 // span in this or another trace.
 
-#include <cstdint>
-#include <string>
 #include <unordered_map>
 
-#include "optional.h"
 #include "trace_id.h"
 
 namespace datadog::tracing {
@@ -16,15 +13,24 @@ namespace datadog::tracing {
 // The map type used for user-supplied span-link attributes.
 using SpanLinkAttributes = std::unordered_map<std::string, std::string>;
 
-struct SpanContext {
+class SpanContext {
+ public:
   // 128-bit trace ID of the span.
   TraceID trace_id;
   // ID of the span within its trace.
-  std::uint64_t span_id = 0;
+  std::uint64_t span_id;
   // W3C `tracestate` header value, if any.
   Optional<std::string> tracestate;
   // W3C trace flags, if any.
   Optional<std::uint32_t> flags;
+
+  SpanContext(TraceID trace_id, std::uint64_t span_id,
+              Optional<std::string> tracestate = nullopt,
+              Optional<std::uint32_t> flags = nullopt)
+      : trace_id(trace_id),
+        span_id(span_id),
+        tracestate(tracestate),
+        flags(flags) {}
 };
 
 }  // namespace datadog::tracing

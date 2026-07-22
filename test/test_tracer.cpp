@@ -1609,14 +1609,14 @@ TEST_TRACER("restart extraction links to the extracted context") {
   const auto& span = collector->first_span();
   REQUIRE(span.span_links.size() == 1);
   const auto& link = span.span_links.front();
-  REQUIRE(link.trace_id.low == 1);
-  REQUIRE(link.trace_id.high == 0x1111111111111111);
-  REQUIRE(link.span_id == 1);
+  REQUIRE(link.context.trace_id.low == 1);
+  REQUIRE(link.context.trace_id.high == 0x1111111111111111);
+  REQUIRE(link.context.span_id == 1);
   REQUIRE(link.attributes == SpanLinkAttributes{
                                  {"reason", "propagation_behavior_extract"},
                                  {"context_headers", "datadog"},
                              });
-  REQUIRE(link.flags == Optional<std::uint32_t>(1u));
+  REQUIRE(link.context.flags == Optional<std::uint32_t>(1u));
 }
 
 TEST_TRACER("restart extraction link preserves traceparent sampled flag") {
@@ -1644,7 +1644,7 @@ TEST_TRACER("restart extraction link preserves traceparent sampled flag") {
 
     REQUIRE(collector->span_count() == 1);
     const auto& link = collector->first_span().span_links.front();
-    REQUIRE(link.flags == Optional<std::uint32_t>(1u));
+    REQUIRE(link.context.flags == Optional<std::uint32_t>(1u));
   }
 
   SECTION("unsampled traceparent yields flags=0") {
@@ -1660,7 +1660,7 @@ TEST_TRACER("restart extraction link preserves traceparent sampled flag") {
 
     REQUIRE(collector->span_count() == 1);
     const auto& link = collector->first_span().span_links.front();
-    REQUIRE(link.flags == Optional<std::uint32_t>(0u));
+    REQUIRE(link.context.flags == Optional<std::uint32_t>(0u));
   }
 }
 
@@ -1695,11 +1695,11 @@ TEST_TRACER("restart extraction link uses metadata from the selected context") {
 
   REQUIRE(collector->span_count() == 1);
   const auto& link = collector->first_span().span_links.front();
-  REQUIRE(link.trace_id.low == 1);
-  REQUIRE(link.trace_id.high == 0);
-  REQUIRE(link.span_id == 1);
-  REQUIRE(link.tracestate == nullopt);
-  REQUIRE(link.flags == Optional<std::uint32_t>(1u));
+  REQUIRE(link.context.trace_id.low == 1);
+  REQUIRE(link.context.trace_id.high == 0);
+  REQUIRE(link.context.span_id == 1);
+  REQUIRE(link.context.tracestate == nullopt);
+  REQUIRE(link.context.flags == Optional<std::uint32_t>(1u));
 }
 
 TEST_TRACER("baggage usage") {
