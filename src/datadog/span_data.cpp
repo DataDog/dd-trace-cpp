@@ -7,7 +7,6 @@
 
 #include <cassert>
 #include <cstddef>
-#include <string>
 #include <vector>
 
 #include "msgpack.h"
@@ -134,28 +133,28 @@ Expected<void> msgpack_encode(std::string& destination, const SpanData& span) {
     return msgpack::pack_string(destination, span.service_type);
   };
 
-  if (span.span_links.empty()) {
-    return msgpack::pack_map(
-        destination, "service", pack_service, "name", pack_name, "resource",
-        pack_resource, "trace_id", pack_trace_id, "span_id", pack_span_id,
-        "parent_id", pack_parent_id, "start", pack_start, "duration",
-        pack_duration, "error", pack_error, "meta", pack_meta, "metrics",
-        pack_metrics, "type", pack_type);
-  } else {
-    auto pack_span_links = [&](auto& destination) {
-      return msgpack::pack_array(
-          destination, span.span_links,
-          [](std::string& destination, const SpanLink& link) {
-            return msgpack_encode(destination, link);
-          });
-    };
-    return msgpack::pack_map(
-        destination, "service", pack_service, "name", pack_name, "resource",
-        pack_resource, "trace_id", pack_trace_id, "span_id", pack_span_id,
-        "parent_id", pack_parent_id, "start", pack_start, "duration",
-        pack_duration, "error", pack_error, "meta", pack_meta, "metrics",
-        pack_metrics, "type", pack_type, "span_links", pack_span_links);
-  }
+  Expected<void> result =
+      msgpack::pack_map(destination, span.span_links.empty() ? 12 : 13);
+  if (!result) return result;
+
+  result = msgpack::pack_map_suffix(
+      destination, "service", pack_service, "name", pack_name, "resource",
+      pack_resource, "trace_id", pack_trace_id, "span_id", pack_span_id,
+      "parent_id", pack_parent_id, "start", pack_start, "duration",
+      pack_duration, "error", pack_error, "meta", pack_meta, "metrics",
+      pack_metrics, "type", pack_type);
+  if (!result) return result;
+
+  if (span.span_links.empty()) return result;
+
+  auto pack_span_links = [&](auto& destination) {
+    return msgpack::pack_array(
+        destination, span.span_links,
+        [](std::string& destination, const SpanLink& link) {
+          return msgpack_encode(destination, link);
+        });
+  };
+  return msgpack::pack_map_suffix(destination, "span_links", pack_span_links);
 }
 
 Expected<void> msgpack_encode(
