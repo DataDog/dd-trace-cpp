@@ -151,6 +151,7 @@ target_sources(dd-trace-cpp-objects
       include/datadog/logger.h
       include/datadog/null_collector.h
       include/datadog/optional.h
+      include/datadog/propagation_behavior_extract.h
       include/datadog/propagation_style.h
       include/datadog/rate.h
       include/datadog/runtime_id.h
@@ -196,6 +197,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/logger.cpp
     src/datadog/msgpack.cpp
     src/datadog/parse_util.cpp
+    src/datadog/propagation_behavior_extract.cpp
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp
     src/datadog/rate.cpp
