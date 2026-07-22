@@ -241,8 +241,6 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
   if (propagation_behavior_extract.has_value()) {
     env_cfg.propagation_behavior_extract = parse_propagation_behavior_extract(
         propagation_behavior_extract.value());
-  } else {
-    env_cfg.propagation_behavior_extract = nullopt;
   }
 
   try {
