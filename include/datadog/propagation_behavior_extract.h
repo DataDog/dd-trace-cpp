@@ -1,9 +1,9 @@
 #pragma once
 
 // This component provides an `enum class`, `PropagationBehaviorExtract`, that
-// indicates a trace context extraction or injection format to be used.
-// `TracerConfig` has one `std::vector<PropagationStyle>` for extraction and
-// another for injection. See `tracer_config.h`.
+// indicates how a tracer should handle an incoming trace context on
+// extraction: propagate it normally, restart the trace while linking to the
+// extracted context, or discard it entirely. See `tracer_config.h`.
 
 #include "optional.h"
 #include "string_view.h"
