@@ -376,7 +376,7 @@ TEST_CASE("TraceSegment finalization of spans") {
 
       SECTION("rules (implicit and explicit)") {
         // When sample rate is 100%, the sampler will consult the limiter.
-        // When sample rate is 0%, it won't.  We test both cases.
+        // When sample rate is 0%, it won't.We test both cases.
         auto sample_rate = GENERATE(0.0, 1.0);
 
         SECTION("global sample rate") {

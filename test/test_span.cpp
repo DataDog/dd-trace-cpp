@@ -1,5 +1,5 @@
-// These are tests for `Span`.  `Span` is a container for labels associated with
-// an extent in time.  `Span` is also responsible for injecting trace context
+// These are tests for `Span`. `Span` is a container for labels associated with
+// an extent in time. `Span` is also responsible for injecting trace context
 // for propagation.
 
 #include <datadog/clock.h>

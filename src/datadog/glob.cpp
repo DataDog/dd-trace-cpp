@@ -26,7 +26,7 @@ bool glob_match(StringView pattern, StringView subject) {
       const char pattern_char = pattern[p];
       switch (pattern_char) {
         case '*':
-          // Try to match at `s`.  If that doesn't work out, restart at
+          // Try to match at `s`. If that doesn't work out, restart at
           // `s + 1` next.
           next_p = p;
           next_s = s + 1;
@@ -47,7 +47,7 @@ bool glob_match(StringView pattern, StringView subject) {
           }
       }
     }
-    // Mismatch.  Maybe restart.
+    // Mismatch. Maybe restart.
     if (0 < next_s && next_s <= s_size) {
       p = next_p;
       s = next_s;

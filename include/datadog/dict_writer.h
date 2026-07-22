@@ -1,7 +1,7 @@
 #pragma once
 
 // This component provides an interface, `DictWriter`, that represents a
-// write-only key/value mapping of strings.  It's used when injecting trace
+// write-only key/value mapping of strings.It's used when injecting trace
 // context into externalized formats: HTTP headers, gRPC metadata, etc.
 //
 // Note that while the data structure modeled is a mapping, duplicate keys are
@@ -17,7 +17,7 @@ class DictWriter {
  public:
   virtual ~DictWriter() {}
 
-  // Associate the specified `value` with the specified `key`.  An
+  // Associate the specified `value` with the specified `key`. An
   // implementation may, but is not required to, overwrite any previous value at
   // `key`.
   virtual void set(StringView key, StringView value) = 0;

@@ -3,7 +3,7 @@
 // This component provides a registry of all environment variables that can be
 // used to configure this library.
 //
-// Each `enum Variable` denotes an environment variable.  The enum value names
+// Each `enum Variable` denotes an environment variable. The enum value names
 // are the same as the names of the environment variables.
 //
 // `name` returns the name of a specified `Variable`.

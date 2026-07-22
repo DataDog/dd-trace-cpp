@@ -11,7 +11,7 @@
 //         array [created time, note], e.g. ["2023-05-12 12:38:25","here's a note"].
 //
 //     POST /notes
-//         Create a new note.  The body of the request is the note content.
+//         Create a new note. The body of the request is the note content.
 //
 //     GET /sleep?seconds=<number>
 //
@@ -107,7 +107,7 @@ void on_get_notes(const httplib::Request& request, httplib::Response& response);
 void on_post_notes(const httplib::Request& request, httplib::Response& response);
 
 int main() {
-  // Set up the Datadog tracer.  See `src/datadog/tracer_config.h`.
+  // Set up the Datadog tracer. See `src/datadog/tracer_config.h`.
   dd::TracerConfig config;
   config.service = "dd-trace-cpp-http-server-example-server";
   config.service_type = "server";

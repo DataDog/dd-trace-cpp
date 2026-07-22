@@ -29,7 +29,7 @@ std::string to_string(const std::vector<SpanSamplerConfig::Rule> &rules) {
 }
 
 // `env_var` is the name of the environment variable from which `rules_raw` was
-// obtained.  It's used for error messages.
+// obtained. It's used for error messages.
 Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
                                                            StringView env_var) {
   std::vector<SpanSamplerConfig::Rule> rules;
@@ -86,7 +86,7 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
         append(message, env_var);
         message += " JSON ";
         append(message, rules_raw);
-        message += ".  The \"sample_rate\" property of the rule ";
+        message += ". The \"sample_rate\" property of the rule ";
         message += json_rule.dump();
         message += " is not a number, but instead has type \"";
         message += type;
@@ -106,7 +106,7 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
         append(message, env_var);
         message += " JSON ";
         append(message, rules_raw);
-        message += ".  The \"max_per_second\" property of the rule ";
+        message += ". The \"max_per_second\" property of the rule ";
         message += json_rule.dump();
         message += " is not a number, but instead has type \"";
         message += type;
@@ -129,7 +129,7 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
       message += value.dump();
       message += " in trace sampling rule ";
       message += json_rule.dump();
-      message += ".  Error occurred while parsing from ";
+      message += ". Error occurred while parsing from ";
       append(message, env_var);
       message += ": ";
       append(message, rules_raw);
@@ -165,7 +165,7 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
       append(message, rules_file_name);
       message += " is overridden by ";
       append(message, rules_name);
-      message += ".  Since both are set, ";
+      message += ". Since both are set, ";
       append(message, rules_name);
       message += " takes precedence, and ";
       append(message, rules_file_name);
