@@ -114,12 +114,8 @@ void maybe_calculate_http_endpoint(HttpEndpointCalculationMode renaming_mode,
 // return its value; otherwise return `nullopt`.
 Optional<std::string> find_trace_source_tag(
     const std::unordered_map<std::string, std::string>& local_root_tags) {
-  const std::unordered_map<std::string, std::string>::const_iterator
-      trace_source_tag_found =
-          std::find_if(local_root_tags.cbegin(), local_root_tags.cend(),
-                       [](const std::pair<const std::string, std::string>& p) {
-                         return p.first == tags::internal::trace_source;
-                       });
+  const auto trace_source_tag_found =
+      local_root_tags.find(tags::internal::trace_source);
   if (trace_source_tag_found == local_root_tags.cend()) {
     return nullopt;
   }

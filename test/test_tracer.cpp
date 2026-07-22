@@ -1577,6 +1577,30 @@ TEST_TRACER("continue extraction resumes the extracted trace") {
   REQUIRE(span.span_links.empty());
 }
 
+TEST_TRACER("ignore extraction returns no span to extract") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::IGNORE;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"x-datadog-parent-id", "2"},
+      {"x-datadog-sampling-priority", "2"},
+  };
+
+  MockDictReader reader{headers};
+  const auto result = tracer.extract_span(reader);
+  REQUIRE(!result);
+  REQUIRE(result.error().code == Error::NO_SPAN_TO_EXTRACT);
+}
+
 TEST_TRACER("restart extraction links to the extracted context") {
   TracerConfig config;
   config.service = "testsvc";
