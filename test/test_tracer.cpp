@@ -2130,6 +2130,30 @@ TEST_TRACER("APM tracing disabled") {
   TimePoint current_time = default_clock();
   auto clock = [&current_time]() { return current_time; };
 
+  SECTION("_dd.apm.enabled is added to every span") {
+    auto finalized_config = finalize_config(config, clock);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+
+    SpanConfig service_entry_config;
+    service_entry_config.service = "child-service";
+
+    {
+      auto root = tracer.create_span();
+      auto child = root.create_child();
+      auto service_entry = root.create_child(service_entry_config);
+      (void)child;
+      (void)service_entry;
+    }
+
+    REQUIRE(collector->chunks.size() == 1);
+    const auto& chunk = collector->chunks.front();
+    REQUIRE(chunk.size() == 3);
+    for (const auto& span : chunk) {
+      CHECK(span->numeric_tags.at(tags::internal::apm_enabled) == 0);
+    }
+  }
+
   SECTION("sampling behaviour") {
     SECTION("span with _dd.p.ts is kept") {
       auto finalized_config = finalize_config(config, clock);
