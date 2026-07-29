@@ -6,7 +6,8 @@
 #include <datadog/tracer_config.h>
 
 #if defined(__linux__)
-// Used to test writing to the `datadog-tracer-info` file; this is a Linux-only feature.
+// Used to test writing to the `datadog-tracer-info` file; this is a Linux-only
+// feature.
 #include <dirent.h>
 #include <unistd.h>
 
@@ -36,7 +37,8 @@
 #include "test.h"
 
 #if defined(__linux__)
-// Used to test writing to the `datadog-tracer-info` file; this is a Linux-only feature.
+// Used to test writing to the `datadog-tracer-info` file; this is a Linux-only
+// feature.
 #include "common/ctx_sharing_helpers.h"
 #include "platform_util.h"
 #include "string_util.h"
