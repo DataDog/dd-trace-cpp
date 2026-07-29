@@ -21,9 +21,10 @@ struct StaticOtelContextState {
   // `runtime_ids` is non-empty: established by the first live registration and
   // dropped once the last one is released.
   Optional<OtelCtxFields> common;
-  // The `service_instance_id` (runtime id) of each live registration; expected
-  // to be unique per registration (see `publish`).
-  std::set<std::string> runtime_ids;
+  // The `service_instance_id` (runtime id) of each live registration. This is a
+  // multiset because several tracers may share one runtime id and each of them
+  // counts separately.
+  std::multiset<std::string> runtime_ids;
 };
 
 StaticOtelContextState& get_otel_context_state() {
@@ -31,9 +32,15 @@ StaticOtelContextState& get_otel_context_state() {
   return state;
 }
 
-// Removes `runtime_id` from `state`. Must be called with `state.mutex` held.
+// Removes one registration for `runtime_id` from `state`. Must be called with
+// `state.mutex` held.
 void unregister(StaticOtelContextState& state, const std::string& runtime_id) {
-  state.runtime_ids.erase(runtime_id);
+  // Erase only one runtime id, leaving copies, if any
+  const std::multiset<std::string>::iterator entry =
+      state.runtime_ids.find(runtime_id);
+  if (entry != state.runtime_ids.end()) {
+    state.runtime_ids.erase(entry);
+  }
   if (state.runtime_ids.empty()) {
     state.common.reset();
   }
@@ -42,17 +49,19 @@ void unregister(StaticOtelContextState& state, const std::string& runtime_id) {
 // (Re)publishes or drops the process context to reflect `state`. Must be called
 // with `state.mutex` held.
 otel_process_ctx_result upsert(const StaticOtelContextState& state) {
-  const std::set<std::string>& runtime_ids = state.runtime_ids;
+  const std::multiset<std::string>& runtime_ids = state.runtime_ids;
   if (runtime_ids.empty()) {
     otel_process_ctx_drop_current();
     return {true, nullptr};
   }
 
   const OtelCtxFields& common = *state.common;
-  // With a single live registration we publish its instance id; with several,
-  // no single id represents the process, so it is omitted (see class docs).
-  // When there is one entry it is necessarily the sole survivor.
-  const bool include_instance_id = runtime_ids.size() == 1;
+  // While all live registrations report one runtime id, that id represents the
+  // process and we publish it; once ids differ, none does, so it is omitted
+  // (see class docs). The multiset is sorted, so the first and last entries are
+  // equal exactly when every entry is.
+  const bool include_instance_id =
+      *runtime_ids.begin() == *runtime_ids.rbegin();
 
   std::vector<const char*> resource_attrs;
   if (common.hostname) {
@@ -115,14 +124,7 @@ std::unique_ptr<OtelCtxRegistration> OtelCtxRegistration::publish(
     });
   }
 
-  if (!state.runtime_ids.insert(runtime_id).second) {
-    // Runtime ids are expected to be unique per tracer
-    logger.log_error([](std::ostream& log) {
-      log << "Two tracers share a runtime id; skipping OpenTelemetry "
-              "context update";
-    });
-    return nullptr;
-  }
+  state.runtime_ids.insert(runtime_id);
 
   const otel_process_ctx_result result = upsert(state);
   if (!result.success) {
