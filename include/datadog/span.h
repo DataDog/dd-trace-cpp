@@ -43,9 +43,12 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "clock.h"
 #include "optional.h"
+#include "span_context.h"
 #include "string_view.h"
 #include "trace_id.h"
 #include "trace_source.h"
@@ -59,6 +62,9 @@ class DictWriter;
 struct SpanConfig;
 struct SpanData;
 class TraceSegment;
+
+// The map type used for user-supplied span-link attributes.
+using SpanLinkAttributes = std::unordered_map<std::string, std::string>;
 
 class Span {
   std::shared_ptr<TraceSegment> trace_segment_;
@@ -164,6 +170,14 @@ class Span {
   void set_end_time(std::chrono::steady_clock::time_point);
   // Specifies the product (AppSec, DBM) that created this span.
   void set_source(Source);
+
+  // Return this span's identifying and propagation state. This does not make a
+  // sampling decision when one has not already been made.
+  SpanContext context() const;
+
+  // Add a link to this span.
+  void add_link(const SpanContext& context,
+                const SpanLinkAttributes& attributes = {});
 
   // Write information about this span and its trace into the specified `writer`
   // using all of the configured injection propagation styles.

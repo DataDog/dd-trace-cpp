@@ -36,6 +36,7 @@ add_executable(tests
     test_parse_util.cpp
     test_smoke.cpp
     test_span.cpp
+    test_span_link.cpp
     test_span_sampler.cpp
     test_trace_id.cpp
     test_trace_segment.cpp

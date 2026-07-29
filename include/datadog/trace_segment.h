@@ -56,6 +56,8 @@ class SpanSampler;
 class TraceSampler;
 class ConfigManager;
 
+using W3CLinkContext = std::pair<std::string, std::uint32_t>;
+
 class TraceSegment {
   mutable std::mutex mutex_;
 
@@ -75,8 +77,8 @@ class TraceSegment {
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   Optional<SamplingDecision> sampling_decision_;
-  Optional<std::string> additional_w3c_tracestate_;
-  Optional<std::string> additional_datadog_w3c_tracestate_;
+  const Optional<std::string> additional_w3c_tracestate_;
+  const Optional<std::string> additional_datadog_w3c_tracestate_;
 
   std::shared_ptr<ConfigManager> config_manager_;
 
@@ -107,6 +109,14 @@ class TraceSegment {
   const Optional<std::string>& hostname() const;
   const Optional<std::string>& origin() const;
   Optional<SamplingDecision> sampling_decision() const;
+
+  // Return the W3C tracestate encoding and derived trace flags for `span`,
+  // based on this segment's sampling decision. Unlike `inject`, this never
+  // makes a sampling decision if one hasn't been made yet -- it returns
+  // `nullopt` instead of forcing (and thereby permanently finalizing) one.
+  // Used by `Span::context` without prematurely deciding sampling for the
+  // trace.
+  Optional<W3CLinkContext> w3c_link_context(const SpanData& span) const;
 
   Logger& logger() const;
 

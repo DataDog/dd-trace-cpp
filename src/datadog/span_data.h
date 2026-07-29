@@ -14,6 +14,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "span_link.h"
+
 namespace datadog {
 namespace tracing {
 
@@ -33,6 +35,7 @@ struct SpanData {
   bool error = false;
   std::unordered_map<std::string, std::string> tags;
   std::unordered_map<std::string, double> numeric_tags;
+  std::vector<SpanLink> span_links;
 
   Optional<StringView> environment() const;
   Optional<StringView> version() const;
