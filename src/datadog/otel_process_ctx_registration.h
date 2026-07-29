@@ -41,12 +41,14 @@ struct OtelCtxFields {
 // which is how the known integrations behave today -- the only field that's
 // expected to differ is the `runtime_id`.
 //
-// The published context is reference-counted across all live tracer instances:
+// The published context is reference-counted across all live tracer instances,
+// and the `runtime_id` is published based on how many unique ids we observe:
 //
-//   * While exactly one registration is alive, the context is published in
-//     full, including its `runtime_id`
-//   * While two or more registrations are alive, the `runtime_id` is
-//     omitted, since this field is expected to differ between tracer instances.
+//   * While every live registration reports the same `runtime_id`, the context
+//     is published in full, including that `runtime_id`: a single id does
+//     represent the whole process.
+//   * While two or more distinct `runtime_id`s are alive, the `runtime_id` is
+//     omitted, since no single id represents the process.
 //
 // This class is thread-safe (takes care of protecting any global state).
 class OtelCtxRegistration {

@@ -190,6 +190,32 @@ OTEL_CTX_TEST("service_instance_id returns only when a single Tracer remains") {
 #endif
 }
 
+OTEL_CTX_TEST("service_instance_id is published while all Tracers share it") {
+#ifndef __linux__
+  SUCCEED("OpenTelemetry process context is Linux-only");
+#else
+  REQUIRE(current_instance_id() == nullopt);  // no context leaked from earlier
+
+  const RuntimeID shared_runtime_id = RuntimeID::generate();
+  const auto logger = std::make_shared<MockLogger>();
+
+  auto worker1 = make_tracer(shared_runtime_id, "otel-ctx-svc", logger);
+  auto worker2 = make_tracer(shared_runtime_id, "otel-ctx-svc", logger);
+  auto worker3 = make_tracer(shared_runtime_id, "otel-ctx-svc", logger);
+
+  CHECK(current_instance_id() == shared_runtime_id.string());
+
+  worker1.reset();
+  CHECK(current_instance_id() == shared_runtime_id.string());
+
+  worker2.reset();
+  CHECK(current_instance_id() == shared_runtime_id.string());
+
+  worker3.reset();
+  CHECK(current_instance_id() == nullopt);
+#endif
+}
+
 OTEL_CTX_TEST(
     "a later Tracer with different config fields is logged and ignored") {
 #ifndef __linux__
