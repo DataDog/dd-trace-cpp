@@ -205,7 +205,9 @@ OTEL_CTX_TEST(
   auto logger2 = std::make_shared<MockLogger>();
   auto tracer2 = make_tracer(runtime_id_2, "svc-two", logger2);
 
-  CHECK(logger2->error_count() == 1);
+  REQUIRE(logger2->error_count() == 1);
+  CHECK_THAT(std::get<std::string>(logger2->entries.back().payload),
+             Catch::Matchers::Contains("fields differ between coexisting"));
   {
     auto read_result = otel_process_ctx_read();
     REQUIRE(read_result.success);
