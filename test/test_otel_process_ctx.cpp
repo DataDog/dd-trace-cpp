@@ -23,12 +23,38 @@ std::map<std::string, std::string> to_map(const char** key_value_array) {
   return out;
 }
 
+#ifdef __linux__
+std::unique_ptr<Tracer> make_tracer(
+    const RuntimeID& runtime_id, const std::string& service = "otel-ctx-svc",
+    std::shared_ptr<Logger> logger = std::make_shared<MockLogger>()) {
+  TracerConfig config;
+  config.service = service;
+  config.runtime_id = runtime_id;
+  config.collector = std::make_shared<MockCollector>();
+  config.logger = std::move(logger);
+
+  auto finalized = finalize_config(config);
+  REQUIRE(finalized);
+  return std::make_unique<Tracer>(*finalized);
+}
+
+Optional<std::string> current_instance_id() {
+  auto read_result = otel_process_ctx_read();
+  if (!read_result.success) return nullopt;
+  std::string instance_id(read_result.data.service_instance_id);
+  otel_process_ctx_read_drop(&read_result);
+  return instance_id;
+}
+#endif
+
 }  // namespace
 
 OTEL_CTX_TEST("Tracer construction publishes OTel process context") {
 #ifndef __linux__
   SUCCEED("OpenTelemetry process context is Linux-only");
 #else
+  REQUIRE(current_instance_id() == nullopt);  // no context leaked from earlier
+
   std::string expected_container_id;
   if (auto id = container::get_id()) {
     expected_container_id = id->value;
@@ -91,6 +117,8 @@ OTEL_CTX_TEST("host.name is omitted when report_hostname is false") {
 #ifndef __linux__
   SUCCEED("OpenTelemetry process context is Linux-only");
 #else
+  REQUIRE(current_instance_id() == nullopt);  // no context leaked from earlier
+
   TracerConfig config;
   config.service = "otel-ctx-svc";
   config.report_hostname = false;
@@ -111,5 +139,78 @@ OTEL_CTX_TEST("host.name is omitted when report_hostname is false") {
   CHECK(resource.count("host.name") == 0);
 
   REQUIRE(otel_process_ctx_read_drop(&read_result));
+#endif
+}
+
+OTEL_CTX_TEST(
+    "service_instance_id is omitted while multiple Tracers are alive") {
+#ifndef __linux__
+  SUCCEED("OpenTelemetry process context is Linux-only");
+#else
+  REQUIRE(current_instance_id() == nullopt);  // no context leaked from earlier
+
+  const RuntimeID runtime_id_1 = RuntimeID::generate();
+  const RuntimeID runtime_id_2 = RuntimeID::generate();
+
+  auto tracer1 = make_tracer(runtime_id_1);
+  CHECK(current_instance_id() == runtime_id_1.string());
+
+  auto tracer2 = make_tracer(runtime_id_2);
+  CHECK(current_instance_id() == "");
+
+  tracer2.reset();
+  CHECK(current_instance_id() == runtime_id_1.string());
+
+  tracer1.reset();
+  CHECK(current_instance_id() == nullopt);
+#endif
+}
+
+OTEL_CTX_TEST("service_instance_id returns only when a single Tracer remains") {
+#ifndef __linux__
+  SUCCEED("OpenTelemetry process context is Linux-only");
+#else
+  REQUIRE(current_instance_id() == nullopt);  // no context leaked from earlier
+
+  const RuntimeID runtime_id_1 = RuntimeID::generate();
+  const RuntimeID runtime_id_2 = RuntimeID::generate();
+  const RuntimeID runtime_id_3 = RuntimeID::generate();
+
+  auto tracer1 = make_tracer(runtime_id_1);
+  auto tracer2 = make_tracer(runtime_id_2);
+  auto tracer3 = make_tracer(runtime_id_3);
+
+  CHECK(current_instance_id() == "");
+
+  tracer1.reset();
+  CHECK(current_instance_id() == "");
+
+  tracer2.reset();
+  CHECK(current_instance_id() == runtime_id_3.string());
+#endif
+}
+
+OTEL_CTX_TEST(
+    "a later Tracer with different config fields is logged and ignored") {
+#ifndef __linux__
+  SUCCEED("OpenTelemetry process context is Linux-only");
+#else
+  REQUIRE(current_instance_id() == nullopt);  // no context leaked from earlier
+
+  const RuntimeID runtime_id_1 = RuntimeID::generate();
+  const RuntimeID runtime_id_2 = RuntimeID::generate();
+
+  auto tracer1 = make_tracer(runtime_id_1, "svc-one");
+
+  auto logger2 = std::make_shared<MockLogger>();
+  auto tracer2 = make_tracer(runtime_id_2, "svc-two", logger2);
+
+  CHECK(logger2->error_count() == 1);
+  {
+    auto read_result = otel_process_ctx_read();
+    REQUIRE(read_result.success);
+    CHECK(std::string(read_result.data.service_name) == "svc-one");
+    REQUIRE(otel_process_ctx_read_drop(&read_result));
+  }
 #endif
 }

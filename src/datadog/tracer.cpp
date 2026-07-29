@@ -23,7 +23,7 @@
 #include "hex.h"
 #include "json.hpp"
 #include "msgpack.h"
-#include "otel_process_ctx_guard.h"
+#include "otel_process_ctx_registration.h"
 #include "platform_util.h"
 #include "random.h"
 #include "root_session_id.h"
@@ -153,24 +153,6 @@ std::string Tracer::config() const {
   return config.dump();
 }
 
-namespace {
-
-std::vector<const char*> otel_resource_attrs(
-    const Optional<std::string>& hostname, const std::string& container_id) {
-  if (hostname) {
-    return {"host.name", hostname->c_str(), "container.id",
-            container_id.c_str(), nullptr};
-  }
-  return {"container.id", container_id.c_str(), nullptr};
-}
-
-std::vector<const char*> otel_extra_attrs(
-    const std::string& process_tags_joined) {
-  return {"datadog.process_tags", process_tags_joined.c_str(), nullptr};
-}
-
-}  // namespace
-
 void Tracer::store_config(
     const std::unordered_map<std::string, std::string>& process_tags) {
   auto maybe_file =
@@ -223,22 +205,20 @@ void Tracer::store_config(
     return;
   }
 
-  auto resource_attrs = otel_resource_attrs(hostname_, container_id);
-  auto extra_attrs = otel_extra_attrs(process_tags_joined);
-
-  otel_process_ctx_data otel_data = {};
-  otel_data.deployment_environment_name = service_env.c_str();
-  otel_data.service_instance_id = runtime_id_string.c_str();
-  otel_data.service_name = service_name.c_str();
-  otel_data.service_version = service_version.c_str();
-  otel_data.telemetry_sdk_language = tracer_language.c_str();
-  otel_data.telemetry_sdk_version = tracer_version_value.c_str();
-  otel_data.telemetry_sdk_name = tracer_library_name;
-  otel_data.resource_attributes = resource_attrs.data();
-  otel_data.extra_attributes = extra_attrs.data();
-  otel_data.thread_ctx_config = nullptr;
-
-  otel_context_guard_ = publish_otel_process_ctx(otel_data, *logger_);
+  // Publish the same metadata as OTel Process Context.
+  // We explicitly opted to publish this only when the above tracer info file
+  // was successful.
+  OtelCtxFields otel_fields;
+  otel_fields.service_env = service_env;
+  otel_fields.service_name = service_name;
+  otel_fields.service_version = service_version;
+  otel_fields.tracer_language = tracer_language;
+  otel_fields.tracer_version = tracer_version_value;
+  otel_fields.hostname = hostname_;
+  otel_fields.container_id = container_id;
+  otel_fields.process_tags = process_tags_joined;
+  otel_context_registration_ =
+      OtelCtxRegistration::publish(otel_fields, runtime_id_string, *logger_);
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }
