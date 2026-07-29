@@ -8,7 +8,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "datadog/config.h"
 #include "datadog/optional.h"
+#include "datadog/propagation_behavior_extract.h"
 #include "datadog_agent.h"
 #include "json.hpp"
 #include "null_logger.h"
@@ -234,6 +236,13 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
         warn_message(var_name, *value, var_name_override, *value_override)});
   }
 
+  const auto propagation_behavior_extract =
+      lookup(environment::DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT);
+  if (propagation_behavior_extract.has_value()) {
+    env_cfg.propagation_behavior_extract = parse_propagation_behavior_extract(
+        propagation_behavior_extract.value());
+  }
+
   try {
     const auto global_styles =
         styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE);
@@ -402,6 +411,15 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
                      PropagationStyle::BAGGAGE);
     final_config.injection_styles.erase(it);
   }
+
+  final_config.propagation_behavior_extract = resolve_and_record_config(
+      env_config->propagation_behavior_extract,
+      user_config.propagation_behavior_extract, &final_config.metadata,
+      ConfigName::PROPAGATION_BEHAVIOR_EXTRACT,
+      PropagationBehaviorExtract::CONTINUE,
+      [](const PropagationBehaviorExtract &behavior) {
+        return std::string{to_string_view(behavior)};
+      });
 
   final_config.runtime_id = user_config.runtime_id;
   final_config.root_session_id = user_config.root_session_id;

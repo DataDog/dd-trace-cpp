@@ -3,16 +3,28 @@
 #include <datadog/optional.h>
 #include <datadog/sampling_priority.h>
 #include <datadog/span_config.h>
+#include <datadog/span_context.h>
 #include <datadog/trace_segment.h>
 #include <datadog/tracer.h>
 #include <datadog/tracer_config.h>
 
+#include <atomic>
 #include <datadog/json.hpp>
 
 #include "httplib.h"
 #include "utils.h"
 
 namespace {
+
+// Return an opaque key for an extracted context without a remote parent span
+// (for example, in propagation restart mode). C++-generated span IDs have
+// their most significant bit cleared, so setting it prevents collisions with
+// IDs in active_spans_.
+std::uint64_t next_synthetic_span_id() {
+  static std::atomic<std::uint64_t> counter{0};
+  return (std::uint64_t{1} << 63) |
+         counter.fetch_add(1, std::memory_order_relaxed);
+}
 
 std::string get_agent_url_from_traces_url(std::string traces_url) {
   // Strip the API path from the traces URL to get the agent URL
@@ -236,6 +248,82 @@ void RequestHandler::on_set_meta(const httplib::Request& req,
   res.status = 200;
 }
 
+// Parse optional attributes, supporting flat strings and arrays.
+static datadog::tracing::SpanLinkAttributes parse_link_attributes(
+    nlohmann::basic_json<> request_json) {
+  datadog::tracing::SpanLinkAttributes link_attributes;
+
+  auto attributes = request_json.find("attributes");
+  if (attributes == request_json.cend() || !attributes->is_object()) {
+    return link_attributes;
+  }
+
+  for (const auto& [key, value] : attributes->items()) {
+    if (value.is_string()) {
+      link_attributes.emplace(key, value.get<std::string>());
+    } else if (value.is_array()) {
+      std::size_t idx = 0;
+      for (const auto& elem : value) {
+        std::string flat_key = key + "." + std::to_string(idx++);
+        if (elem.is_string()) {
+          link_attributes.emplace(flat_key, elem.get<std::string>());
+        } else if (elem.is_boolean()) {
+          link_attributes.emplace(flat_key,
+                                  elem.get<bool>() ? "true" : "false");
+        } else if (elem.is_number_integer()) {
+          link_attributes.emplace(flat_key,
+                                  std::to_string(elem.get<int64_t>()));
+        } else if (elem.is_number_float()) {
+          link_attributes.emplace(flat_key, std::to_string(elem.get<double>()));
+        }
+      }
+    }
+  }
+
+  return link_attributes;
+}
+
+void RequestHandler::on_add_link(const httplib::Request& req,
+                                 httplib::Response& res) {
+  const auto request_json = nlohmann::json::parse(req.body);
+
+  auto span_id = utils::get_if_exists<uint64_t>(request_json, "span_id");
+  if (!span_id) {
+    VALIDATION_ERROR(res, "on_add_link: missing `span_id` field.");
+  }
+
+  auto parent_id = utils::get_if_exists<uint64_t>(request_json, "parent_id");
+  if (!parent_id) {
+    VALIDATION_ERROR(res, "on_add_link: missing `parent_id` field.");
+  }
+
+  auto span_link_attributes = parse_link_attributes(request_json);
+
+  auto span = active_spans_.find(*span_id);
+  if (span == active_spans_.cend()) {
+    const auto msg =
+        "on_add_link: span not found for id " + std::to_string(*span_id);
+    VALIDATION_ERROR(res, msg);
+  }
+
+  // The linked context is either another active span or a previously extracted
+  // propagation context, both keyed by `parent_id`.
+  auto linked_it = active_spans_.find(*parent_id);
+  if (linked_it != active_spans_.cend()) {
+    span->second.add_link(linked_it->second.context(), span_link_attributes);
+  } else {
+    auto context_it = link_contexts_.find(*parent_id);
+    if (context_it == link_contexts_.cend()) {
+      const auto msg = "on_add_link: linked context not found for parent_id " +
+                       std::to_string(*parent_id);
+      VALIDATION_ERROR(res, msg);
+    }
+    span->second.add_link(context_it->second, span_link_attributes);
+  }
+
+  res.status = 200;
+}
+
 void RequestHandler::on_set_metric(const httplib::Request& req,
                                    httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);
@@ -333,6 +421,42 @@ void RequestHandler::on_inject_headers(const httplib::Request& req,
   res.set_content(response_json.dump(), "application/json");
 }
 
+datadog::tracing::SpanContext RequestHandler::make_link_context(
+    const datadog::tracing::Expected<datadog::tracing::Span>& span,
+    const datadog::tracing::Optional<nlohmann::json::array_t>& headers,
+    std::uint64_t upstream_id) {
+  datadog::tracing::SpanContext stored_context{span->trace_id(), upstream_id};
+  datadog::tracing::Optional<int> sampling_priority;
+
+  for (const auto& hdr : *headers) {
+    if (hdr.size() != 2) continue;
+    const auto name = utils::tolower(hdr[0].get<std::string>());
+    if (name == "tracestate") {
+      stored_context.tracestate = hdr[1].get<std::string>();
+    } else if (name == "traceparent") {
+      const auto tp = hdr[1].get<std::string>();
+      const auto pos = tp.rfind('-');
+      if (pos != std::string::npos && pos + 1 < tp.size()) {
+        try {
+          stored_context.flags = static_cast<std::uint32_t>(
+              std::stoul(tp.substr(pos + 1), nullptr, 16));
+        } catch (...) {
+        }
+      }
+    } else if (name == "x-datadog-sampling-priority") {
+      try {
+        sampling_priority = std::stoi(hdr[1].get<std::string>());
+      } catch (...) {
+      }
+    }
+  }
+  // Derive W3C flags from sampling priority when no traceparent flags present.
+  if (!stored_context.flags.has_value() && sampling_priority.has_value()) {
+    stored_context.flags = *sampling_priority > 0 ? 1u : 0u;
+  }
+  return stored_context;
+}
+
 void RequestHandler::on_extract_headers(const httplib::Request& req,
                                         httplib::Response& res) {
   const auto request_json = nlohmann::json::parse(req.body);
@@ -345,18 +469,20 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
   auto span = tracer_.extract_span(utils::HeaderReader(*http_headers));
 
   if (span.if_error()) {
-    const auto response_body_fail = nlohmann::json{
-        {"span_id", nullptr},
-    };
+    const auto response_body_fail = nlohmann::json{{"span_id", nullptr}};
     res.set_content(response_body_fail.dump(), "application/json");
     return;
   }
 
-  const auto response_body = nlohmann::json{
-      {"span_id", span->parent_id().value()},
-  };
+  const auto upstream_id = span->parent_id().value_or(0);
 
-  tracing_context_[*span->parent_id()] = std::move(*http_headers);
+  // Keep a remote parent span ID when extraction has one. Otherwise, return a
+  // synthetic key so a restart context can still be used as a parent_id.
+  const auto handle = span->parent_id().value_or(next_synthetic_span_id());
+  const auto response_body = nlohmann::json{{"span_id", handle}};
+  link_contexts_.insert_or_assign(
+      handle, make_link_context(span, http_headers, upstream_id));
+  tracing_context_[handle] = std::move(*http_headers);
 
   // The span below will not be finished and flushed.
   blackhole_.emplace_back(std::move(*span));
@@ -369,6 +495,7 @@ void RequestHandler::on_span_flush(const httplib::Request& /* req */,
   scheduler_->flush_telemetry();
   active_spans_.clear();
   tracing_context_.clear();
+  link_contexts_.clear();
   res.status = 200;
 }
 
