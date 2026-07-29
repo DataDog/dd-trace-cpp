@@ -33,7 +33,7 @@ class TraceSampler;
 class SpanSampler;
 class IDGenerator;
 class InMemoryFile;
-class OtelCtxGuard;
+class OtelCtxRegistration;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
@@ -52,8 +52,7 @@ class Tracer {
   // read to determine if the process is instrumented with a tracer and to
   // retrieve relevant tracing information.
   std::shared_ptr<InMemoryFile> metadata_file_;
-  // Owns the published OpenTelemetry process context, if any.
-  std::unique_ptr<OtelCtxGuard> otel_context_guard_;
+  std::unique_ptr<OtelCtxRegistration> otel_context_registration_;
   Baggage::Options baggage_opts_;
   bool baggage_injection_enabled_;
   bool baggage_extraction_enabled_;
@@ -70,9 +69,8 @@ class Tracer {
 
   ~Tracer();
 
-  // Move-only. The otel context guarded by OtelCtxGuard is a process-wide
-  // singleton; duplicating ownership would lead to spurious drops, so copies
-  // are disallowed.
+  // Move-only. OtelCtxRegistration is a per-tracer-instance handle; duplicating
+  // ownership would break that invariant, thus copies are disallowed.
   Tracer(Tracer&&) noexcept;
   Tracer& operator=(Tracer&&) noexcept;
   Tracer(const Tracer&) = delete;
