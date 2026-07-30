@@ -3,7 +3,7 @@
 // This component provides a registry of all environment variables that can be
 // used to configure this library.
 //
-// Each `enum Variable` denotes an environment variable.  The enum value names
+// Each `enum Variable` denotes an environment variable. The enum value names
 // are the same as the names of the environment variables.
 //
 // `name` returns the name of a specified `Variable`.
@@ -52,6 +52,7 @@ namespace environment {
         ENV_DEFAULT_RESOLVED_IN_CODE("Defaults to process name when unset."))  \
   MACRO(DD_SPAN_SAMPLING_RULES, ARRAY, "[]")                                   \
   MACRO(DD_SPAN_SAMPLING_RULES_FILE, STRING, "")                               \
+  MACRO(DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT, STRING, "continue")             \
   MACRO(DD_TRACE_PROPAGATION_STYLE_EXTRACT, ARRAY,                             \
         "datadog,tracecontext,baggage")                                        \
   MACRO(DD_TRACE_PROPAGATION_STYLE_INJECT, ARRAY,                              \

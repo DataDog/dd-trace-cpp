@@ -2,10 +2,10 @@
 
 // This component provides facilities for configuring a `DatadogAgent`.
 //
-// `struct DatadogAgentConfig` contains fields that are used to configure
-// `DatadogAgent`.  The configuration must first be finalized before it can be
-// used by `DatadogAgent`.  The function `finalize_config` produces either an
-// error or a `FinalizedDatadogAgentConfig`.  The latter can be used by
+// The `DatadogAgentConfig` struct contains fields that are used to configure
+// `DatadogAgent`. The configuration must first be finalized before it can be
+// used by `DatadogAgent`. The function `finalize_config` produces either an
+// error or a `FinalizedDatadogAgentConfig`. The latter can be used by
 // `DatadogAgent`.
 //
 // Typical usage of `DatadogAgentConfig` is implicit as part of `TracerConfig`.
@@ -30,14 +30,14 @@ class EventScheduler;
 class Logger;
 
 struct DatadogAgentConfig {
-  // The `HTTPClient` used to submit traces to the Datadog Agent.  If this
+  // The `HTTPClient` used to submit traces to the Datadog Agent. If this
   // library was built with libcurl (the default), then `http_client` is
   // optional: a `Curl` instance will be used if `http_client` is left null.
   // If this library was built without libcurl, then `http_client` is required
   // not to be null.
   std::shared_ptr<HTTPClient> http_client = nullptr;
   // The `EventScheduler` used to periodically submit batches of traces to the
-  // Datadog Agent.  If `event_scheduler` is null, then a
+  // Datadog Agent. If `event_scheduler` is null, then a
   // `ThreadedEventScheduler` instance will be used instead.
   std::shared_ptr<EventScheduler> event_scheduler = nullptr;
   // A list of Remote Configuration listeners.

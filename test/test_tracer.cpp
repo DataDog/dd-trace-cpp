@@ -1,4 +1,4 @@
-// These are tests for `Tracer`.  `Tracer` is responsible for creating root
+// These are tests for `Tracer`. `Tracer` is responsible for creating root
 // spans and for extracting spans from propagated trace context.
 
 #include <datadog/error.h>
@@ -748,7 +748,7 @@ TEST_TRACER("span extraction") {
         {__LINE__, "invalid: trailing characters when version is zero",
          "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-foo", // traceparent
          "malformed_traceparent"}, // expected_error_tag_value
-      
+
         {__LINE__, "invalid: non hex trace ID",
          "00-abcdefghijklmnopqrstuvxyzabcdefg-00f067aa0ba902b7-00", // traceparent
          "malformed_traceid"}, // expected_error_tag_value
@@ -792,7 +792,7 @@ TEST_TRACER("span extraction") {
     MockDictReader reader{headers};
 
     // We can't `span->lookup(tags::internal::w3c_extraction_error)`, because
-    // that tag is internal and will not be returned by `lookup`.  Instead, we
+    // that tag is internal and will not be returned by `lookup`. Instead, we
     // finish (destroy) the span to send it to a collector, and then inspect the
     // `SpanData` at the collector.
     Optional<SamplingDecision> decision;
@@ -1544,6 +1544,188 @@ TEST_TRACER("span extraction") {
   }
 }
 
+TEST_TRACER("continue extraction resumes the extracted trace") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::CONTINUE;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"x-datadog-parent-id", "2"},
+      {"x-datadog-sampling-priority", "2"},
+  };
+
+  {
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+    REQUIRE(span->trace_id().low == 1);
+    REQUIRE(span->parent_id() == 2);
+  }
+
+  REQUIRE(collector->span_count() == 1);
+  const auto& span = collector->first_span();
+  REQUIRE(span.trace_id.low == 1);
+  REQUIRE(span.parent_id == 2);
+  REQUIRE(span.span_links.empty());
+}
+
+TEST_TRACER("ignore extraction returns no span to extract") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::IGNORE;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"x-datadog-parent-id", "2"},
+      {"x-datadog-sampling-priority", "2"},
+  };
+
+  MockDictReader reader{headers};
+  const auto result = tracer.extract_span(reader);
+  REQUIRE(!result);
+  REQUIRE(result.error().code == Error::NO_SPAN_TO_EXTRACT);
+}
+
+TEST_TRACER("restart extraction links to the extracted context") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"x-datadog-parent-id", "1"},
+      {"x-datadog-sampling-priority", "2"},
+      {"x-datadog-tags", "_dd.p.tid=1111111111111111"},
+      {"traceparent",
+       "00-11111111111111110000000000000001-0000000000000001-01"},
+  };
+
+  {
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+    REQUIRE_FALSE(span->parent_id());
+  }
+
+  REQUIRE(collector->span_count() == 1);
+  const auto& span = collector->first_span();
+  REQUIRE(span.span_links.size() == 1);
+  const auto& link = span.span_links.front();
+  REQUIRE(link.context.trace_id.low == 1);
+  REQUIRE(link.context.trace_id.high == 0x1111111111111111);
+  REQUIRE(link.context.span_id == 1);
+  REQUIRE(link.attributes == SpanLinkAttributes{
+                                 {"reason", "propagation_behavior_extract"},
+                                 {"context_headers", "datadog"},
+                             });
+  REQUIRE(link.context.flags == Optional<std::uint32_t>(1u));
+}
+
+TEST_TRACER("restart extraction link preserves traceparent sampled flag") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  SECTION("sampled traceparent yields flags=1") {
+    const std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-11111111111111110000000000000001-0000000000000001-01"},
+    };
+    {
+      MockDictReader reader{headers};
+      const auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+    }
+
+    REQUIRE(collector->span_count() == 1);
+    const auto& link = collector->first_span().span_links.front();
+    REQUIRE(link.context.flags == Optional<std::uint32_t>(1u));
+  }
+
+  SECTION("unsampled traceparent yields flags=0") {
+    const std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-11111111111111110000000000000001-0000000000000001-00"},
+    };
+    {
+      MockDictReader reader{headers};
+      const auto span = tracer.extract_span(reader);
+      REQUIRE(span);
+    }
+
+    REQUIRE(collector->span_count() == 1);
+    const auto& link = collector->first_span().span_links.front();
+    REQUIRE(link.context.flags == Optional<std::uint32_t>(0u));
+  }
+}
+
+TEST_TRACER("restart extraction link uses metadata from the selected context") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+  const auto collector = std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  // Datadog is the default first extraction style. The W3C context is
+  // intentionally unrelated and must not contribute metadata to the link.
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"x-datadog-parent-id", "1"},
+      {"x-datadog-sampling-priority", "2"},
+      {"traceparent",
+       "00-00000000000000000000000000000002-0000000000000002-00"},
+      {"tracestate", "vendor=unrelated"},
+  };
+
+  {
+    MockDictReader reader{headers};
+    const auto span = tracer.extract_span(reader);
+    REQUIRE(span);
+  }
+
+  REQUIRE(collector->span_count() == 1);
+  const auto& link = collector->first_span().span_links.front();
+  REQUIRE(link.context.trace_id.low == 1);
+  REQUIRE(link.context.trace_id.high == 0);
+  REQUIRE(link.context.span_id == 1);
+  REQUIRE(link.context.tracestate == nullopt);
+  REQUIRE(link.context.flags == Optional<std::uint32_t>(1u));
+}
+
 TEST_TRACER("baggage usage") {
   TracerConfig config;
   config.logger = std::make_shared<NullLogger>();
@@ -1582,6 +1764,44 @@ TEST_TRACER("baggage usage") {
 
     REQUIRE(writer.items.count("baggage") == 1);
     CHECK(writer.items["baggage"] == "data=dog");
+  }
+}
+
+TEST_TRACER("baggage extraction and propagation_behavior_extract") {
+  TracerConfig config;
+  config.logger = std::make_shared<NullLogger>();
+  config.collector = std::make_shared<NullCollector>();
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"baggage", "data=dog"},
+  };
+
+  SECTION("baggage extraction behaves identically for continue and restart") {
+    for (const auto behavior : {PropagationBehaviorExtract::CONTINUE,
+                                PropagationBehaviorExtract::RESTART}) {
+      config.propagation_behavior_extract = behavior;
+      auto finalized_config = finalize_config(config);
+      REQUIRE(finalized_config);
+
+      Tracer tracer(*finalized_config);
+
+      MockDictReader reader{headers};
+      auto maybe_baggage = tracer.extract_baggage(reader);
+      REQUIRE(maybe_baggage);
+      CHECK(maybe_baggage->get("data") == "dog");
+    }
+  }
+
+  SECTION("baggage extraction returns no result when ignoring context") {
+    config.propagation_behavior_extract = PropagationBehaviorExtract::IGNORE;
+    auto finalized_config = finalize_config(config);
+    REQUIRE(finalized_config);
+
+    Tracer tracer(*finalized_config);
+
+    MockDictReader reader{headers};
+    auto maybe_baggage = tracer.extract_baggage(reader);
+    CHECK(!maybe_baggage);
   }
 }
 

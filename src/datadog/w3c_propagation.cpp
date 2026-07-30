@@ -251,7 +251,7 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
       const auto tag_suffix = key.substr(2);
       std::string tag_name = "_dd.p.";
       append(tag_name, tag_suffix);
-      // The tag value was encoded with all '=' replaced by '~'.  Undo that
+      // The tag value was encoded with all '=' replaced by '~'. Undo that
       // transformation.
       std::string decoded_value{value};
       std::replace(decoded_value.begin(), decoded_value.end(), '~', '=');
@@ -287,6 +287,8 @@ void extract_tracestate(
   }
 
   const auto tracestate = trim(*maybe_tracestate);
+  result.tracestate_full = tracestate;
+
   auto maybe_parsed = parse_tracestate(tracestate);
   if (!maybe_parsed) {
     // No "dd" entry in `tracestate`, so there's nothing to extract.

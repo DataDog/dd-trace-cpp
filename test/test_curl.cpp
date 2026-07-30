@@ -282,7 +282,7 @@ CURL_TEST("fail to allocate request handle") {
 
 CURL_TEST("setopt failures") {
   // Each call to `Curl::post` allocates a new "easy handle" and sets various
-  // options on it.  Any of those setters can fail.  When one does, `post`
+  // options on it. Any of those setters can fail. When one does, `post`
   // immediately returns an error.
   class MockCurlLibrary : public CurlLibrary {
    public:

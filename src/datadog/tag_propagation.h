@@ -1,7 +1,7 @@
 #pragma once
 
 // Some span tags are associated with the entire local trace, rather than just
-// a single span within the trace.  These tags are added to the local root span
+// a single span within the trace. These tags are added to the local root span
 // before the trace is flushed.
 //
 // Among these root span tags, some are also propagated as trace context.

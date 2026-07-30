@@ -1,7 +1,7 @@
 #pragma once
 
 // This component provides an `enum class`, `SamplingMechanism`, describing a
-// reason for a sampling decision.  A sampler (or a user, with a manual
+// reason for a sampling decision. A sampler (or a user, with a manual
 // override) decides whether to keep or to drop a trace, but it might do so for
 // various reasons.
 //
@@ -9,9 +9,9 @@
 // but `SamplingPriority` is inadequate for future expansion, for two reasons:
 //
 // - `SamplingPriority` conflates the keep/drop decision with the reason (e.g.
-//   `UserKeep` vs. `SamplerKeep`).  Some engineers dislike this.
+//   `UserKeep` vs. `SamplerKeep`). Some engineers dislike this.
 // - Some tracer implementations do not decode `SamplingPriority` integer values
-//   outside of those enumerated in this library.  This makes adding new values
+//   outside of those enumerated in this library. This makes adding new values
 //   infeasible, as older versions of tracers propagating the `SamplingPriority`
 //   along the trace will omit new integer values.
 //
@@ -21,7 +21,7 @@
 // Since `SamplingPriority` is already in use and has implications for sampling
 // behavior (both in its propagation along and trace and its interpretation by
 // the trace agent), the combination `{SamplingPriority, SamplingMechanism}` is
-// used to completely describe a sampling decision.  The `SamplingPriority`
+// used to completely describe a sampling decision. The `SamplingPriority`
 // conveys the keep/drop decision, as well as the existing (and now redundant)
 // user vs. sampler distinction, while the `SamplingMechanism` conveys
 // precisely where the sampling decision came from, e.g. a user-specified
@@ -30,7 +30,7 @@
 //
 // To allow forward compatibility with future `SamplingMechanism` values,
 // sampling mechanism is treated as just an integer when being deserialized or
-// serialized.  `SamplingMechanism` enumerates integer values relevant to logic
+// serialized. `SamplingMechanism` enumerates integer values relevant to logic
 // within the tracer.
 
 namespace datadog {

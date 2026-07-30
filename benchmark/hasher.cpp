@@ -3,11 +3,11 @@
 // If the path does not exist, print an error.
 //
 // If the path exists and is a regular file, print the SHA256 digest of the
-// file's contents.  Produce a single tracing span indicating the calculation.
+// file's contents. Produce a single tracing span indicating the calculation.
 //
 // If the path exists and is a directory, calculate the SHA256 digest of the
 // directory from the names and digests of its children, combined in some
-// canonical format.  Produce a trace whose structure reflects the directory
+// canonical format. Produce a trace whose structure reflects the directory
 // structure.
 //
 // Files that are neither regular files nor directories are ignored.
@@ -47,7 +47,7 @@ std::string hex(const Digest &digest) {
 }
 
 // Store into the specified `digest` the SHA256 digest of the contents of the
-// specified `file`.  Return zero on success, or a nonzero value if an error
+// specified `file`. Return zero on success, or a nonzero value if an error
 // occurs.
 int sha256(Digest &digest, const fs::path &file) {
   std::ifstream in(file);

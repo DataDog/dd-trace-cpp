@@ -17,7 +17,7 @@ namespace datadog {
 namespace tracing {
 
 // Return whether the specified `subject` matches the specified glob `pattern`,
-// i.e.  whether `subject` is a member of the set of strings represented by the
+// i.e.whether `subject` is a member of the set of strings represented by the
 // glob `pattern`.
 bool glob_match(StringView pattern, StringView subject);
 
