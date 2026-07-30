@@ -128,6 +128,10 @@ int main(int argc, char* argv[]) {
            [&handler](const httplib::Request& req, httplib::Response& res) {
              handler.on_manual_keep(req, res);
            });
+  svr.Post("/trace/span/add_link",
+           [&handler](const httplib::Request& req, httplib::Response& res) {
+             handler.on_add_link(req, res);
+           });
 
   // Not implemented
   svr.Post("/trace/span/set_metric",
