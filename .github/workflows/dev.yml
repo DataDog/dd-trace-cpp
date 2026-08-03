@@ -9,7 +9,7 @@ jobs:
     env:
       BUILD_DIR: .build
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check format
         run: bin/check-format
       - name: Shellcheck
@@ -57,7 +57,7 @@ jobs:
       BUILD_DIR: .build
       HAS_DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY != '' }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Configure
         run: bin/with-toolchain ${{ matrix.toolchain }} cmake . -B .build --preset ci-clang
       - name: Build
@@ -93,7 +93,7 @@ jobs:
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-${{matrix.docker-arch}}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build
         run: bin/with-toolchain ${{ matrix.toolchain }} bazelisk --bazelrc=${{ matrix.bazelrc }} build dd_trace_cpp
 
@@ -107,7 +107,7 @@ jobs:
       matrix:
         bazelrc: [".bazelrc.absl", ".bazelrc.std"]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Dependency Manager (scoop)
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -141,7 +141,7 @@ jobs:
     env:
       HAS_DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY != '' }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Dependency Manager (scoop)
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -179,7 +179,7 @@ jobs:
     env:
       HAS_DD_API_KEY: ${{ secrets.DD_CI_VIS_API_KEY != '' }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bin/test --coverage --verbose
       - name: Upload code coverage report to Datadog
         if: success() && env.HAS_DD_API_KEY == 'true'
