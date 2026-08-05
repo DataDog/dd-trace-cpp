@@ -328,16 +328,12 @@ void TraceSegment::span_finished() {
     }
   }
 
-  // RFC seems to only mandate that this be set if the trace is kept.
-  // However, system-tests expect this to always be set.
-  // Add it all the time; can't hurt
-  if (!tracing_enabled_) {
-    local_root.numeric_tags[tags::internal::apm_enabled] = 0;
-  }
-
   // Some tags are repeated on all spans.
   for (const auto& span_ptr : spans_) {
     SpanData& span = *span_ptr;
+    if (!tracing_enabled_) {
+      span.numeric_tags[tags::internal::apm_enabled] = 0;
+    }
     if (origin_) {
       span.tags[tags::internal::origin] = *origin_;
     }
