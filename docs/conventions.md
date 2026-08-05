@@ -37,6 +37,24 @@ We separate public and private APIs. Public headers live in `include/datadog` an
 
 **Google Benchmark** is used for performance benchmarks.
 
+## Clean Code
+
+- Use meaningfull variable and function names.
+- Do not use single-letter variable names.
+- Avoid abbreviations, unless very common and unambiguous.
+- Avoid ovbious comments.
+- Prefer clearer variable and function names over explanatory comments.
+- Keep functions small and focused (<~ 20 lines when practical).
+- When practical, place caller functions before callees, so the code can be read from top to bottom.
+
+## C++ Code Style
+
+- Use modern C++ (C++17).
+- For readability, avoid `auto` unless for very long type names (>~ 50 characters).
+- Never use C-style casts.
+- Use C++17 nested namespace syntax.
+- Minimize the number of `#include lines`. Do not enforce the include-what-you-use rule.
+
 ## Naming Conventions
 
 - `class TypeName;`
