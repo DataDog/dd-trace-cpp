@@ -332,11 +332,6 @@ void TraceSegment::span_finished() {
   for (const auto& span_ptr : spans_) {
     SpanData& span = *span_ptr;
     if (!tracing_enabled_) {
-      // RFC seems to only mandate that this be set if the trace is kept.
-      // However, system-tests expect this to always be set.
-      // Add it all the time; can't hurt
-      // Following incident-57980, go beyond the RFC and add it to every span so
-      // that every trace chunk is marked.
       span.numeric_tags[tags::internal::apm_enabled] = 0;
     }
     if (origin_) {
