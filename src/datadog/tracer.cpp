@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
+#include <vector>
 
 #include "config_manager.h"
 #include "datadog_agent.h"
@@ -22,6 +23,7 @@
 #include "hex.h"
 #include "json.hpp"
 #include "msgpack.h"
+#include "otel_process_ctx_registration.h"
 #include "platform_util.h"
 #include "random.h"
 #include "root_session_id.h"
@@ -124,6 +126,10 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
   store_config(process_tags);
 }
 
+Tracer::~Tracer() = default;
+Tracer::Tracer(Tracer&&) noexcept = default;
+Tracer& Tracer::operator=(Tracer&&) noexcept = default;
+
 std::string Tracer::config() const {
   // clang-format off
   auto config = nlohmann::json::object({
@@ -164,9 +170,17 @@ void Tracer::store_config(
 
   metadata_file_ = std::make_unique<InMemoryFile>(std::move(*maybe_file));
 
-  auto defaults = config_manager_->span_defaults();
-
-  std::string container_id = "";
+  const std::shared_ptr<const SpanDefaults> defaults =
+      config_manager_->span_defaults();
+  const std::string& runtime_id_string = runtime_id_.string();
+  const std::string& tracer_version_value = signature_.library_version;
+  const std::string tracer_language(signature_.library_language);
+  const std::string hostname_value = hostname_.value_or("");
+  const std::string& service_name = defaults->service;
+  const std::string& service_env = defaults->environment;
+  const std::string& service_version = defaults->version;
+  const std::string process_tags_joined = join_tags(process_tags);
+  std::string container_id;
   if (auto maybe_container_id = container::get_id()) {
     container_id = maybe_container_id->value;
   }
@@ -177,22 +191,38 @@ void Tracer::store_config(
   // clang-format off
   msgpack::pack_map(
     buffer,
-    "schema_version", [&](auto& buffer) { msgpack::pack_integer(buffer, std::uint64_t(2)); return Expected<void>{}; },
-    "runtime_id", [&](auto& buffer) { return msgpack::pack_string(buffer, runtime_id_.string()); },
-    "tracer_version", [&](auto& buffer) { return msgpack::pack_string(buffer, signature_.library_version); },
-    "tracer_language", [&](auto& buffer) { return msgpack::pack_string(buffer, signature_.library_language); },
-    "hostname", [&](auto& buffer) { return msgpack::pack_string(buffer, hostname_.value_or("")); },
-    "service_name", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->service); },
-    "service_env", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->environment); },
-    "service_version", [&](auto& buffer) { return msgpack::pack_string(buffer, defaults->version); },
-    "process_tags", [&](auto& buffer) { return msgpack::pack_string(buffer, join_tags(process_tags)); },
-    "container_id", [&](auto& buffer) { return msgpack::pack_string(buffer, container_id); }
+    "schema_version",  [&](auto& buffer) { msgpack::pack_integer(buffer, std::uint64_t(2)); return Expected<void>{}; },
+    "runtime_id",      [&](auto& buffer) { return msgpack::pack_string(buffer, runtime_id_string); },
+    "tracer_version",  [&](auto& buffer) { return msgpack::pack_string(buffer, tracer_version_value); },
+    "tracer_language", [&](auto& buffer) { return msgpack::pack_string(buffer, tracer_language); },
+    "hostname",        [&](auto& buffer) { return msgpack::pack_string(buffer, hostname_value); },
+    "service_name",    [&](auto& buffer) { return msgpack::pack_string(buffer, service_name); },
+    "service_env",     [&](auto& buffer) { return msgpack::pack_string(buffer, service_env); },
+    "service_version", [&](auto& buffer) { return msgpack::pack_string(buffer, service_version); },
+    "process_tags",    [&](auto& buffer) { return msgpack::pack_string(buffer, process_tags_joined); },
+    "container_id",    [&](auto& buffer) { return msgpack::pack_string(buffer, container_id); }
   );
   // clang-format on
 
   if (!metadata_file_->write_then_seal(buffer)) {
     logger_->log_error("Either failed to write or seal the configuration file");
+    return;
   }
+
+  // Publish the same metadata as OTel Process Context.
+  // We explicitly opted to publish this only when the above tracer info file
+  // was successful.
+  OtelCtxFields otel_fields;
+  otel_fields.service_env = service_env;
+  otel_fields.service_name = service_name;
+  otel_fields.service_version = service_version;
+  otel_fields.tracer_language = tracer_language;
+  otel_fields.tracer_version = tracer_version_value;
+  otel_fields.hostname = hostname_;
+  otel_fields.container_id = container_id;
+  otel_fields.process_tags = process_tags_joined;
+  otel_context_registration_ =
+      OtelCtxRegistration::publish(otel_fields, runtime_id_string, *logger_);
 }
 
 Span Tracer::create_span() { return create_span(SpanConfig{}); }

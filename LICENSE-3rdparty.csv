@@ -3,3 +3,4 @@ vendored,nlohmann/json,MIT,Copyright (c) 2013-2022 Niels Lohmann <http://nlohman
 vendored,Catch2,Boost,Copyright (c) 2022 Two Blue Cubes Ltd. All rights reserved.
 vendored,picosha2,MIT,Copyright (C) 2017 okdshin
 vendored,cpp-httplib,MIT,Copyright (c) 2023 Yuji Hirose. All rights reserved.
+vendored,open-telemetry/sig-profiling (process-context),Apache-2.0,"Copyright 2025 Datadog, Inc."

@@ -34,6 +34,7 @@ class TraceSampler;
 class SpanSampler;
 class IDGenerator;
 class InMemoryFile;
+class OtelCtxRegistration;
 
 class Tracer {
   std::shared_ptr<Logger> logger_;
@@ -53,6 +54,7 @@ class Tracer {
   // read to determine if the process is instrumented with a tracer and to
   // retrieve relevant tracing information.
   std::shared_ptr<InMemoryFile> metadata_file_;
+  std::unique_ptr<OtelCtxRegistration> otel_context_registration_;
   Baggage::Options baggage_opts_;
   bool baggage_injection_enabled_;
   bool baggage_extraction_enabled_;
@@ -66,6 +68,15 @@ class Tracer {
   explicit Tracer(const FinalizedTracerConfig& config);
   Tracer(const FinalizedTracerConfig& config,
          const std::shared_ptr<const IDGenerator>& generator);
+
+  ~Tracer();
+
+  // Move-only. OtelCtxRegistration is a per-tracer-instance handle; duplicating
+  // ownership would break that invariant, thus copies are disallowed.
+  Tracer(Tracer&&) noexcept;
+  Tracer& operator=(Tracer&&) noexcept;
+  Tracer(const Tracer&) = delete;
+  Tracer& operator=(const Tracer&) = delete;
 
   // Create a new trace and return the root span of the trace. Optionally
   // specify a `config` indicating the attributes of the root span.

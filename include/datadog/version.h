@@ -4,6 +4,9 @@
 
 namespace datadog::tracing {
 
+// This library's name
+extern const char *const tracer_library_name;
+
 // The release version at or before this code revision, e.g. "v0.1.12".
 // That is, this code is at least as recent as `tracer_version`, but may be
 // more recent.
