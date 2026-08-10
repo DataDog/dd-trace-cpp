@@ -14,8 +14,8 @@ namespace datadog::tracing {
 namespace {
 
 // Process-wide OTel context state, including the mutex that guards it.
-// Accessed through the single `get_otel_context_state()` instance.
-struct StaticOtelContextState {
+// Accessed through the single `get_otel_ctx_state()` instance.
+struct StaticOtelCtxState {
   std::mutex mutex;
   // Shared by all coexisting registrations. Present iff
   // `runtime_ids` is non-empty: established by the first live registration and
@@ -27,14 +27,14 @@ struct StaticOtelContextState {
   std::multiset<std::string> runtime_ids;
 };
 
-StaticOtelContextState& get_otel_context_state() {
-  static StaticOtelContextState state;
+StaticOtelCtxState& get_otel_ctx_state() {
+  static StaticOtelCtxState state;
   return state;
 }
 
 // Removes one registration for `runtime_id` from `state`. Must be called with
 // `state.mutex` held.
-void unregister(StaticOtelContextState& state, const std::string& runtime_id) {
+void unregister(StaticOtelCtxState& state, const std::string& runtime_id) {
   // Erase only one runtime id, leaving copies, if any
   const std::multiset<std::string>::iterator entry =
       state.runtime_ids.find(runtime_id);
@@ -48,7 +48,7 @@ void unregister(StaticOtelContextState& state, const std::string& runtime_id) {
 
 // (Re)publishes or drops the process context to reflect `state`. Must be called
 // with `state.mutex` held.
-otel_process_ctx_result upsert(const StaticOtelContextState& state) {
+otel_process_ctx_result upsert(const StaticOtelCtxState& state) {
   const std::multiset<std::string>& runtime_ids = state.runtime_ids;
   if (runtime_ids.empty()) {
     otel_process_ctx_drop_current();
@@ -92,7 +92,7 @@ otel_process_ctx_result upsert(const StaticOtelContextState& state) {
 }  // namespace
 
 OtelCtxRegistration::~OtelCtxRegistration() {
-  StaticOtelContextState& state = get_otel_context_state();
+  StaticOtelCtxState& state = get_otel_ctx_state();
   std::lock_guard<std::mutex> lock(state.mutex);
   unregister(state, runtime_id_);
   upsert(state);
@@ -111,7 +111,7 @@ std::unique_ptr<OtelCtxRegistration> OtelCtxRegistration::publish(
 std::unique_ptr<OtelCtxRegistration> OtelCtxRegistration::publish(
     const OtelCtxFields& fields, const std::string& runtime_id,
     Logger& logger) {
-  StaticOtelContextState& state = get_otel_context_state();
+  StaticOtelCtxState& state = get_otel_ctx_state();
   std::lock_guard<std::mutex> lock(state.mutex);
 
   if (!state.common) {
