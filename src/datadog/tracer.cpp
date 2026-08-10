@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
-#include <vector>
 
 #include "config_manager.h"
 #include "datadog_agent.h"
