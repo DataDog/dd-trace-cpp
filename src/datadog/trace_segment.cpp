@@ -31,8 +31,8 @@
 #include "trace_sampler.h"
 #include "w3c_propagation.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
+
 namespace {
 
 struct Cache {
@@ -69,7 +69,7 @@ void inject_trace_tags(
   if (encoded_trace_tags.size() > tags_header_max_size) {
     std::string message;
     message +=
-        "Serialized x-datadog-tags header value is too large.  The configured "
+        "Serialized x-datadog-tags header value is too large. The configured "
         "maximum size is ";
     message += std::to_string(tags_header_max_size);
     message += " bytes, but the encoded value is ";
@@ -109,7 +109,49 @@ void maybe_calculate_http_endpoint(HttpEndpointCalculationMode renaming_mode,
     }
   }
 }
-}  // namespace
+
+// If `local_root_tags` contains the `tags::internal::trace_source` tag,
+// return its value; otherwise return `nullopt`.
+Optional<std::string> find_trace_source_tag(
+    const std::unordered_map<std::string, std::string>& local_root_tags) {
+  const auto trace_source_tag_found =
+      local_root_tags.find(tags::internal::trace_source);
+  if (trace_source_tag_found == local_root_tags.cend()) {
+    return nullopt;
+  }
+  return trace_source_tag_found->second;
+}
+
+// Convert rate to a fixed-point string with 6 decimal digits,
+// stripping trailing zeros and a decimal point. Examples:
+//   0.100000 -> "0.1"
+//   0.123456789 -> "0.123456"
+//   1.0 -> "1"
+Optional<std::string> format_rate(double rate, Logger& logger) {
+  constexpr int nb_decimal_digits = 6;
+  std::array<char, nb_decimal_digits + 2> buf;
+  char* const begin = buf.data();
+  auto [end, error_code] =
+      std::to_chars(begin, begin + buf.size(), rate, std::chars_format::fixed,
+                    nb_decimal_digits);
+  if (error_code != std::errc()) {
+    logger.log_error("rate to string conversion failed: " +
+                     std::make_error_code(error_code).message());
+    return nullopt;
+  }
+  // strip trailing zeros and possibly the decimal point
+  if (std::find(begin, end, '.') != end) {
+    while ((end > begin) && (*(end - 1) == '0')) {
+      --end;
+    }
+    if ((end > begin) && (*(end - 1) == '.')) {
+      --end;
+    }
+  }
+  return std::string(begin, end);
+}
+
+}  // anonymous namespace
 
 TraceSegment::TraceSegment(
     const std::shared_ptr<Logger>& logger,
@@ -172,6 +214,32 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
   return sampling_decision_;
 }
 
+Optional<std::pair<std::string, std::uint32_t>> TraceSegment::w3c_link_context(
+    const SpanData& span) const {
+  int sampling_priority;
+  std::vector<std::pair<std::string, std::string>> trace_tags;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!sampling_decision_) {
+      return nullopt;
+    }
+    sampling_priority = sampling_decision_->priority;
+    trace_tags = trace_tags_;
+
+    const Optional<std::string> trace_source_tag =
+        find_trace_source_tag(spans_.front()->tags);
+    if (trace_source_tag) {
+      trace_tags.emplace_back(tags::internal::trace_source, *trace_source_tag);
+    }
+  }
+
+  return std::make_pair(
+      encode_tracestate(span.span_id, sampling_priority, origin_, trace_tags,
+                        additional_datadog_w3c_tracestate_,
+                        additional_w3c_tracestate_),
+      sampling_priority > 0 ? 1u : 0u);
+}
+
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
@@ -197,7 +265,7 @@ void TraceSegment::span_finished() {
 
   telemetry::counter::increment(metrics::tracer::trace_chunks_enqueued);
 
-  // We don't need the lock anymore.  There's nobody left to call our methods.
+  // We don't need the lock anymore. There's nobody left to call our methods.
   // On the other hand, there's nobody left to contend for the mutex, so it
   // doesn't make any difference.
   make_sampling_decision_if_null();
@@ -260,16 +328,12 @@ void TraceSegment::span_finished() {
     }
   }
 
-  // RFC seems to only mandate that this be set if the trace is kept.
-  // However, system-tests expect this to always be set.
-  // Add it all the time; can't hurt
-  if (!tracing_enabled_) {
-    local_root.numeric_tags[tags::internal::apm_enabled] = 0;
-  }
-
   // Some tags are repeated on all spans.
   for (const auto& span_ptr : spans_) {
     SpanData& span = *span_ptr;
+    if (!tracing_enabled_) {
+      span.numeric_tags[tags::internal::apm_enabled] = 0;
+    }
     if (origin_) {
       span.tags[tags::internal::origin] = *origin_;
     }
@@ -322,22 +386,17 @@ void TraceSegment::make_sampling_decision_if_null() {
 
   update_decision_maker_trace_tag();
 
-  // Only set ksr when the sampling mechanism is explicit (agent rate, rule, or
-  // remote rule).  The DEFAULT mechanism means we haven't received any
-  // configuration from the agent yet, so ksr would be meaningless.
+  // Only set ksr when the sampling mechanism is explicit.
+  // The DEFAULT mechanism means we haven't received any configuration from the
+  // agent yet, so ksr would be meaningless.
   if (sampling_decision_->mechanism &&
-      *sampling_decision_->mechanism != int(SamplingMechanism::DEFAULT)) {
-    std::array<char, 8> buf;
-    const auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(),
-                                         *sampling_decision_->configured_rate,
-                                         std::chars_format::general, 6);
-    if (ec != std::errc()) {
-      std::string error{"string conversion failed: "};
-      error += std::make_error_code(ec).message();
-      logger_->log_error(error);
+      (*sampling_decision_->mechanism != int(SamplingMechanism::DEFAULT))) {
+    const Optional<std::string> rate_string =
+        format_rate(*sampling_decision_->configured_rate, *logger_);
+    if (!rate_string) {
       return;
     }
-    trace_tags_.emplace_back(tags::internal::ksr, std::string(buf.data(), ptr));
+    trace_tags_.emplace_back(tags::internal::ksr, *rate_string);
   }
 }
 
@@ -394,18 +453,18 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     trace_tags = trace_tags_;
   }
 
-  auto& local_root_tags = spans_.front()->tags;
+  std::unordered_map<std::string, std::string>& local_root_tags =
+      spans_.front()->tags;
 
-  auto ts_tag_found = std::find_if(
-      local_root_tags.cbegin(), local_root_tags.cend(),
-      [](const auto& p) { return p.first == tags::internal::trace_source; });
+  const Optional<std::string> trace_source_tag =
+      find_trace_source_tag(local_root_tags);
 
   // When tracing (the product) is disabled, skip tracing context propagation
   // when:
   //  - the local root span is NOT created by another product (no `_dd.p.ts`)
   //  - sampling priority is DROP
   if (!tracing_enabled_) {
-    if (ts_tag_found == local_root_tags.cend() && sampling_priority <= 0) {
+    if (!trace_source_tag && sampling_priority <= 0) {
       writer.erase("x-datadog-trace-id");
       writer.erase("x-datadog-parent-id");
       writer.erase("x-datadog-sampling-priority");
@@ -423,8 +482,8 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
   }
 
   // Add `_dd.p.ts` to `trace_tags` for context propagation.
-  if (ts_tag_found != local_root_tags.cend()) {
-    trace_tags.emplace_back(tags::internal::trace_source, ts_tag_found->second);
+  if (trace_source_tag) {
+    trace_tags.emplace_back(tags::internal::trace_source, *trace_source_tag);
   }
 
   for (const auto style : injection_styles_) {
@@ -481,5 +540,4 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
 
 SpanData& TraceSegment::local_root() const { return *spans_.front(); }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing

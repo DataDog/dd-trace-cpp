@@ -509,7 +509,7 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
           {"override port with default host", nullopt, "8080", nullopt, "http",
            "localhost:8080"},
           // A bogus port number will cause an error in the TCPClient, not
-          // during configuration.  For the purposes of configuration, any
+          // during configuration. For the purposes of configuration, any
           // value is accepted.
           {"we don't parse port", nullopt, "bogus", nullopt, "http",
            "localhost:bogus"},
@@ -1232,7 +1232,7 @@ TRACER_CONFIG_TEST("TracerConfig propagation styles") {
       }
 
       // It's the same as for injection styles, so let's omit most of the
-      // section.  Keep only an example where parsing fails, so we cover the
+      // section. Keep only an example where parsing fails, so we cover the
       // error handling code in `TracerConfig`.
       SECTION("parsing failure") {
         const EnvGuard guard{"DD_PROPAGATION_STYLE_EXTRACT", "b3,,datadog"};
@@ -1290,6 +1290,86 @@ TRACER_CONFIG_TEST("TracerConfig propagation styles") {
         logger->entries.clear();
       }
     }
+  }
+}
+
+TRACER_CONFIG_TEST("TracerConfig propagation behavior extract") {
+  TracerConfig config;
+  config.service = "testsvc";
+
+  const auto behavior_metadata = [](const FinalizedTracerConfig& finalized) {
+    return finalized.metadata.at(ConfigName::PROPAGATION_BEHAVIOR_EXTRACT);
+  };
+
+  SECTION("defaults to continue") {
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::CONTINUE);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 1);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(metadata.back().value == "continue");
+  }
+
+  SECTION("uses programmatic configuration") {
+    config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::RESTART);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 2);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::CODE);
+    CHECK(metadata.back().value == "restart");
+  }
+
+  SECTION("environment configuration overrides programmatic configuration") {
+    const EnvGuard guard{"DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT", "ignore"};
+    config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::IGNORE);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 3);
+    CHECK(metadata.back().origin ==
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(metadata.back().value == "ignore");
+  }
+
+  SECTION("invalid environment configuration falls through to code") {
+    const EnvGuard guard{"DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT", "invalid"};
+    config.propagation_behavior_extract = PropagationBehaviorExtract::RESTART;
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::RESTART);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 2);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::CODE);
+    CHECK(metadata.back().value == "restart");
+  }
+
+  SECTION("invalid environment configuration falls through to the default") {
+    const EnvGuard guard{"DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT", "invalid"};
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_behavior_extract ==
+          PropagationBehaviorExtract::CONTINUE);
+
+    const auto& metadata = behavior_metadata(*finalized);
+    REQUIRE(metadata.size() == 1);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(metadata.back().value == "continue");
   }
 }
 

@@ -61,7 +61,7 @@ class HeaderWriter final : public dd::DictWriter {
   HeaderWriter(nlohmann::json& headers) : j_(headers){};
   ~HeaderWriter() = default;
 
-  // Associate the specified `value` with the specified `key`.  An
+  // Associate the specified `value` with the specified `key`. An
   // implementation may, but is not required to, overwrite any previous value at
   // `key`.
   void set(dd::StringView key, dd::StringView value) override {

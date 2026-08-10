@@ -1,25 +1,25 @@
 #pragma once
 
-// This component provides a class, `TraceSegment`, that represents a portion of
-// a trace that is passing through this process.
+// The `TraceSegment` class represents a portion of a trace that is passing
+// through this process.
 //
-// `TraceSegment` is not instantiated directly.  It is an implementation detail
+// `TraceSegment` is not instantiated directly. It is an implementation detail
 // of this library.
 //
 // A trace might begin in this process, or it might have been propagated in from
-// outside (see `Tracer::extract_span`).  A trace might remain in this process,
-// or it might be propagated outward (see `Span::inject`) one or more times.
+// outside (see `Tracer::extract_span()`). A trace might remain in this process,
+// or it might be propagated outward (see `Span::inject()`) one or more times.
 //
-// A trace might pass through this process twice or more.  Consider an RPC
+// A trace might pass through this process twice or more. Consider an RPC
 // server that receives a request, in handling that request makes a request to a
 // different service, and in the course of the other service handling its
-// request, the original service is called again.  Both "passes" through this
-// process are part of the same trace, but each pass is a different _trace
-// segment_.
+// request, the original service is called again. Both "passes" through this
+// process are part of the same trace, but each pass is a different trace
+// segment.
 //
 // `TraceSegment` stores context and configuration shared among all spans within
-// the trace segment, and additionally owns the spans' data.  When `Tracer`
-// creates or extracts a span, it also creates a new `TraceSegment`.  When a
+// the trace segment, and additionally owns the spans' data. When `Tracer`
+// creates or extracts a `Span`, it also creates a new `TraceSegment`. When a
 // child `Span` is created from a `Span`, the child and the parent share the
 // same `TraceSegment`.
 //
@@ -56,6 +56,8 @@ class SpanSampler;
 class TraceSampler;
 class ConfigManager;
 
+using W3CLinkContext = std::pair<std::string, std::uint32_t>;
+
 class TraceSegment {
   mutable std::mutex mutex_;
 
@@ -75,8 +77,8 @@ class TraceSegment {
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   Optional<SamplingDecision> sampling_decision_;
-  Optional<std::string> additional_w3c_tracestate_;
-  Optional<std::string> additional_datadog_w3c_tracestate_;
+  const Optional<std::string> additional_w3c_tracestate_;
+  const Optional<std::string> additional_datadog_w3c_tracestate_;
 
   std::shared_ptr<ConfigManager> config_manager_;
 
@@ -108,18 +110,26 @@ class TraceSegment {
   const Optional<std::string>& origin() const;
   Optional<SamplingDecision> sampling_decision() const;
 
+  // Return the W3C tracestate encoding and derived trace flags for `span`,
+  // based on this segment's sampling decision. Unlike `inject`, this never
+  // makes a sampling decision if one hasn't been made yet -- it returns
+  // `nullopt` instead of forcing (and thereby permanently finalizing) one.
+  // Used by `Span::context` without prematurely deciding sampling for the
+  // trace.
+  Optional<W3CLinkContext> w3c_link_context(const SpanData& span) const;
+
   Logger& logger() const;
 
-  // Inject trace context for the specified `span` into the specified `writer`.
-  // Return whether the trace sampling decision was delegated.
-  // This function is the implementation of `Span::inject`.
+  // Inject trace context for the specified `span` into the specified `writer`,
+  // using the configured injection styles. Return whether the injection
+  // happened. This function is the implementation of `Span::inject()`.
   bool inject(DictWriter& writer, const SpanData& span);
   bool inject(DictWriter& writer, const SpanData& span,
               const InjectionOptions& options);
 
   // Take ownership of the specified `span`.
   void register_span(std::unique_ptr<SpanData> span);
-  // Increment the number of finished spans.  If that number is equal to the
+  // Increment the number of finished spans. If that number is equal to the
   // number of registered spans, send all of the spans to the `Collector`.
   void span_finished();
 

@@ -13,6 +13,8 @@ updates:
       bazel-packages:
         patterns:
           - "*"
+    cooldown:
+      default-days: 2
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -21,3 +23,5 @@ updates:
       gh-actions-packages:
         patterns:
           - "*"
+    cooldown:
+      default-days: 2

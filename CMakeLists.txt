@@ -146,11 +146,13 @@ target_sources(dd-trace-cpp-objects
       include/datadog/event_scheduler.h
       include/datadog/expected.h
       include/datadog/http_client.h
+      include/datadog/http_endpoint_calculation_mode.h
       include/datadog/id_generator.h
       include/datadog/injection_options.h
       include/datadog/logger.h
       include/datadog/null_collector.h
       include/datadog/optional.h
+      include/datadog/propagation_behavior_extract.h
       include/datadog/propagation_style.h
       include/datadog/rate.h
       include/datadog/runtime_id.h
@@ -159,6 +161,7 @@ target_sources(dd-trace-cpp-objects
       include/datadog/sampling_priority.h
       include/datadog/span.h
       include/datadog/span_config.h
+      include/datadog/span_context.h
       include/datadog/span_defaults.h
       include/datadog/span_matcher.h
       include/datadog/span_sampler_config.h
@@ -195,6 +198,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/logger.cpp
     src/datadog/msgpack.cpp
     src/datadog/parse_util.cpp
+    src/datadog/propagation_behavior_extract.cpp
     src/datadog/propagation_style.cpp
     src/datadog/random.cpp
     src/datadog/rate.cpp
@@ -203,6 +207,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/runtime_id.cpp
     src/datadog/span.cpp
     src/datadog/span_data.cpp
+    src/datadog/span_link.cpp
     src/datadog/span_matcher.cpp
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp

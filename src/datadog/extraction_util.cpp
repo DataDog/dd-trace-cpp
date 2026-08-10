@@ -152,7 +152,18 @@ Expected<ExtractedData> extract_datadog(
 
   auto trace_tags = headers.lookup("x-datadog-tags");
   if (trace_tags) {
-    handle_trace_tags(*trace_tags, result, span_tags, logger);
+    // If the x-datadog-tags header value exceeds 512 bytes, drop it and record
+    // a propagation error tag.
+    if (trace_tags->size() > 512) {
+      logger.log_error([&](auto& stream) {
+        stream << "Received x-datadog-tags header value is too large. The "
+                  "maximum size is 512 bytes, but the received value is "
+               << trace_tags->size() << " bytes.";
+      });
+      span_tags[tags::internal::propagation_error] = "extract_max_size";
+    } else {
+      handle_trace_tags(*trace_tags, result, span_tags, logger);
+    }
   }
 
   return result;

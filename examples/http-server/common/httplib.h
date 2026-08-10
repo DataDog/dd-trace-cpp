@@ -3110,7 +3110,7 @@ inline unsigned int str2tag(const std::string &s) {
 
 namespace udl {
 
-inline constexpr unsigned int operator"" _t(const char *s, size_t l) {
+inline constexpr unsigned int operator""_t(const char *s, size_t l) {
   return str2tag_core(s, l, 0);
 }
 
@@ -8713,7 +8713,7 @@ inline bool SSLClient::verify_host(X509 *server_cert) const {
      Certification Authorities are encouraged to use the dNSName instead.
 
      Matching is performed using the matching rules specified by
-     [RFC2459].  If more than one identity of a given type is present in
+     [RFC2459]. If more than one identity of a given type is present in
      the certificate (e.g., more than one dNSName name, a match in any one
      of the set is considered acceptable.) Names may contain the wildcard
      character * which is considered to match any single domain name

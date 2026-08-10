@@ -13,7 +13,7 @@ using namespace datadog::tracing;
 namespace {
 
 // Replace the `streambuf` associated with a specified `std::ios` for the
-// lifetime of this object.  Restore the previous `streambuf` afterward.
+// lifetime of this object. Restore the previous `streambuf` afterward.
 class StreambufGuard {
   std::ios *stream_;
   std::streambuf *buffer_;

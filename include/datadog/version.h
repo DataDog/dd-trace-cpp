@@ -2,8 +2,7 @@
 
 // This component provides the release version of this library.
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 // The release version at or before this code revision, e.g. "v0.1.12".
 // That is, this code is at least as recent as `tracer_version`, but may be
@@ -15,5 +14,4 @@ extern const char *const tracer_version;
 // version v0.1.12]".
 extern const char *const tracer_version_string;
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing

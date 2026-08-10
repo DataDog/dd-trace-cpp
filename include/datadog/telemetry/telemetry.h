@@ -44,6 +44,25 @@ void init(FinalizedConfiguration configuration,
           tracing::HTTPClient::URL agent_url,
           tracing::Clock clock = tracing::default_clock);
 
+/// Deterministically shut down the telemetry module.
+///
+/// Cancels all scheduled tasks, sends the app-closing payload, and waits up
+/// to 2 seconds for in-flight requests to complete (HTTPClient::drain()).
+/// Then releases the HTTP client reference; if this is the last shared_ptr
+/// to the client, the background Curl thread is joined synchronously and any
+/// remaining in-flight requests are abandoned without firing their callbacks.
+/// If other holders of the client remain, the Curl thread continues running
+/// and requests may still complete and fire their callbacks after this call
+/// returns (the callbacks guard against this with weak_from_this()). After
+/// this call all telemetry send functions become no-ops. Safe to call even if
+/// telemetry was never initialized, but must be called at most once after a
+/// successful init.
+///
+/// Call this from the worker process exit path (e.g. before destroying the
+/// tracer) so that telemetry's reference to the HTTP client is released
+/// promptly, reducing the window before the Curl thread is quiesced.
+void shutdown();
+
 /// Sends configuration changes.
 ///
 /// This function is responsible for sending reported configuration changes

@@ -175,8 +175,8 @@ TEST_CASE("TraceSegment finalization of spans") {
 
   SECTION("root span") {
     SECTION(
-        "'inject_max_size' propagation error if X-Datadog-Tags oversized on "
-        "inject") {
+        "'extract_max_size' propagation error if x-datadog-tags oversized on "
+        "extract") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);
       Tracer tracer{*finalized};
@@ -200,15 +200,18 @@ TEST_CASE("TraceSegment finalization of spans") {
         auto span = tracer.extract_span(reader);
         REQUIRE(span);
 
-        // Injecting the oversized X-Datadog-Tags will make `TraceSegment` note
-        // an error, which it will later tag on the root span.
+        // The oversized x-datadog-tags is rejected at extraction, so none of
+        // its `_dd.p.*` entries are propagated.
         MockDictWriter writer;
         span->inject(writer);
-        REQUIRE(writer.items.count("x-datadog-tags") == 0);
+        const auto injected = writer.items.find("x-datadog-tags");
+        if (injected != writer.items.end()) {
+          REQUIRE(injected->second.find("_dd.p.0=") == std::string::npos);
+        }
       }
 
       REQUIRE(collector->first_span().tags.at(
-                  tags::internal::propagation_error) == "inject_max_size");
+                  tags::internal::propagation_error) == "extract_max_size");
     }
 
     SECTION("sampling priority") {
@@ -373,7 +376,7 @@ TEST_CASE("TraceSegment finalization of spans") {
 
       SECTION("rules (implicit and explicit)") {
         // When sample rate is 100%, the sampler will consult the limiter.
-        // When sample rate is 0%, it won't.  We test both cases.
+        // When sample rate is 0%, it won't.We test both cases.
         auto sample_rate = GENERATE(0.0, 1.0);
 
         SECTION("global sample rate") {
@@ -398,11 +401,8 @@ TEST_CASE("TraceSegment finalization of spans") {
         const auto& span = collector->first_span();
         REQUIRE(span.numeric_tags.at(tags::internal::rule_sample_rate) ==
                 sample_rate);
-        {
-          char buf[32];
-          std::snprintf(buf, sizeof(buf), "%.6g", sample_rate);
-          CHECK(span.tags.at(tags::internal::ksr) == std::string(buf));
-        }
+        CHECK(span.tags.at(tags::internal::ksr) ==
+              (sample_rate == 0.0 ? "0" : "1"));
         if (sample_rate == 1.0) {
           REQUIRE(span.numeric_tags.at(
                       tags::internal::rule_limiter_sample_rate) == 1.0);

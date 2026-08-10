@@ -44,7 +44,7 @@ std::uint64_t random_uint64() { return thread_local_generator(); }
 
 std::string uuid() {
   // clang-format off
-  // It's not all random.  From most significant to least significant, the
+  // It's not all random. From most significant to least significant, the
   // bits look like this:
   //
   //     xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 0100xxxx xxxxxxxx 10xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx

@@ -1,8 +1,8 @@
 #pragma once
 
-// This component provides a `struct`, `SpanSamplerConfig`, used to configure
-// `SpanSampler`. `SpanSampler` accepts a `FinalizedSpanSamplerConfig`, which
-// must be obtained from a call to `finalize_config`.
+// The `SpanSamplerConfig` struct is used to configure `SpanSampler`.
+// `SpanSampler` accepts a `FinalizedSpanSamplerConfig`, which must be obtained
+// from a call to `finalize_config()`.
 //
 // `SpanSamplerConfig` is specified as the `span_sampler` property of
 // `TracerConfig`.
