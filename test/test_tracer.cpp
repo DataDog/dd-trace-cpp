@@ -2127,6 +2127,29 @@ TEST_TRACER("move-only semantics") {
   { auto span = tracer2.create_span(); }
 }
 
+TEST_TRACER("APM tracing enabled") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.name = "test.op";
+  const std::shared_ptr<MockCollector> collector =
+      std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+  config.tracing_enabled = true;
+
+  Expected<FinalizedTracerConfig> finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  tracer.create_span();
+
+  REQUIRE(collector->chunks.size() == 1);
+  REQUIRE(collector->chunks.front().size() == 1);
+  const SpanData& span = *collector->chunks.front().front();
+  // tracing needs to be disabled for this tag to be set
+  CHECK(span.numeric_tags.count(tags::internal::apm_enabled) == 0);
+}
+
 TEST_TRACER("APM tracing disabled") {
   TracerConfig config;
   config.service = "testsvc";
@@ -2138,6 +2161,29 @@ TEST_TRACER("APM tracing disabled") {
 
   TimePoint current_time = default_clock();
   auto clock = [&current_time]() { return current_time; };
+
+  SECTION("_dd.apm.enabled is added to every span") {
+    Expected<FinalizedTracerConfig> finalized_config =
+        finalize_config(config, clock);
+    REQUIRE(finalized_config);
+    Tracer tracer{*finalized_config};
+
+    SpanConfig service_entry_config;
+    service_entry_config.service = "child-service";
+
+    {
+      Span root = tracer.create_span();
+      root.create_child();
+      root.create_child(service_entry_config);
+    }
+
+    REQUIRE(collector->chunks.size() == 1);
+    const auto& chunk = collector->chunks.front();
+    REQUIRE(chunk.size() == 3);
+    for (const auto& span : chunk) {
+      CHECK(span->numeric_tags.at(tags::internal::apm_enabled) == 0);
+    }
+  }
 
   SECTION("sampling behaviour") {
     SECTION("span with _dd.p.ts is kept") {

@@ -146,6 +146,7 @@ target_sources(dd-trace-cpp-objects
       include/datadog/event_scheduler.h
       include/datadog/expected.h
       include/datadog/http_client.h
+      include/datadog/http_endpoint_calculation_mode.h
       include/datadog/id_generator.h
       include/datadog/injection_options.h
       include/datadog/logger.h
