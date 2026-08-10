@@ -2150,6 +2150,29 @@ TEST_TRACER("APM tracing enabled") {
   CHECK(span.numeric_tags.count(tags::internal::apm_enabled) == 0);
 }
 
+TEST_TRACER("APM tracing enabled") {
+  TracerConfig config;
+  config.service = "testsvc";
+  config.name = "test.op";
+  const std::shared_ptr<MockCollector> collector =
+      std::make_shared<MockCollector>();
+  config.collector = collector;
+  config.logger = std::make_shared<NullLogger>();
+  config.tracing_enabled = true;
+
+  Expected<FinalizedTracerConfig> finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  tracer.create_span();
+
+  REQUIRE(collector->chunks.size() == 1);
+  REQUIRE(collector->chunks.front().size() == 1);
+  const SpanData& span = *collector->chunks.front().front();
+  // tracing needs to be disabled for this tag to be set
+  CHECK(span.numeric_tags.count(tags::internal::apm_enabled) == 0);
+}
+
 TEST_TRACER("APM tracing disabled") {
   TracerConfig config;
   config.service = "testsvc";
