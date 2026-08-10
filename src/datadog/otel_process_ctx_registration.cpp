@@ -112,27 +112,40 @@ std::unique_ptr<OtelCtxRegistration> OtelCtxRegistration::publish(
     const OtelCtxFields& fields, const std::string& runtime_id,
     Logger& logger) {
   StaticOtelCtxState& state = get_otel_ctx_state();
-  std::lock_guard<std::mutex> lock(state.mutex);
 
-  if (!state.common) {
-    // First registration establishes the process-wide fields
-    state.common = fields;
-  } else if (!(*state.common == fields)) {
+  bool fields_differ = false;
+  Optional<otel_process_ctx_result> publish_error;
+  {
+    std::lock_guard<std::mutex> lock(state.mutex);
+
+    if (!state.common) {
+      // First registration establishes the process-wide fields
+      state.common = fields;
+    } else if (!(*state.common == fields)) {
+      fields_differ = true;
+    }
+
+    state.runtime_ids.insert(runtime_id);
+
+    const otel_process_ctx_result result = upsert(state);
+    if (!result.success) {
+      unregister(state, runtime_id);
+      publish_error = result;
+    }
+  }
+
+  if (fields_differ) {
     logger.log_error([](std::ostream& log) {
       log << "OpenTelemetry process context fields differ between coexisting "
              "tracers; keeping the previously-published values";
     });
   }
 
-  state.runtime_ids.insert(runtime_id);
-
-  const otel_process_ctx_result result = upsert(state);
-  if (!result.success) {
+  if (publish_error) {
     logger.log_error([&](std::ostream& log) {
       log << "Failed to publish OpenTelemetry process context: "
-          << result.error_message;
+          << publish_error->error_message;
     });
-    unregister(state, runtime_id);
     return nullptr;
   }
 
