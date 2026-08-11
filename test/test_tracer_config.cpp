@@ -460,6 +460,7 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
           {"http://dd-agent:8126", nullopt, "http", "dd-agent:8126", ""},
           {"http://dd-agent:8126/", nullopt, "http", "dd-agent:8126", "/"},
           {"https://dd-agent:8126/", nullopt, "https", "dd-agent:8126", "/"},
+          {"http://[::1]:8126/", nullopt, "http", "[::1]:8126", "/"},
           {"unix:///var/run/datadog/trace-agent.sock", nullopt, "unix",
            "/var/run/datadog/trace-agent.sock"},
           {"unix://var/run/datadog/trace-agent.sock",

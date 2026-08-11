@@ -14,7 +14,7 @@ namespace datadog::tracing {
 
 namespace {
 
-Optional<std::string> build_agent_url_from_environmment_variables() {
+Optional<std::string> build_agent_url_from_environment_variables() {
   if (Optional<StringView> url_env = lookup(environment::DD_TRACE_AGENT_URL)) {
     return std::string{*url_env};
   }
@@ -62,7 +62,7 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
   }
 
   if (Optional<std::string> agent_url =
-          build_agent_url_from_environmment_variables()) {
+          build_agent_url_from_environment_variables()) {
     env_config.url = *std::move(agent_url);
   }
 
