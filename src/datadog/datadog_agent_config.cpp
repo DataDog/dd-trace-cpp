@@ -24,7 +24,7 @@ Optional<std::string> build_agent_url_from_environment_variables() {
     if (is_ipv6_without_brackets) {
       agent_url += '[';
     }
-    append(agent_url, env_host.value_or("localhost"));
+    append(agent_url, host);
     if (is_ipv6_without_brackets) {
       agent_url += ']';
     }
