@@ -23,7 +23,16 @@ Optional<std::string> build_agent_url_from_environmment_variables() {
   Optional<StringView> env_port = lookup(environment::DD_TRACE_AGENT_PORT);
   if (env_host || env_port) {
     std::string agent_url = "http://";
+    const StringView host = env_host.value_or("localhost");
+    const bool is_ipv6_without_brackets =
+        (host.find(':') != StringView::npos) && (host.front() != '[');
+    if (is_ipv6_without_brackets) {
+      agent_url += '[';
+    }
     append(agent_url, env_host.value_or("localhost"));
+    if (is_ipv6_without_brackets) {
+      agent_url += ']';
+    }
     agent_url += ':';
     append(agent_url, env_port.value_or("8126"));
     return agent_url;
