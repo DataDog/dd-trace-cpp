@@ -26,15 +26,13 @@
 #include "null_logger.h"
 #include "test.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 std::ostream& operator<<(std::ostream& stream, PropagationStyle style) {
   return stream << to_string_view(style);
 }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
 
 using namespace datadog::test;
 using namespace datadog::tracing;

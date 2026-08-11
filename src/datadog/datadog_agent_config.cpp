@@ -10,8 +10,29 @@
 #include "platform_util.h"
 #include "threaded_event_scheduler.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
+
+namespace {
+
+Optional<std::string> build_agent_url_from_environmment_variables() {
+  if (Optional<StringView> url_env = lookup(environment::DD_TRACE_AGENT_URL)) {
+    return std::string{*url_env};
+  }
+
+  Optional<StringView> env_host = lookup(environment::DD_AGENT_HOST);
+  Optional<StringView> env_port = lookup(environment::DD_TRACE_AGENT_PORT);
+  if (env_host || env_port) {
+    std::string agent_url = "http://";
+    append(agent_url, env_host.value_or("localhost"));
+    agent_url += ':';
+    append(agent_url, env_port.value_or("8126"));
+    return agent_url;
+  }
+
+  return nullopt;
+}
+
+}  // namespace
 
 Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
   DatadogAgentConfig env_config;
@@ -31,18 +52,9 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
     env_config.remote_configuration_poll_interval_seconds = *res;
   }
 
-  auto env_host = lookup(environment::DD_AGENT_HOST);
-  auto env_port = lookup(environment::DD_TRACE_AGENT_PORT);
-
-  if (auto url_env = lookup(environment::DD_TRACE_AGENT_URL)) {
-    env_config.url = std::string{*url_env};
-  } else if (env_host || env_port) {
-    std::string configured_url = "http://";
-    append(configured_url, env_host.value_or("localhost"));
-    configured_url += ':';
-    append(configured_url, env_port.value_or("8126"));
-
-    env_config.url = std::move(configured_url);
+  if (Optional<std::string> agent_url =
+          build_agent_url_from_environmment_variables()) {
+    env_config.url = *std::move(agent_url);
   }
 
   return env_config;
@@ -158,5 +170,4 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   return result;
 }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
