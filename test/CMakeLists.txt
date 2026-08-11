@@ -1,3 +1,5 @@
+include(${CMAKE_SOURCE_DIR}/cmake/deps/msgpack.cmake)
+
 add_executable(tests
     # test driver
     main.cpp
@@ -29,6 +31,7 @@ add_executable(tests
     test_glob.cpp
     test_limiter.cpp
     test_msgpack.cpp
+    test_otel_process_ctx.cpp
     test_platform_util.cpp
     test_parse_util.cpp
     test_smoke.cpp
@@ -61,10 +64,11 @@ target_compile_definitions(tests
     CATCH_CONFIG_ENABLE_ALL_STRINGMAKERS
 )
 
-target_link_libraries(tests 
+target_link_libraries(tests
   PRIVATE
     dd-trace-cpp::static
     dd-trace-cpp::specs
+    msgpack-cxx
 )
 
 if(DD_TRACE_TRANSPORT STREQUAL "curl")

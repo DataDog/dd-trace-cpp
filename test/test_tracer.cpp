@@ -28,6 +28,7 @@
 #include <ctime>
 #include <iosfwd>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 #include "matchers.h"
@@ -2102,8 +2103,16 @@ TEST_TRACER("heterogeneous extraction") {
   REQUIRE(writer.items == test_case.expected_injected_headers);
 }
 
-TEST_TRACER("move semantics") {
-  // Verify that `Tracer` can be moved.
+TEST_TRACER("move-only semantics") {
+  static_assert(std::is_move_constructible<Tracer>::value,
+                "Tracer must be move-constructible");
+  static_assert(std::is_move_assignable<Tracer>::value,
+                "Tracer must be move-assignable");
+  static_assert(!std::is_copy_constructible<Tracer>::value,
+                "Tracer must not be copy-constructible");
+  static_assert(!std::is_copy_assignable<Tracer>::value,
+                "Tracer must not be copy-assignable");
+
   TracerConfig config;
   config.service = "testsvc";
   config.logger = std::make_shared<NullLogger>();
@@ -2111,11 +2120,11 @@ TEST_TRACER("move semantics") {
 
   auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);
-  Tracer tracer1{*finalized_config};
 
-  // This must compile.
+  // The moved-into Tracer must remain usable.
+  Tracer tracer1{*finalized_config};
   Tracer tracer2{std::move(tracer1)};
-  (void)tracer2;
+  { auto span = tracer2.create_span(); }
 }
 
 TEST_TRACER("APM tracing enabled") {
