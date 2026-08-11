@@ -506,6 +506,7 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
            "dd-agent:8080"},
           {"override port with default host", nullopt, "8080", nullopt, "http",
            "localhost:8080"},
+          {"IPv6 host", "::1", nullopt, nullopt, "http", "[::1]:8126"},
           // A bogus port number will cause an error in the TCPClient, not
           // during configuration. For the purposes of configuration, any
           // value is accepted.
