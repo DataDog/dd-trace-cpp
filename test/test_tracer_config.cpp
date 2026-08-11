@@ -1,23 +1,8 @@
-#include <datadog/id_generator.h>
-#include <datadog/optional.h>
-#include <datadog/propagation_style.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
-#include <datadog/tracer_config.h>
 
-#include <chrono>
-#include <cmath>
-#include <cstddef>
-#include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <limits>
-#include <ostream>
-#include <stdexcept>
-#include <string>
-#include <system_error>
-#include <unordered_map>
 
 #include "common/environment.h"
 #include "mocks/collectors.h"

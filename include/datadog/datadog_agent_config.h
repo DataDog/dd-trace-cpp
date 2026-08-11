@@ -11,11 +11,7 @@
 // Typical usage of `DatadogAgentConfig` is implicit as part of `TracerConfig`.
 // See `tracer_config.h`.
 
-#include <chrono>
 #include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
 
 #include "clock.h"
 #include "config.h"
