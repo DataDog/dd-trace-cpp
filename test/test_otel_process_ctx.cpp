@@ -13,6 +13,7 @@ using namespace datadog::tracing;
 
 namespace {
 
+#ifdef __linux__
 std::map<std::string, std::string> to_map(const char** key_value_array) {
   std::map<std::string, std::string> out;
   if (key_value_array == nullptr) return out;
@@ -23,7 +24,6 @@ std::map<std::string, std::string> to_map(const char** key_value_array) {
   return out;
 }
 
-#ifdef __linux__
 std::unique_ptr<Tracer> make_tracer(
     const RuntimeID& runtime_id, const std::string& service = "otel-ctx-svc",
     std::shared_ptr<Logger> logger = std::make_shared<MockLogger>()) {

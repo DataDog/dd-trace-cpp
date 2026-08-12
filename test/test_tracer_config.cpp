@@ -1,11 +1,7 @@
-#include <datadog/id_generator.h>
-#include <datadog/optional.h>
-#include <datadog/propagation_style.h>
 #include <datadog/threaded_event_scheduler.h>
 #include <datadog/tracer.h>
-#include <datadog/tracer_config.h>
 
-#if defined(__linux__)
+#ifdef __linux__
 // Used to test writing to the `datadog-tracer-info` file; this is a Linux-only
 // feature.
 #include <dirent.h>
@@ -15,19 +11,8 @@
 #include <msgpack.hpp>
 #endif
 
-#include <chrono>
-#include <cmath>
-#include <cstddef>
-#include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <limits>
-#include <ostream>
-#include <stdexcept>
-#include <string>
-#include <system_error>
-#include <unordered_map>
 
 #include "common/environment.h"
 #include "mocks/collectors.h"
@@ -36,7 +21,7 @@
 #include "null_logger.h"
 #include "test.h"
 
-#if defined(__linux__)
+#ifdef __linux__
 // Used to test writing to the `datadog-tracer-info` file; this is a Linux-only
 // feature.
 #include "common/ctx_sharing_helpers.h"
@@ -44,15 +29,13 @@
 #include "string_util.h"
 #endif
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 std::ostream& operator<<(std::ostream& stream, PropagationStyle style) {
   return stream << to_string_view(style);
 }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
 
 using namespace datadog::test;
 using namespace datadog::tracing;
@@ -480,6 +463,7 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
           {"http://dd-agent:8126", nullopt, "http", "dd-agent:8126", ""},
           {"http://dd-agent:8126/", nullopt, "http", "dd-agent:8126", "/"},
           {"https://dd-agent:8126/", nullopt, "https", "dd-agent:8126", "/"},
+          {"http://[::1]:8126/", nullopt, "http", "[::1]:8126", "/"},
           {"unix:///var/run/datadog/trace-agent.sock", nullopt, "unix",
            "/var/run/datadog/trace-agent.sock"},
           {"unix://var/run/datadog/trace-agent.sock",
@@ -526,6 +510,9 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
            "dd-agent:8080"},
           {"override port with default host", nullopt, "8080", nullopt, "http",
            "localhost:8080"},
+          {"IPv6 host", "::1", nullopt, nullopt, "http", "[::1]:8126"},
+          {"IPv6 host with brackets", "[::1]", nullopt, nullopt, "http",
+           "[::1]:8126"},
           // A bogus port number will cause an error in the TCPClient, not
           // during configuration. For the purposes of configuration, any
           // value is accepted.

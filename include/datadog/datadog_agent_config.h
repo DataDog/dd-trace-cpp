@@ -11,11 +11,7 @@
 // Typical usage of `DatadogAgentConfig` is implicit as part of `TracerConfig`.
 // See `tracer_config.h`.
 
-#include <chrono>
 #include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
 
 #include "clock.h"
 #include "config.h"
@@ -23,8 +19,7 @@
 #include "http_client.h"
 #include "remote_config/listener.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 class EventScheduler;
 class Logger;
@@ -100,5 +95,4 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
     const Clock& clock);
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
