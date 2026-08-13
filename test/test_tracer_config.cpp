@@ -504,18 +504,18 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"override host with default port", "dd-agent", nullopt, nullopt,
-           "http", "dd-agent:8126"},
-          {"override port and host", "dd-agent", "8080", nullopt, "http",
+          {"all defaults", nullopt, nullopt, nullopt, "http", "localhost:8126"},
+          {"override host", "dd-agent", nullopt, nullopt, "http",
+           "dd-agent:8126"},
+          {"override port", nullopt, "8080", nullopt, "http", "localhost:8080"},
+          {"override host and port", "dd-agent", "8080", nullopt, "http",
            "dd-agent:8080"},
-          {"override port with default host", nullopt, "8080", nullopt, "http",
-           "localhost:8080"},
+          {"empty URL", "dd-agent", "8080", "", "http", "dd-agent:8080"},
+          {"empty host", "", nullopt, nullopt, "http", "localhost:8126"},
+          {"empty port", nullopt, "", nullopt, "http", "localhost:8126"},
           {"IPv6 host", "::1", nullopt, nullopt, "http", "[::1]:8126"},
           {"IPv6 host with brackets", "[::1]", nullopt, nullopt, "http",
            "[::1]:8126"},
-          // A bogus port number will cause an error in the TCPClient, not
-          // during configuration. For the purposes of configuration, any
-          // value is accepted.
           {"we don't parse port", nullopt, "bogus", nullopt, "http",
            "localhost:bogus"},
           {"URL", nullopt, nullopt, "http://dd-agent:8080", "http",

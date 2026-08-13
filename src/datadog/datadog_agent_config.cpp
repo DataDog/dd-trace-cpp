@@ -10,12 +10,15 @@ namespace datadog::tracing {
 namespace {
 
 Optional<std::string> build_agent_url_from_environment_variables() {
-  if (Optional<StringView> url_env = lookup(environment::DD_TRACE_AGENT_URL)) {
+  Optional<StringView> url_env = lookup(environment::DD_TRACE_AGENT_URL);
+  if (url_env && !url_env->empty()) {
     return std::string{*url_env};
   }
 
   Optional<StringView> env_host = lookup(environment::DD_AGENT_HOST);
+  if (env_host && env_host->empty()) env_host = nullopt;
   Optional<StringView> env_port = lookup(environment::DD_TRACE_AGENT_PORT);
+  if (env_port && env_port->empty()) env_port = nullopt;
   if (env_host || env_port) {
     std::string agent_url = "http://";
     const StringView host = env_host.value_or("localhost");
