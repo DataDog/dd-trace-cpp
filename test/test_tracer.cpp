@@ -1727,6 +1727,50 @@ TEST_TRACER("restart extraction link uses metadata from the selected context") {
   REQUIRE(link.context.flags == Optional<std::uint32_t>(1u));
 }
 
+TEST_TRACER("OpenTelemetry tracestate sampling values") {
+  SECTION("malformed sampling values are removed") {
+    const auto normalized =
+        sanitize_otel_tracestate("rv:1234567890abcd;th:not-hex;future:value");
+    REQUIRE(normalized);
+    REQUIRE(*normalized == "rv:1234567890abcd;future:value");
+
+    REQUIRE(!sanitize_otel_tracestate("rv:not-hex;th:also-not-hex"));
+  }
+
+  SECTION("sampling values are replaced without altering other values") {
+    const auto rewritten = rewrite_otel_tracestate("rv:bad;future:value;th:bad",
+                                                   UINT64_C(0xf0948a54d43b8e),
+                                                   UINT64_C(0xe6666666666668));
+    REQUIRE(rewritten);
+    REQUIRE(*rewritten == "rv:f0948a54d43b8e;th:e6666666666668;future:value");
+
+    const auto no_threshold =
+        rewrite_otel_tracestate("rv:1234567890abcd;th:e6666666666668",
+                                UINT64_C(0x1234567890abcd), nullopt);
+    REQUIRE(no_threshold);
+    REQUIRE(*no_threshold == "rv:1234567890abcd");
+  }
+
+  SECTION("the OpenTelemetry member is separated from other vendors") {
+    const std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-00000000000000000000000000000001-0000000000000001-01"},
+        {"tracestate",
+         "dd=s:2,ot=rv:1234567890abcd;th:e6666666666668;future:value,"
+         "congo=t61rcWkgMzE"},
+    };
+    MockDictReader reader{headers};
+    std::unordered_map<std::string, std::string> span_tags;
+    MockLogger logger;
+
+    const auto extracted = extract_w3c(reader, span_tags, logger);
+    REQUIRE(extracted);
+    REQUIRE(extracted->otel_w3c_tracestate ==
+            "rv:1234567890abcd;th:e6666666666668;future:value");
+    REQUIRE(extracted->additional_w3c_tracestate == "congo=t61rcWkgMzE");
+  }
+}
+
 TEST_TRACER("baggage usage") {
   TracerConfig config;
   config.logger = std::make_shared<NullLogger>();

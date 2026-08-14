@@ -31,6 +31,8 @@ struct ExtractedData {
   // then `additional_w3c_tracestate` is null.
   // `additional_w3c_tracestate` is used for the `W3C` injection style.
   Optional<std::string> additional_w3c_tracestate;
+  // The raw value of the OpenTelemetry `ot` tracestate member, if present.
+  Optional<std::string> otel_w3c_tracestate;
   // If this `ExtractedData` was created on account of `PropagationStyle::W3C`,
   // and if the "tracestate" header contained a "dd" (Datadog) entry, then
   // `additional_datadog_w3c_tracestate` contains fields from within the "dd"

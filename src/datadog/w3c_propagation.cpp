@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 
 #include "hex.h"
@@ -36,6 +37,107 @@ auto verboten(int lowest_ascii, int highest_ascii,
 constexpr bool is_hexdiglc(const char c) {
   return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
          (c >= 'A' && c <= 'F');
+}
+
+constexpr bool is_lowercase_hexdig(const char c) {
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+}
+
+bool is_valid_otel_hex(StringView value, std::size_t minimum_size,
+                       std::size_t maximum_size) {
+  return value.size() >= minimum_size && value.size() <= maximum_size &&
+         std::all_of(value.begin(), value.end(), is_lowercase_hexdig);
+}
+
+Optional<std::uint64_t> parse_otel_random_value(StringView value) {
+  if (!is_valid_otel_hex(value, 14, 14)) {
+    return nullopt;
+  }
+
+  const auto parsed = parse_uint64(value, 16);
+  if (parsed.if_error()) {
+    return nullopt;
+  }
+  return *parsed;
+}
+
+Optional<std::uint64_t> parse_otel_threshold(StringView value) {
+  if (!is_valid_otel_hex(value, 1, 14)) {
+    return nullopt;
+  }
+
+  const auto parsed = parse_uint64(value, 16);
+  if (parsed.if_error()) {
+    return nullopt;
+  }
+  return *parsed;
+}
+
+template <class Function>
+void for_each_otel_item(StringView raw, Function&& function) {
+  std::size_t begin = 0;
+  while (begin <= raw.size()) {
+    const auto end = raw.find(';', begin);
+    const auto item = raw.substr(begin, end - begin);
+    const auto separator = item.find(':');
+    const auto key = item.substr(0, separator);
+    const auto value = separator == StringView::npos
+                           ? StringView{}
+                           : item.substr(separator + 1);
+    function(item, key, value);
+    if (end == StringView::npos) {
+      return;
+    }
+    begin = end + 1;
+  }
+}
+
+template <class Function>
+void for_each_tracestate_member(StringView raw, Function&& function) {
+  std::size_t begin = 0;
+  while (begin < raw.size()) {
+    const auto end = raw.find(',', begin);
+    const auto member = trim(raw.substr(begin, end - begin));
+    const auto separator = member.find('=');
+    const auto key = member.substr(0, separator);
+    const auto value = separator == StringView::npos
+                           ? StringView{}
+                           : member.substr(separator + 1);
+    function(member, key, value);
+    if (end == StringView::npos) {
+      return;
+    }
+    begin = end + 1;
+  }
+}
+
+bool append_otel_item(std::string& result, StringView item) {
+  if (item.empty()) {
+    return true;
+  }
+
+  const std::size_t separator_size = result.empty() ? 0 : 1;
+  if (result.size() + separator_size + item.size() > 256) {
+    return false;
+  }
+
+  if (separator_size) {
+    result += ';';
+  }
+  append(result, item);
+  return true;
+}
+
+std::string format_otel_hex(std::uint64_t value) {
+  return hex_padded(value).substr(2);
+}
+
+std::string format_otel_threshold(std::uint64_t threshold) {
+  auto result = format_otel_hex(threshold);
+  while (result.size() > 1 && result.back() == '0') {
+    result.pop_back();
+  }
+  return result;
 }
 
 // Populate the specified `result` with data extracted from the "traceparent"
@@ -295,22 +397,47 @@ void extract_tracestate(
     if (!tracestate.empty()) {
       result.additional_w3c_tracestate = std::string{tracestate};
     }
+  } else {
+    auto& [datadog_value, other_entries] = *maybe_parsed;
+    if (!other_entries.empty()) {
+      result.additional_w3c_tracestate = std::move(other_entries);
+    }
+
+    // If the "dd" vendor entry's value exceeds 512 bytes, drop it and record a
+    // propagation error tag.
+    if (datadog_value.size() > 512) {
+      span_tags[tags::internal::propagation_error] = "extract_max_size";
+    } else {
+      parse_datadog_tracestate(result, datadog_value);
+    }
+  }
+
+  if (!result.additional_w3c_tracestate) {
     return;
   }
 
-  auto& [datadog_value, other_entries] = *maybe_parsed;
-  if (!other_entries.empty()) {
-    result.additional_w3c_tracestate = std::move(other_entries);
-  }
+  std::string remaining;
+  for_each_tracestate_member(
+      *result.additional_w3c_tracestate,
+      [&](StringView item, StringView key, StringView value) {
+        if (key == "ot") {
+          if (!result.otel_w3c_tracestate) {
+            result.otel_w3c_tracestate = std::string(value);
+          }
+          return;
+        }
 
-  // If the "dd" vendor entry's value exceeds 512 bytes, drop it and record a
-  // propagation error tag.
-  if (datadog_value.size() > 512) {
-    span_tags[tags::internal::propagation_error] = "extract_max_size";
-    return;
-  }
+        if (!remaining.empty()) {
+          remaining += ',';
+        }
+        append(remaining, item);
+      });
 
-  parse_datadog_tracestate(result, datadog_value);
+  if (remaining.empty()) {
+    result.additional_w3c_tracestate = nullopt;
+  } else {
+    result.additional_w3c_tracestate = std::move(remaining);
+  }
 }
 
 }  // namespace
@@ -424,19 +551,95 @@ std::string encode_datadog_tracestate(
   return result;
 }
 
+Optional<std::string> sanitize_otel_tracestate(StringView raw) {
+  std::string result;
+  for_each_otel_item(raw,
+                     [&](StringView item, StringView key, StringView value) {
+                       if ((key == "rv" && !parse_otel_random_value(value)) ||
+                           (key == "th" && !parse_otel_threshold(value))) {
+                         return;
+                       }
+                       append_otel_item(result, item);
+                     });
+  if (result.empty()) {
+    return nullopt;
+  }
+  return result;
+}
+
+Optional<std::uint64_t> extract_otel_random_value(StringView raw) {
+  Optional<std::uint64_t> result;
+  for_each_otel_item(raw, [&](StringView, StringView key, StringView value) {
+    if (!result && key == "rv") {
+      result = parse_otel_random_value(value);
+    }
+  });
+  return result;
+}
+
+Optional<std::string> rewrite_otel_tracestate(
+    StringView raw, Optional<std::uint64_t> random_value,
+    Optional<std::uint64_t> threshold) {
+  std::string result;
+  if (random_value) {
+    const std::string item = "rv:" + format_otel_hex(*random_value);
+    append_otel_item(result, item);
+  }
+  if (threshold) {
+    const std::string item = "th:" + format_otel_threshold(*threshold);
+    append_otel_item(result, item);
+  }
+
+  for_each_otel_item(raw, [&](StringView item, StringView key, StringView) {
+    if (key != "rv" && key != "th") {
+      append_otel_item(result, item);
+    }
+  });
+
+  if (result.empty()) {
+    return nullopt;
+  }
+  return result;
+}
+
+void append_tracestate_entries(std::string& result, StringView entries,
+                               std::size_t& member_count) {
+  std::size_t begin = 0;
+  while (member_count < 32 && begin < entries.size()) {
+    const auto end = entries.find(',', begin);
+    const auto entry = trim(entries.substr(begin, end - begin));
+    if (!entry.empty()) {
+      result += ',';
+      append(result, entry);
+      ++member_count;
+    }
+    if (end == StringView::npos) {
+      return;
+    }
+    begin = end + 1;
+  }
+}
+
 std::string encode_tracestate(
     uint64_t span_id, int sampling_priority,
     const Optional<std::string>& origin,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate,
+    const Optional<std::string>& otel_w3c_tracestate,
     const Optional<std::string>& additional_w3c_tracestate) {
   std::string result =
       encode_datadog_tracestate(span_id, sampling_priority, origin, trace_tags,
                                 additional_datadog_w3c_tracestate);
 
+  std::size_t member_count = 1;
+  if (otel_w3c_tracestate) {
+    result += ",ot=";
+    result += *otel_w3c_tracestate;
+    ++member_count;
+  }
+
   if (additional_w3c_tracestate) {
-    result += ',';
-    result += *additional_w3c_tracestate;
+    append_tracestate_entries(result, *additional_w3c_tracestate, member_count);
   }
 
   return result;
