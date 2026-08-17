@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <cstdint>
 #include <utility>
 
 #include "hex.h"

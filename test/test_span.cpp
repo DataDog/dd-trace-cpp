@@ -4,7 +4,6 @@
 
 #include <datadog/clock.h>
 #include <datadog/hex.h>
-#include <datadog/id_generator.h>
 #include <datadog/injection_options.h>
 #include <datadog/null_collector.h>
 #include <datadog/optional.h>

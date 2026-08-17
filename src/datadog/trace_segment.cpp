@@ -6,7 +6,6 @@
 #include <datadog/injection_options.h>
 #include <datadog/logger.h>
 #include <datadog/optional.h>
-#include <datadog/sampling_mechanism.h>
 #include <datadog/span_defaults.h>
 #include <datadog/telemetry/metrics.h>
 #include <datadog/telemetry/telemetry.h>
@@ -16,7 +15,6 @@
 #include <cassert>
 #include <charconv>
 #include <cmath>
-#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <utility>
