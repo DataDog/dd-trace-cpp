@@ -1730,11 +1730,11 @@ TEST_TRACER("restart extraction link uses metadata from the selected context") {
 TEST_TRACER("OpenTelemetry tracestate sampling values") {
   SECTION("malformed sampling values are removed") {
     const auto normalized =
-        sanitize_otel_tracestate("rv:1234567890abcd;th:not-hex;future:value");
+        sanitize_otel_tracestate("rv:1234567890abcd;th:ABC;future:value");
     REQUIRE(normalized);
     REQUIRE(*normalized == "rv:1234567890abcd;future:value");
 
-    REQUIRE(!sanitize_otel_tracestate("rv:not-hex;th:also-not-hex"));
+    REQUIRE(!sanitize_otel_tracestate("rv:1234567890ABCD;th:A"));
   }
 
   SECTION("sampling values are replaced without altering other values") {
