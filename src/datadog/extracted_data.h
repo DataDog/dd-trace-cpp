@@ -26,9 +26,9 @@ struct ExtractedData {
   // refering to the latest datadog parent ID.
   Optional<std::string> datadog_w3c_parent_id;
   // If this `ExtractedData` was created on account of `PropagationStyle::W3C`,
-  // then `additional_w3c_tracestate` contains the parts of the "tracestate"
-  // header that are not the "dd" (Datadog) entry. If there are no other parts,
-  // then `additional_w3c_tracestate` is null.
+  // then `additional_w3c_tracestate` contains the entries of the "tracestate"
+  // header other than the "dd" (Datadog) and "ot" (OpenTelemetry) entries.
+  // If there are no such entries, then `additional_w3c_tracestate` is null.
   // `additional_w3c_tracestate` is used for the `W3C` injection style.
   Optional<std::string> additional_w3c_tracestate;
   // The raw value of the OpenTelemetry `ot` tracestate member, if present.

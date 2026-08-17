@@ -2081,9 +2081,12 @@ TEST_TRACER("heterogeneous extraction") {
      {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
       {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
       {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
-      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}}, // origin is different
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo,"
+                     "ot=rv:1234567890abcd;th:e6666666666668;future:value"}}, // origin is different
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,competitor=stuff"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,"
+                     "ot=rv:1234567890abcd;th:e6666666666668;future:value,"
+                     "competitor=stuff"}}},
 
     {__LINE__, "ignore interlopers",
      {PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C},
@@ -2104,7 +2107,8 @@ TEST_TRACER("heterogeneous extraction") {
      {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
       {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
       {"traceparent", "00-00000000000000000000000000000031-0000000000000040-01"},
-      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo,"
+                     "ot=rv:1234567890abcd;th:e6666666666668;future:value"}},
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
       {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas"}}},
 

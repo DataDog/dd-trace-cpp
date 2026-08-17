@@ -42,6 +42,12 @@ constexpr bool is_lowercase_hexdig(const char c) {
   return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
 }
 
+constexpr std::size_t otel_sampling_value_size = 14;
+constexpr std::size_t min_otel_threshold_size = 1;
+constexpr std::size_t max_w3c_tracestate_member_value_size = 256;
+constexpr std::size_t max_datadog_tracestate_value_size = 512;
+constexpr std::size_t max_w3c_tracestate_members = 32;
+
 bool is_valid_otel_hex(StringView value, std::size_t minimum_size,
                        std::size_t maximum_size) {
   return value.size() >= minimum_size && value.size() <= maximum_size &&
@@ -49,7 +55,8 @@ bool is_valid_otel_hex(StringView value, std::size_t minimum_size,
 }
 
 Optional<std::uint64_t> parse_otel_random_value(StringView value) {
-  if (!is_valid_otel_hex(value, 14, 14)) {
+  if (!is_valid_otel_hex(value, otel_sampling_value_size,
+                         otel_sampling_value_size)) {
     return nullopt;
   }
 
@@ -61,7 +68,8 @@ Optional<std::uint64_t> parse_otel_random_value(StringView value) {
 }
 
 Optional<std::uint64_t> parse_otel_threshold(StringView value) {
-  if (!is_valid_otel_hex(value, 1, 14)) {
+  if (!is_valid_otel_hex(value, min_otel_threshold_size,
+                         otel_sampling_value_size)) {
     return nullopt;
   }
 
@@ -97,7 +105,8 @@ bool append_otel_item(std::string& result, StringView item) {
   }
 
   const std::size_t separator_size = result.empty() ? 0 : 1;
-  if (result.size() + separator_size + item.size() > 256) {
+  if (result.size() + separator_size + item.size() >
+      max_w3c_tracestate_member_value_size) {
     return false;
   }
 
@@ -325,9 +334,9 @@ void parse_w3c_tracestate(
                                   ? StringView{}
                                   : member.substr(separator + 1);
     if (key == "dd") {
-      // If the "dd" vendor entry's value exceeds 512 bytes, drop it and
-      // record a propagation error tag.
-      if (member_value.size() > 512) {
+      // If the "dd" vendor entry's value exceeds the maximum size, drop it
+      // and record a propagation error tag.
+      if (member_value.size() > max_datadog_tracestate_value_size) {
         span_tags[tags::internal::propagation_error] = "extract_max_size";
       } else {
         parse_datadog_trace_state(result, member_value);
@@ -455,12 +464,11 @@ std::string encode_datadog_tracestate(
     result += *additional_datadog_w3c_tracestate;
   }
 
-  const std::size_t max_size = 256;
-  while (result.size() > max_size) {
+  while (result.size() > max_w3c_tracestate_member_value_size) {
     const auto last_semicolon_index = result.rfind(';');
     // This assumption is safe, because `result` always begins with
-    // "dd=s:<int>", and that's fewer than `max_size` characters for any
-    // `<int>`.
+    // "dd=s:<int>", and that's fewer than
+    // `max_w3c_tracestate_member_value_size` characters for any `<int>`.
     assert(last_semicolon_index != std::string::npos);
     result.resize(last_semicolon_index);
   }
@@ -522,7 +530,7 @@ Optional<std::string> rewrite_otel_tracestate(
 void append_tracestate_entries(std::string& result, StringView entries,
                                std::size_t& member_count) {
   std::size_t begin = 0;
-  while (member_count < 32 && begin < entries.size()) {
+  while (member_count < max_w3c_tracestate_members && begin < entries.size()) {
     const auto end = entries.find(',', begin);
     const auto entry = trim(entries.substr(begin, end - begin));
     if (!entry.empty()) {
