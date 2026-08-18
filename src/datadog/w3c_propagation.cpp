@@ -88,9 +88,9 @@ void for_each_otel_item(StringView raw, Function&& function) {
     const StringView item = raw.substr(begin, end - begin);
     const std::size_t separator = item.find(':');
     const StringView key = item.substr(0, separator);
-    const StringView value =
-        separator == StringView::npos ? StringView{}
-                                       : item.substr(separator + 1);
+    const StringView value = separator == StringView::npos
+                                 ? StringView{}
+                                 : item.substr(separator + 1);
     function(item, key, value);
     if (end == StringView::npos) {
       return;
@@ -314,6 +314,31 @@ void parse_ot_tracestate(ExtractedData& result, StringView ot_tracestate) {
   }
 }
 
+void parse_w3c_tracestate_member(
+    ExtractedData& result, StringView member,
+    std::unordered_map<std::string, std::string>& span_tags,
+    std::string& other_w3c_tracestate) {
+  const std::size_t separator = member.find('=');
+  const StringView key = member.substr(0, separator);
+  const StringView member_value = separator == StringView::npos
+                                      ? StringView{}
+                                      : member.substr(separator + 1);
+  if (key == "dd") {
+    if (member_value.size() > max_datadog_tracestate_value_size) {
+      span_tags[tags::internal::propagation_error] = "extract_max_size";
+    } else {
+      parse_datadog_trace_state(result, member_value);
+    }
+  } else if (key == "ot") {
+    parse_ot_tracestate(result, member_value);
+  } else {
+    if (!other_w3c_tracestate.empty()) {
+      other_w3c_tracestate += ',';
+    }
+    append(other_w3c_tracestate, member);
+  }
+}
+
 // Fill the specified `result` with information parsed from the specified W3C
 // `tracestate`.
 //
@@ -327,29 +352,9 @@ void parse_w3c_tracestate(
   std::size_t begin = 0;
   while (begin < w3c_tracestate.size()) {
     const std::size_t end = w3c_tracestate.find(',', begin);
-    const StringView member =
-        trim(w3c_tracestate.substr(begin, end - begin));
-    const std::size_t separator = member.find('=');
-    const StringView key = member.substr(0, separator);
-    const StringView member_value =
-        separator == StringView::npos ? StringView{}
-                                       : member.substr(separator + 1);
-    if (key == "dd") {
-      // If the "dd" vendor entry's value exceeds the maximum size, drop it
-      // and record a propagation error tag.
-      if (member_value.size() > max_datadog_tracestate_value_size) {
-        span_tags[tags::internal::propagation_error] = "extract_max_size";
-      } else {
-        parse_datadog_trace_state(result, member_value);
-      }
-    } else if (key == "ot") {
-      parse_ot_tracestate(result, member_value);
-    } else {
-      if (!other_w3c_tracestate.empty()) {
-        other_w3c_tracestate += ',';
-      }
-      append(other_w3c_tracestate, member);
-    }
+    const StringView member = trim(w3c_tracestate.substr(begin, end - begin));
+    parse_w3c_tracestate_member(result, member, span_tags,
+                                other_w3c_tracestate);
 
     if (end == StringView::npos) {
       break;
