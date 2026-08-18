@@ -1729,7 +1729,7 @@ TEST_TRACER("restart extraction link uses metadata from the selected context") {
 
 TEST_TRACER("OpenTelemetry tracestate sampling values") {
   SECTION("malformed sampling values are removed") {
-    const auto normalized =
+    const Optional<std::string> normalized =
         sanitize_otel_tracestate("rv:1234567890abcd;th:ABC;future:value");
     REQUIRE(normalized);
     REQUIRE(*normalized == "rv:1234567890abcd;future:value");
@@ -1738,13 +1738,13 @@ TEST_TRACER("OpenTelemetry tracestate sampling values") {
   }
 
   SECTION("sampling values are replaced without altering other values") {
-    const auto rewritten = rewrite_otel_tracestate("rv:bad;future:value;th:bad",
-                                                   UINT64_C(0xf0948a54d43b8e),
-                                                   UINT64_C(0xe6666666666668));
+    const Optional<std::string> rewritten = rewrite_otel_tracestate(
+        "rv:bad;future:value;th:bad", UINT64_C(0xf0948a54d43b8e),
+        UINT64_C(0xe6666666666668));
     REQUIRE(rewritten);
     REQUIRE(*rewritten == "rv:f0948a54d43b8e;th:e6666666666668;future:value");
 
-    const auto no_threshold =
+    const Optional<std::string> no_threshold =
         rewrite_otel_tracestate("rv:1234567890abcd;th:e6666666666668",
                                 UINT64_C(0x1234567890abcd), nullopt);
     REQUIRE(no_threshold);
@@ -1763,7 +1763,8 @@ TEST_TRACER("OpenTelemetry tracestate sampling values") {
     std::unordered_map<std::string, std::string> span_tags;
     MockLogger logger;
 
-    const auto extracted = extract_w3c(reader, span_tags, logger);
+    const Expected<ExtractedData> extracted =
+        extract_w3c(reader, span_tags, logger);
     REQUIRE(extracted);
     REQUIRE(extracted->otel_w3c_tracestate ==
             "rv:1234567890abcd;th:e6666666666668;future:value");

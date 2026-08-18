@@ -1003,12 +1003,12 @@ TEST_SPAN("OpenTelemetry consistent probability sampling") {
     config.trace_sampler.sample_rate = test_case.rate;
     config.trace_sampler.max_per_second = 100;
 
-    const auto finalized = finalize_config(config);
+    const Expected<FinalizedTracerConfig> finalized = finalize_config(config);
     REQUIRE(finalized);
     Tracer tracer{*finalized,
                   std::make_shared<Generator>(TraceID(test_case.trace_id))};
 
-    auto span = tracer.create_span();
+    Span span = tracer.create_span();
     MockDictWriter writer;
     span.inject(writer);
 
@@ -1017,7 +1017,7 @@ TEST_SPAN("OpenTelemetry consistent probability sampling") {
     REQUIRE(tracestate->second.find("dd=") == 0);
     REQUIRE(tracestate->second.find("ot=" + test_case.expected_ot) !=
             std::string::npos);
-    const auto& traceparent = writer.items.at("traceparent");
+    const std::string& traceparent = writer.items.at("traceparent");
     REQUIRE(traceparent.substr(traceparent.size() - 3) ==
             (test_case.sampled ? "-01" : "-00"));
   }
@@ -1031,7 +1031,7 @@ TEST_SPAN("OpenTelemetry consistent probability sampling") {
     config.extraction_styles = {PropagationStyle::W3C};
     config.injection_styles = {PropagationStyle::W3C};
 
-    const auto finalized = finalize_config(config);
+    const Expected<FinalizedTracerConfig> finalized = finalize_config(config);
     REQUIRE(finalized);
     Tracer tracer{*finalized};
 
@@ -1041,7 +1041,7 @@ TEST_SPAN("OpenTelemetry consistent probability sampling") {
         {"tracestate", "ot=rv:1234567890abcd;th:e6666666666668"},
     };
     MockDictReader reader{input_headers};
-    auto span = tracer.extract_span(reader);
+    Expected<Span> span = tracer.extract_span(reader);
     REQUIRE(span);
     span->trace_segment().override_sampling_priority(
         int(SamplingPriority::USER_KEEP));
@@ -1063,18 +1063,18 @@ TEST_SPAN("OpenTelemetry consistent probability sampling") {
     config.trace_sampler.sample_rate = 1.0;
     config.trace_sampler.max_per_second = 0.1;
 
-    const auto finalized = finalize_config(config);
+    const Expected<FinalizedTracerConfig> finalized = finalize_config(config);
     REQUIRE(finalized);
     Tracer tracer{*finalized, std::make_shared<Generator>(TraceID(1))};
 
     {
-      auto span = tracer.create_span();
+      Span span = tracer.create_span();
       MockDictWriter writer;
       span.inject(writer);
       REQUIRE(writer.items.at("tracestate").find("ot=") != std::string::npos);
     }
 
-    auto span = tracer.create_span();
+    Span span = tracer.create_span();
     MockDictWriter writer;
     span.inject(writer);
     REQUIRE(writer.items.at("tracestate").find("ot=") == std::string::npos);

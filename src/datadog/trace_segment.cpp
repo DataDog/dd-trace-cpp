@@ -186,7 +186,7 @@ Optional<std::string> resolve_otel_tracestate(
   }
 
   constexpr std::uint64_t max_value = UINT64_C(1) << 56;
-  auto threshold = static_cast<std::uint64_t>(
+  std::uint64_t threshold = static_cast<std::uint64_t>(
       std::round((1.0 - decision.configured_rate->value()) *
                  static_cast<double>(max_value)));
   threshold = std::min(threshold, max_value - 1);

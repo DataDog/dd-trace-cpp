@@ -60,7 +60,7 @@ Optional<std::uint64_t> parse_otel_random_value(StringView value) {
     return nullopt;
   }
 
-  const auto parsed = parse_uint64(value, 16);
+  const Expected<std::uint64_t> parsed = parse_uint64(value, 16);
   if (parsed.if_error()) {
     return nullopt;
   }
@@ -73,7 +73,7 @@ Optional<std::uint64_t> parse_otel_threshold(StringView value) {
     return nullopt;
   }
 
-  const auto parsed = parse_uint64(value, 16);
+  const Expected<std::uint64_t> parsed = parse_uint64(value, 16);
   if (parsed.if_error()) {
     return nullopt;
   }
@@ -84,13 +84,13 @@ template <class Function>
 void for_each_otel_item(StringView raw, Function&& function) {
   std::size_t begin = 0;
   while (begin <= raw.size()) {
-    const auto end = raw.find(';', begin);
-    const auto item = raw.substr(begin, end - begin);
-    const auto separator = item.find(':');
-    const auto key = item.substr(0, separator);
-    const auto value = separator == StringView::npos
-                           ? StringView{}
-                           : item.substr(separator + 1);
+    const std::size_t end = raw.find(';', begin);
+    const StringView item = raw.substr(begin, end - begin);
+    const std::size_t separator = item.find(':');
+    const StringView key = item.substr(0, separator);
+    const StringView value =
+        separator == StringView::npos ? StringView{}
+                                       : item.substr(separator + 1);
     function(item, key, value);
     if (end == StringView::npos) {
       return;
@@ -122,7 +122,7 @@ std::string format_otel_hex(std::uint64_t value) {
 }
 
 std::string format_otel_threshold(std::uint64_t threshold) {
-  auto result = format_otel_hex(threshold);
+  std::string result = format_otel_hex(threshold);
   while (result.size() > 1 && result.back() == '0') {
     result.pop_back();
   }
@@ -326,13 +326,14 @@ void parse_w3c_tracestate(
   std::string other_w3c_tracestate;
   std::size_t begin = 0;
   while (begin < w3c_tracestate.size()) {
-    const auto end = w3c_tracestate.find(',', begin);
-    const auto member = trim(w3c_tracestate.substr(begin, end - begin));
-    const auto separator = member.find('=');
-    const auto key = member.substr(0, separator);
-    const auto member_value = separator == StringView::npos
-                                  ? StringView{}
-                                  : member.substr(separator + 1);
+    const std::size_t end = w3c_tracestate.find(',', begin);
+    const StringView member =
+        trim(w3c_tracestate.substr(begin, end - begin));
+    const std::size_t separator = member.find('=');
+    const StringView key = member.substr(0, separator);
+    const StringView member_value =
+        separator == StringView::npos ? StringView{}
+                                       : member.substr(separator + 1);
     if (key == "dd") {
       // If the "dd" vendor entry's value exceeds the maximum size, drop it
       // and record a propagation error tag.
@@ -388,9 +389,9 @@ Expected<ExtractedData> extract_w3c(
   }
 
   result.datadog_w3c_parent_id = "0000000000000000";
-  const auto maybe_tracestate = headers.lookup("tracestate");
+  const Optional<StringView> maybe_tracestate = headers.lookup("tracestate");
   if (maybe_tracestate && !maybe_tracestate->empty()) {
-    const auto tracestate = trim(*maybe_tracestate);
+    const StringView tracestate = trim(*maybe_tracestate);
     result.tracestate_full = tracestate;
     parse_w3c_tracestate(result, tracestate, span_tags);
   }
@@ -531,8 +532,8 @@ void append_tracestate_entries(std::string& result, StringView entries,
                                std::size_t& member_count) {
   std::size_t begin = 0;
   while (member_count < max_w3c_tracestate_members && begin < entries.size()) {
-    const auto end = entries.find(',', begin);
-    const auto entry = trim(entries.substr(begin, end - begin));
+    const std::size_t end = entries.find(',', begin);
+    const StringView entry = trim(entries.substr(begin, end - begin));
     if (!entry.empty()) {
       result += ',';
       append(result, entry);
