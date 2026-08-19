@@ -33,7 +33,7 @@ auto verboten(int lowest_ascii, int highest_ascii,
   };
 }
 
-constexpr bool is_hexdiglc(const char c) {
+constexpr bool is_hexdig(const char c) {
   return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
          (c >= 'A' && c <= 'F');
 }
@@ -155,7 +155,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
 
           beg = i + 1;
           internal_state = state::trace_id;
-        } else if (!is_hexdiglc(traceparent[i])) {
+        } else if (!is_hexdig(traceparent[i])) {
           return "invalid_version";
         }
       } break;
