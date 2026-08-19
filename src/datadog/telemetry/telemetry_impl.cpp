@@ -94,6 +94,8 @@ std::string to_string(datadog::tracing::ConfigName name) {
       return "trace_propagation_style_inject";
     case ConfigName::PROPAGATION_BEHAVIOR_EXTRACT:
       return "trace_propagation_behavior_extract";
+    case ConfigName::PROPAGATION_EXTRACT_FIRST:
+      return "trace_propagation_extract_first";
     case ConfigName::STARTUP_LOGS:
       return "trace_startup_logs_enabled";
     case ConfigName::REPORT_TELEMETRY:

@@ -31,6 +31,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "common/environment.h"
 #include "matchers.h"
 #include "mocks/collectors.h"
 #include "mocks/dict_readers.h"
@@ -70,6 +71,9 @@ TEST_TRACER("tracer span defaults") {
   config.name = "test.thing";
   config.tags = {{"some.thing", "thing value"},
                  {"another.thing", "another value"}};
+  // The test does not cover telemetry. Disabling it prevents an asynchronous
+  // request to a local agent from racing the logger assertion below.
+  config.telemetry.enabled = false;
 
   const auto collector = std::make_shared<MockCollector>();
   config.collector = collector;
@@ -1545,6 +1549,32 @@ TEST_TRACER("span extraction") {
   }
 }
 
+TEST_TRACER(
+    "extract first tries later styles after an unsuccessful extraction") {
+  const datadog::test::EnvGuard guard{"DD_TRACE_PROPAGATION_EXTRACT_FIRST",
+                                      "true"};
+  TracerConfig config;
+  config.service = "testsvc";
+  config.collector = std::make_shared<NullCollector>();
+  config.telemetry.enabled = false;
+  config.extraction_styles = std::vector<PropagationStyle>{
+      PropagationStyle::DATADOG, PropagationStyle::W3C};
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"traceparent",
+       "00-00000000000000000000000000000001-0000000000000002-01"},
+  };
+
+  MockDictReader reader{headers};
+  const auto span = tracer.extract_span(reader);
+  REQUIRE(span);
+  CHECK(span->parent_id() == 2);
+}
+
 TEST_TRACER("continue extraction resumes the extracted trace") {
   TracerConfig config;
   config.service = "testsvc";
@@ -2019,6 +2049,7 @@ TEST_TRACER("heterogeneous extraction") {
     std::vector<PropagationStyle> injection_styles;
     std::unordered_map<std::string, std::string> extracted_headers;
     std::unordered_map<std::string, std::string> expected_injected_headers;
+    bool extract_first = false;
   };
 
   // clang-format off
@@ -2040,6 +2071,17 @@ TEST_TRACER("heterogeneous extraction") {
       {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}}, // origin is different
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
       {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,competitor=stuff"}}},
+
+    {__LINE__, "extract first ignores tracestate from subsequent style",
+     {PropagationStyle::DATADOG, PropagationStyle::W3C},
+     {PropagationStyle::W3C},
+     {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
+      {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
+      {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
+     {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas"}},
+     true},
 
     {__LINE__, "ignore interlopers",
      {PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C},
@@ -2087,8 +2129,12 @@ TEST_TRACER("heterogeneous extraction") {
   config.service = "testsvc";
   config.extraction_styles = test_case.extraction_styles;
   config.injection_styles = test_case.injection_styles;
+  config.telemetry.enabled = false;
   config.logger = std::make_shared<NullLogger>();
 
+  const datadog::test::EnvGuard extract_first{
+      "DD_TRACE_PROPAGATION_EXTRACT_FIRST",
+      test_case.extract_first ? "true" : "false"};
   auto finalized_config = finalize_config(config);
   REQUIRE(finalized_config);
   Tracer tracer{*finalized_config, std::make_shared<MockIDGenerator>()};

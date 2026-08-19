@@ -64,6 +64,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       propagation_behavior_extract_(config.propagation_behavior_extract),
+      propagation_extract_first_(config.propagation_extract_first),
       tags_header_max_size_(config.tags_header_size),
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
@@ -309,7 +310,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     telemetry::counter::increment(metrics::tracer::trace_context::extracted,
                                   {extracted_tag});
 
-    if (!first_style_with_trace_id && data->trace_id.has_value()) {
+    const bool extracted_trace_context = data->trace_id.has_value();
+    if (!first_style_with_trace_id && extracted_trace_context) {
       first_style_with_trace_id = style;
     }
 
@@ -319,6 +321,10 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
 
     data->headers_examined = audited_reader.entries_found;
     extracted_contexts.emplace(style, std::move(*data));
+
+    if (propagation_extract_first_ && extracted_trace_context) {
+      break;
+    }
   }
 
   ExtractedData merged_context;

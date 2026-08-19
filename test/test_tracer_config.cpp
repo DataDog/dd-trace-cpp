@@ -1378,6 +1378,55 @@ TRACER_CONFIG_TEST("TracerConfig propagation behavior extract") {
   }
 }
 
+TRACER_CONFIG_TEST("TracerConfig propagation extract first") {
+  TracerConfig config;
+  config.service = "testsvc";
+
+  const auto extract_first_metadata =
+      [](const FinalizedTracerConfig& finalized) {
+        return finalized.metadata.at(ConfigName::PROPAGATION_EXTRACT_FIRST);
+      };
+
+  SECTION("defaults to false") {
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK_FALSE(finalized->propagation_extract_first);
+
+    const auto& metadata = extract_first_metadata(*finalized);
+    REQUIRE(metadata.size() == 1);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::DEFAULT);
+    CHECK(metadata.back().value == "false");
+  }
+
+  SECTION("uses programmatic configuration") {
+    config.propagation_extract_first = true;
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_extract_first);
+
+    const auto& metadata = extract_first_metadata(*finalized);
+    REQUIRE(metadata.size() == 2);
+    CHECK(metadata.back().origin == ConfigMetadata::Origin::CODE);
+    CHECK(metadata.back().value == "true");
+  }
+
+  SECTION("environment configuration overrides programmatic configuration") {
+    const EnvGuard guard{"DD_TRACE_PROPAGATION_EXTRACT_FIRST", "true"};
+    config.propagation_extract_first = false;
+
+    const auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+    CHECK(finalized->propagation_extract_first);
+
+    const auto& metadata = extract_first_metadata(*finalized);
+    REQUIRE(metadata.size() == 3);
+    CHECK(metadata.back().origin ==
+          ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+    CHECK(metadata.back().value == "true");
+  }
+}
+
 TRACER_CONFIG_TEST("configure 128-bit trace IDs") {
   TracerConfig config;
   config.service = "testsvc";
