@@ -53,6 +53,7 @@ namespace environment {
   MACRO(DD_SPAN_SAMPLING_RULES, ARRAY, "[]")                                   \
   MACRO(DD_SPAN_SAMPLING_RULES_FILE, STRING, "")                               \
   MACRO(DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT, STRING, "continue")             \
+  MACRO(DD_TRACE_PROPAGATION_EXTRACT_FIRST, BOOLEAN, false)                    \
   MACRO(DD_TRACE_PROPAGATION_STYLE_EXTRACT, ARRAY,                             \
         "datadog,tracecontext,baggage")                                        \
   MACRO(DD_TRACE_PROPAGATION_STYLE_INJECT, ARRAY,                              \
