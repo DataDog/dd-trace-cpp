@@ -39,8 +39,9 @@ struct SamplingDecision {
   // The per-second maximum allowed number of "keeps" configured for the limiter
   // consulted in this decision, if any.
   Optional<double> limiter_max_per_second;
-  // The outcome of the probability comparison before rate limiting, if any.
-  Optional<bool> probability_sampled;
+  // Whether the sample rate alone, before the rate limiter, would keep this
+  // trace.
+  Optional<bool> was_probability_sampled;
   // The provenance of this decision.
   Origin origin;
 };

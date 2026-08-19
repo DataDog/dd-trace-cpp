@@ -162,9 +162,9 @@ Optional<std::string> resolve_otel_tracestate(
   }
 
   if (!decision.mechanism || !decision.configured_rate ||
-      !decision.probability_sampled ||
+      !decision.was_probability_sampled ||
       !is_probability_mechanism(*decision.mechanism) ||
-      (*decision.probability_sampled && decision.priority <= 0)) {
+      (*decision.was_probability_sampled && decision.priority <= 0)) {
     return rewrite_otel_tracestate(raw, extract_otel_random_value(raw),
                                    nullopt);
   }
@@ -176,9 +176,9 @@ Optional<std::string> resolve_otel_tracestate(
   threshold = std::min(threshold, max_value - 1);
 
   std::uint64_t random_value = (~knuth_hash(trace_id.low)) >> 8;
-  if (*decision.probability_sampled && random_value < threshold) {
+  if (*decision.was_probability_sampled && random_value < threshold) {
     random_value = threshold;
-  } else if (!*decision.probability_sampled && random_value >= threshold) {
+  } else if (!*decision.was_probability_sampled && random_value >= threshold) {
     random_value = threshold == 0 ? 0 : threshold - 1;
   }
 

@@ -50,9 +50,10 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
     decision.mechanism = int(rule.mechanism);
     decision.limiter_max_per_second = limiter_max_per_second_;
     decision.configured_rate = rule.rate;
-    const std::uint64_t threshold = max_id_from_rate(rule.rate);
-    decision.probability_sampled = knuth_hash(span.trace_id.low) <= threshold;
-    if (*decision.probability_sampled) {
+    const std::uint64_t threshold = max_id_from_rate(*decision.configured_rate);
+    decision.was_probability_sampled =
+        knuth_hash(span.trace_id.low) <= threshold;
+    if (*decision.was_probability_sampled) {
       if (rule.bypass_limiter) {
         decision.priority = int(SamplingPriority::USER_KEEP);
         return decision;
@@ -92,8 +93,8 @@ SamplingDecision TraceSampler::decide(const SpanData& span) {
   }
 
   const std::uint64_t threshold = max_id_from_rate(*decision.configured_rate);
-  decision.probability_sampled = knuth_hash(span.trace_id.low) <= threshold;
-  if (*decision.probability_sampled) {
+  decision.was_probability_sampled = knuth_hash(span.trace_id.low) <= threshold;
+  if (*decision.was_probability_sampled) {
     decision.priority = int(SamplingPriority::AUTO_KEEP);
   } else {
     decision.priority = int(SamplingPriority::AUTO_DROP);
