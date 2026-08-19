@@ -153,22 +153,6 @@ Optional<std::string> format_rate(double rate, Logger& logger) {
   return std::string(begin, end);
 }
 
-bool is_probability_mechanism(int mechanism) {
-  switch (static_cast<SamplingMechanism>(mechanism)) {
-    case SamplingMechanism::DEFAULT:
-    case SamplingMechanism::AGENT_RATE:
-    case SamplingMechanism::REMOTE_RATE_AUTO:
-    case SamplingMechanism::RULE:
-    case SamplingMechanism::REMOTE_RATE_USER_DEFINED:
-    case SamplingMechanism::REMOTE_RATE_EMERGENCY:
-    case SamplingMechanism::REMOTE_RULE:
-    case SamplingMechanism::REMOTE_ADAPTIVE_RULE:
-      return true;
-    default:
-      return false;
-  }
-}
-
 Optional<std::string> resolve_otel_tracestate(
     TraceID trace_id, const SamplingDecision& decision,
     const Optional<std::string>& inherited) {
