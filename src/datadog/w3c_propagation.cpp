@@ -42,8 +42,9 @@ constexpr bool is_lowercase_hexdig(const char c) {
   return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
 }
 
-constexpr std::size_t otel_sampling_value_size = 14;
+constexpr std::size_t otel_random_value_size = 14;
 constexpr std::size_t min_otel_threshold_size = 1;
+constexpr std::size_t max_otel_threshold_size = otel_random_value_size;
 constexpr std::size_t max_w3c_tracestate_member_value_size = 256;
 constexpr std::size_t max_datadog_tracestate_value_size = 512;
 constexpr std::size_t max_w3c_tracestate_members = 32;
@@ -64,13 +65,13 @@ Optional<std::uint64_t> parse_otel_value(StringView value,
 }
 
 Optional<std::uint64_t> parse_otel_random_value(StringView value) {
-  return parse_otel_value(value, otel_sampling_value_size,
-                          otel_sampling_value_size);
+  return parse_otel_value(value, otel_random_value_size,
+                          otel_random_value_size);
 }
 
 Optional<std::uint64_t> parse_otel_threshold(StringView value) {
   return parse_otel_value(value, min_otel_threshold_size,
-                          otel_sampling_value_size);
+                          max_otel_threshold_size);
 }
 
 template <class Function>
