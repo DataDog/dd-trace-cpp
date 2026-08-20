@@ -250,7 +250,7 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
   return sampling_decision_;
 }
 
-Optional<std::pair<std::string, std::uint32_t>> TraceSegment::w3c_link_context(
+Optional<W3CLinkContext> TraceSegment::w3c_link_context(
     const SpanData& span) const {
   SamplingDecision sampling_decision;
   std::vector<std::pair<std::string, std::string>> trace_tags;
