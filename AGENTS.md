@@ -11,3 +11,7 @@ See [docs/development.md](docs/development.md) for build, test, and formatting i
 ## Architecture
 
 See [docs/design.md](docs/design.md) for the library's architecture and design rationale.
+
+## Agent-Only Instructions
+
+Write short comments, with simple words and short sentences.
