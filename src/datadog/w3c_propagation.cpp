@@ -48,42 +48,35 @@ constexpr std::size_t max_w3c_tracestate_member_value_size = 256;
 constexpr std::size_t max_datadog_tracestate_value_size = 512;
 constexpr std::size_t max_w3c_tracestate_members = 32;
 
-bool is_valid_otel_hex(StringView value, std::size_t minimum_size,
-                       std::size_t maximum_size) {
-  return value.size() >= minimum_size && value.size() <= maximum_size &&
-         std::all_of(value.begin(), value.end(), is_lowercase_hexdig);
+Optional<std::uint64_t> parse_otel_value(StringView value,
+                                         std::size_t minimum_size,
+                                         std::size_t maximum_size) {
+  if (value.size() < minimum_size || value.size() > maximum_size ||
+      !std::all_of(value.begin(), value.end(), is_lowercase_hexdig)) {
+    return nullopt;
+  }
+
+  const Expected<std::uint64_t> parsed = parse_uint64(value, 16);
+  if (parsed.if_error()) {
+    return nullopt;
+  }
+  return *parsed;
 }
 
 Optional<std::uint64_t> parse_otel_random_value(StringView value) {
-  if (!is_valid_otel_hex(value, otel_sampling_value_size,
-                         otel_sampling_value_size)) {
-    return nullopt;
-  }
-
-  const Expected<std::uint64_t> parsed = parse_uint64(value, 16);
-  if (parsed.if_error()) {
-    return nullopt;
-  }
-  return *parsed;
+  return parse_otel_value(value, otel_sampling_value_size,
+                          otel_sampling_value_size);
 }
 
 Optional<std::uint64_t> parse_otel_threshold(StringView value) {
-  if (!is_valid_otel_hex(value, min_otel_threshold_size,
-                         otel_sampling_value_size)) {
-    return nullopt;
-  }
-
-  const Expected<std::uint64_t> parsed = parse_uint64(value, 16);
-  if (parsed.if_error()) {
-    return nullopt;
-  }
-  return *parsed;
+  return parse_otel_value(value, min_otel_threshold_size,
+                          otel_sampling_value_size);
 }
 
 template <class Function>
 void for_each_otel_item(StringView raw, Function&& function) {
   std::size_t begin = 0;
-  while (begin <= raw.size()) {
+  while (begin < raw.size()) {
     const std::size_t end = raw.find(';', begin);
     const StringView item = raw.substr(begin, end - begin);
     const std::size_t separator = item.find(':');
@@ -93,6 +86,20 @@ void for_each_otel_item(StringView raw, Function&& function) {
                                  : item.substr(separator + 1);
     function(item, key, value);
     if (end == StringView::npos) {
+      return;
+    }
+    begin = end + 1;
+  }
+}
+
+template <class Function>
+void for_each_w3c_tracestate_member(StringView tracestate,
+                                    Function&& function) {
+  std::size_t begin = 0;
+  while (begin < tracestate.size()) {
+    const std::size_t end = tracestate.find(',', begin);
+    const StringView member = trim(tracestate.substr(begin, end - begin));
+    if (!function(member) || end == StringView::npos) {
       return;
     }
     begin = end + 1;
@@ -349,18 +356,11 @@ void parse_w3c_tracestate(
     ExtractedData& result, StringView w3c_tracestate,
     std::unordered_map<std::string, std::string>& span_tags) {
   std::string other_w3c_tracestate;
-  std::size_t begin = 0;
-  while (begin < w3c_tracestate.size()) {
-    const std::size_t end = w3c_tracestate.find(',', begin);
-    const StringView member = trim(w3c_tracestate.substr(begin, end - begin));
+  for_each_w3c_tracestate_member(w3c_tracestate, [&](StringView member) {
     parse_w3c_tracestate_member(result, member, span_tags,
                                 other_w3c_tracestate);
-
-    if (end == StringView::npos) {
-      break;
-    }
-    begin = end + 1;
-  }
+    return true;
+  });
 
   if (!other_w3c_tracestate.empty()) {
     result.additional_w3c_tracestate = std::move(other_w3c_tracestate);
@@ -535,20 +535,14 @@ Optional<std::string> rewrite_otel_tracestate(
 
 void append_tracestate_entries(std::string& result, StringView entries,
                                std::size_t& member_count) {
-  std::size_t begin = 0;
-  while (member_count < max_w3c_tracestate_members && begin < entries.size()) {
-    const std::size_t end = entries.find(',', begin);
-    const StringView entry = trim(entries.substr(begin, end - begin));
+  for_each_w3c_tracestate_member(entries, [&](StringView entry) {
     if (!entry.empty()) {
       result += ',';
       append(result, entry);
       ++member_count;
     }
-    if (end == StringView::npos) {
-      return;
-    }
-    begin = end + 1;
-  }
+    return member_count < max_w3c_tracestate_members;
+  });
 }
 
 std::string encode_tracestate(
