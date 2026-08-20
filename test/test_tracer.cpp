@@ -1797,6 +1797,22 @@ TEST_TRACER("OpenTelemetry tracestate sampling values") {
             "rv:1234567890abcd;th:e6666666666668;future:value");
     REQUIRE(extracted->additional_w3c_tracestate == "congo=t61rcWkgMzE");
   }
+
+  SECTION("the first OpenTelemetry member is retained") {
+    const std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-00000000000000000000000000000001-0000000000000001-01"},
+        {"tracestate", "ot=first,ot=second"},
+    };
+    MockDictReader reader{headers};
+    std::unordered_map<std::string, std::string> span_tags;
+    MockLogger logger;
+
+    const Expected<ExtractedData> extracted =
+        extract_w3c(reader, span_tags, logger);
+    REQUIRE(extracted);
+    REQUIRE(extracted->otel_w3c_tracestate == "first");
+  }
 }
 
 TEST_TRACER("baggage usage") {

@@ -313,8 +313,7 @@ void parse_datadog_trace_state(ExtractedData& result,
 // `ot_tracestate`. `ot_tracestate` is the value of the "ot" entry in the W3C
 // "tracestate" header.
 //
-// `parse_ot_tracestate` populates `otel_w3c_tracestate` if it has not already
-// been set.
+// `parse_ot_tracestate` preserves the first OpenTelemetry state in a header.
 void parse_ot_tracestate(ExtractedData& result, StringView ot_tracestate) {
   if (!result.otel_w3c_tracestate) {
     result.otel_w3c_tracestate = std::string(ot_tracestate);
