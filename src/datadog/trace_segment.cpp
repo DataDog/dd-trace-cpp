@@ -156,11 +156,12 @@ Optional<std::string> format_rate(double rate, Logger& logger) {
 Optional<std::string> resolve_otel_tracestate(
     TraceID trace_id, const SamplingDecision& decision,
     const Optional<std::string>& inherited) {
-  const StringView raw = inherited ? StringView(*inherited) : StringView{};
   if (decision.origin != SamplingDecision::Origin::LOCAL) {
-    return inherited ? sanitize_otel_tracestate(raw) : nullopt;
+    return inherited ? sanitize_otel_tracestate(StringView(*inherited))
+                     : nullopt;
   }
 
+  const StringView raw = inherited ? StringView(*inherited) : StringView{};
   if (!decision.mechanism || !decision.configured_rate ||
       !decision.was_probability_sampled ||
       !is_probability_mechanism(*decision.mechanism) ||
