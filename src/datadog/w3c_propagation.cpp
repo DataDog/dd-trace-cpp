@@ -106,22 +106,21 @@ void for_each_w3c_tracestate_member(StringView tracestate,
   }
 }
 
-bool append_otel_item(std::string& result, StringView item) {
+void append_otel_item(std::string& result, StringView item) {
   if (item.empty()) {
-    return true;
+    return;
   }
 
   const std::size_t separator_size = result.empty() ? 0 : 1;
   if (result.size() + separator_size + item.size() >
       max_w3c_tracestate_member_value_size) {
-    return false;
+    return;
   }
 
   if (separator_size) {
     result += ';';
   }
   append(result, item);
-  return true;
 }
 
 std::string format_otel_hex(std::uint64_t value) {
