@@ -337,7 +337,11 @@ void parse_w3c_tracestate_member(
       parse_datadog_trace_state(result, member_value);
     }
   } else if (key == "ot") {
-    parse_ot_tracestate(result, member_value);
+    if (member_value.size() > max_w3c_tracestate_member_value_size) {
+      span_tags[tags::internal::propagation_error] = "extract_max_size";
+    } else {
+      parse_ot_tracestate(result, member_value);
+    }
   } else {
     if (!other_w3c_tracestate.empty()) {
       other_w3c_tracestate += ',';

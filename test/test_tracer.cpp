@@ -1291,6 +1291,33 @@ TEST_TRACER("span extraction") {
             "extract_max_size");
   }
 
+  SECTION(
+      "'extract_max_size' propagation error if tracestate \"ot\" vendor "
+      "value is oversized on extract") {
+    constexpr std::size_t max_w3c_tracestate_member_value_size = 256;
+    const std::string ot_value(max_w3c_tracestate_member_value_size + 1, 'a');
+    std::unordered_map<std::string, std::string> span_tags;
+    MockLogger logger;
+    CAPTURE(logger.entries);
+    CAPTURE(span_tags);
+
+    std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-00000000000000000000000000000001-0000000000000001-00"},
+        {"tracestate", "dd=s:1,ot=" + ot_value + ",vendorx=keepme"}};
+    MockDictReader reader{headers};
+
+    const auto extracted = extract_w3c(reader, span_tags, logger);
+    REQUIRE(extracted);
+    REQUIRE(extracted->otel_w3c_tracestate == nullopt);
+    REQUIRE(extracted->additional_w3c_tracestate == "vendorx=keepme");
+
+    REQUIRE(logger.entries.empty());
+    REQUIRE(span_tags.count(tags::internal::propagation_error) == 1);
+    REQUIRE(span_tags.at(tags::internal::propagation_error) ==
+            "extract_max_size");
+  }
+
   SECTION("W3C Phase 3 support - Preferring tracecontext") {
     // Tests behavior from system-test
     // test_headers_tracecontext.py::test_tracestate_w3c_p_extract_datadog_w3c
