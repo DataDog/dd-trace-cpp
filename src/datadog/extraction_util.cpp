@@ -283,6 +283,7 @@ ExtractedData merge(
 
   if (w3c != contexts.end() && w3c->second.trace_id == result.trace_id) {
     result.additional_w3c_tracestate = w3c->second.additional_w3c_tracestate;
+    result.otel_w3c_tracestate = w3c->second.otel_w3c_tracestate;
     result.additional_datadog_w3c_tracestate =
         w3c->second.additional_datadog_w3c_tracestate;
     result.headers_examined.insert(result.headers_examined.end(),
