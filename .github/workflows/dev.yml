@@ -68,7 +68,8 @@ jobs:
         uses: ./.github/actions/dd-sts-credentials
         id: dd-sts-credentials
         if: success() || failure()
-        continue-on-error: true
+        # This fails on PRs.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
       - name: Upload test report to Datadog
         if: (success() || failure()) && steps.dd-sts-credentials.outcome == 'success'
         env:
@@ -162,7 +163,8 @@ jobs:
         uses: ./.github/actions/dd-sts-credentials
         id: dd-sts-credentials
         if: success() || failure()
-        continue-on-error: true
+        # This fails on PRs.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
       - name: Upload test report to Datadog
         if: (success() || failure()) && steps.dd-sts-credentials.outcome == 'success'
         env:
@@ -187,7 +189,8 @@ jobs:
         uses: ./.github/actions/dd-sts-credentials
         id: dd-sts-credentials
         if: success()
-        continue-on-error: true
+        # This fails on PRs.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
       - name: Upload code coverage report to Datadog
         if: success() && steps.dd-sts-credentials.outcome == 'success'
         # See https://github.com/DataDog/coverage-upload-github-action/releases
