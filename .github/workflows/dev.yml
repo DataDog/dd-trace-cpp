@@ -48,8 +48,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-${{matrix.docker-arch}}
-    environment:
-      name: dev
     permissions:
       contents: read
       packages: read
@@ -138,8 +136,6 @@ jobs:
     defaults:
       run:
         shell: powershell
-    environment:
-      name: dev
     permissions:
       contents: read
       packages: read
@@ -180,8 +176,6 @@ jobs:
     runs-on: ubuntu-22.04-arm
     container:
       image: datadog/docker-library:dd-trace-cpp-ci-23768e9-arm64
-    environment:
-      name: dev
     permissions:
       contents: read
       packages: read
