@@ -162,10 +162,12 @@ Optional<std::string> resolve_otel_tracestate(
   }
 
   const StringView raw = inherited ? StringView(*inherited) : StringView{};
-  if (!decision.mechanism || !decision.configured_rate ||
+  const bool probability_sampling_is_unavailable_or_dropped =
       !decision.was_probability_sampled ||
+      (*decision.was_probability_sampled && decision.priority <= 0);
+  if (!decision.mechanism || !decision.configured_rate ||
       !is_probability_mechanism(*decision.mechanism) ||
-      (*decision.was_probability_sampled && decision.priority <= 0)) {
+      probability_sampling_is_unavailable_or_dropped) {
     return rewrite_otel_tracestate(raw, extract_otel_random_value(raw),
                                    nullopt);
   }
