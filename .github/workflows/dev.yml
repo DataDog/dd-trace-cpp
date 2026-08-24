@@ -65,11 +65,11 @@ jobs:
         env:
           ASAN_OPTIONS: alloc_dealloc_mismatch=0
       - name: Get Datadog credentials
-        if: (success() || failure()) && github.event_name != 'pull_request'
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
         uses: ./.github/actions/dd-sts-credentials
         id: dd-sts-credentials
       - name: Upload test report to Datadog
-        if: (success() || failure()) && steps.dd-sts-credentials.outcome == 'success'
+        if: ${{ !cancelled() && steps.dd-sts-credentials.outcome == 'success' }}
         env:
           DD_API_KEY: ${{ steps.dd-sts-credentials.outputs.api_key }}
         run: |
@@ -158,11 +158,11 @@ jobs:
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }}
           .\build\test\tests.exe -r junit -o report.xml
       - name: Get Datadog credentials
-        if: (success() || failure()) && github.event_name != 'pull_request'
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
         uses: ./.github/actions/dd-sts-credentials
         id: dd-sts-credentials
       - name: Upload test report to Datadog
-        if: (success() || failure()) && steps.dd-sts-credentials.outcome == 'success'
+        if: ${{ !cancelled() && steps.dd-sts-credentials.outcome == 'success' }}
         env:
           DD_API_KEY: ${{ steps.dd-sts-credentials.outputs.api_key }}
         run: |
