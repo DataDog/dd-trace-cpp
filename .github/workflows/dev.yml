@@ -65,11 +65,9 @@ jobs:
         env:
           ASAN_OPTIONS: alloc_dealloc_mismatch=0
       - name: Get Datadog credentials
+        if: (success() || failure()) && github.event_name != 'pull_request'
         uses: ./.github/actions/dd-sts-credentials
         id: dd-sts-credentials
-        if: success() || failure()
-        # This fails on PRs.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
       - name: Upload test report to Datadog
         if: (success() || failure()) && steps.dd-sts-credentials.outcome == 'success'
         env:
@@ -160,11 +158,9 @@ jobs:
           & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }}
           .\build\test\tests.exe -r junit -o report.xml
       - name: Get Datadog credentials
+        if: (success() || failure()) && github.event_name != 'pull_request'
         uses: ./.github/actions/dd-sts-credentials
         id: dd-sts-credentials
-        if: success() || failure()
-        # This fails on PRs.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
       - name: Upload test report to Datadog
         if: (success() || failure()) && steps.dd-sts-credentials.outcome == 'success'
         env:
@@ -186,14 +182,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bin/test --coverage --verbose
       - name: Get Datadog credentials
+        if: success() && github.event_name != 'pull_request'
         uses: ./.github/actions/dd-sts-credentials
         id: dd-sts-credentials
-        if: success()
-        # This fails on PRs.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
       - name: Upload code coverage report to Datadog
         if: success() && steps.dd-sts-credentials.outcome == 'success'
-        # See https://github.com/DataDog/coverage-upload-github-action/releases
         uses: DataDog/coverage-upload-github-action@d9548b1c3c4ab639d5d3ab29a1508af188975f77 # v1.0.5
         with:
           api_key: ${{ steps.dd-sts-credentials.outputs.api_key }}
