@@ -131,6 +131,18 @@ struct PartiallyParsedTracestate {
   std::string other_entries;
 };
 
+void append_tracestate_member(std::string& destination, StringView member) {
+  member = trim(member);
+  if (member.empty()) {
+    return;
+  }
+
+  if (!destination.empty()) {
+    destination += ',';
+  }
+  append(destination, member);
+}
+
 // Return the separate Datadog-specific and non-Datadog-specific portions of the
 // specified `tracestate`. If `tracestate` does not have a Datadog-specific
 // portion, return `nullopt`.
@@ -138,6 +150,7 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
   const std::size_t begin = 0;
   const std::size_t end = tracestate.size();
   std::size_t pair_begin = begin;
+  std::string other_entries;
   while (pair_begin < end) {
     const std::size_t pair_end = tracestate.find(',', pair_begin);
     // Note that since this `pair` is `strip`ped, `pair_begin` is not
@@ -154,6 +167,7 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
       // This is an invalid entry because it contains a non-whitespace character
       // but not a "=".
       // Let's move on to the next entry.
+      append_tracestate_member(other_entries, pair);
       pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
       continue;
     }
@@ -161,25 +175,27 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
     const auto key = pair.substr(0, kv_separator);
     if (key != "dd") {
       // On to the next.
+      append_tracestate_member(other_entries, pair);
       pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
       continue;
     }
 
     PartiallyParsedTracestate result;
     result.datadog_value = pair.substr(kv_separator + 1);
-    // `result->other_entries` is whatever was before the "dd" entry and
-    // whatever is after the "dd" entry, but without an extra comma in the
-    // middle.
-    if (pair_begin != 0) {
-      // There's a prefix
-      append(result.other_entries, tracestate.substr(0, pair_begin - 1));
-      if (pair_end != StringView::npos && pair_end + 1 < end) {
-        // and a suffix
-        append(result.other_entries, tracestate.substr(pair_end));
-      }
-    } else if (pair_end != StringView::npos && pair_end + 1 < end) {
-      // There's just a suffix
-      append(result.other_entries, tracestate.substr(pair_end + 1));
+    result.other_entries = std::move(other_entries);
+
+    std::size_t remaining_pair_begin =
+        (pair_end == StringView::npos) ? end : pair_end + 1;
+    while (remaining_pair_begin < end) {
+      const std::size_t remaining_pair_end =
+          tracestate.find(',', remaining_pair_begin);
+      append_tracestate_member(
+          result.other_entries,
+          tracestate.substr(remaining_pair_begin,
+                            remaining_pair_end - remaining_pair_begin));
+      remaining_pair_begin = (remaining_pair_end == StringView::npos)
+                                 ? end
+                                 : remaining_pair_end + 1;
     }
 
     return result;
@@ -187,6 +203,28 @@ Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
 
   return nullopt;
 }
+
+bool is_valid_datadog_tracestate(StringView datadog_value) {
+  const std::size_t end = datadog_value.size();
+  std::size_t pair_begin = 0;
+  while (pair_begin < end) {
+    const std::size_t pair_end = datadog_value.find(';', pair_begin);
+    const auto pair = datadog_value.substr(pair_begin, pair_end - pair_begin);
+    pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
+
+    const auto trimmed = trim(pair);
+    if (trimmed.empty()) {
+      continue;
+    }
+
+    if (trimmed.data() != pair.data() || trimmed.size() != pair.size()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // Fill the specified `result` with information parsed from the specified
 // `datadog_value`. `datadog_value` is the value of the "dd" entry in the
 // "tracestate" header.
@@ -307,6 +345,10 @@ void extract_tracestate(
   // propagation error tag.
   if (datadog_value.size() > 512) {
     span_tags[tags::internal::propagation_error] = "extract_max_size";
+    return;
+  }
+
+  if (!is_valid_datadog_tracestate(datadog_value)) {
     return;
   }
 

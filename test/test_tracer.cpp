@@ -999,6 +999,110 @@ TEST_TRACER("span extraction") {
 
         {
             __LINE__,
+            "dd entry with trailing semicolon",
+            traceparent_keep,       // traceparent
+            "foo=1,dd=s:2;o:some;", // tracestate
+            2,                      // expected_sampling_priority
+            "some",                 // expected_origin
+            {},                     // expected_trace_tags
+            "foo=1",                // expected_additional_w3c_tracestate
+            nullopt,                // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",     // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "dd entry with trailing semicolon and OWS",
+            traceparent_keep,           // traceparent
+            "foo=1,dd=s:2;o:some; \t",  // tracestate
+            2,                          // expected_sampling_priority
+            "some",                     // expected_origin
+            {},                         // expected_trace_tags
+            "foo=1",                    // expected_additional_w3c_tracestate
+            nullopt,  // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "dd entry with double semicolon",
+            traceparent_keep,        // traceparent
+            "foo=1,dd=s:2;;o:some",  // tracestate
+            2,                       // expected_sampling_priority
+            "some",                  // expected_origin
+            {},                      // expected_trace_tags
+            "foo=1",                 // expected_additional_w3c_tracestate
+            nullopt,                 // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",      // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "dd entry with leading semicolon",
+            traceparent_keep,       // traceparent
+            "foo=1,dd=;s:2;o:some", // tracestate
+            2,                      // expected_sampling_priority
+            "some",                 // expected_origin
+            {},                     // expected_trace_tags
+            "foo=1",                // expected_additional_w3c_tracestate
+            nullopt,                // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",     // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "dd entry with interior OWS",
+            traceparent_keep,  // traceparent
+            "foo=1,dd=s:0;t.dm:934086a686-4;  t.x:y",  // tracestate
+            1,        // expected_sampling_priority
+            nullopt,  // expected_origin
+            {},       // expected_trace_tags
+            "foo=1",  // expected_additional_w3c_tracestate
+            nullopt,  // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "dd entry with OWS after first subentry",
+            traceparent_keep,                 // traceparent
+            "foo=1,dd=s:0; t.dm:934086a686-4", // tracestate
+            1,                                // expected_sampling_priority
+            nullopt,                          // expected_origin
+            {},                               // expected_trace_tags
+            "foo=1",                          // expected_additional_w3c_tracestate
+            nullopt,  // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "outer empty list member before dd",
+            traceparent_keep,          // traceparent
+            "foo=1,,dd=s:2;o:some",    // tracestate
+            2,                         // expected_sampling_priority
+            "some",                    // expected_origin
+            {},                        // expected_trace_tags
+            "foo=1",                   // expected_additional_w3c_tracestate
+            nullopt,                   // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",        // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "outer OWS around list members",
+            traceparent_keep,                    // traceparent
+            "foo=1 , dd=s:2;o:some , bar=2",     // tracestate
+            2,                                   // expected_sampling_priority
+            "some",                              // expected_origin
+            {},                                  // expected_trace_tags
+            "foo=1,bar=2",                       // expected_additional_w3c_tracestate
+            nullopt,  // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
             "origin, trace tags, parent, and extra fields",
             traceparent_drop,  // traceparent
             "dd=o:France;p:00000000000d69ac;t.ksr:0.728;t.foo:thing1;t.bar:"
