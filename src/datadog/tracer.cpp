@@ -247,7 +247,8 @@ Span Tracer::create_span(const SpanConfig& config) {
       logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
       defaults, config_manager_, runtime_id_, injection_styles_, hostname_,
       nullopt /* origin */, tags_header_max_size_, std::move(trace_tags),
-      nullopt /* sampling_decision */, nullopt /* additional_w3c_tracestate */,
+      nullopt /* sampling_decision */, nullopt /* otel_w3c_tracestate */,
+      nullopt /* additional_w3c_tracestate */,
       nullopt /* additional_datadog_w3c_tracestate*/, std::move(span_data),
       resource_renaming_mode_, tracing_enabled_);
   Span span{span_data_ptr, segment,
@@ -483,6 +484,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
           injection_styles_, hostname_, std::move(merged_context.origin),
           tags_header_max_size_, std::move(merged_context.trace_tags),
           std::move(sampling_decision),
+          std::move(merged_context.otel_w3c_tracestate),
           std::move(merged_context.additional_w3c_tracestate),
           std::move(merged_context.additional_datadog_w3c_tracestate),
           std::move(span_data), resource_renaming_mode_, tracing_enabled_);

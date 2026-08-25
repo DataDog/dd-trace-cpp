@@ -14,6 +14,7 @@
 #include <array>
 #include <cassert>
 #include <charconv>
+#include <cmath>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -23,6 +24,7 @@
 #include "endpoint_inferral.h"
 #include "hex.h"
 #include "platform_util.h"
+#include "sampling_util.h"
 #include "span_data.h"
 #include "span_sampler.h"
 #include "tag_propagation.h"
@@ -55,15 +57,12 @@ Cache cache_singleton;
 
 // Encode the specified `trace_tags`. If the encoded value is not longer than
 // the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
-// header using the specified `writer`. If the encoded value is oversized, then
-// write a diagnostic to the specified `logger` and set a propagation error tag
-// on the specified `local_root_tags`.
-void inject_trace_tags(
+// header using the specified `writer`. Return true if the encoded value is
+// oversized.
+bool inject_trace_tags(
     DictWriter& writer,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
-    std::size_t tags_header_max_size,
-    std::unordered_map<std::string, std::string>& local_root_tags,
-    Logger& logger) {
+    std::size_t tags_header_max_size, Logger& logger) {
   const std::string encoded_trace_tags = encode_tags(trace_tags);
 
   if (encoded_trace_tags.size() > tags_header_max_size) {
@@ -76,10 +75,13 @@ void inject_trace_tags(
     message += std::to_string(encoded_trace_tags.size());
     message += " bytes.";
     logger.log_error(message);
-    local_root_tags[tags::internal::propagation_error] = "inject_max_size";
-  } else if (!encoded_trace_tags.empty()) {
+    return true;
+  }
+
+  if (!encoded_trace_tags.empty()) {
     writer.set("x-datadog-tags", encoded_trace_tags);
   }
+  return false;
 }
 
 void maybe_calculate_http_endpoint(HttpEndpointCalculationMode renaming_mode,
@@ -151,6 +153,59 @@ Optional<std::string> format_rate(double rate, Logger& logger) {
   return std::string(begin, end);
 }
 
+Optional<std::string> resolve_otel_tracestate_value(
+    TraceID trace_id, const SamplingDecision& decision,
+    const Optional<OtelTraceState>& inherited) {
+  if (decision.origin != SamplingDecision::Origin::LOCAL) {
+    return inherited ? sanitize_otel_tracestate(inherited->value) : nullopt;
+  }
+
+  const StringView raw =
+      inherited ? StringView(inherited->value) : StringView{};
+  const bool probability_sampling_is_unavailable_or_dropped =
+      !decision.was_probability_sampled ||
+      (*decision.was_probability_sampled && decision.priority <= 0);
+  if (!decision.mechanism || !decision.configured_rate ||
+      !is_probability_mechanism(*decision.mechanism) ||
+      probability_sampling_is_unavailable_or_dropped) {
+    return rewrite_otel_tracestate(raw, extract_otel_random_value(raw),
+                                   nullopt);
+  }
+
+  constexpr std::uint64_t max_value = UINT64_C(1) << 56;
+  std::uint64_t threshold = static_cast<std::uint64_t>(
+      std::round((1.0 - decision.configured_rate->value()) *
+                 static_cast<double>(max_value)));
+  threshold = std::min(threshold, max_value - 1);
+
+  std::uint64_t random_value = (~knuth_hash(trace_id.low)) >> 8;
+  if (*decision.was_probability_sampled && random_value < threshold) {
+    random_value = threshold;
+  } else if (!*decision.was_probability_sampled && random_value >= threshold) {
+    random_value = threshold == 0 ? 0 : threshold - 1;
+  }
+
+  return rewrite_otel_tracestate(raw, random_value, threshold);
+}
+
+Optional<OtelTraceState> resolve_otel_tracestate(
+    TraceID trace_id, const SamplingDecision& decision,
+    const Optional<OtelTraceState>& inherited) {
+  Optional<std::string> resolved =
+      resolve_otel_tracestate_value(trace_id, decision, inherited);
+  if (!resolved) {
+    return nullopt;
+  }
+
+  const bool otel_w3c_tracestate_is_unchanged =
+      inherited && *resolved == inherited->value;
+  constexpr std::size_t first_non_datadog_tracestate_position = 0;
+  const std::size_t position = otel_w3c_tracestate_is_unchanged
+                                   ? inherited->position
+                                   : first_non_datadog_tracestate_position;
+  return OtelTraceState{std::move(*resolved), position};
+}
+
 }  // anonymous namespace
 
 TraceSegment::TraceSegment(
@@ -166,6 +221,7 @@ TraceSegment::TraceSegment(
     std::size_t tags_header_max_size,
     std::vector<std::pair<std::string, std::string>> trace_tags,
     Optional<SamplingDecision> sampling_decision,
+    Optional<OtelTraceState> otel_w3c_tracestate,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
     std::unique_ptr<SpanData> local_root,
@@ -184,6 +240,7 @@ TraceSegment::TraceSegment(
       trace_tags_(std::move(trace_tags)),
       num_finished_spans_(0),
       sampling_decision_(std::move(sampling_decision)),
+      otel_w3c_tracestate_(std::move(otel_w3c_tracestate)),
       additional_w3c_tracestate_(std::move(additional_w3c_tracestate)),
       additional_datadog_w3c_tracestate_(
           std::move(additional_datadog_w3c_tracestate)),
@@ -214,16 +271,16 @@ Optional<SamplingDecision> TraceSegment::sampling_decision() const {
   return sampling_decision_;
 }
 
-Optional<std::pair<std::string, std::uint32_t>> TraceSegment::w3c_link_context(
+Optional<W3CLinkContext> TraceSegment::w3c_link_context(
     const SpanData& span) const {
-  int sampling_priority;
+  SamplingDecision sampling_decision;
   std::vector<std::pair<std::string, std::string>> trace_tags;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!sampling_decision_) {
       return nullopt;
     }
-    sampling_priority = sampling_decision_->priority;
+    sampling_decision = *sampling_decision_;
     trace_tags = trace_tags_;
 
     const Optional<std::string> trace_source_tag =
@@ -233,11 +290,15 @@ Optional<std::pair<std::string, std::uint32_t>> TraceSegment::w3c_link_context(
     }
   }
 
+  const Optional<OtelTraceState> resolved_otel_w3c_tracestate =
+      resolve_otel_tracestate(span.trace_id, sampling_decision,
+                              otel_w3c_tracestate_);
   return std::make_pair(
-      encode_tracestate(span.span_id, sampling_priority, origin_, trace_tags,
-                        additional_datadog_w3c_tracestate_,
+      encode_tracestate(span.span_id, sampling_decision.priority, origin_,
+                        trace_tags, additional_datadog_w3c_tracestate_,
+                        resolved_otel_w3c_tracestate,
                         additional_w3c_tracestate_),
-      sampling_priority > 0 ? 1u : 0u);
+      sampling_decision.priority > 0 ? 1u : 0u);
 }
 
 Logger& TraceSegment::logger() const { return *logger_; }
@@ -443,28 +504,25 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
   // and trace tags might change when that happens ("_dd.p.dm").
   // So, we lock here, make a sampling decision if necessary, and then copy the
   // decision and trace tags before unlocking.
-  int sampling_priority;
+  SamplingDecision sampling_decision;
   std::vector<std::pair<std::string, std::string>> trace_tags;
+  Optional<std::string> trace_source_tag;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     make_sampling_decision_if_null();
     assert(sampling_decision_);
-    sampling_priority = sampling_decision_->priority;
+    sampling_decision = *sampling_decision_;
     trace_tags = trace_tags_;
+
+    trace_source_tag = find_trace_source_tag(spans_.front()->tags);
   }
-
-  std::unordered_map<std::string, std::string>& local_root_tags =
-      spans_.front()->tags;
-
-  const Optional<std::string> trace_source_tag =
-      find_trace_source_tag(local_root_tags);
 
   // When tracing (the product) is disabled, skip tracing context propagation
   // when:
   //  - the local root span is NOT created by another product (no `_dd.p.ts`)
   //  - sampling priority is DROP
   if (!tracing_enabled_) {
-    if (!trace_source_tag && sampling_priority <= 0) {
+    if (!trace_source_tag && sampling_decision.priority <= 0) {
       writer.erase("x-datadog-trace-id");
       writer.erase("x-datadog-parent-id");
       writer.erase("x-datadog-sampling-priority");
@@ -486,18 +544,21 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     trace_tags.emplace_back(tags::internal::trace_source, *trace_source_tag);
   }
 
+  bool trace_tags_too_large = false;
   for (const auto style : injection_styles_) {
     switch (style) {
       case PropagationStyle::DATADOG:
         writer.set("x-datadog-trace-id", std::to_string(span.trace_id.low));
         writer.set("x-datadog-parent-id", std::to_string(span.span_id));
         writer.set("x-datadog-sampling-priority",
-                   std::to_string(sampling_priority));
+                   std::to_string(sampling_decision.priority));
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
         }
-        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          local_root_tags, *logger_);
+        if (inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+                              *logger_)) {
+          trace_tags_too_large = true;
+        }
 
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:datadog"});
@@ -509,30 +570,45 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
           writer.set("x-b3-traceid", hex_padded(span.trace_id.low));
         }
         writer.set("x-b3-spanid", hex_padded(span.span_id));
-        writer.set("x-b3-sampled", std::to_string(int(sampling_priority > 0)));
+        writer.set("x-b3-sampled",
+                   std::to_string(int(sampling_decision.priority > 0)));
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
         }
-        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          local_root_tags, *logger_);
+        if (inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+                              *logger_)) {
+          trace_tags_too_large = true;
+        }
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:b3multi"});
         break;
-      case PropagationStyle::W3C:
-        writer.set(
-            "traceparent",
-            encode_traceparent(span.trace_id, span.span_id, sampling_priority));
+      case PropagationStyle::W3C: {
+        const Optional<OtelTraceState> resolved_otel_w3c_tracestate =
+            resolve_otel_tracestate(span.trace_id, sampling_decision,
+                                    otel_w3c_tracestate_);
+        writer.set("traceparent",
+                   encode_traceparent(span.trace_id, span.span_id,
+                                      sampling_decision.priority));
         writer.set(
             "tracestate",
-            encode_tracestate(span.span_id, sampling_priority, origin_,
+            encode_tracestate(span.span_id, sampling_decision.priority, origin_,
                               trace_tags, additional_datadog_w3c_tracestate_,
+                              resolved_otel_w3c_tracestate,
                               additional_w3c_tracestate_));
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:tracecontext"});
         break;
+      }
       default:
         break;
     }
+  }
+
+  if (trace_tags_too_large) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::unordered_map<std::string, std::string>& local_root_tags =
+        spans_.front()->tags;
+    local_root_tags[tags::internal::propagation_error] = "inject_max_size";
   }
 
   return true;

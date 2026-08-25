@@ -792,7 +792,8 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-origin", "France"},
        },
        // The "s:-1" and "t.ksr:0" comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;o:France;t.ksr:0"},
+       "dd=s:-1;p:$parent_id;o:France;t.ksr:0,ot=rv:f0948a54d43b8e;th:"
+       "ffffffffffffff"},
 
       {__LINE__,
        "trace tags",
@@ -802,7 +803,8 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-tags", "_dd.p.foo=x,_dd.p.bar=y,ignored=wrong_prefix"},
        },
        // The "s:-1" and "t.ksr:0"  comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;t.foo:x;t.bar:y;t.ksr:0"},
+       "dd=s:-1;p:$parent_id;t.foo:x;t.bar:y;t.ksr:0,ot=rv:f0948a54d43b8e;"
+       "th:ffffffffffffff"},
 
       {__LINE__,
        "extra fields",
@@ -832,7 +834,7 @@ TEST_SPAN("injecting W3C tracestate header") {
           },
           // The "s:-1" comes from the 0% sample rate.
           "dd=s:-1;p:$parent_id;o:France_ is a country~nation_ so is "
-          "______.;t.ksr:0",
+          "______.;t.ksr:0,ot=rv:f0948a54d43b8e;th:ffffffffffffff",
       },
 
       {__LINE__,
@@ -843,7 +845,8 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-tags", "_dd.p.a;d台北x =foo,_dd.p.ok=bar"},
        },
        // The "s:-1" comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;t.a_d______x_:foo;t.ok:bar;t.ksr:0"},
+       "dd=s:-1;p:$parent_id;t.a_d______x_:foo;t.ok:bar;t.ksr:0,ot=rv:"
+       "f0948a54d43b8e;th:ffffffffffffff"},
 
       {__LINE__,
        "replace invalid characters in trace tag value",
@@ -854,7 +857,7 @@ TEST_SPAN("injecting W3C tracestate header") {
        },
        // The "s:-1" comes from the 0% sample rate.
        "dd=s:-1;p:$parent_id;t.wacky:hello fr_d_ how are "
-       "_________?;t.ksr:0"},
+       "_________?;t.ksr:0,ot=rv:f0948a54d43b8e;th:ffffffffffffff"},
 
       {__LINE__,
        "replace equal signs with tildes in trace tag value",
@@ -864,7 +867,8 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-tags", "_dd.p.base64_thingy=d2Fra2EhIHdhaw=="},
        },
        // The "s:-1" comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;t.base64_thingy:d2Fra2EhIHdhaw~~;t.ksr:0"},
+       "dd=s:-1;p:$parent_id;t.base64_thingy:d2Fra2EhIHdhaw~~;t.ksr:0,ot="
+       "rv:f0948a54d43b8e;th:ffffffffffffff"},
 
       {__LINE__,
        "oversized origin truncates it and subsequent fields",
@@ -883,7 +887,7 @@ TEST_SPAN("injecting W3C tracestate header") {
            {"x-datadog-tags", "_dd.p.foo=bar,_dd.p.honk=honk"},
        },
        // The "s:-1" comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id"},
+       "dd=s:-1;p:$parent_id,ot=rv:f0948a54d43b8e;th:ffffffffffffff"},
 
       {__LINE__,
        "oversized trace tag truncates it and subsequent fields",
@@ -901,7 +905,8 @@ TEST_SPAN("injecting W3C tracestate header") {
             "ooooooooooooooooooong,_dd.p.lost=forever"},
        },
        // The "s:-1" comes from the 0% sample rate.
-       "dd=s:-1;p:$parent_id;t.foo:bar"},
+       "dd=s:-1;p:$parent_id;t.foo:bar,ot=rv:f0948a54d43b8e;"
+       "th:ffffffffffffff"},
 
       {__LINE__,
        "oversized extra field truncates itself and subsequent fields",
@@ -928,6 +933,15 @@ TEST_SPAN("injecting W3C tracestate header") {
        },
        // The "s:0" comes from the sampling decision in `traceparent_drop`.
        "dd=s:0;p:$parent_id,foo=bar,boing=boing"},
+
+      {__LINE__,
+       "unmodified OpenTelemetry member preserves vendor order",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate", "foo=bar,ot=future:value,boing=boing"},
+       },
+       // The "s:0" comes from the sampling decision in `traceparent_drop`.
+       "dd=s:0;p:$parent_id,foo=bar,ot=future:value,boing=boing"},
   }));
 
   CAPTURE(test_case.name);
@@ -953,6 +967,127 @@ TEST_SPAN("injecting W3C tracestate header") {
   REQUIRE(found->second == test_case.expected_tracestate);
 
   REQUIRE(logger->error_count() == 0);
+}
+
+TEST_SPAN("OpenTelemetry consistent probability sampling") {
+  class Generator : public IDGenerator {
+    const TraceID trace_id_;
+
+   public:
+    explicit Generator(TraceID trace_id) : trace_id_(trace_id) {}
+    TraceID trace_id(const TimePoint&) const override { return trace_id_; }
+    std::uint64_t span_id() const override { return trace_id_.low; }
+  };
+
+  SECTION("local probability decisions emit a consistent rv and th") {
+    struct TestCase {
+      double rate;
+      std::uint64_t trace_id;
+      bool sampled;
+      std::string expected_ot;
+    };
+
+    const auto test_case = GENERATE(values<TestCase>({
+        {0.01, 1, false, "rv:f0948a54d43b8e;th:fd70a3d70a3d7"},
+        {0.1, 1, true, "rv:f0948a54d43b8e;th:e6666666666668"},
+        {0.2, 1, true, "rv:f0948a54d43b8e;th:ccccccccccccd"},
+        {0.5, 1, true, "rv:f0948a54d43b8e;th:8"},
+        {0.99, 1, true, "rv:f0948a54d43b8e;th:028f5c28f5c29"},
+        {0.1, UINT64_C(0x03A93EE8B1999F00), true,
+         "rv:e6666666666668;th:e6666666666668"},
+        {0.05, UINT64_C(5401449561355763072), false,
+         "rv:f333333333332f;th:f333333333333"},
+    }));
+
+    CAPTURE(test_case.rate);
+    CAPTURE(test_case.trace_id);
+    CAPTURE(test_case.expected_ot);
+
+    TracerConfig config;
+    config.service = "testsvc";
+    config.collector = std::make_shared<NullCollector>();
+    config.logger = std::make_shared<NullLogger>();
+    config.telemetry.enabled = false;
+    config.injection_styles = {PropagationStyle::W3C};
+    config.trace_sampler.sample_rate = test_case.rate;
+    config.trace_sampler.max_per_second = 100;
+
+    const Expected<FinalizedTracerConfig> finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized,
+                  std::make_shared<Generator>(TraceID(test_case.trace_id))};
+
+    Span span = tracer.create_span();
+    MockDictWriter writer;
+    span.inject(writer);
+
+    const auto tracestate = writer.items.find("tracestate");
+    REQUIRE(tracestate != writer.items.end());
+    REQUIRE(tracestate->second.find("dd=") == 0);
+    REQUIRE(tracestate->second.find("ot=" + test_case.expected_ot) !=
+            std::string::npos);
+    const std::string& traceparent = writer.items.at("traceparent");
+    REQUIRE(traceparent.substr(traceparent.size() - 3) ==
+            (test_case.sampled ? "-01" : "-00"));
+  }
+
+  SECTION("non-probability decisions retain inherited rv but erase th") {
+    TracerConfig config;
+    config.service = "testsvc";
+    config.collector = std::make_shared<NullCollector>();
+    config.logger = std::make_shared<NullLogger>();
+    config.telemetry.enabled = false;
+    config.extraction_styles = {PropagationStyle::W3C};
+    config.injection_styles = {PropagationStyle::W3C};
+
+    const Expected<FinalizedTracerConfig> finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized};
+
+    const std::unordered_map<std::string, std::string> input_headers{
+        {"traceparent",
+         "00-00000000000000000000000000000001-0000000000000001-00"},
+        {"tracestate", "ot=rv:1234567890abcd;th:e6666666666668"},
+    };
+    MockDictReader reader{input_headers};
+    Expected<Span> span = tracer.extract_span(reader);
+    REQUIRE(span);
+    span->trace_segment().override_sampling_priority(
+        int(SamplingPriority::USER_KEEP));
+
+    MockDictWriter writer;
+    span->inject(writer);
+    REQUIRE(writer.items.at("tracestate").find("ot=rv:1234567890abcd") !=
+            std::string::npos);
+    REQUIRE(writer.items.at("tracestate").find("th:") == std::string::npos);
+  }
+
+  SECTION("rate-limiter demotion clears locally generated sampling values") {
+    TracerConfig config;
+    config.service = "testsvc";
+    config.collector = std::make_shared<NullCollector>();
+    config.logger = std::make_shared<NullLogger>();
+    config.telemetry.enabled = false;
+    config.injection_styles = {PropagationStyle::W3C};
+    config.trace_sampler.sample_rate = 1.0;
+    config.trace_sampler.max_per_second = 0.1;
+
+    const Expected<FinalizedTracerConfig> finalized = finalize_config(config);
+    REQUIRE(finalized);
+    Tracer tracer{*finalized, std::make_shared<Generator>(TraceID(1))};
+
+    {
+      Span span = tracer.create_span();
+      MockDictWriter writer;
+      span.inject(writer);
+      REQUIRE(writer.items.at("tracestate").find("ot=") != std::string::npos);
+    }
+
+    Span span = tracer.create_span();
+    MockDictWriter writer;
+    span.inject(writer);
+    REQUIRE(writer.items.at("tracestate").find("ot=") == std::string::npos);
+  }
 }
 
 TEST_SPAN("128-bit trace ID injection") {
