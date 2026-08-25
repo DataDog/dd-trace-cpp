@@ -152,6 +152,7 @@ target_sources(dd-trace-cpp-objects
       include/datadog/logger.h
       include/datadog/null_collector.h
       include/datadog/optional.h
+      include/datadog/otel_tracestate.h
       include/datadog/propagation_behavior_extract.h
       include/datadog/propagation_style.h
       include/datadog/rate.h

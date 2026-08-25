@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "optional.h"
+#include "otel_tracestate.h"
 #include "propagation_style.h"
 #include "runtime_id.h"
 #include "sampling_decision.h"
@@ -77,7 +78,7 @@ class TraceSegment {
   std::vector<std::unique_ptr<SpanData>> spans_;
   std::size_t num_finished_spans_;
   Optional<SamplingDecision> sampling_decision_;
-  const Optional<std::string> otel_w3c_tracestate_;
+  const Optional<OtelTraceState> otel_w3c_tracestate_;
   const Optional<std::string> additional_w3c_tracestate_;
   const Optional<std::string> additional_datadog_w3c_tracestate_;
 
@@ -100,7 +101,7 @@ class TraceSegment {
                Optional<std::string> origin, std::size_t tags_header_max_size,
                std::vector<std::pair<std::string, std::string>> trace_tags,
                Optional<SamplingDecision> sampling_decision,
-               Optional<std::string> otel_w3c_tracestate,
+               Optional<OtelTraceState> otel_w3c_tracestate,
                Optional<std::string> additional_w3c_tracestate,
                Optional<std::string> additional_datadog_w3c_tracestate,
                std::unique_ptr<SpanData> local_root,

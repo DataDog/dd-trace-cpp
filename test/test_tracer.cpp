@@ -1793,7 +1793,8 @@ TEST_TRACER("OpenTelemetry tracestate sampling values") {
     const Expected<ExtractedData> extracted =
         extract_w3c(reader, span_tags, logger);
     REQUIRE(extracted);
-    REQUIRE(extracted->otel_w3c_tracestate ==
+    REQUIRE(extracted->otel_w3c_tracestate);
+    REQUIRE(extracted->otel_w3c_tracestate->value ==
             "rv:1234567890abcd;th:e6666666666668;future:value");
     REQUIRE(extracted->additional_w3c_tracestate == "congo=t61rcWkgMzE");
   }
@@ -1811,7 +1812,8 @@ TEST_TRACER("OpenTelemetry tracestate sampling values") {
     const Expected<ExtractedData> extracted =
         extract_w3c(reader, span_tags, logger);
     REQUIRE(extracted);
-    REQUIRE(extracted->otel_w3c_tracestate == "first");
+    REQUIRE(extracted->otel_w3c_tracestate);
+    REQUIRE(extracted->otel_w3c_tracestate->value == "first");
   }
 }
 
@@ -2129,8 +2131,8 @@ TEST_TRACER("heterogeneous extraction") {
                      "ot=rv:1234567890abcd;th:e6666666666668;future:value"}}, // origin is different
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
       {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,"
-                     "ot=rv:1234567890abcd;th:e6666666666668;future:value,"
-                     "competitor=stuff"}}},
+                     "competitor=stuff,ot=rv:1234567890abcd;th:e6666666666668;"
+                     "future:value"}}},
 
     {__LINE__, "ignore interlopers",
      {PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C},

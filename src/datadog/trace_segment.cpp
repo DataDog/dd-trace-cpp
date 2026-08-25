@@ -153,15 +153,15 @@ Optional<std::string> format_rate(double rate, Logger& logger) {
   return std::string(begin, end);
 }
 
-Optional<std::string> resolve_otel_tracestate(
+Optional<std::string> resolve_otel_tracestate_value(
     TraceID trace_id, const SamplingDecision& decision,
-    const Optional<std::string>& inherited) {
+    const Optional<OtelTraceState>& inherited) {
   if (decision.origin != SamplingDecision::Origin::LOCAL) {
-    return inherited ? sanitize_otel_tracestate(StringView(*inherited))
-                     : nullopt;
+    return inherited ? sanitize_otel_tracestate(inherited->value) : nullopt;
   }
 
-  const StringView raw = inherited ? StringView(*inherited) : StringView{};
+  const StringView raw =
+      inherited ? StringView(inherited->value) : StringView{};
   const bool probability_sampling_is_unavailable_or_dropped =
       !decision.was_probability_sampled ||
       (*decision.was_probability_sampled && decision.priority <= 0);
@@ -188,6 +188,24 @@ Optional<std::string> resolve_otel_tracestate(
   return rewrite_otel_tracestate(raw, random_value, threshold);
 }
 
+Optional<OtelTraceState> resolve_otel_tracestate(
+    TraceID trace_id, const SamplingDecision& decision,
+    const Optional<OtelTraceState>& inherited) {
+  Optional<std::string> resolved =
+      resolve_otel_tracestate_value(trace_id, decision, inherited);
+  if (!resolved) {
+    return nullopt;
+  }
+
+  const bool otel_w3c_tracestate_is_unchanged =
+      inherited && *resolved == inherited->value;
+  constexpr std::size_t first_non_datadog_tracestate_position = 0;
+  const std::size_t position = otel_w3c_tracestate_is_unchanged
+                                   ? inherited->position
+                                   : first_non_datadog_tracestate_position;
+  return OtelTraceState{std::move(*resolved), position};
+}
+
 }  // anonymous namespace
 
 TraceSegment::TraceSegment(
@@ -203,7 +221,7 @@ TraceSegment::TraceSegment(
     std::size_t tags_header_max_size,
     std::vector<std::pair<std::string, std::string>> trace_tags,
     Optional<SamplingDecision> sampling_decision,
-    Optional<std::string> otel_w3c_tracestate,
+    Optional<OtelTraceState> otel_w3c_tracestate,
     Optional<std::string> additional_w3c_tracestate,
     Optional<std::string> additional_datadog_w3c_tracestate,
     std::unique_ptr<SpanData> local_root,
@@ -272,13 +290,14 @@ Optional<W3CLinkContext> TraceSegment::w3c_link_context(
     }
   }
 
+  const Optional<OtelTraceState> resolved_otel_w3c_tracestate =
+      resolve_otel_tracestate(span.trace_id, sampling_decision,
+                              otel_w3c_tracestate_);
   return std::make_pair(
-      encode_tracestate(
-          span.span_id, sampling_decision.priority, origin_, trace_tags,
-          additional_datadog_w3c_tracestate_,
-          resolve_otel_tracestate(span.trace_id, sampling_decision,
-                                  otel_w3c_tracestate_),
-          additional_w3c_tracestate_),
+      encode_tracestate(span.span_id, sampling_decision.priority, origin_,
+                        trace_tags, additional_datadog_w3c_tracestate_,
+                        resolved_otel_w3c_tracestate,
+                        additional_w3c_tracestate_),
       sampling_decision.priority > 0 ? 1u : 0u);
 }
 
@@ -563,20 +582,23 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:b3multi"});
         break;
-      case PropagationStyle::W3C:
+      case PropagationStyle::W3C: {
+        const Optional<OtelTraceState> resolved_otel_w3c_tracestate =
+            resolve_otel_tracestate(span.trace_id, sampling_decision,
+                                    otel_w3c_tracestate_);
         writer.set("traceparent",
                    encode_traceparent(span.trace_id, span.span_id,
                                       sampling_decision.priority));
-        writer.set("tracestate",
-                   encode_tracestate(
-                       span.span_id, sampling_decision.priority, origin_,
-                       trace_tags, additional_datadog_w3c_tracestate_,
-                       resolve_otel_tracestate(span.trace_id, sampling_decision,
-                                               otel_w3c_tracestate_),
-                       additional_w3c_tracestate_));
+        writer.set(
+            "tracestate",
+            encode_tracestate(span.span_id, sampling_decision.priority, origin_,
+                              trace_tags, additional_datadog_w3c_tracestate_,
+                              resolved_otel_w3c_tracestate,
+                              additional_w3c_tracestate_));
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:tracecontext"});
         break;
+      }
       default:
         break;
     }

@@ -7,6 +7,7 @@
 #include <datadog/dict_reader.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
+#include <datadog/otel_tracestate.h>
 #include <datadog/string_view.h>
 #include <datadog/trace_id.h>
 
@@ -52,7 +53,7 @@ std::string encode_tracestate(
     const Optional<std::string>& origin,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate,
-    const Optional<std::string>& otel_w3c_tracestate,
+    const Optional<OtelTraceState>& otel_w3c_tracestate,
     const Optional<std::string>& additional_w3c_tracestate);
 
 }  // namespace tracing

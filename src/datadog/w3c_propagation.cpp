@@ -314,16 +314,19 @@ void parse_datadog_trace_state(ExtractedData& result,
 // "tracestate" header.
 //
 // `parse_ot_tracestate` preserves the first OpenTelemetry state in a header.
-void parse_ot_tracestate(ExtractedData& result, StringView ot_tracestate) {
+void parse_ot_tracestate(ExtractedData& result, StringView ot_tracestate,
+                         std::size_t position) {
   if (!result.otel_w3c_tracestate) {
-    result.otel_w3c_tracestate = std::string(ot_tracestate);
+    result.otel_w3c_tracestate =
+        OtelTraceState{std::string(ot_tracestate), position};
   }
 }
 
 void parse_w3c_tracestate_member(
     ExtractedData& result, StringView member,
     std::unordered_map<std::string, std::string>& span_tags,
-    std::string& other_w3c_tracestate) {
+    std::string& other_w3c_tracestate,
+    std::size_t& other_w3c_tracestate_member_count) {
   const std::size_t separator = member.find('=');
   const StringView key = member.substr(0, separator);
   const StringView member_value = separator == StringView::npos
@@ -339,13 +342,17 @@ void parse_w3c_tracestate_member(
     if (member_value.size() > max_w3c_tracestate_member_value_size) {
       span_tags[tags::internal::propagation_error] = "extract_max_size";
     } else {
-      parse_ot_tracestate(result, member_value);
+      parse_ot_tracestate(result, member_value,
+                          other_w3c_tracestate_member_count);
     }
   } else {
     if (!other_w3c_tracestate.empty()) {
       other_w3c_tracestate += ',';
     }
-    append(other_w3c_tracestate, member);
+    if (!member.empty()) {
+      append(other_w3c_tracestate, member);
+      ++other_w3c_tracestate_member_count;
+    }
   }
 }
 
@@ -359,9 +366,10 @@ void parse_w3c_tracestate(
     ExtractedData& result, StringView w3c_tracestate,
     std::unordered_map<std::string, std::string>& span_tags) {
   std::string other_w3c_tracestate;
+  std::size_t other_w3c_tracestate_member_count = 0;
   for_each_w3c_tracestate_member(w3c_tracestate, [&](StringView member) {
-    parse_w3c_tracestate_member(result, member, span_tags,
-                                other_w3c_tracestate);
+    parse_w3c_tracestate_member(result, member, span_tags, other_w3c_tracestate,
+                                other_w3c_tracestate_member_count);
     return true;
   });
 
@@ -536,16 +544,41 @@ Optional<std::string> rewrite_otel_tracestate(
   return result;
 }
 
-void append_tracestate_entries(std::string& result, StringView entries,
-                               std::size_t& member_count) {
+// Append other vendors and the `ot` member in their specified order.
+void append_tracestate_entries(
+    std::string& result, StringView entries, std::size_t& member_count,
+    const Optional<OtelTraceState>& otel_w3c_tracestate) {
+  std::size_t other_w3c_tracestate_position = 0;
+  const auto append_otel_tracestate = [&]() {
+    result += ",ot=";
+    result += otel_w3c_tracestate->value;
+    ++member_count;
+  };
+
   for_each_w3c_tracestate_member(entries, [&](StringView entry) {
-    if (!entry.empty()) {
-      result += ',';
-      append(result, entry);
-      ++member_count;
+    if (entry.empty()) {
+      return true;
     }
+    if (otel_w3c_tracestate &&
+        otel_w3c_tracestate->position == other_w3c_tracestate_position) {
+      append_otel_tracestate();
+      if (member_count >= max_w3c_tracestate_members) {
+        return false;
+      }
+    }
+
+    result += ',';
+    append(result, entry);
+    ++member_count;
+    ++other_w3c_tracestate_position;
     return member_count < max_w3c_tracestate_members;
   });
+
+  if (otel_w3c_tracestate &&
+      otel_w3c_tracestate->position == other_w3c_tracestate_position &&
+      member_count < max_w3c_tracestate_members) {
+    append_otel_tracestate();
+  }
 }
 
 std::string encode_tracestate(
@@ -553,21 +586,19 @@ std::string encode_tracestate(
     const Optional<std::string>& origin,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate,
-    const Optional<std::string>& otel_w3c_tracestate,
+    const Optional<OtelTraceState>& otel_w3c_tracestate,
     const Optional<std::string>& additional_w3c_tracestate) {
   std::string result =
       encode_datadog_tracestate(span_id, sampling_priority, origin, trace_tags,
                                 additional_datadog_w3c_tracestate);
 
   std::size_t member_count = 1;
-  if (otel_w3c_tracestate) {
-    result += ",ot=";
-    result += *otel_w3c_tracestate;
-    ++member_count;
-  }
-
-  if (additional_w3c_tracestate) {
-    append_tracestate_entries(result, *additional_w3c_tracestate, member_count);
+  if (additional_w3c_tracestate || otel_w3c_tracestate) {
+    const StringView entries = additional_w3c_tracestate
+                                   ? StringView(*additional_w3c_tracestate)
+                                   : StringView{};
+    append_tracestate_entries(result, entries, member_count,
+                              otel_w3c_tracestate);
   }
 
   return result;

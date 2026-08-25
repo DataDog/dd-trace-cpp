@@ -933,6 +933,15 @@ TEST_SPAN("injecting W3C tracestate header") {
        },
        // The "s:0" comes from the sampling decision in `traceparent_drop`.
        "dd=s:0;p:$parent_id,foo=bar,boing=boing"},
+
+      {__LINE__,
+       "unmodified OpenTelemetry member preserves vendor order",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate", "foo=bar,ot=future:value,boing=boing"},
+       },
+       // The "s:0" comes from the sampling decision in `traceparent_drop`.
+       "dd=s:0;p:$parent_id,foo=bar,ot=future:value,boing=boing"},
   }));
 
   CAPTURE(test_case.name);
