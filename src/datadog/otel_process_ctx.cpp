@@ -14,15 +14,17 @@
   #define _GNU_SOURCE
 #endif
 
-#if defined(__GNUC__) && defined(__cplusplus) && __cplusplus < 202002L
+#if defined(__GNUC__) && defined(__cplusplus)
   // This file uses C99 compound literals with designated initializers
-  // throughout. They are standard in C (since C99) and in C++ (since C++20),
-  // but trigger -Wpedantic (older GCC) or -Wc++20-extensions (newer GCC) when
-  // compiled as C++17 or older. Silencing -Wpragmas first lets GCC versions
-  // that don't know -Wc++20-extensions accept the pragma silently.
+  // throughout. Designated initializers are standard in C++20; compound
+  // literals themselves never are. This triggers -Wpedantic (older GCC) or
+  // -Wc++20-extensions (newer GCC) under C++17 or older, and -Wc99-extensions
+  // (Clang) regardless of dialect. Silencing -Wpragmas first lets GCC
+  // versions that don't know -Wc++20-extensions accept the pragma silently.
   #pragma GCC diagnostic ignored "-Wpragmas"
   #pragma GCC diagnostic ignored "-Wpedantic"
   #pragma GCC diagnostic ignored "-Wc++20-extensions"
+  #pragma GCC diagnostic ignored "-Wc99-extensions"
 #endif
 
 // Note: Things here are needed for NOOP. Things that are only for non-NOOP get added further below.

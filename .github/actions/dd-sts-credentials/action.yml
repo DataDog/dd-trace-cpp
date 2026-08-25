@@ -1,0 +1,15 @@
+name: "Get Datadog credentials"
+description: "Exchange the workflow's OIDC token for a short-lived Datadog API key via dd-sts"
+
+outputs:
+  api_key:
+    description: "Datadog API key"
+    value: ${{ steps.dd-sts-action.outputs.api_key }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: dd-sts-action
+      uses: DataDog/dd-sts-action@639d841c72f15e4e77747bd726ef8105ce971da2 # v1.0.5
+      with:
+        policy: public-datadog-dd-trace-cpp
