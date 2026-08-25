@@ -57,15 +57,12 @@ Cache cache_singleton;
 
 // Encode the specified `trace_tags`. If the encoded value is not longer than
 // the specified `tags_header_max_size`, then set it as the "x-datadog-tags"
-// header using the specified `writer`. If the encoded value is oversized, then
-// write a diagnostic to the specified `logger` and set a propagation error tag
-// on the specified `local_root_tags`.
-void inject_trace_tags(
+// header using the specified `writer`. Return true if the encoded value is
+// oversized.
+bool inject_trace_tags(
     DictWriter& writer,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
-    std::size_t tags_header_max_size,
-    std::unordered_map<std::string, std::string>& local_root_tags,
-    Logger& logger) {
+    std::size_t tags_header_max_size, Logger& logger) {
   const std::string encoded_trace_tags = encode_tags(trace_tags);
 
   if (encoded_trace_tags.size() > tags_header_max_size) {
@@ -78,10 +75,13 @@ void inject_trace_tags(
     message += std::to_string(encoded_trace_tags.size());
     message += " bytes.";
     logger.log_error(message);
-    local_root_tags[tags::internal::propagation_error] = "inject_max_size";
-  } else if (!encoded_trace_tags.empty()) {
+    return true;
+  }
+
+  if (!encoded_trace_tags.empty()) {
     writer.set("x-datadog-tags", encoded_trace_tags);
   }
+  return false;
 }
 
 void maybe_calculate_http_endpoint(HttpEndpointCalculationMode renaming_mode,
@@ -487,19 +487,16 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
   // decision and trace tags before unlocking.
   SamplingDecision sampling_decision;
   std::vector<std::pair<std::string, std::string>> trace_tags;
+  Optional<std::string> trace_source_tag;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     make_sampling_decision_if_null();
     assert(sampling_decision_);
     sampling_decision = *sampling_decision_;
     trace_tags = trace_tags_;
+
+    trace_source_tag = find_trace_source_tag(spans_.front()->tags);
   }
-
-  std::unordered_map<std::string, std::string>& local_root_tags =
-      spans_.front()->tags;
-
-  const Optional<std::string> trace_source_tag =
-      find_trace_source_tag(local_root_tags);
 
   // When tracing (the product) is disabled, skip tracing context propagation
   // when:
@@ -528,6 +525,7 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
     trace_tags.emplace_back(tags::internal::trace_source, *trace_source_tag);
   }
 
+  bool trace_tags_too_large = false;
   for (const auto style : injection_styles_) {
     switch (style) {
       case PropagationStyle::DATADOG:
@@ -538,8 +536,10 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
         }
-        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          local_root_tags, *logger_);
+        if (inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+                              *logger_)) {
+          trace_tags_too_large = true;
+        }
 
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:datadog"});
@@ -556,8 +556,10 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
         if (origin_) {
           writer.set("x-datadog-origin", *origin_);
         }
-        inject_trace_tags(writer, trace_tags, tags_header_max_size_,
-                          local_root_tags, *logger_);
+        if (inject_trace_tags(writer, trace_tags, tags_header_max_size_,
+                              *logger_)) {
+          trace_tags_too_large = true;
+        }
         telemetry::counter::increment(metrics::tracer::trace_context::injected,
                                       {"header_style:b3multi"});
         break;
@@ -578,6 +580,13 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
       default:
         break;
     }
+  }
+
+  if (trace_tags_too_large) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::unordered_map<std::string, std::string>& local_root_tags =
+        spans_.front()->tags;
+    local_root_tags[tags::internal::propagation_error] = "inject_max_size";
   }
 
   return true;
