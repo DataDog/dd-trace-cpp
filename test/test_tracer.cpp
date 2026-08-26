@@ -1575,6 +1575,49 @@ TEST_TRACER(
   CHECK(span->parent_id() == 2);
 }
 
+TEST_TRACER("extract first tries later styles after an incomplete extraction") {
+  struct TestCase {
+    int line;
+    std::string description;
+    std::string traceparent;
+    TraceID expected_trace_id;
+  };
+
+  const auto test_case = GENERATE(values<TestCase>({
+      {__LINE__, "matching trace ID",
+       "00-00000000000000000000000000000001-0000000000000002-01", TraceID{1}},
+      {__LINE__, "different trace ID",
+       "00-00000000000000000000000000000003-0000000000000002-01", TraceID{3}},
+  }));
+
+  CAPTURE(test_case.line);
+  CAPTURE(test_case.description);
+
+  const datadog::test::EnvGuard guard{"DD_TRACE_PROPAGATION_EXTRACT_FIRST",
+                                      "true"};
+  TracerConfig config;
+  config.service = "testsvc";
+  config.collector = std::make_shared<NullCollector>();
+  config.telemetry.enabled = false;
+  config.extraction_styles = std::vector<PropagationStyle>{
+      PropagationStyle::DATADOG, PropagationStyle::W3C};
+
+  const auto finalized_config = finalize_config(config);
+  REQUIRE(finalized_config);
+  Tracer tracer{*finalized_config};
+
+  const std::unordered_map<std::string, std::string> headers{
+      {"x-datadog-trace-id", "1"},
+      {"traceparent", test_case.traceparent},
+  };
+
+  MockDictReader reader{headers};
+  const auto span = tracer.extract_span(reader);
+  REQUIRE(span);
+  CHECK(span->trace_id() == test_case.expected_trace_id);
+  CHECK(span->parent_id() == 2);
+}
+
 TEST_TRACER("continue extraction resumes the extracted trace") {
   TracerConfig config;
   config.service = "testsvc";
