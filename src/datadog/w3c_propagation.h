@@ -7,6 +7,8 @@
 #include <datadog/dict_reader.h>
 #include <datadog/expected.h>
 #include <datadog/optional.h>
+#include <datadog/otel_tracestate.h>
+#include <datadog/string_view.h>
 #include <datadog/trace_id.h>
 
 #include <cstdint>
@@ -37,12 +39,21 @@ Expected<ExtractedData> extract_w3c(
 std::string encode_traceparent(TraceID trace_id, std::uint64_t span_id,
                                int sampling_priority);
 
+Optional<std::string> sanitize_otel_tracestate(StringView raw);
+
+Optional<std::uint64_t> extract_otel_random_value(StringView raw);
+
+Optional<std::string> rewrite_otel_tracestate(
+    StringView raw, Optional<std::uint64_t> random_value,
+    Optional<std::uint64_t> threshold);
+
 // Return a value for the "tracestate" header containing the specified fields.
 std::string encode_tracestate(
     uint64_t span_id, int sampling_priority,
     const Optional<std::string>& origin,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate,
+    const Optional<OtelTraceState>& otel_w3c_tracestate,
     const Optional<std::string>& additional_w3c_tracestate);
 
 }  // namespace tracing

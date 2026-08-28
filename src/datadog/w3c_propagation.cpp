@@ -33,9 +33,107 @@ auto verboten(int lowest_ascii, int highest_ascii,
   };
 }
 
-constexpr bool is_hexdiglc(const char c) {
+constexpr bool is_hexdig(const char c) {
   return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
          (c >= 'A' && c <= 'F');
+}
+
+constexpr bool is_lowercase_hexdig(const char c) {
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+}
+
+constexpr std::size_t otel_random_value_size = 14;
+constexpr std::size_t min_otel_threshold_size = 1;
+constexpr std::size_t max_otel_threshold_size = otel_random_value_size;
+constexpr std::size_t max_w3c_tracestate_member_value_size = 256;
+constexpr std::size_t max_datadog_tracestate_value_size = 512;
+constexpr std::size_t max_w3c_tracestate_members = 32;
+
+Optional<std::uint64_t> parse_otel_value(StringView value,
+                                         std::size_t minimum_size,
+                                         std::size_t maximum_size) {
+  if (value.size() < minimum_size || value.size() > maximum_size ||
+      !std::all_of(value.begin(), value.end(), is_lowercase_hexdig)) {
+    return nullopt;
+  }
+
+  const Expected<std::uint64_t> parsed = parse_uint64(value, 16);
+  if (parsed.if_error()) {
+    return nullopt;
+  }
+  return *parsed;
+}
+
+Optional<std::uint64_t> parse_otel_random_value(StringView value) {
+  return parse_otel_value(value, otel_random_value_size,
+                          otel_random_value_size);
+}
+
+Optional<std::uint64_t> parse_otel_threshold(StringView value) {
+  return parse_otel_value(value, min_otel_threshold_size,
+                          max_otel_threshold_size);
+}
+
+template <class Function>
+void for_each_otel_item(StringView raw, Function&& function) {
+  std::size_t begin = 0;
+  while (begin < raw.size()) {
+    const std::size_t end = raw.find(';', begin);
+    const StringView item = raw.substr(begin, end - begin);
+    const std::size_t separator = item.find(':');
+    const StringView key = item.substr(0, separator);
+    const StringView value = separator == StringView::npos
+                                 ? StringView{}
+                                 : item.substr(separator + 1);
+    function(item, key, value);
+    if (end == StringView::npos) {
+      return;
+    }
+    begin = end + 1;
+  }
+}
+
+template <class Function>
+void for_each_w3c_tracestate_member(StringView tracestate,
+                                    Function&& function) {
+  std::size_t begin = 0;
+  while (begin < tracestate.size()) {
+    const std::size_t end = tracestate.find(',', begin);
+    const StringView member = trim(tracestate.substr(begin, end - begin));
+    if (!function(member) || end == StringView::npos) {
+      return;
+    }
+    begin = end + 1;
+  }
+}
+
+void append_otel_item(std::string& result, StringView item) {
+  if (item.empty()) {
+    return;
+  }
+
+  const std::size_t separator_size = result.empty() ? 0 : 1;
+  if (result.size() + separator_size + item.size() >
+      max_w3c_tracestate_member_value_size) {
+    return;
+  }
+
+  if (separator_size) {
+    result += ';';
+  }
+  append(result, item);
+}
+
+std::string format_otel_hex(std::uint64_t value) {
+  return hex_padded(value).substr(2);
+}
+
+std::string format_otel_threshold(std::uint64_t threshold) {
+  std::string result = format_otel_hex(threshold);
+  while (result.size() > 1 && result.back() == '0') {
+    result.pop_back();
+  }
+  return result;
 }
 
 // Populate the specified `result` with data extracted from the "traceparent"
@@ -64,7 +162,7 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
 
           beg = i + 1;
           internal_state = state::trace_id;
-        } else if (!is_hexdiglc(traceparent[i])) {
+        } else if (!is_hexdig(traceparent[i])) {
           return "invalid_version";
         }
       } break;
@@ -124,100 +222,18 @@ handle_trace_flag:
   return nullopt;
 }
 
-// `struct PartiallyParsedTracestat` contains the separated Datadog-specific and
-// non-Datadog-specific portions of tracestate.
-struct PartiallyParsedTracestate {
-  StringView datadog_value;
-  std::string other_entries;
-};
+bool is_valid_datadog_trace_state(StringView datadog_trace_state) {
+  const std::size_t end = datadog_trace_state.size();
+  std::size_t item_begin = 0;
+  while (item_begin < end) {
+    const std::size_t item_end = datadog_trace_state.find(';', item_begin);
+    const StringView item =
+        datadog_trace_state.substr(item_begin, item_end - item_begin);
+    item_begin = item_end == StringView::npos ? end : item_end + 1;
 
-void append_tracestate_member(std::string& destination, StringView member) {
-  member = trim(member);
-  if (member.empty()) {
-    return;
-  }
-
-  if (!destination.empty()) {
-    destination += ',';
-  }
-  append(destination, member);
-}
-
-// Return the separate Datadog-specific and non-Datadog-specific portions of the
-// specified `tracestate`. If `tracestate` does not have a Datadog-specific
-// portion, return `nullopt`.
-Optional<PartiallyParsedTracestate> parse_tracestate(StringView tracestate) {
-  const std::size_t begin = 0;
-  const std::size_t end = tracestate.size();
-  std::size_t pair_begin = begin;
-  std::string other_entries;
-  while (pair_begin < end) {
-    const std::size_t pair_end = tracestate.find(',', pair_begin);
-    // Note that since this `pair` is `strip`ped, `pair_begin` is not
-    // necessarily equal to `pair.begin()` (similarly for the ends).
-    const auto pair =
-        trim(tracestate.substr(pair_begin, pair_end - pair_begin));
-    if (pair.empty()) {
-      pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
-      continue;
-    }
-
-    const auto kv_separator = pair.find('=');
-    if (kv_separator == StringView::npos) {
-      // This is an invalid entry because it contains a non-whitespace character
-      // but not a "=".
-      // Let's move on to the next entry.
-      append_tracestate_member(other_entries, pair);
-      pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
-      continue;
-    }
-
-    const auto key = pair.substr(0, kv_separator);
-    if (key != "dd") {
-      // On to the next.
-      append_tracestate_member(other_entries, pair);
-      pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
-      continue;
-    }
-
-    PartiallyParsedTracestate result;
-    result.datadog_value = pair.substr(kv_separator + 1);
-    result.other_entries = std::move(other_entries);
-
-    std::size_t remaining_pair_begin =
-        (pair_end == StringView::npos) ? end : pair_end + 1;
-    while (remaining_pair_begin < end) {
-      const std::size_t remaining_pair_end =
-          tracestate.find(',', remaining_pair_begin);
-      append_tracestate_member(
-          result.other_entries,
-          tracestate.substr(remaining_pair_begin,
-                            remaining_pair_end - remaining_pair_begin));
-      remaining_pair_begin = (remaining_pair_end == StringView::npos)
-                                 ? end
-                                 : remaining_pair_end + 1;
-    }
-
-    return result;
-  }
-
-  return nullopt;
-}
-
-bool is_valid_datadog_tracestate(StringView datadog_value) {
-  const std::size_t end = datadog_value.size();
-  std::size_t pair_begin = 0;
-  while (pair_begin < end) {
-    const std::size_t pair_end = datadog_value.find(';', pair_begin);
-    const auto pair = datadog_value.substr(pair_begin, pair_end - pair_begin);
-    pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
-
-    const auto trimmed = trim(pair);
-    if (trimmed.empty()) {
-      continue;
-    }
-
-    if (trimmed.data() != pair.data() || trimmed.size() != pair.size()) {
+    const StringView trimmed_item = trim(item);
+    if (trimmed_item.data() != item.data() ||
+        trimmed_item.size() != item.size()) {
       return false;
     }
   }
@@ -226,22 +242,24 @@ bool is_valid_datadog_tracestate(StringView datadog_value) {
 }
 
 // Fill the specified `result` with information parsed from the specified
-// `datadog_value`. `datadog_value` is the value of the "dd" entry in the
-// "tracestate" header.
+// `datadog_trace_state`. `datadog_trace_state` is the value of the "dd" entry
+// in the W3C "tracestate" header.
 //
-// `parse_datadog_tracestate` populates the following `ExtractedData` fields:
+// `parse_datadog_trace_state` populates the following `ExtractedData` fields:
 //
 // - `origin`
 // - `trace_tags`
 // - `sampling_priority`
 // - `datadog_w3c_parent_id`
 // - `additional_datadog_w3c_tracestate`
-void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
-  const std::size_t end = datadog_value.size();
+void parse_datadog_trace_state(ExtractedData& result,
+                               StringView datadog_trace_state) {
+  const std::size_t end = datadog_trace_state.size();
   std::size_t pair_begin = 0;
   while (pair_begin < end) {
-    const std::size_t pair_end = datadog_value.find(';', pair_begin);
-    const auto pair = datadog_value.substr(pair_begin, pair_end - pair_begin);
+    const std::size_t pair_end = datadog_trace_state.find(';', pair_begin);
+    const auto pair =
+        datadog_trace_state.substr(pair_begin, pair_end - pair_begin);
     pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
     if (pair.empty()) {
       continue;
@@ -310,49 +328,92 @@ void parse_datadog_tracestate(ExtractedData& result, StringView datadog_value) {
   }
 }
 
-// Fill the specified `result` with information parsed from the "tracestate"
-// element of the specified `headers`, if present.
+// Fill the specified `result` with information parsed from the specified
+// `ot_tracestate`. `ot_tracestate` is the value of the "ot" entry in the W3C
+// "tracestate" header.
 //
-// `extract_tracestate` populates the `additional_w3c_tracestate` field of
-// `ExtractedData`, in addition to those populated by
-// `parse_datadog_tracestate`.
-void extract_tracestate(
-    ExtractedData& result, const DictReader& headers,
-    std::unordered_map<std::string, std::string>& span_tags) {
-  const auto maybe_tracestate = headers.lookup("tracestate");
-  if (!maybe_tracestate || maybe_tracestate->empty()) {
-    return;
+// `parse_ot_tracestate` preserves the first OpenTelemetry state in a header.
+void parse_ot_tracestate(ExtractedData& result, StringView ot_tracestate,
+                         std::size_t position) {
+  if (!result.otel_w3c_tracestate) {
+    result.otel_w3c_tracestate =
+        OtelTraceState{std::string(ot_tracestate), position};
   }
+}
 
-  const auto tracestate = trim(*maybe_tracestate);
-  result.tracestate_full = tracestate;
-
-  auto maybe_parsed = parse_tracestate(tracestate);
-  if (!maybe_parsed) {
-    // No "dd" entry in `tracestate`, so there's nothing to extract.
-    if (!tracestate.empty()) {
-      result.additional_w3c_tracestate = std::string{tracestate};
+void parse_w3c_tracestate_member(
+    ExtractedData& result, StringView member,
+    std::unordered_map<std::string, std::string>& span_tags,
+    std::string& other_w3c_tracestate,
+    std::size_t& other_w3c_tracestate_member_count,
+    bool& has_datadog_trace_state) {
+  const std::size_t separator = member.find('=');
+  const StringView key = member.substr(0, separator);
+  const StringView member_value = separator == StringView::npos
+                                      ? StringView{}
+                                      : member.substr(separator + 1);
+  if (key == "dd") {
+    has_datadog_trace_state = true;
+    if (member_value.size() > max_datadog_tracestate_value_size) {
+      span_tags[tags::internal::propagation_error] = "extract_max_size";
+    } else if (is_valid_datadog_trace_state(member_value)) {
+      parse_datadog_trace_state(result, member_value);
     }
-    return;
+  } else if (key == "ot") {
+    if (member_value.size() > max_w3c_tracestate_member_value_size) {
+      span_tags[tags::internal::propagation_error] = "extract_max_size";
+    } else {
+      parse_ot_tracestate(result, member_value,
+                          other_w3c_tracestate_member_count);
+    }
+  } else {
+    if (!other_w3c_tracestate.empty()) {
+      other_w3c_tracestate += ',';
+    }
+    if (!member.empty()) {
+      append(other_w3c_tracestate, member);
+      ++other_w3c_tracestate_member_count;
+    }
+  }
+}
+
+// Fill the specified `result` with information parsed from the specified W3C
+// `tracestate`.
+//
+// `parse_w3c_tracestate` populates `additional_w3c_tracestate`, in addition to
+// the fields populated by `parse_datadog_trace_state` and
+// `parse_ot_tracestate`.
+void parse_w3c_tracestate(
+    ExtractedData& result, StringView w3c_tracestate,
+    std::unordered_map<std::string, std::string>& span_tags) {
+  std::string other_w3c_tracestate;
+  std::size_t other_w3c_tracestate_member_count = 0;
+  bool has_datadog_trace_state = false;
+  for_each_w3c_tracestate_member(w3c_tracestate, [&](StringView member) {
+    parse_w3c_tracestate_member(result, member, span_tags, other_w3c_tracestate,
+                                other_w3c_tracestate_member_count,
+                                has_datadog_trace_state);
+    return true;
+  });
+
+  if (has_datadog_trace_state) {
+    std::string canonical_other_w3c_tracestate;
+    for_each_w3c_tracestate_member(
+        other_w3c_tracestate, [&](StringView member) {
+          if (!member.empty()) {
+            if (!canonical_other_w3c_tracestate.empty()) {
+              canonical_other_w3c_tracestate += ',';
+            }
+            append(canonical_other_w3c_tracestate, member);
+          }
+          return true;
+        });
+    other_w3c_tracestate = std::move(canonical_other_w3c_tracestate);
   }
 
-  auto& [datadog_value, other_entries] = *maybe_parsed;
-  if (!other_entries.empty()) {
-    result.additional_w3c_tracestate = std::move(other_entries);
+  if (!other_w3c_tracestate.empty()) {
+    result.additional_w3c_tracestate = std::move(other_w3c_tracestate);
   }
-
-  // If the "dd" vendor entry's value exceeds 512 bytes, drop it and record a
-  // propagation error tag.
-  if (datadog_value.size() > 512) {
-    span_tags[tags::internal::propagation_error] = "extract_max_size";
-    return;
-  }
-
-  if (!is_valid_datadog_tracestate(datadog_value)) {
-    return;
-  }
-
-  parse_datadog_tracestate(result, datadog_value);
 }
 
 }  // namespace
@@ -382,7 +443,12 @@ Expected<ExtractedData> extract_w3c(
   }
 
   result.datadog_w3c_parent_id = "0000000000000000";
-  extract_tracestate(result, headers, span_tags);
+  const Optional<StringView> maybe_tracestate = headers.lookup("tracestate");
+  if (maybe_tracestate && !maybe_tracestate->empty()) {
+    const StringView tracestate = trim(*maybe_tracestate);
+    result.tracestate_full = tracestate;
+    parse_w3c_tracestate(result, tracestate, span_tags);
+  }
 
   return result;
 }
@@ -453,12 +519,11 @@ std::string encode_datadog_tracestate(
     result += *additional_datadog_w3c_tracestate;
   }
 
-  const std::size_t max_size = 256;
-  while (result.size() > max_size) {
+  while (result.size() > max_w3c_tracestate_member_value_size) {
     const auto last_semicolon_index = result.rfind(';');
     // This assumption is safe, because `result` always begins with
-    // "dd=s:<int>", and that's fewer than `max_size` characters for any
-    // `<int>`.
+    // "dd=s:<int>", and that's fewer than
+    // `max_w3c_tracestate_member_value_size` characters for any `<int>`.
     assert(last_semicolon_index != std::string::npos);
     result.resize(last_semicolon_index);
   }
@@ -466,19 +531,112 @@ std::string encode_datadog_tracestate(
   return result;
 }
 
+Optional<std::string> sanitize_otel_tracestate(StringView raw) {
+  std::string result;
+  for_each_otel_item(raw,
+                     [&](StringView item, StringView key, StringView value) {
+                       if ((key == "rv" && !parse_otel_random_value(value)) ||
+                           (key == "th" && !parse_otel_threshold(value))) {
+                         return;
+                       }
+                       append_otel_item(result, item);
+                     });
+  if (result.empty()) {
+    return nullopt;
+  }
+  return result;
+}
+
+Optional<std::uint64_t> extract_otel_random_value(StringView raw) {
+  Optional<std::uint64_t> result;
+  for_each_otel_item(raw, [&](StringView, StringView key, StringView value) {
+    if (!result && key == "rv") {
+      result = parse_otel_random_value(value);
+    }
+  });
+  return result;
+}
+
+Optional<std::string> rewrite_otel_tracestate(
+    StringView raw, Optional<std::uint64_t> random_value,
+    Optional<std::uint64_t> threshold) {
+  std::string result;
+  if (random_value) {
+    const std::string item = "rv:" + format_otel_hex(*random_value);
+    append_otel_item(result, item);
+  }
+  if (threshold) {
+    const std::string item = "th:" + format_otel_threshold(*threshold);
+    append_otel_item(result, item);
+  }
+
+  for_each_otel_item(raw, [&](StringView item, StringView key, StringView) {
+    if (key != "rv" && key != "th") {
+      append_otel_item(result, item);
+    }
+  });
+
+  if (result.empty()) {
+    return nullopt;
+  }
+  return result;
+}
+
+// Append other vendors and the `ot` member in their specified order.
+void append_tracestate_entries(
+    std::string& result, StringView entries, std::size_t& member_count,
+    const Optional<OtelTraceState>& otel_w3c_tracestate) {
+  std::size_t other_w3c_tracestate_position = 0;
+  const auto append_otel_tracestate = [&]() {
+    result += ",ot=";
+    result += otel_w3c_tracestate->value;
+    ++member_count;
+  };
+
+  for_each_w3c_tracestate_member(entries, [&](StringView entry) {
+    if (entry.empty()) {
+      return true;
+    }
+    if (otel_w3c_tracestate &&
+        otel_w3c_tracestate->position == other_w3c_tracestate_position) {
+      append_otel_tracestate();
+      if (member_count >= max_w3c_tracestate_members) {
+        return false;
+      }
+    }
+
+    result += ',';
+    append(result, entry);
+    ++member_count;
+    ++other_w3c_tracestate_position;
+    return member_count < max_w3c_tracestate_members;
+  });
+
+  if (otel_w3c_tracestate &&
+      otel_w3c_tracestate->position == other_w3c_tracestate_position &&
+      member_count < max_w3c_tracestate_members) {
+    append_otel_tracestate();
+  }
+}
+
 std::string encode_tracestate(
     uint64_t span_id, int sampling_priority,
     const Optional<std::string>& origin,
     const std::vector<std::pair<std::string, std::string>>& trace_tags,
     const Optional<std::string>& additional_datadog_w3c_tracestate,
+    const Optional<OtelTraceState>& otel_w3c_tracestate,
     const Optional<std::string>& additional_w3c_tracestate) {
   std::string result =
       encode_datadog_tracestate(span_id, sampling_priority, origin, trace_tags,
                                 additional_datadog_w3c_tracestate);
 
-  if (additional_w3c_tracestate) {
-    result += ',';
-    result += *additional_w3c_tracestate;
+  std::size_t member_count = 1;
+  if (additional_w3c_tracestate || otel_w3c_tracestate) {
+    const StringView entries = additional_w3c_tracestate
+                                   ? StringView(*additional_w3c_tracestate)
+                                   : StringView{};
+    append_tracestate_entries(result, entries, member_count,
+                              otel_w3c_tracestate);
   }
 
   return result;

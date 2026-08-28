@@ -4,12 +4,29 @@
 // `TraceSampler` and `SpanSampler`.
 
 #include <datadog/rate.h>
+#include <datadog/sampling_mechanism.h>
 
 #include <cstdint>
 #include <limits>
 
 namespace datadog {
 namespace tracing {
+
+inline bool is_probability_mechanism(int mechanism) {
+  switch (static_cast<SamplingMechanism>(mechanism)) {
+    case SamplingMechanism::DEFAULT:
+    case SamplingMechanism::AGENT_RATE:
+    case SamplingMechanism::REMOTE_RATE_AUTO:
+    case SamplingMechanism::RULE:
+    case SamplingMechanism::REMOTE_RATE_USER_DEFINED:
+    case SamplingMechanism::REMOTE_RATE_EMERGENCY:
+    case SamplingMechanism::REMOTE_RULE:
+    case SamplingMechanism::REMOTE_ADAPTIVE_RULE:
+      return true;
+    default:
+      return false;
+  }
+}
 
 // Return a hash value for the specified `value`. `value` is one of the
 // following:

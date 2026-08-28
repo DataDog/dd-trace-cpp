@@ -1000,14 +1000,14 @@ TEST_TRACER("span extraction") {
         {
             __LINE__,
             "dd entry with trailing semicolon",
-            traceparent_keep,       // traceparent
-            "foo=1,dd=s:2;o:some;", // tracestate
-            2,                      // expected_sampling_priority
-            "some",                 // expected_origin
-            {},                     // expected_trace_tags
-            "foo=1",                // expected_additional_w3c_tracestate
-            nullopt,                // expected_additional_datadog_w3c_tracestate
-            "0000000000000000",     // expected_datadog_w3c_parent_id,
+            traceparent_keep,        // traceparent
+            "foo=1,dd=s:2;o:some;",  // tracestate
+            2,                       // expected_sampling_priority
+            "some",                  // expected_origin
+            {},                      // expected_trace_tags
+            "foo=1",                 // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
 
         {
@@ -1019,7 +1019,7 @@ TEST_TRACER("span extraction") {
             "some",                     // expected_origin
             {},                         // expected_trace_tags
             "foo=1",                    // expected_additional_w3c_tracestate
-            nullopt,  // expected_additional_datadog_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
             "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
 
@@ -1032,72 +1032,111 @@ TEST_TRACER("span extraction") {
             "some",                  // expected_origin
             {},                      // expected_trace_tags
             "foo=1",                 // expected_additional_w3c_tracestate
-            nullopt,                 // expected_additional_datadog_w3c_tracestate
-            "0000000000000000",      // expected_datadog_w3c_parent_id,
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
 
         {
             __LINE__,
             "dd entry with leading semicolon",
-            traceparent_keep,       // traceparent
-            "foo=1,dd=;s:2;o:some", // tracestate
-            2,                      // expected_sampling_priority
-            "some",                 // expected_origin
-            {},                     // expected_trace_tags
-            "foo=1",                // expected_additional_w3c_tracestate
-            nullopt,                // expected_additional_datadog_w3c_tracestate
-            "0000000000000000",     // expected_datadog_w3c_parent_id,
+            traceparent_keep,        // traceparent
+            "foo=1,dd=;s:2;o:some",  // tracestate
+            2,                       // expected_sampling_priority
+            "some",                  // expected_origin
+            {},                      // expected_trace_tags
+            "foo=1",                 // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
 
         {
             __LINE__,
             "dd entry with interior OWS",
-            traceparent_keep,  // traceparent
+            traceparent_keep,                          // traceparent
             "foo=1,dd=s:0;t.dm:934086a686-4;  t.x:y",  // tracestate
-            1,        // expected_sampling_priority
-            nullopt,  // expected_origin
-            {},       // expected_trace_tags
-            "foo=1",  // expected_additional_w3c_tracestate
-            nullopt,  // expected_additional_datadog_w3c_tracestate
+            1,                   // expected_sampling_priority
+            nullopt,             // expected_origin
+            {},                  // expected_trace_tags
+            "foo=1",             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
             "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
 
         {
             __LINE__,
             "dd entry with OWS after first subentry",
-            traceparent_keep,                 // traceparent
-            "foo=1,dd=s:0; t.dm:934086a686-4", // tracestate
-            1,                                // expected_sampling_priority
-            nullopt,                          // expected_origin
-            {},                               // expected_trace_tags
-            "foo=1",                          // expected_additional_w3c_tracestate
-            nullopt,  // expected_additional_datadog_w3c_tracestate
+            traceparent_keep,                   // traceparent
+            "foo=1,dd=s:0; t.dm:934086a686-4",  // tracestate
+            1,                                  // expected_sampling_priority
+            nullopt,                            // expected_origin
+            {},                                 // expected_trace_tags
+            "foo=1",             // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "dd entry with whitespace-only subentry",
+            traceparent_keep,        // traceparent
+            "foo=1,dd=s:0; ;t.x:y",  // tracestate
+            1,                       // expected_sampling_priority
+            nullopt,                 // expected_origin
+            {},                      // expected_trace_tags
+            "foo=1",                 // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "dd entry with whitespace-only first subentry",
+            traceparent_keep,         // traceparent
+            "foo=1,dd= ;s:2;o:some",  // tracestate
+            1,                        // expected_sampling_priority
+            nullopt,                  // expected_origin
+            {},                       // expected_trace_tags
+            "foo=1",                  // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
             "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
 
         {
             __LINE__,
             "outer empty list member before dd",
-            traceparent_keep,          // traceparent
-            "foo=1,,dd=s:2;o:some",    // tracestate
-            2,                         // expected_sampling_priority
-            "some",                    // expected_origin
-            {},                        // expected_trace_tags
-            "foo=1",                   // expected_additional_w3c_tracestate
-            nullopt,                   // expected_additional_datadog_w3c_tracestate
-            "0000000000000000",        // expected_datadog_w3c_parent_id,
+            traceparent_keep,        // traceparent
+            "foo=1,,dd=s:2;o:some",  // tracestate
+            2,                       // expected_sampling_priority
+            "some",                  // expected_origin
+            {},                      // expected_trace_tags
+            "foo=1",                 // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
+            "outer empty list member after dd",
+            traceparent_keep,        // traceparent
+            "dd=s:2;o:some,,foo=1",  // tracestate
+            2,                       // expected_sampling_priority
+            "some",                  // expected_origin
+            {},                      // expected_trace_tags
+            "foo=1",                 // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
 
         {
             __LINE__,
             "outer OWS around list members",
-            traceparent_keep,                    // traceparent
-            "foo=1 , dd=s:2;o:some , bar=2",     // tracestate
-            2,                                   // expected_sampling_priority
-            "some",                              // expected_origin
-            {},                                  // expected_trace_tags
-            "foo=1,bar=2",                       // expected_additional_w3c_tracestate
-            nullopt,  // expected_additional_datadog_w3c_tracestate
+            traceparent_keep,                 // traceparent
+            "foo=1 , dd=s:2;o:some , bar=2",  // tracestate
+            2,                                // expected_sampling_priority
+            "some",                           // expected_origin
+            {},                               // expected_trace_tags
+            "foo=1,bar=2",       // expected_additional_w3c_tracestate
+            nullopt,             // expected_additional_datadog_w3c_tracestate
             "0000000000000000",  // expected_datadog_w3c_parent_id,
         },
 
@@ -1388,6 +1427,33 @@ TEST_TRACER("span extraction") {
     REQUIRE(extracted->additional_w3c_tracestate == "vendorx=keepme");
     REQUIRE(extracted->additional_datadog_w3c_tracestate == nullopt);
     REQUIRE(extracted->datadog_w3c_parent_id == "0000000000000000");
+
+    REQUIRE(logger.entries.empty());
+    REQUIRE(span_tags.count(tags::internal::propagation_error) == 1);
+    REQUIRE(span_tags.at(tags::internal::propagation_error) ==
+            "extract_max_size");
+  }
+
+  SECTION(
+      "'extract_max_size' propagation error if tracestate \"ot\" vendor "
+      "value is oversized on extract") {
+    constexpr std::size_t max_w3c_tracestate_member_value_size = 256;
+    const std::string ot_value(max_w3c_tracestate_member_value_size + 1, 'a');
+    std::unordered_map<std::string, std::string> span_tags;
+    MockLogger logger;
+    CAPTURE(logger.entries);
+    CAPTURE(span_tags);
+
+    std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-00000000000000000000000000000001-0000000000000001-00"},
+        {"tracestate", "dd=s:1,ot=" + ot_value + ",vendorx=keepme"}};
+    MockDictReader reader{headers};
+
+    const auto extracted = extract_w3c(reader, span_tags, logger);
+    REQUIRE(extracted);
+    REQUIRE(extracted->otel_w3c_tracestate == nullopt);
+    REQUIRE(extracted->additional_w3c_tracestate == "vendorx=keepme");
 
     REQUIRE(logger.entries.empty());
     REQUIRE(span_tags.count(tags::internal::propagation_error) == 1);
@@ -1831,6 +1897,69 @@ TEST_TRACER("restart extraction link uses metadata from the selected context") {
   REQUIRE(link.context.flags == Optional<std::uint32_t>(1u));
 }
 
+TEST_TRACER("OpenTelemetry tracestate sampling values") {
+  SECTION("malformed sampling values are removed") {
+    const Optional<std::string> normalized =
+        sanitize_otel_tracestate("rv:1234567890abcd;th:ABC;future:value");
+    REQUIRE(normalized);
+    REQUIRE(*normalized == "rv:1234567890abcd;future:value");
+
+    REQUIRE(!sanitize_otel_tracestate("rv:1234567890ABCD;th:A"));
+  }
+
+  SECTION("sampling values are replaced without altering other values") {
+    const Optional<std::string> rewritten = rewrite_otel_tracestate(
+        "rv:bad;future:value;th:bad", UINT64_C(0xf0948a54d43b8e),
+        UINT64_C(0xe6666666666668));
+    REQUIRE(rewritten);
+    REQUIRE(*rewritten == "rv:f0948a54d43b8e;th:e6666666666668;future:value");
+
+    const Optional<std::string> no_threshold =
+        rewrite_otel_tracestate("rv:1234567890abcd;th:e6666666666668",
+                                UINT64_C(0x1234567890abcd), nullopt);
+    REQUIRE(no_threshold);
+    REQUIRE(*no_threshold == "rv:1234567890abcd");
+  }
+
+  SECTION("the OpenTelemetry member is separated from other vendors") {
+    const std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-00000000000000000000000000000001-0000000000000001-01"},
+        {"tracestate",
+         "dd=s:2,ot=rv:1234567890abcd;th:e6666666666668;future:value,"
+         "congo=t61rcWkgMzE"},
+    };
+    MockDictReader reader{headers};
+    std::unordered_map<std::string, std::string> span_tags;
+    MockLogger logger;
+
+    const Expected<ExtractedData> extracted =
+        extract_w3c(reader, span_tags, logger);
+    REQUIRE(extracted);
+    REQUIRE(extracted->otel_w3c_tracestate);
+    REQUIRE(extracted->otel_w3c_tracestate->value ==
+            "rv:1234567890abcd;th:e6666666666668;future:value");
+    REQUIRE(extracted->additional_w3c_tracestate == "congo=t61rcWkgMzE");
+  }
+
+  SECTION("the first OpenTelemetry member is retained") {
+    const std::unordered_map<std::string, std::string> headers{
+        {"traceparent",
+         "00-00000000000000000000000000000001-0000000000000001-01"},
+        {"tracestate", "ot=first,ot=second"},
+    };
+    MockDictReader reader{headers};
+    std::unordered_map<std::string, std::string> span_tags;
+    MockLogger logger;
+
+    const Expected<ExtractedData> extracted =
+        extract_w3c(reader, span_tags, logger);
+    REQUIRE(extracted);
+    REQUIRE(extracted->otel_w3c_tracestate);
+    REQUIRE(extracted->otel_w3c_tracestate->value == "first");
+  }
+}
+
 TEST_TRACER("baggage usage") {
   TracerConfig config;
   config.logger = std::make_shared<NullLogger>();
@@ -2141,9 +2270,12 @@ TEST_TRACER("heterogeneous extraction") {
      {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
       {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
       {"traceparent", "00-00000000000000000000000000000030-0000000000000040-01"},
-      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}}, // origin is different
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo,"
+                     "ot=rv:1234567890abcd;th:e6666666666668;future:value"}}, // origin is different
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
-      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,competitor=stuff"}}},
+      {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas;ah:choo,"
+                     "competitor=stuff,ot=rv:1234567890abcd;th:e6666666666668;"
+                     "future:value"}}},
 
     {__LINE__, "ignore interlopers",
      {PropagationStyle::DATADOG, PropagationStyle::B3, PropagationStyle::W3C},
@@ -2164,7 +2296,8 @@ TEST_TRACER("heterogeneous extraction") {
      {{"x-datadog-trace-id", "48"}, {"x-datadog-parent-id", "64"},
       {"x-datadog-origin", "Kansas"}, {"x-datadog-sampling-priority", "2"},
       {"traceparent", "00-00000000000000000000000000000031-0000000000000040-01"},
-      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo"}},
+      {"tracestate", "competitor=stuff,dd=o:Nebraska;s:1;ah:choo,"
+                     "ot=rv:1234567890abcd;th:e6666666666668;future:value"}},
      {{"traceparent", "00-00000000000000000000000000000030-000000000000002a-01"},
       {"tracestate", "dd=s:2;p:000000000000002a;o:Kansas"}}},
 
