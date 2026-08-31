@@ -2,6 +2,7 @@
 
 This directory contains documentation of the Datadog C++ Tracer, including:
 
-- [Design](design.md)
 - [Conventions](conventions.md)
+- [Design](design.md)
 - [Development Processes](development.md)
+- [Thread Safety](thread-safety.md)
