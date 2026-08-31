@@ -67,3 +67,63 @@ set once and never mutated afterward.
 - If you supply your own `Collector`/`HTTPClient`/`EventScheduler`/`IDGenerator`/`Logger`, you must
   ensure it is safe to be called from multiple threads. The library will call it from whatever
   threads its other pluggable pieces run on.
+
+## Web Reverse Proxies Integrations
+
+The Datadog C++ Tracer was notably designed with the following three integrations in mind. Thus,
+they serve both as examples of different threading models and as projects for validating changes to
+the Tracer.
+
+### Datadog Nginx Module
+
+See [nginx-datadog](https://github.com/DataDog/nginx-datadog).
+
+Process / Thread Model:
+
+- Nginx has a **master process** which forks into several **worker processes**.
+- Each worker process handles many connections at once in a **single thread** (with one exception:
+  the optional security/WAF analysis runs in a side thread pool).
+- Each worker process creates its `Tracer`.
+
+It has a custom `NgxEventScheduler`, which runs on the worker's own event loop.
+
+It has a custom logger locking.
+
+The `root_session_id` is set explicitly, generated once pre-fork.
+
+The WAF thread pool mutates a `Span` from a non-owning thread (in `Context::run_waf_start()` ,
+`Context::run_waf_req_post()` and `Context::do_on_main_log_request()`). It is safe by an ad hoc
+protocol: handler swap (`Context::replace_handlers()`), and `std::atomic<bool> ran_on_thread_`
+release (`Context::handle()`) / acquire (`Context::complete()`).
+
+### Datadog Apache Httpd Module
+
+See [httpd-datadog](https://github.com/DataDog/httpd-datadog).
+
+Process / Thread Model:
+
+- Apache has a **master process** which forks into several **child processes**.
+- Depending on the configuration, the child processes can be single-threaded or **multi-threaded**.
+- Each child process creates its `Tracer`, shared by every thread in it.
+
+The `root_session_id` and `runtime_id` are set explicitly pre-fork.
+
+It has a custom logger locking.
+
+The `Span`s are allocated on the heap and tied to the request's Apache Pre-Request (APR) memory pool (and so automatically deleted when the request finishes).
+
+### Datadog Envoy Extension
+
+See
+[envoyproxy/envoy/source/extensions/tracers/datadog](https://github.com/envoyproxy/envoy/tree/main/source/extensions/tracers/datadog).
+
+Process / Thread Model:
+
+- Envoy has a **single process**, with several **worker threads**.
+- Each worker thread creates its `Tracer`.
+
+It uses a custom `AgentHTTPClient` and a custom `EventScheduler`. They are bound to the owning `Dispatcher`, with no extra thread.
+
+It uses Envoy’s own logging.
+
+Envoy is the only integration where `OtelCtxRegistration`'s multi-Tracer bookkeeping is actually exercised.
