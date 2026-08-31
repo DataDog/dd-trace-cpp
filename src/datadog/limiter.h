@@ -3,8 +3,8 @@
 // The `Limiter` class is an implementation of the [token
 // bucket](https://en.wikipedia.org/wiki/Token_bucket) rate limiter.
 //
-// `Limiter` is used by the `TraceSampler` and the `SpanSampler` to enforce their respective
-// `max_per_second` configuration parameters.
+// `Limiter` is used by the `TraceSampler` and the `SpanSampler` to enforce
+// their respective `max_per_second` configuration parameters.
 
 #include <datadog/clock.h>
 #include <datadog/rate.h>

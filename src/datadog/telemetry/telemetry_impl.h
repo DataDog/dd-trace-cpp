@@ -21,12 +21,13 @@ namespace datadog::telemetry {
 
 using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
 
-// The `Telemetry` class is responsible for handling internal telemetry data to track Datadog
-// product usage. It _can_ collect and report logs and metrics.
+// The `Telemetry` class is responsible for handling internal telemetry data to
+// track Datadog product usage. It _can_ collect and report logs and metrics.
 //
-// The current implementation can lead a significant amount of overhead if the mutex is highly
-// disputed. Unless this is proven to be indeed a bottleneck, we embrace KISS principle. However, in
-// a future iteration we could use multiple producers - single consumer queue or lock-free queue.
+// The current implementation can lead a significant amount of overhead if the
+// mutex is highly disputed. Unless this is proven to be indeed a bottleneck, we
+// embrace KISS principle. However, in a future iteration we could use multiple
+// producers - single consumer queue or lock-free queue.
 class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   // Configuration object containing the validated settings for telemetry
   FinalizedConfiguration config_;
