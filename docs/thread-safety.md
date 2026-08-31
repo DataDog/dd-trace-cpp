@@ -44,3 +44,26 @@ set once and never mutated afterward.
   trace loss on shutdown.
 - **AppSec/WAF-style thread-pool offload**. This Nginx feature stresses the core library's
   unsynchronized `Span` (see details below).
+
+## Take-aways for Library Users
+
+- It is safe to share one `Tracer` across many threads. `create_span()`/`extract_span()` can be
+  called concurrently. This is the primary supported model.
+- It is safe to create/finish sibling `Span`s of the same `TraceSegment` concurrently across
+  threads.
+- It is unsafe to use a single `Span` object from two threads at once. Either transfer ownership
+  completely (moves are supported) or build your own handoff protocol (see, for example,
+  `nginx-datadog`'s WAF thread-pool integration: atomic release/acquire flag + swapping out the
+  request's event handlers so the main thread can't touch it mid-flight).
+- Never construct a `Tracer` before your process forks. Construct it after, in each child.
+- Multiple `Tracer`s in one process share one telemetry pipeline.
+- Multiple `Tracer`s in one process will end up with a `root_session_id` decided by whichever
+  `Tracer` happened to construct first. To avoid this, you can you explicitly set
+  `TracerConfig::root_session_id` (for example, Nginx and Apache both compute it once, pre-fork,
+  then pass it explicitly).
+- Multiple `Tracer`s in one process publish one shared OpenTelemetry process context. The first
+  `Tracer`'s fields win. The shared `runtime_id` is published only while every `Tracer` agrees on
+  it.
+- If you supply your own `Collector`/`HTTPClient`/`EventScheduler`/`IDGenerator`/`Logger`, you must
+  ensure it is safe to be called from multiple threads. The library will call it from whatever
+  threads its other pluggable pieces run on.
