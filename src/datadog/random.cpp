@@ -22,7 +22,7 @@ class Uint64Generator {
     // If a process links to this library and then calls `fork`, the
     // `generator_` in the parent and child processes will produce the exact
     // same sequence of values, which is bad.
-    // A subsequent call to `exec` would remedy this, but nginx in particular
+    // A subsequent call to `exec` would remedy this, but Nginx in particular
     // does not call `exec` after forking its worker processes.
     // So, we use `at_fork_in_child` to re-seed `generator_` in the child
     // process after `fork`.

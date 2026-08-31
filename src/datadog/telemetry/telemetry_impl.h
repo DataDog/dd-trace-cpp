@@ -21,18 +21,16 @@ namespace datadog::telemetry {
 
 using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
 
-/// The telemetry class is responsible for handling internal telemetry data to
-/// track Datadog product usage. It _can_ collect and report logs and metrics.
-///
-/// NOTE(@dmehala): The current implementation can lead a significant amount
-/// of overhead if the mutext is highly disputed. Unless this is proven to be
-/// indeed a bottleneck, I'll embrace KISS principle. However, in a future
-/// iteration we could use multiple producer single consumer queue or
-/// lock-free queue.
+// The `Telemetry` class is responsible for handling internal telemetry data to track Datadog
+// product usage. It _can_ collect and report logs and metrics.
+//
+// The current implementation can lead a significant amount of overhead if the mutex is highly
+// disputed. Unless this is proven to be indeed a bottleneck, we embrace KISS principle. However, in
+// a future iteration we could use multiple producers - single consumer queue or lock-free queue.
 class Telemetry final : public std::enable_shared_from_this<Telemetry> {
-  /// Configuration object containing the validated settings for telemetry
+  // Configuration object containing the validated settings for telemetry
   FinalizedConfiguration config_;
-  /// Shared pointer to the user logger instance.
+  // Shared pointer to the user logger instance
   std::shared_ptr<tracing::Logger> logger_;
   std::vector<tracing::EventScheduler::Cancel> tasks_;
   tracing::HTTPClient::URL telemetry_endpoint_;
@@ -41,23 +39,23 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   tracing::Clock clock_;
   std::shared_ptr<tracing::EventScheduler> scheduler_;
 
-  /// Counter
+  // Counter
   std::mutex counter_mutex_;
   std::unordered_map<MetricContext<Counter>, uint64_t> counters_;
   std::unordered_map<MetricContext<Counter>, MetricSnapshot> counters_snapshot_;
 
-  /// Rate
+  // Rate
   std::mutex rate_mutex_;
   std::unordered_map<MetricContext<Rate>, uint64_t> rates_;
   std::unordered_map<MetricContext<Rate>, MetricSnapshot> rates_snapshot_;
 
-  /// Distribution
-  /// TODO: split distribution in array of N element?
+  // Distribution
+  // TODO: split distribution in array of N element?
   std::mutex distributions_mutex_;
   std::unordered_map<MetricContext<Distribution>, std::vector<uint64_t>>
       distributions_;
 
-  /// Configuration
+  // Configuration
   std::vector<tracing::ConfigMetadata> configuration_snapshot_;
 
   std::mutex log_mutex_;
@@ -97,15 +95,11 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
             tracing::Clock clock = tracing::default_clock);
 
  public:
-  /// Capture and report internal error message to Datadog.
-  ///
-  /// @param message The error message.
+  // Capture and report internal error message to Datadog.
   void log_error(std::string message);
   void log_error(std::string message, std::string stacktrace);
 
-  /// capture and report internal warning message to Datadog.
-  ///
-  /// @param message The warning message to log.
+  // Capture and report internal warning message to Datadog.
   void log_warning(std::string message);
 
   void send_configuration_change();
@@ -119,7 +113,7 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   // After this call the Telemetry object is inert and safe to destroy.
   void shutdown();
 
-  /// Counter
+  // Counter
   void increment_counter(const Counter& counter);
   void increment_counter(const Counter& counter,
                          const std::vector<std::string>& tags);
@@ -130,12 +124,12 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   void set_counter(const Counter& counter, const std::vector<std::string>& tags,
                    uint64_t value);
 
-  /// Rate
+  // Rate
   void set_rate(const Rate& rate, uint64_t value);
   void set_rate(const Rate& rate, const std::vector<std::string>& tags,
                 uint64_t value);
 
-  /// Distribution
+  // Distribution
   void add_datapoint(const Distribution& distribution, uint64_t value);
   void add_datapoint(const Distribution& distribution,
                      const std::vector<std::string>& tags, uint64_t value);
