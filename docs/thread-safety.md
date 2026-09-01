@@ -64,9 +64,9 @@ set once and never mutated afterward.
 - Multiple `Tracer`s in one process publish one shared OpenTelemetry process context. The first
   `Tracer`'s fields win. The shared `runtime_id` is published only while every `Tracer` agrees on
   it.
-- If you supply your own `Collector`/`HTTPClient`/`EventScheduler`/`IDGenerator`/`Logger`, you must
-  ensure it is safe to be called from multiple threads. The library will call it from whatever
-  threads its other pluggable pieces run on.
+- If you supply your own `Clock`/`Collector`/`EventScheduler`/`HTTPClient`/`IDGenerator`/`Logger`,
+  you must ensure it is safe to be called from multiple threads because the library will call it
+  from whatever threads its other pluggable pieces run on.
 
 ## Web Reverse Proxies Integrations
 
