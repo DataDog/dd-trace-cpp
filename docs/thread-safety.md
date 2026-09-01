@@ -19,10 +19,13 @@ set once and never mutated afterward.
   contract is: **one `Span`, one owner thread at a time**. Concurrency is meant to happen between
   sibling `Span`s of the same `TraceSegment`.
 - **Use `std::mutex`, not `std::atomic`**:
-  - Every synchronized class uses plain `std::mutex` + `lock_guard`/`unique_lock` (no usage of `std::atomic`), for simplicity.
+  - Every synchronized class uses plain `std::mutex` + `lock_guard`/`unique_lock` (no usage of
+    `std::atomic`), for simplicity.
   - No logging while holding a process-wide singleton's lock, because of potentially slow custom
     `Logger`.
-- **The default pluggable interfaces add extra threads.** The default `HTTPClient`, which is `Curl`, and the default `EventScheduler`, which is `ThreadedEventScheduler`, add each one a dedicated thread.
+- **The default pluggable interfaces add extra threads.** The default `HTTPClient`, which is `Curl`,
+  and the default `EventScheduler`, which is `ThreadedEventScheduler`, add each one a dedicated
+  thread.
 - `Fork` (such as Nginx/Apache pre-fork workers). Because background threads are not automatically
   fork-safe, the embedder must construct the `Tracer` (and therefore any default
   `Curl`/`ThreadedEventScheduler`) strictly after `fork()`.
@@ -110,7 +113,8 @@ The `root_session_id` and `runtime_id` are set explicitly pre-fork.
 
 It has a custom logger locking.
 
-The `Span`s are allocated on the heap and tied to the request's Apache Pre-Request (APR) memory pool (and so automatically deleted when the request finishes).
+The `Span`s are allocated on the heap and tied to the request's Apache Pre-Request (APR) memory pool
+(and so automatically deleted when the request finishes).
 
 ### Datadog Envoy Extension
 
@@ -122,8 +126,10 @@ Process / Thread Model:
 - Envoy has a **single process**, with several **worker threads**.
 - Each worker thread creates its `Tracer`.
 
-It uses a custom `AgentHTTPClient` and a custom `EventScheduler`. They are bound to the owning `Dispatcher`, with no extra thread.
+It uses a custom `AgentHTTPClient` and a custom `EventScheduler`. They are bound to the owning
+`Dispatcher`, with no extra thread.
 
 It uses Envoy’s own logging.
 
-Envoy is the only integration where `OtelCtxRegistration`'s multi-Tracer bookkeeping is actually exercised.
+Envoy is the only integration where `OtelCtxRegistration`'s multi-Tracer bookkeeping is actually
+exercised.
