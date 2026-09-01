@@ -60,10 +60,11 @@ set once and never mutated afterward.
   request's event handlers so the main thread can't touch it mid-flight).
 - Never construct a `Tracer` before your process forks. Construct it after, in each child.
 - Multiple `Tracer`s in one process share one telemetry pipeline.
-- Multiple `Tracer`s in one process will end up with a `root_session_id` decided by whichever
-  `Tracer` happened to construct first. To avoid this, you can you explicitly set
-  `TracerConfig::root_session_id` (for example, Nginx and Apache both compute it once, pre-fork,
-  then pass it explicitly).
+- Multiple `Tracer`s in one process end up with a `root_session_id` decided by the first `Tracer`
+  constructed (later values are silently ignored). Pass the same explicit
+  `TracerConfig::root_session_id` to every `Tracer` (for example, Nginx and Apache both compute it
+  once pre-fork, then pass it to each worker's `Tracer`).
+
 - Multiple `Tracer`s in one process publish one shared OpenTelemetry process context. The first
   `Tracer`'s fields win. The shared `runtime_id` is published only while every `Tracer` agrees on
   it.
