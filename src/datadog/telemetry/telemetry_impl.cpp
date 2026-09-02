@@ -617,27 +617,24 @@ std::string Telemetry::app_started_payload() {
     /// is no need to declare it.
     if (product.name == Product::Name::tracing) continue;
 
-    auto p = nlohmann::json{
-        {to_string(product.name),
-         nlohmann::json{
-             {"version", product.version},
-             {"enabled", product.enabled},
-         }},
+    auto product_details = nlohmann::json{
+        {"version", product.version},
+        {"enabled", product.enabled},
     };
 
     if (product.error_code || product.error_message) {
-      auto p_error = nlohmann::json{};
+      auto product_error = nlohmann::json{};
       if (product.error_code) {
-        p_error.emplace("code", *product.error_code);
+        product_error.emplace("code", *product.error_code);
       }
       if (product.error_message) {
-        p_error.emplace("message", *product.error_message);
+        product_error.emplace("message", *product.error_message);
       }
 
-      p.emplace("error", std::move(p_error));
+      product_details.emplace("error", std::move(product_error));
     }
 
-    product_json.emplace(std::move(p));
+    product_json.emplace(to_string(product.name), std::move(product_details));
   }
 
   auto app_started_msg = nlohmann::json{
