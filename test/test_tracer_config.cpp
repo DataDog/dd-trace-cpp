@@ -1626,6 +1626,52 @@ TRACER_CONFIG_TEST("telemetry products contain configuration precedence") {
   }
 }
 
+TRACER_CONFIG_TEST("telemetry includes AppSec product state") {
+  SECTION("AppSec defaults to disabled") {
+    auto finalized = finalize_config(TracerConfig{});
+    REQUIRE(finalized);
+
+    const datadog::telemetry::Product* appsec = nullptr;
+    for (const auto& product : finalized->telemetry.products) {
+      if (product.name == datadog::telemetry::Product::Name::appsec) {
+        appsec = &product;
+        break;
+      }
+    }
+
+    REQUIRE(appsec != nullptr);
+    CHECK(appsec->enabled == false);
+    CHECK(appsec->version == tracer_version);
+    CHECK(appsec->error_code == nullopt);
+    CHECK(appsec->error_message == nullopt);
+  }
+
+  SECTION("caller-provided AppSec state is preserved") {
+    TracerConfig config;
+    config.telemetry.products.emplace_back(
+        datadog::telemetry::Product{datadog::telemetry::Product::Name::appsec,
+                                    true,
+                                    "1.2.3",
+                                    nullopt,
+                                    nullopt,
+                                    {}});
+
+    auto finalized = finalize_config(config);
+    REQUIRE(finalized);
+
+    std::size_t appsec_count = 0;
+    for (const auto& product : finalized->telemetry.products) {
+      if (product.name != datadog::telemetry::Product::Name::appsec) continue;
+
+      ++appsec_count;
+      CHECK(product.enabled == true);
+      CHECK(product.version == "1.2.3");
+    }
+
+    CHECK(appsec_count == 1);
+  }
+}
+
 TRACER_CONFIG_TEST("Tracer construction publishes tracer info file") {
 #ifndef __linux__
   SUCCEED("In-memory tracer info file is Linux-only");

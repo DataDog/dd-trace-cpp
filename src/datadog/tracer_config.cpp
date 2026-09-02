@@ -472,6 +472,21 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
     final_config.telemetry.products.emplace_back(telemetry::Product{
         telemetry::Product::Name::tracing, true, tracer_version, nullopt,
         nullopt, final_config.metadata});
+
+    const bool has_appsec_product = std::any_of(
+        final_config.telemetry.products.begin(),
+        final_config.telemetry.products.end(), [](const auto &product) {
+          return product.name == telemetry::Product::Name::appsec;
+        });
+    if (!has_appsec_product) {
+      final_config.telemetry.products.emplace_back(
+          telemetry::Product{telemetry::Product::Name::appsec,
+                             false,
+                             tracer_version,
+                             nullopt,
+                             nullopt,
+                             {}});
+    }
   } else {
     return std::move(telemetry_final_config.error());
   }
