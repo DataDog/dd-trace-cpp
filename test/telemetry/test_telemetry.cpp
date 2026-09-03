@@ -330,7 +330,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
       }
     }
 
-    SECTION("With AppSec product state") {
+    SECTION("Product error is nested under the product name") {
       client->clear();
 
       Configuration cfg;
@@ -346,8 +346,11 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
                             client, scheduler, *url);
 
       const auto message_batch = nlohmann::json::parse(client->request_body);
-      const auto& appsec =
-          message_batch["payload"][0]["payload"]["products"]["appsec"];
+      const auto& appsec = message_batch.at("payload")
+                               .at(0)
+                               .at("payload")
+                               .at("products")
+                               .at("appsec");
 
       CHECK(appsec ==
             nlohmann::json{
