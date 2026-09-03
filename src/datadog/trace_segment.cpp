@@ -14,7 +14,6 @@
 #include <array>
 #include <cassert>
 #include <charconv>
-#include <cmath>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -173,9 +172,10 @@ Optional<std::string> resolve_otel_tracestate_value(
   }
 
   constexpr std::uint64_t max_value = UINT64_C(1) << 56;
-  std::uint64_t threshold = static_cast<std::uint64_t>(
-      std::round((1.0 - decision.configured_rate->value()) *
-                 static_cast<double>(max_value)));
+  const double threshold_value = (1.0 - decision.configured_rate->value()) *
+                                 static_cast<double>(max_value);
+  // The value is non-negative. Adding 0.5 before truncation rounds it.
+  std::uint64_t threshold = static_cast<std::uint64_t>(threshold_value + 0.5);
   threshold = std::min(threshold, max_value - 1);
 
   std::uint64_t random_value = (~knuth_hash(trace_id.low)) >> 8;

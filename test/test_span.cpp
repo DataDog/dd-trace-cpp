@@ -988,11 +988,13 @@ TEST_SPAN("OpenTelemetry consistent probability sampling") {
     };
 
     const auto test_case = GENERATE(values<TestCase>({
+        {0.0, 1, false, "rv:f0948a54d43b8e;th:ffffffffffffff"},
         {0.01, 1, false, "rv:f0948a54d43b8e;th:fd70a3d70a3d7"},
         {0.1, 1, true, "rv:f0948a54d43b8e;th:e6666666666668"},
         {0.2, 1, true, "rv:f0948a54d43b8e;th:ccccccccccccd"},
         {0.5, 1, true, "rv:f0948a54d43b8e;th:8"},
         {0.99, 1, true, "rv:f0948a54d43b8e;th:028f5c28f5c29"},
+        {1.0, 1, true, "rv:f0948a54d43b8e;th:0"},
         {0.1, UINT64_C(0x03A93EE8B1999F00), true,
          "rv:e6666666666668;th:e6666666666668"},
         {0.05, UINT64_C(5401449561355763072), false,
