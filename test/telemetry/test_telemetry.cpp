@@ -329,6 +329,36 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
         }
       }
     }
+
+    SECTION("Product error is nested under the product name") {
+      client->clear();
+
+      Configuration cfg;
+      cfg.products.emplace_back(Product{Product::Name::appsec,
+                                        false,
+                                        "1.2.3",
+                                        12,
+                                        "Error initializing WAF",
+                                        {}});
+
+      auto telemetry =
+          Telemetry::create(*finalize_config(cfg), tracer_signature, logger,
+                            client, scheduler, *url);
+
+      const auto message_batch = nlohmann::json::parse(client->request_body);
+      const auto& appsec = message_batch.at("payload")
+                               .at(0)
+                               .at("payload")
+                               .at("products")
+                               .at("appsec");
+
+      CHECK(appsec ==
+            nlohmann::json{
+                {"version", "1.2.3"},
+                {"enabled", false},
+                {"error",
+                 {{"code", 12}, {"message", "Error initializing WAF"}}}});
+    }
   }
 
   SECTION("dtor send app-closing message") {
