@@ -64,6 +64,7 @@ Tracer::Tracer(const FinalizedTracerConfig& config,
       injection_styles_(config.injection_styles),
       extraction_styles_(config.extraction_styles),
       propagation_behavior_extract_(config.propagation_behavior_extract),
+      propagation_extract_first_(config.propagation_extract_first),
       tags_header_max_size_(config.tags_header_size),
       baggage_opts_(config.baggage_opts),
       baggage_injection_enabled_(false),
@@ -275,6 +276,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   AuditedReader audited_reader{reader};
 
   auto span_data = std::make_unique<SpanData>();
+  Optional<PropagationStyle> first_style_with_valid_context;
   Optional<PropagationStyle> first_style_with_trace_id;
   Optional<PropagationStyle> first_style_with_parent_id;
   std::unordered_map<PropagationStyle, ExtractedData> extracted_contexts;
@@ -310,7 +312,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     telemetry::counter::increment(metrics::tracer::trace_context::extracted,
                                   {extracted_tag});
 
-    if (!first_style_with_trace_id && data->trace_id.has_value()) {
+    const bool extracted_trace_context = data->trace_id.has_value();
+    if (!first_style_with_trace_id && extracted_trace_context) {
       first_style_with_trace_id = style;
     }
 
@@ -318,12 +321,28 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       first_style_with_parent_id = style;
     }
 
+    const bool extracted_valid_context =
+        extracted_trace_context && *data->trace_id != 0 &&
+        (data->parent_id.has_value() || data->origin.has_value());
+    if (!first_style_with_valid_context && extracted_valid_context) {
+      first_style_with_valid_context = style;
+    }
+
     data->headers_examined = audited_reader.entries_found;
     extracted_contexts.emplace(style, std::move(*data));
+
+    if (propagation_extract_first_ && extracted_valid_context) {
+      break;
+    }
+  }
+
+  Optional<PropagationStyle> primary_style = first_style_with_valid_context;
+  if (!primary_style) {
+    primary_style = first_style_with_trace_id;
   }
 
   ExtractedData merged_context;
-  if (!first_style_with_trace_id) {
+  if (!primary_style) {
     // Nothing extracted a trace ID. Return the first context that includes a
     // parent ID, if any, or otherwise just return an empty `ExtractedData`.
     // The purpose of looking for a parent ID is to allow for the error
@@ -334,7 +353,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       merged_context = other->second;
     }
   } else {
-    merged_context = merge(*first_style_with_trace_id, extracted_contexts);
+    merged_context = merge(*primary_style, extracted_contexts);
   }
 
   // Some information might be missing.
@@ -497,7 +516,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
     case PropagationBehaviorExtract::RESTART: {
       // restart: create a new trace, with a span link to the previous one
 
-      std::string context_headers{to_string_view(*first_style_with_trace_id)};
+      std::string context_headers{to_string_view(*primary_style)};
       to_lower(context_headers);
       auto link_attributes = SpanLinkAttributes{};
       link_attributes.emplace("reason", "propagation_behavior_extract");
