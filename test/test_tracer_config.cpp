@@ -15,6 +15,7 @@
 #include <iostream>
 
 #include "common/environment.h"
+#include "datadog_agent_config_internal.h"
 #include "mocks/collectors.h"
 #include "mocks/event_schedulers.h"
 #include "mocks/loggers.h"
@@ -450,6 +451,75 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
   }
 
   SECTION("url") {
+    SECTION("the default socket path is the well-known Agent socket") {
+      REQUIRE(std::string{default_agent_socket_path} ==
+              "/var/run/datadog/apm.socket");
+    }
+
+    SECTION("all defaults use the detected default URL") {
+      // Whether the well-known socket exists depends on the machine running
+      // this test, so compare against what detection decides, not against a
+      // hard-coded URL. This checks that `finalize_config` probes the
+      // well-known socket path.
+      EnvGuard host_guard{"DD_AGENT_HOST"};
+      EnvGuard port_guard{"DD_TRACE_AGENT_PORT"};
+      EnvGuard url_guard{"DD_TRACE_AGENT_URL"};
+
+      const auto [origin, expected_url] =
+          select_agent_url(nullopt, nullopt, default_agent_socket_path);
+      REQUIRE(origin == ConfigMetadata::Origin::DEFAULT);
+      const auto expected = HTTPClient::URL::parse(expected_url);
+      REQUIRE(expected);
+
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      const auto* const agent =
+          std::get_if<FinalizedDatadogAgentConfig>(&finalized->collector);
+      REQUIRE(agent);
+      REQUIRE(agent->url.scheme == expected->scheme);
+      REQUIRE(agent->url.authority == expected->authority);
+    }
+
+    SECTION("default socket detection") {
+      SomewhatSecureTemporaryFile socket;
+      REQUIRE(socket.is_open());
+
+      SECTION("uses an existing socket") {
+        const auto [origin, url] =
+            select_agent_url(nullopt, nullopt, socket.path());
+        REQUIRE(origin == ConfigMetadata::Origin::DEFAULT);
+#ifdef _WIN32
+        REQUIRE(url == "http://localhost:8126");
+#else
+        REQUIRE(url == "unix://" + socket.path().string());
+#endif
+      }
+
+      SECTION("falls back when the socket does not exist") {
+        const std::filesystem::path missing_socket =
+            socket.path().string() + ".missing";
+        const auto [origin, url] =
+            select_agent_url(nullopt, nullopt, missing_socket);
+        REQUIRE(origin == ConfigMetadata::Origin::DEFAULT);
+        REQUIRE(url == "http://localhost:8126");
+      }
+
+      SECTION("programmatic URL takes precedence") {
+        const auto [origin, url] = select_agent_url(
+            nullopt, "http://configured-agent:8126", socket.path());
+        REQUIRE(origin == ConfigMetadata::Origin::CODE);
+        REQUIRE(url == "http://configured-agent:8126");
+      }
+
+      SECTION("environment configuration takes precedence") {
+        const auto [origin, url] =
+            select_agent_url("http://environment-agent:8126",
+                             "http://configured-agent:8126", socket.path());
+        REQUIRE(origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE);
+        REQUIRE(url == "http://environment-agent:8126");
+      }
+    }
+
     SECTION("parsing") {
       struct TestCase {
         std::string url;
@@ -493,6 +563,39 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
       }
     }
 
+    SECTION("no environment configuration") {
+      struct TestCase {
+        std::string name;
+        Optional<std::string> env_host;
+        Optional<std::string> env_port;
+        Optional<std::string> env_url;
+      };
+
+      auto test_case = GENERATE(values<TestCase>({
+          {"all unset", nullopt, nullopt, nullopt},
+          {"empty host", "", nullopt, nullopt},
+          {"empty port", nullopt, "", nullopt},
+          {"empty URL", nullopt, nullopt, ""},
+          {"all empty", "", "", ""},
+      }));
+
+      CAPTURE(test_case.name);
+      EnvGuard host_guard{"DD_AGENT_HOST"};
+      EnvGuard port_guard{"DD_TRACE_AGENT_PORT"};
+      EnvGuard url_guard{"DD_TRACE_AGENT_URL"};
+      if (test_case.env_host) {
+        host_guard.set_value(*test_case.env_host);
+      }
+      if (test_case.env_port) {
+        port_guard.set_value(*test_case.env_port);
+      }
+      if (test_case.env_url) {
+        url_guard.set_value(*test_case.env_url);
+      }
+
+      REQUIRE(build_agent_url_from_environment_variables() == nullopt);
+    }
+
     SECTION("environment variables override") {
       struct TestCase {
         std::string name;
@@ -504,15 +607,12 @@ TRACER_CONFIG_TEST("TracerConfig::agent") {
       };
 
       auto test_case = GENERATE(values<TestCase>({
-          {"all defaults", nullopt, nullopt, nullopt, "http", "localhost:8126"},
           {"override host", "dd-agent", nullopt, nullopt, "http",
            "dd-agent:8126"},
           {"override port", nullopt, "8080", nullopt, "http", "localhost:8080"},
           {"override host and port", "dd-agent", "8080", nullopt, "http",
            "dd-agent:8080"},
           {"empty URL", "dd-agent", "8080", "", "http", "dd-agent:8080"},
-          {"empty host", "", nullopt, nullopt, "http", "localhost:8126"},
-          {"empty port", nullopt, "", nullopt, "http", "localhost:8126"},
           {"IPv6 host", "::1", nullopt, nullopt, "http", "[::1]:8126"},
           {"IPv6 host with brackets", "[::1]", nullopt, nullopt, "http",
            "[::1]:8126"},
