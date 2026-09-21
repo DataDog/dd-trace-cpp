@@ -1,6 +1,9 @@
 #include <datadog/datadog_agent_config.h>
 #include <datadog/environment.h>
 
+#include <filesystem>
+
+#include "datadog_agent_config_internal.h"
 #include "default_http_client.h"
 #include "parse_util.h"
 #include "threaded_event_scheduler.h"
@@ -8,6 +11,31 @@
 namespace datadog::tracing {
 
 namespace {
+
+constexpr char default_agent_url[] = "http://localhost:8126";
+
+std::string detect_default_agent_url(const std::filesystem::path& socket_path) {
+#ifdef _WIN32
+  (void)socket_path;
+#else
+  std::error_code error;
+  if (std::filesystem::exists(socket_path, error)) {
+    return "unix://" + socket_path.string();
+  }
+#endif
+
+  return std::string{default_agent_url};
+}
+
+}  // namespace
+
+std::pair<ConfigMetadata::Origin, std::string> select_agent_url(
+    const Optional<std::string>& environment_url,
+    const Optional<std::string>& programmatic_url,
+    const std::filesystem::path& default_socket_path) {
+  return pick(environment_url, programmatic_url,
+              detect_default_agent_url(default_socket_path));
+}
 
 Optional<std::string> build_agent_url_from_environment_variables() {
   Optional<StringView> url_env = lookup(environment::DD_TRACE_AGENT_URL);
@@ -38,8 +66,6 @@ Optional<std::string> build_agent_url_from_environment_variables() {
 
   return nullopt;
 }
-
-}  // namespace
 
 Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
   DatadogAgentConfig env_config;
@@ -155,7 +181,8 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                user_config.remote_configuration_enabled, true);
 
   const auto [origin, url] =
-      pick(env_config->url, user_config.url, "http://localhost:8126");
+      select_agent_url(env_config->url, user_config.url,
+                       std::filesystem::path{default_agent_socket_path});
   auto parsed_url = HTTPClient::URL::parse(url);
   if (auto* error = parsed_url.if_error()) {
     return std::move(*error);

@@ -63,7 +63,8 @@ namespace environment {
   MACRO(DD_TRACE_AGENT_URL, STRING,                                            \
         ENV_DEFAULT_RESOLVED_IN_CODE(                                          \
             "If unset, built from DD_AGENT_HOST and DD_TRACE_AGENT_PORT, "     \
-            "then defaults to http://localhost:8126."))                        \
+            "then uses /var/run/datadog/apm.socket when present, otherwise "   \
+            "defaults to http://localhost:8126."))                             \
   MACRO(DD_TRACE_DEBUG, BOOLEAN, false)                                        \
   MACRO(DD_TRACE_ENABLED, BOOLEAN, true)                                       \
   MACRO(DD_TRACE_RATE_LIMIT, INT, 100)                                         \
