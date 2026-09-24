@@ -39,6 +39,7 @@
       "displayName": "CI Clang",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "DD_TRACE_ENABLE_SANITIZE": "ON",
         "DD_TRACE_BUILD_TOOLS": "ON",
         "DD_TRACE_BUILD_TESTING": "ON"
