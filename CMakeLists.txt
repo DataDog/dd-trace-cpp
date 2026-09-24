@@ -48,6 +48,8 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   option(DD_TRACE_BUILD_BENCHMARK "Build benchmark binaries" OFF)
   option(DD_TRACE_ENABLE_COVERAGE "Build code with code coverage profiling instrumentation" OFF)
   option(DD_TRACE_ENABLE_SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
+  option(DD_TRACE_ENABLE_CLANG_TIDY "Run clang-tidy on first-party sources during build" OFF)
+  set(DD_TRACE_CLANG_TIDY "clang-tidy-14" CACHE STRING "clang-tidy executable when DD_TRACE_ENABLE_CLANG_TIDY is ON")
 endif()
 
 # Include mandatory files
@@ -257,6 +259,11 @@ set_target_properties(dd-trace-cpp-objects
     VERIFY_INTERFACE_HEADER_SETS ON
     POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS}
 )
+
+if(DD_TRACE_ENABLE_CLANG_TIDY)
+  set_property(TARGET dd-trace-cpp-objects PROPERTY CXX_CLANG_TIDY
+    "${DD_TRACE_CLANG_TIDY};--quiet;--use-color")
+endif()
 
 install(
   TARGETS dd-trace-cpp-objects dd-trace-cpp-specs

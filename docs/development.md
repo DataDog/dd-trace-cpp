@@ -34,11 +34,11 @@ bin/check-format
 C++ is analyzed with **clang-tidy-14** (pinned; same major as `clang-format-14`)
 using the shared `.clang-tidy` baseline. Warnings are errors.
 
-Do not run clang-tidy on the host. `compile_commands.json` must be produced by
-the same container that runs tidy (CMake, compiler, and sysroot). `bin/check-tidy`
-re-execs in `datadog/docker-library:dd-trace-cpp-ci-23768e9-*`, configures CMake
-there, and runs `clang-tidy-14` on configured `src/` only (no examples, tests,
-bindings, or vendored code):
+Do not run clang-tidy on the host. Tidy must use the same compiler, flags, and
+stdlib as the real build (`ci-clang` + libc++). `bin/check-tidy` re-execs in
+`datadog/docker-library:dd-trace-cpp-ci-23768e9-*`, configures CMake there with
+`DD_TRACE_ENABLE_CLANG_TIDY`, and builds `dd-trace-cpp-objects` so CMake
+invokes `clang-tidy-14` with the exact compile line (first-party `src/` only):
 
 ```shell
 bin/check-tidy
