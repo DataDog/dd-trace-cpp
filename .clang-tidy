@@ -31,5 +31,5 @@ Checks: >
   readability-redundant-string-cstr,
   readability-simplify-boolean-expr
 WarningsAsErrors: '*'
-HeaderFilterRegex: '(src|include|binding|test|fuzz|examples)/'
+HeaderFilterRegex: '^src/'
 FormatStyle: file

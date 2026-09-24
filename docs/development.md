@@ -37,7 +37,8 @@ using the shared `.clang-tidy` baseline. Warnings are errors.
 Do not run clang-tidy on the host. `compile_commands.json` must be produced by
 the same container that runs tidy (CMake, compiler, and sysroot). `bin/check-tidy`
 re-execs in `datadog/docker-library:dd-trace-cpp-ci-23768e9-*`, configures CMake
-there, and runs `clang-tidy-14`:
+there, and runs `clang-tidy-14` on configured `src/` only (no examples, tests,
+bindings, or vendored code):
 
 ```shell
 bin/check-tidy
