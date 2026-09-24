@@ -1,10 +1,12 @@
 #!/bin/sh
-# Run clang-tidy on first-party C++ sources. Findings fail the check.
+# Run the pinned clang-tidy in the CI container.
 #
-# Requires compile_commands.json. Generate it with:
-#   cmake . -B .build --preset dev
-# or, in CI:
-#   bin/with-toolchain llvm cmake . -B .build --preset ci-clang
+# clang-tidy is not reproducible across versions, and compile_commands.json
+# points at the container sysroot. Do not run tidy against a host CMake
+# database (especially on macOS). This script always configures and analyzes
+# inside the same image CI uses.
+#
+# Usage: bin/check-tidy
 
 set -e
 
@@ -12,50 +14,80 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 cd "$REPO_ROOT"
 
-build_dir=${BUILD_DIR:-.build}
-compile_commands="$build_dir/compile_commands.json"
+# Keep this in sync with .github/workflows/dev.yml.
+CLANG_TIDY_VERSION=14
+CI_IMAGE_BASE=datadog/docker-library:dd-trace-cpp-ci-23768e9
 
-find_tidy() {
-    if command -v clang-tidy-14 >/dev/null 2>&1; then
-        echo clang-tidy-14
-        return
-    fi
-    if command -v clang-tidy >/dev/null 2>&1; then
-        echo clang-tidy
-        return
-    fi
-    for candidate in clang-tidy-21 clang-tidy-20 clang-tidy-19 clang-tidy-18 \
-                     clang-tidy-17 clang-tidy-16 clang-tidy-15; do
-        if command -v "$candidate" >/dev/null 2>&1; then
-            echo "$candidate"
-            return
-        fi
-    done
-    return 1
+in_container() {
+    [ -f /.dockerenv ] || [ -n "${KUBERNETES_SERVICE_HOST:-}" ] || \
+        [ "${DD_TRACE_CPP_TIDY_IN_CONTAINER:-}" = "1" ]
 }
 
-if ! [ -f "$compile_commands" ]; then
-    >&2 echo "Missing $compile_commands."
-    >&2 echo "Configure CMake first so clang-tidy can use the compilation database:"
-    >&2 echo "  cmake . -B ${build_dir} --preset dev"
-    >&2 echo "  bin/check-tidy"
+docker_arch() {
+    case "$(uname -m)" in
+        arm64|aarch64) echo arm64 ;;
+        *) echo amd64 ;;
+    esac
+}
+
+if ! in_container; then
+    if ! command -v docker >/dev/null 2>&1; then
+        >&2 echo "docker is required to run clang-tidy-$CLANG_TIDY_VERSION."
+        exit 1
+    fi
+    if ! docker info >/dev/null 2>&1; then
+        >&2 echo "Docker is not running. Please start Docker."
+        exit 1
+    fi
+    arch=$(docker_arch)
+    image="${CI_IMAGE_BASE}-${arch}"
+    exec docker run --rm -t \
+        --platform "linux/${arch}" \
+        -e DD_TRACE_CPP_TIDY_IN_CONTAINER=1 \
+        -e BUILD_DIR=.clang-tidy-build \
+        -v "$REPO_ROOT:$REPO_ROOT" \
+        -w "$REPO_ROOT" \
+        "$image" \
+        bin/check-tidy
+fi
+
+build_dir=${BUILD_DIR:-.clang-tidy-build}
+tidy=clang-tidy-$CLANG_TIDY_VERSION
+
+if ! command -v "$tidy" >/dev/null 2>&1; then
+    if [ -f /etc/debian_version ]; then
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install --yes "$tidy"
+    else
+        >&2 echo "$tidy is required (pinned). Install it in this container."
+        exit 1
+    fi
+fi
+
+if ! command -v "$tidy" >/dev/null 2>&1; then
+    >&2 echo "$tidy is not installed."
     exit 1
 fi
 
-if ! tidy=$(find_tidy); then
-    >&2 echo "clang-tidy-14 (or clang-tidy) is not installed. On Ubuntu: apt-get install --yes clang-tidy-14"
-    exit 1
+if ! [ -f "$build_dir/compile_commands.json" ]; then
+    bin/with-toolchain llvm cmake . -B "$build_dir" --preset ci-clang \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 fi
 
-# Collect first-party translation units. Headers are analyzed through them.
-# Compiler flags from the database may include -Werror. Tidy findings are the
-# gate; unknown-to-this-tidy compiler flags should not fail the job.
-find binding/ examples/ fuzz/ include/ src/ test/ \
-    -type f \( -name '*.cpp' -o -name '*.c' \) \
-    ! -path '*/google-benchmark/*' \
-    ! -path '*/tinycc/*' \
-    -print0 \
-    | xargs -0 "$tidy" -p "$build_dir" --quiet --use-color \
+if command -v "run-clang-tidy-$CLANG_TIDY_VERSION" >/dev/null 2>&1; then
+    "run-clang-tidy-$CLANG_TIDY_VERSION" -p "$build_dir" -quiet \
         -extra-arg=-Wno-error \
         -extra-arg=-Wno-unknown-warning-option \
-        -extra-arg=-Wno-unused-command-line-argument
+        -extra-arg=-Wno-unused-command-line-argument \
+        binding/ examples/ fuzz/ include/ src/ test/
+else
+    find binding/ examples/ fuzz/ include/ src/ test/ \
+        -type f \( -name '*.cpp' -o -name '*.c' \) \
+        ! -path '*/google-benchmark/*' \
+        ! -path '*/tinycc/*' \
+        -print0 \
+        | xargs -0 "$tidy" -p "$build_dir" --quiet --use-color \
+            -extra-arg=-Wno-error \
+            -extra-arg=-Wno-unknown-warning-option \
+            -extra-arg=-Wno-unused-command-line-argument
+fi

@@ -31,16 +31,17 @@ bin/check-format
 
 ## Static Analysis
 
-C++ is analyzed with clang-tidy using the shared `.clang-tidy` baseline (kept in
-sync with `httpd-datadog` and `nginx-datadog`). Warnings are errors.
+C++ is analyzed with **clang-tidy-14** (pinned; same major as `clang-format-14`)
+using the shared `.clang-tidy` baseline. Warnings are errors.
 
-Configure CMake so a compilation database exists, then run tidy:
+Do not run clang-tidy on the host. `compile_commands.json` must be produced by
+the same container that runs tidy (CMake, compiler, and sysroot). `bin/check-tidy`
+re-execs in `datadog/docker-library:dd-trace-cpp-ci-23768e9-*`, configures CMake
+there, and runs `clang-tidy-14`:
 
 ```shell
-cmake . -B .build --preset dev
 bin/check-tidy
 ```
 
-`BUILD_DIR` defaults to `.build`. CI runs the same check in the Development
-workflow after `ci-clang` configure; a finding fails the pull request.
+CI runs the same script in that image. A finding fails the pull request.
 

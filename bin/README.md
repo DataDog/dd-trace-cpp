@@ -11,9 +11,9 @@ This directory contains scripts that are useful during development.
   before pushing changes.
 - [check-format](check-format) verifies that the source code is formatted as
   [format](format) prefers.
-- [check-tidy](check-tidy) runs clang-tidy against first-party sources using
-  the compilation database in `.build` (or `$BUILD_DIR`). Findings fail the
-  check.
+- [check-tidy](check-tidy) runs **clang-tidy-14** (pinned) in the CI container.
+  It configures CMake inside the container and fails on findings. Do not point
+  it at a host `compile_commands.json`.
 - [check-version](check-version) accepts a version string as a command line
   argument (e.g. "v1.2.3") and checks whether the version within the source code
   matches. This is a good check to perform before publishing a source release.
