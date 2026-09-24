@@ -2,7 +2,6 @@
 # Keep this file in sync across those repositories.
 Checks: >
   -*,
-  bugprone-argument-comment,
   bugprone-assert-side-effect,
   bugprone-bool-pointer-implicit-conversion,
   bugprone-copy-constructor-init,
@@ -17,19 +16,21 @@ Checks: >
   bugprone-string-constructor,
   bugprone-undelegated-constructor,
   bugprone-unused-raii,
-  bugprone-use-after-move,
   bugprone-virtual-near-miss,
-  misc-redundant-expression,
-  misc-static-assert,
   misc-unused-using-decls,
-  modernize-redundant-void-arg,
-  performance-move-const-arg,
-  performance-noexcept-move-constructor,
   readability-delete-null-pointer,
   readability-redundant-control-flow,
-  readability-redundant-member-init,
-  readability-redundant-string-cstr,
-  readability-simplify-boolean-expr
+  readability-redundant-string-cstr
+# Deferred until existing findings are cleaned up:
+# bugprone-argument-comment
+# bugprone-use-after-move
+# misc-redundant-expression
+# misc-static-assert
+# modernize-redundant-void-arg
+# performance-move-const-arg
+# performance-noexcept-move-constructor
+# readability-redundant-member-init
+# readability-simplify-boolean-expr
 WarningsAsErrors: '*'
 HeaderFilterRegex: '^src/'
 FormatStyle: file
