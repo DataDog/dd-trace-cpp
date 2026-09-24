@@ -18,6 +18,8 @@ jobs:
         run: bin/check-environment-variables
       - name: Configure
         run: bin/with-toolchain llvm cmake . -B ${BUILD_DIR} --preset ci-clang
+      - name: Install clang-tidy
+        run: apt-get update && apt-get install --yes clang-tidy-14
       - name: clang-tidy
         run: bin/check-tidy
       - name: Build
