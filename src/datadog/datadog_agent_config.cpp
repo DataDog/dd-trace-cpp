@@ -14,10 +14,9 @@ namespace {
 
 constexpr char default_agent_url[] = "http://localhost:8126";
 
-std::string detect_default_agent_url(const std::filesystem::path& socket_path) {
-#ifdef _WIN32
-  (void)socket_path;
-#else
+std::string detect_default_agent_url(
+    [[maybe_unused]] const std::filesystem::path& socket_path) {
+#ifndef _WIN32
   std::error_code error;
   if (std::filesystem::exists(socket_path, error)) {
     return "unix://" + socket_path.string();
