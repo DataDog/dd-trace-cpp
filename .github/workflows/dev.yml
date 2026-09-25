@@ -18,6 +18,8 @@ jobs:
         run: bin/check-environment-variables
       - name: Configure
         run: bin/with-toolchain llvm cmake . -B ${BUILD_DIR} --preset ci-clang
+      - name: clang-tidy
+        run: bin/check-tidy
       - name: Build
         run: cmake --build ${BUILD_DIR} -j --target config-inversion -v
       - name: Verify supported configurations metadata
