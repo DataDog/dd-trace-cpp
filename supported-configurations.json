@@ -210,6 +210,13 @@
         "type": "string"
       }
     ],
+    "DD_TRACE_PROPAGATION_EXTRACT_FIRST": [
+      {
+        "default": "false",
+        "implementation": "A",
+        "type": "boolean"
+      }
+    ],
     "DD_TRACE_PROPAGATION_STYLE": [
       {
         "default": "datadog,tracecontext,baggage",
