@@ -17,13 +17,15 @@ validate_supported_configurations_v2_local_file:
   image: registry.ddbuild.io/ci/libdatadog-build/packaging:100425777
   tags: ["arch:amd64"]
   rules:
-    - when: on_success
+    - when: never
   extends: .validate_supported_configurations_v2_local_file
   variables:
     LOCAL_JSON_PATH: "supported-configurations.json"
     BACKFILLED: true
 
 update_central_configurations_version_range_v2:
+  rules:
+    - when: never
   stage: config-validation
   image: registry.ddbuild.io/ci/libdatadog-build/packaging:100425777
   tags: ["arch:amd64"]
