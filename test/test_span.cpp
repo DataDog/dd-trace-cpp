@@ -816,6 +816,33 @@ TEST_SPAN("injecting W3C tracestate header") {
        "dd=s:0;p:$parent_id;foo:bar;boing:boing"},
 
       {__LINE__,
+       "trim outer tracestate OWS",
+       {
+           {"traceparent",
+            "00-00000000000000000000000000000001-0000000000000001-01"},
+           {"tracestate", "foo=1 , dd=s:2;o:some , bar=2"},
+       },
+       "dd=s:2;p:$parent_id;o:some,foo=1,bar=2"},
+
+      {__LINE__,
+       "skip dd entry with interior OWS",
+       {
+           {"traceparent",
+            "00-00000000000000000000000000000001-0000000000000001-01"},
+           {"tracestate", "foo=1,dd=s:0;t.dm:934086a686-4;  t.x:y"},
+       },
+       "dd=s:1;p:$parent_id,foo=1"},
+
+      {__LINE__,
+       "skip dd entry with whitespace-only subentry",
+       {
+           {"traceparent",
+            "00-00000000000000000000000000000001-0000000000000001-01"},
+           {"tracestate", "foo=1,dd=s:0; ;t.x:y"},
+       },
+       "dd=s:1;p:$parent_id,foo=1"},
+
+      {__LINE__,
        "all of the above",
        {
            {"traceparent", traceparent_drop},
