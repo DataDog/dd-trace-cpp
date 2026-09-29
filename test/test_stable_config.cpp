@@ -168,6 +168,8 @@ rules:
     configuration:
       DD_SERVICE: "{{ language }}-{{ tags[cluster] }}-{{ process_arguments[--name] }}-{{ environment_variables[ZONE] }}-{{ missing }}"
       DD_VERSION: "{{ tags[absent] }}"
+      DD_TRACE_AGENT_URL: "prefix{{ tags[ cluster ] }}{{ language[ }}suffix"
+      DD_TAGS: "{{ tags }}-{{ tags[cluster }}-{{ unknown[key] }}"
 )",
       "", process);
   REQUIRE(loaded);
@@ -175,6 +177,8 @@ rules:
   CHECK(loaded->find("DD_SERVICE")->value ==
         "cpp-alpha-worker=one-east-UNDEFINED");
   CHECK(loaded->find("DD_VERSION")->value == "UNDEFINED");
+  CHECK(loaded->find("DD_TRACE_AGENT_URL")->value == "prefixalphacppsuffix");
+  CHECK(loaded->find("DD_TAGS")->value == "UNDEFINED-UNDEFINED-UNDEFINED");
 
   auto invalid = stable_config_internal::load_yaml(
       "rules: [{selectors: [], configuration: {DD_SERVICE: '{{ broken'}}]", "",
@@ -207,6 +211,8 @@ STABLE_CONFIG_TEST("stable config validates YAML fields") {
       "apm_configuration_default: {DD_SERVICE: null}",
       "tags: []",
       "rules: {}",
+      "rules: [null]",
+      "rules: [{selectors: {}, configuration: {}}]",
       "rules: [{configuration: {DD_SERVICE: x}}]",
       "rules: [{selectors: [], configuration: []}]",
       "rules: [{selectors: [{origin: invalid, operator: exists}], "

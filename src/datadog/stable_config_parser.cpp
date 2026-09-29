@@ -1,5 +1,6 @@
 #include <yaml-cpp/yaml.h>
 
+#include <algorithm>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -83,6 +84,20 @@ Selector parse_selector(const YAML::Node& node) {
   return result;
 }
 
+Rule parse_rule(const YAML::Node& node) {
+  if (!node.IsMap()) throw std::runtime_error("rule must be a map");
+  const YAML::Node selectors = node["selectors"];
+  if (!selectors || !selectors.IsSequence()) {
+    throw std::runtime_error("rule selectors must be a sequence");
+  }
+  Rule rule;
+  for (const YAML::Node& selector : selectors) {
+    rule.selectors.push_back(parse_selector(selector));
+  }
+  rule.configuration = parse_map(node["configuration"], "rule configuration");
+  return rule;
+}
+
 ParsedConfig parse_yaml(StringView content) {
   const std::string text = content.empty()
                                ? std::string{}
@@ -109,18 +124,7 @@ ParsedConfig parse_yaml(StringView content) {
     if (!rules.IsSequence())
       throw std::runtime_error("rules must be a sequence");
     for (const YAML::Node& item : rules) {
-      if (!item.IsMap()) throw std::runtime_error("rule must be a map");
-      const YAML::Node selectors = item["selectors"];
-      if (!selectors || !selectors.IsSequence()) {
-        throw std::runtime_error("rule selectors must be a sequence");
-      }
-      Rule rule;
-      for (const YAML::Node& selector : selectors) {
-        rule.selectors.push_back(parse_selector(selector));
-      }
-      rule.configuration =
-          parse_map(item["configuration"], "rule configuration");
-      result.rules.push_back(std::move(rule));
+      result.rules.push_back(parse_rule(item));
     }
   }
   return result;
@@ -213,6 +217,28 @@ std::string trim(std::string value) {
   return value.substr(start, end - start + 1);
 }
 
+std::string resolve_template_variable(
+    const std::string& variable, const ParsedConfig& source,
+    const ProcessInfo& process, const std::map<std::string, std::string>& args,
+    const std::map<std::string, std::string>& environment) {
+  const std::size_t bracket = variable.find('[');
+  const std::string name = variable.substr(0, bracket);
+  if (name == "language") return process.language;
+  if (bracket == std::string::npos) return "UNDEFINED";
+  const std::size_t end = variable.find(']', bracket + 1);
+  if (end == std::string::npos) return "UNDEFINED";
+
+  const std::map<std::string, std::string>* values = nullptr;
+  if (name == "tags") values = &source.tags;
+  if (name == "process_arguments") values = &args;
+  if (name == "environment_variables") values = &environment;
+  if (!values) return "UNDEFINED";
+
+  const std::string key = trim(variable.substr(bracket + 1, end - bracket - 1));
+  const auto found = values->find(key);
+  return found == values->end() ? "UNDEFINED" : found->second;
+}
+
 std::string template_value(
     const std::string& input, const ParsedConfig& source,
     const ProcessInfo& process, const std::map<std::string, std::string>& args,
@@ -227,32 +253,8 @@ std::string template_value(
     if (close == std::string::npos)
       throw std::runtime_error("unterminated template in config");
     const std::string variable = trim(input.substr(open + 2, close - open - 2));
-    const std::size_t bracket = variable.find('[');
-    const std::string name =
-        bracket == std::string::npos ? variable : variable.substr(0, bracket);
-    std::string key;
-    bool has_index = false;
-    if (bracket != std::string::npos) {
-      const std::size_t end = variable.find(']', bracket + 1);
-      if (end != std::string::npos) {
-        key = trim(variable.substr(bracket + 1, end - bracket - 1));
-        has_index = true;
-      }
-    }
-    if (name == "language") {
-      output += process.language;
-    } else {
-      const std::map<std::string, std::string>* values = nullptr;
-      if (name == "tags") values = &source.tags;
-      if (name == "process_arguments") values = &args;
-      if (name == "environment_variables") values = &environment;
-      if (values && has_index) {
-        const auto found = values->find(key);
-        output += found == values->end() ? "UNDEFINED" : found->second;
-      } else {
-        output += "UNDEFINED";
-      }
-    }
+    output +=
+        resolve_template_variable(variable, source, process, args, environment);
     cursor = close + 2;
   }
 }
@@ -267,13 +269,11 @@ void apply_source(StableConfig& result, const ParsedConfig& source,
   const std::map<std::string, std::string> environment =
       split_entries(process.environment, true);
   for (const Rule& rule : source.rules) {
-    bool matches = true;
-    for (const Selector& selector : rule.selectors) {
-      if (!selector_matches(selector, source, process, args, environment)) {
-        matches = false;
-        break;
-      }
-    }
+    const bool matches = std::all_of(
+        rule.selectors.begin(), rule.selectors.end(),
+        [&](const Selector& selector) {
+          return selector_matches(selector, source, process, args, environment);
+        });
     if (!matches) continue;
     for (const std::pair<std::string, std::string>& entry :
          rule.configuration) {
