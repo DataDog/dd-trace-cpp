@@ -19,6 +19,7 @@ project(
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_STATIC_LIBS "Build static libraries" ON)
 option(DD_TRACE_BUILD_C_BINDING "Build C binding" OFF)
+option(DD_TRACE_BUILD_STABLE_CONFIG "Build the native stable config loader" OFF)
 
 if (WIN32)
   option(DD_TRACE_STATIC_CRT "Build dd-trace-cpp with static CRT with MSVC" OFF)
@@ -166,6 +167,7 @@ target_sources(dd-trace-cpp-objects
       include/datadog/span_defaults.h
       include/datadog/span_matcher.h
       include/datadog/span_sampler_config.h
+      include/datadog/stable_config.h
       include/datadog/string_view.h
       include/datadog/trace_id.h
       include/datadog/trace_sampler_config.h
@@ -214,6 +216,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/span_matcher.cpp
     src/datadog/span_sampler_config.cpp
     src/datadog/span_sampler.cpp
+    src/datadog/stable_config.cpp
     src/datadog/string_util.cpp
     src/datadog/tags.cpp
     src/datadog/tag_propagation.cpp
@@ -365,6 +368,43 @@ if (BUILD_STATIC_LIBS)
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
+endif ()
+
+if (DD_TRACE_BUILD_STABLE_CONFIG)
+  include(cmake/deps/yaml-cpp.cmake)
+  add_library(dd-trace-cpp-stable-config STATIC
+    src/datadog/stable_config_loader.cpp
+    src/datadog/stable_config_parser.cpp)
+  add_library(dd-trace-cpp::stable-config ALIAS dd-trace-cpp-stable-config)
+  set_target_properties(dd-trace-cpp-stable-config PROPERTIES EXPORT_NAME stable-config)
+  target_compile_features(dd-trace-cpp-stable-config PUBLIC cxx_std_17)
+  target_sources(dd-trace-cpp-stable-config PUBLIC
+    FILE_SET public_headers TYPE HEADERS BASE_DIRS include
+    FILES include/datadog/stable_config_loader.h)
+  target_link_libraries(dd-trace-cpp-stable-config PUBLIC yaml-cpp::yaml-cpp)
+  if (WIN32)
+    target_link_libraries(dd-trace-cpp-stable-config PUBLIC shell32)
+  endif ()
+  if (BUILD_STATIC_LIBS)
+    target_link_libraries(dd-trace-cpp-stable-config PUBLIC dd-trace-cpp::static)
+  elseif (BUILD_SHARED_LIBS)
+    target_link_libraries(dd-trace-cpp-stable-config PUBLIC dd-trace-cpp::shared)
+  else ()
+    message(FATAL_ERROR "Stable config requires a dd-trace-cpp library")
+  endif ()
+  install(TARGETS dd-trace-cpp-stable-config
+    EXPORT dd-trace-cpp-targets
+    FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  install(FILES "${yaml-cpp_SOURCE_DIR}/LICENSE"
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/dd-trace-cpp/licenses
+    RENAME yaml-cpp-LICENSE)
+  if (DD_TRACE_BUILD_TESTING)
+    target_sources(tests PRIVATE test/test_stable_config.cpp)
+    target_link_libraries(tests PRIVATE dd-trace-cpp::stable-config)
+    target_compile_definitions(tests PRIVATE
+      "DD_TRACE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+  endif ()
 endif ()
 
 # install target

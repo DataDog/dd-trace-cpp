@@ -1,0 +1,4 @@
+config_id: fleet-test
+apm_configuration_default:
+  DD_SERVICE: fleet-service
+  DD_TRACE_SAMPLE_RATE: "0.5"

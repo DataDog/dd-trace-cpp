@@ -1,6 +1,8 @@
 #include <datadog/datadog_agent_config.h>
 #include <datadog/environment.h>
+#include <datadog/stable_config.h>
 
+#include <algorithm>
 #include <filesystem>
 
 #include "datadog_agent_config_internal.h"
@@ -36,15 +38,45 @@ std::pair<ConfigMetadata::Origin, std::string> select_agent_url(
               detect_default_agent_url(default_socket_path));
 }
 
-Optional<std::string> build_agent_url_from_environment_variables() {
-  Optional<StringView> url_env = lookup(environment::DD_TRACE_AGENT_URL);
-  if (url_env && !url_env->empty()) {
-    return std::string{*url_env};
+namespace {
+
+int agent_url_source_rank(environment::Variable variable,
+                          const StableConfig* stable_config) {
+  const Optional<StringView> value = lookup(variable, stable_config);
+  if (!value || value->empty()) return -1;
+  // Rank sources as local < environment < fleet.
+  const auto origin = config_value_source(variable, stable_config).origin;
+  if (origin == ConfigMetadata::Origin::FLEET_STABLE_CONFIG) return 2;
+  return origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE ? 1 : 0;
+}
+
+environment::Variable agent_url_source(const StableConfig* stable_config) {
+  const int url_rank =
+      agent_url_source_rank(environment::DD_TRACE_AGENT_URL, stable_config);
+  const int host_rank =
+      agent_url_source_rank(environment::DD_AGENT_HOST, stable_config);
+  const int port_rank =
+      agent_url_source_rank(environment::DD_TRACE_AGENT_PORT, stable_config);
+  if (url_rank >= 0 && url_rank >= std::max(host_rank, port_rank)) {
+    return environment::DD_TRACE_AGENT_URL;
+  }
+  return host_rank >= port_rank ? environment::DD_AGENT_HOST
+                                : environment::DD_TRACE_AGENT_PORT;
+}
+
+}  // namespace
+
+Optional<std::string> build_agent_url_from_environment_variables(
+    const StableConfig* stable_config) {
+  if (agent_url_source(stable_config) == environment::DD_TRACE_AGENT_URL) {
+    return std::string{*lookup(environment::DD_TRACE_AGENT_URL, stable_config)};
   }
 
-  Optional<StringView> env_host = lookup(environment::DD_AGENT_HOST);
+  Optional<StringView> env_host =
+      lookup(environment::DD_AGENT_HOST, stable_config);
   if (env_host && env_host->empty()) env_host = nullopt;
-  Optional<StringView> env_port = lookup(environment::DD_TRACE_AGENT_PORT);
+  Optional<StringView> env_port =
+      lookup(environment::DD_TRACE_AGENT_PORT, stable_config);
   if (env_port && env_port->empty()) env_port = nullopt;
   if (env_host || env_port) {
     std::string agent_url = "http://";
@@ -66,15 +98,17 @@ Optional<std::string> build_agent_url_from_environment_variables() {
   return nullopt;
 }
 
-Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
+Expected<DatadogAgentConfig> load_datadog_agent_env_config(
+    const StableConfig* stable_config) {
   DatadogAgentConfig env_config;
 
-  if (auto rc_enabled = lookup(environment::DD_REMOTE_CONFIGURATION_ENABLED)) {
+  if (auto rc_enabled =
+          lookup(environment::DD_REMOTE_CONFIGURATION_ENABLED, stable_config)) {
     env_config.remote_configuration_enabled = !falsy(*rc_enabled);
   }
 
-  if (auto raw_rc_poll_interval_value =
-          lookup(environment::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS)) {
+  if (auto raw_rc_poll_interval_value = lookup(
+          environment::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS, stable_config)) {
     auto res = parse_double(*raw_rc_poll_interval_value);
     if (auto error = res.if_error()) {
       return error->with_prefix(
@@ -85,7 +119,7 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
   }
 
   if (Optional<std::string> agent_url =
-          build_agent_url_from_environment_variables()) {
+          build_agent_url_from_environment_variables(stable_config)) {
     env_config.url = *std::move(agent_url);
   }
 
@@ -94,8 +128,10 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config() {
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& user_config,
-    const std::shared_ptr<Logger>& logger, const Clock& clock) {
-  Expected<DatadogAgentConfig> env_config = load_datadog_agent_env_config();
+    const std::shared_ptr<Logger>& logger, const Clock& clock,
+    const StableConfig* stable_config) {
+  Expected<DatadogAgentConfig> env_config =
+      load_datadog_agent_env_config(stable_config);
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -126,9 +162,9 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
   result.remote_configuration_listeners =
       user_config.remote_configuration_listeners;
 
-  if (auto flush_interval_milliseconds =
-          value_or(env_config->flush_interval_milliseconds,
-                   user_config.flush_interval_milliseconds, 2000);
+  if (auto flush_interval_milliseconds = choose_with_stable_config(
+          env_config->flush_interval_milliseconds,
+          user_config.flush_interval_milliseconds, 2000, stable_config);
       flush_interval_milliseconds > 0) {
     result.flush_interval =
         std::chrono::milliseconds(flush_interval_milliseconds);
@@ -138,9 +174,9 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "milliseconds."};
   }
 
-  if (auto request_timeout_milliseconds =
-          value_or(env_config->request_timeout_milliseconds,
-                   user_config.request_timeout_milliseconds, 2000);
+  if (auto request_timeout_milliseconds = choose_with_stable_config(
+          env_config->request_timeout_milliseconds,
+          user_config.request_timeout_milliseconds, 2000, stable_config);
       request_timeout_milliseconds > 0) {
     result.request_timeout =
         std::chrono::milliseconds(request_timeout_milliseconds);
@@ -150,9 +186,9 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "milliseconds."};
   }
 
-  if (auto shutdown_timeout_milliseconds =
-          value_or(env_config->shutdown_timeout_milliseconds,
-                   user_config.shutdown_timeout_milliseconds, 2000);
+  if (auto shutdown_timeout_milliseconds = choose_with_stable_config(
+          env_config->shutdown_timeout_milliseconds,
+          user_config.shutdown_timeout_milliseconds, 2000, stable_config);
       shutdown_timeout_milliseconds > 0) {
     result.shutdown_timeout =
         std::chrono::milliseconds(shutdown_timeout_milliseconds);
@@ -162,9 +198,10 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "milliseconds."};
   }
 
-  if (double rc_poll_interval_seconds =
-          value_or(env_config->remote_configuration_poll_interval_seconds,
-                   user_config.remote_configuration_poll_interval_seconds, 5.0);
+  if (double rc_poll_interval_seconds = choose_with_stable_config(
+          env_config->remote_configuration_poll_interval_seconds,
+          user_config.remote_configuration_poll_interval_seconds, 5.0,
+          stable_config);
       rc_poll_interval_seconds >= 0.0) {
     result.remote_configuration_poll_interval =
         std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -175,25 +212,36 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
                  "positive number of seconds."};
   }
 
-  result.remote_configuration_enabled =
-      value_or(env_config->remote_configuration_enabled,
-               user_config.remote_configuration_enabled, true);
+  result.remote_configuration_enabled = choose_with_stable_config(
+      env_config->remote_configuration_enabled,
+      user_config.remote_configuration_enabled, true, stable_config);
 
-  const auto [origin, url] =
+  auto [origin, url] =
       select_agent_url(env_config->url, user_config.url,
                        std::filesystem::path{default_agent_socket_path});
+  Optional<std::string> config_id;
+  if (stable_config && user_config.url) {
+    // With stable config, code wins over the environment.
+    origin = ConfigMetadata::Origin::CODE;
+    url = *user_config.url;
+  } else if (origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE) {
+    const ConfigValueSource source =
+        config_value_source(agent_url_source(stable_config), stable_config);
+    origin = source.origin;
+    config_id = source.config_id;
+  }
   auto parsed_url = HTTPClient::URL::parse(url);
   if (auto* error = parsed_url.if_error()) {
     return std::move(*error);
   }
   result.url = *parsed_url;
   result.metadata[ConfigName::AGENT_URL] = {
-      ConfigMetadata(ConfigName::AGENT_URL, url, origin)};
+      ConfigMetadata(ConfigName::AGENT_URL, url, origin, nullopt, config_id)};
 
   // Starting Datadog Agent 7.62.0, the admission controller inject a unique
   // identifier through `DD_EXTERNAL_ENV`. This uid is used for origin
   // detection.
-  if (auto external_env = lookup(environment::DD_EXTERNAL_ENV)) {
+  if (auto external_env = lookup(environment::DD_EXTERNAL_ENV, stable_config)) {
     result.admission_controller_uid = std::string(*external_env);
   }
 

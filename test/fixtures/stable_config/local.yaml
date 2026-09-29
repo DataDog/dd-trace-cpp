@@ -1,0 +1,15 @@
+config_id: local-test
+apm_configuration_default:
+  DD_SERVICE: local-service
+  DD_ENV: local-env
+  DD_VERSION: local-version
+  DD_APM_TRACING_ENABLED: "false"
+  DD_TRACE_SAMPLE_RATE: "0.25"
+  DD_TRACE_AGENT_URL: http://local-agent:8126
+rules:
+  - selectors:
+      - origin: language
+        matches: ["cpp"]
+        operator: equals
+    configuration:
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: b3

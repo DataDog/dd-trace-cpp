@@ -1,4 +1,35 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+cc_library(
+    name = "dd_trace_cpp_stable_config",
+    srcs = [
+        "src/datadog/stable_config_loader.cpp",
+        "src/datadog/stable_config_loader_internal.h",
+        "src/datadog/stable_config_parser.cpp",
+    ],
+    hdrs = ["include/datadog/stable_config_loader.h"],
+    strip_include_prefix = "include/",
+    visibility = ["//visibility:public"],
+    linkopts = select({
+        "@platforms//os:windows": ["-lshell32"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":dd_trace_cpp",
+        "@yaml-cpp//:yaml-cpp",
+    ],
+)
+
+cc_test(
+    name = "stable_config_loader_test",
+    size = "small",
+    srcs = ["test/bazel_stable_config_test.cpp"],
+    data = [
+        "test/fixtures/stable_config/fleet.yaml",
+        "test/fixtures/stable_config/local.yaml",
+    ],
+    deps = [":dd_trace_cpp_stable_config"],
+)
 
 cc_library(
     name = "dd_trace_cpp",
@@ -67,6 +98,7 @@ cc_library(
         "src/datadog/span_sampler.cpp",
         "src/datadog/span_sampler.h",
         "src/datadog/span_sampler_config.cpp",
+        "src/datadog/stable_config.cpp",
         "src/datadog/string_util.cpp",
         "src/datadog/string_util.h",
         "src/datadog/tag_propagation.cpp",
@@ -145,6 +177,7 @@ cc_library(
         "include/datadog/span_defaults.h",
         "include/datadog/span_matcher.h",
         "include/datadog/span_sampler_config.h",
+        "include/datadog/stable_config.h",
         "include/datadog/string_view.h",
         "include/datadog/telemetry/configuration.h",
         "include/datadog/telemetry/metrics.h",

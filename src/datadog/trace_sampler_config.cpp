@@ -1,4 +1,5 @@
 #include <datadog/environment.h>
+#include <datadog/stable_config.h>
 #include <datadog/trace_sampler_config.h>
 #include <datadog/trace_source.h>
 
@@ -15,10 +16,12 @@ namespace datadog {
 namespace tracing {
 namespace {
 
-Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
+Expected<TraceSamplerConfig> load_trace_sampler_env_config(
+    const StableConfig *stable_config) {
   TraceSamplerConfig env_config;
 
-  if (auto rules_env = lookup(environment::DD_TRACE_SAMPLING_RULES)) {
+  if (auto rules_env =
+          lookup(environment::DD_TRACE_SAMPLING_RULES, stable_config)) {
     nlohmann::json json_rules;
     try {
       json_rules = nlohmann::json::parse(*rules_env);
@@ -107,7 +110,8 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
     }
   }
 
-  if (auto sample_rate_env = lookup(environment::DD_TRACE_SAMPLE_RATE)) {
+  if (auto sample_rate_env =
+          lookup(environment::DD_TRACE_SAMPLE_RATE, stable_config)) {
     auto maybe_sample_rate = parse_double(*sample_rate_env);
     if (auto *error = maybe_sample_rate.if_error()) {
       std::string prefix;
@@ -119,7 +123,8 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config() {
     env_config.sample_rate = *maybe_sample_rate;
   }
 
-  if (auto limit_env = lookup(environment::DD_TRACE_RATE_LIMIT)) {
+  if (auto limit_env =
+          lookup(environment::DD_TRACE_RATE_LIMIT, stable_config)) {
     auto maybe_max_per_second = parse_double(*limit_env);
     if (auto *error = maybe_max_per_second.if_error()) {
       std::string prefix;
@@ -150,8 +155,9 @@ std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig &config) {
-  Expected<TraceSamplerConfig> env_config = load_trace_sampler_env_config();
+    const TraceSamplerConfig &config, const StableConfig *stable_config) {
+  Expected<TraceSamplerConfig> env_config =
+      load_trace_sampler_env_config(stable_config);
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -160,11 +166,15 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   std::vector<TraceSamplerConfig::Rule> rules;
 
-  if (!env_config->rules.empty()) {
+  // With stable config, code rules win over the environment.
+  const bool code_wins = stable_config && !config.rules.empty();
+  if (!code_wins && !env_config->rules.empty()) {
     rules = std::move(env_config->rules);
+    const ConfigValueSource source = config_value_source(
+        environment::DD_TRACE_SAMPLING_RULES, stable_config);
     result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::ENVIRONMENT_VARIABLE)};
+                       source.origin, nullopt, source.config_id)};
   } else if (!config.rules.empty()) {
     rules = std::move(config.rules);
     result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
@@ -191,10 +201,10 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
-  Optional<double> sample_rate = resolve_and_record_config(
+  Optional<double> sample_rate = resolve_with_stable_config(
       env_config->sample_rate, config.sample_rate, &result.metadata,
-      ConfigName::TRACE_SAMPLING_RATE, 1.0,
-      [](const double &d) { return to_string(d, 1); });
+      ConfigName::TRACE_SAMPLING_RATE, environment::DD_TRACE_SAMPLE_RATE,
+      stable_config, 1.0, [](const double &d) { return to_string(d, 1); });
 
   bool is_sample_rate_provided = env_config->sample_rate || config.sample_rate;
   // If `sample_rate` was specified, then it translates to a "catch-all" rule
@@ -214,10 +224,10 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
     result.rules.emplace_back(std::move(finalized_rule));
   }
 
-  double max_per_second = resolve_and_record_config(
+  double max_per_second = resolve_with_stable_config(
       env_config->max_per_second, config.max_per_second, &result.metadata,
-      ConfigName::TRACE_SAMPLING_LIMIT, 100.0,
-      [](const double &d) { return std::to_string(d); });
+      ConfigName::TRACE_SAMPLING_LIMIT, environment::DD_TRACE_RATE_LIMIT,
+      stable_config, 100.0, [](const double &d) { return std::to_string(d); });
 
   const auto allowed_types = {FP_NORMAL, FP_SUBNORMAL};
   if (!(max_per_second > 0) ||
