@@ -9,4 +9,11 @@ if(DD_TRACE_TRANSPORT STREQUAL "curl")
   find_dependency(CURL)
 endif()
 
+if(@DD_TRACE_BUILD_STABLE_CONFIG@ AND
+   NOT TARGET dd-trace-cpp-stable-config-rust-lib)
+  add_library(dd-trace-cpp-stable-config-rust-lib STATIC IMPORTED)
+  set_target_properties(dd-trace-cpp-stable-config-rust-lib PROPERTIES
+    IMPORTED_LOCATION "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/@DD_TRACE_RUST_FILE_NAME@")
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/dd-trace-cpp-targets.cmake")

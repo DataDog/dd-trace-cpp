@@ -1,6 +1,7 @@
 #include <datadog/environment.h>
 #include <datadog/expected.h>
 #include <datadog/span_sampler_config.h>
+#include <datadog/stable_config.h>
 
 #include <cmath>
 #include <fstream>
@@ -143,10 +144,11 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
   return rules;
 }
 
-Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
+Expected<SpanSamplerConfig> load_span_sampler_env_config(
+    Logger &logger, const StableConfig *stable_config) {
   SpanSamplerConfig env_config;
 
-  auto rules_env = lookup(environment::DD_SPAN_SAMPLING_RULES);
+  auto rules_env = lookup(environment::DD_SPAN_SAMPLING_RULES, stable_config);
   if (rules_env) {
     auto maybe_rules =
         parse_rules(*rules_env, name(environment::DD_SPAN_SAMPLING_RULES));
@@ -156,7 +158,8 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
     env_config.rules = std::move(*maybe_rules);
   }
 
-  if (auto file_env = lookup(environment::DD_SPAN_SAMPLING_RULES_FILE)) {
+  if (auto file_env =
+          lookup(environment::DD_SPAN_SAMPLING_RULES_FILE, stable_config)) {
     if (rules_env) {
       const auto rules_file_name =
           name(environment::DD_SPAN_SAMPLING_RULES_FILE);
@@ -222,7 +225,14 @@ SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(
     const SpanSamplerConfig &user_config, Logger &logger) {
-  Expected<SpanSamplerConfig> env_config = load_span_sampler_env_config(logger);
+  return finalize_config(user_config, logger, nullptr);
+}
+
+Expected<FinalizedSpanSamplerConfig> finalize_config(
+    const SpanSamplerConfig &user_config, Logger &logger,
+    const StableConfig *stable_config) {
+  Expected<SpanSamplerConfig> env_config =
+      load_span_sampler_env_config(logger, stable_config);
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -237,9 +247,13 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
     user_rules = user_config.rules;
   }
 
-  std::vector<SpanSamplerConfig::Rule> rules = resolve_and_record_config(
+  std::vector<SpanSamplerConfig::Rule> rules = resolve_with_stable_config(
       env_rules, user_rules, &result.metadata, ConfigName::SPAN_SAMPLING_RULES,
-      nullptr, [](const std::vector<SpanSamplerConfig::Rule> &r) {
+      lookup(environment::DD_SPAN_SAMPLING_RULES, stable_config)
+          ? environment::DD_SPAN_SAMPLING_RULES
+          : environment::DD_SPAN_SAMPLING_RULES_FILE,
+      stable_config, nullptr,
+      [](const std::vector<SpanSamplerConfig::Rule> &r) {
         return to_string(r);
       });
 

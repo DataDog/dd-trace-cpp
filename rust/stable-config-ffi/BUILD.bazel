@@ -1,0 +1,27 @@
+load("@rules_rs//rs:rust_library.bzl", "rust_library")
+load("@rules_rs//rs:rust_static_library.bzl", "rust_static_library")
+
+exports_files(["Cargo.toml", "Cargo.lock"])
+
+rust_library(
+    name = "libdd_library_config",
+    srcs = ["//:libdd_library_config_sources"],
+    crate_root = "//:vendor/libdatadog/libdd-library-config/src/lib.rs",
+    crate_name = "libdd_library_config",
+    edition = "2021",
+    deps = [
+        "@stable_config_crates//:anyhow",
+        "@stable_config_crates//:serde",
+        "@stable_config_crates//:thiserror",
+        "@stable_config_crates//:yaml_serde",
+    ],
+)
+
+rust_static_library(
+    name = "stable_config_ffi",
+    srcs = ["src/lib.rs"],
+    crate_name = "dd_trace_cpp_stable_config_ffi",
+    deps = [":libdd_library_config"],
+    edition = "2021",
+    visibility = ["//visibility:public"],
+)

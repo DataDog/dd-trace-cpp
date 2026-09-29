@@ -20,6 +20,8 @@
 namespace datadog {
 namespace tracing {
 
+class StableConfig;
+
 struct SpanSamplerConfig {
   struct Rule : public SpanMatcher {
     double sample_rate = 1.0;
@@ -38,6 +40,8 @@ struct SpanSamplerConfig {
 class FinalizedSpanSamplerConfig {
   friend Expected<FinalizedSpanSamplerConfig> finalize_config(
       const SpanSamplerConfig&, Logger&);
+  friend Expected<FinalizedSpanSamplerConfig> finalize_config(
+      const SpanSamplerConfig&, Logger&, const StableConfig*);
   friend class FinalizedTracerConfig;
 
   FinalizedSpanSamplerConfig() = default;
@@ -54,6 +58,9 @@ class FinalizedSpanSamplerConfig {
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
                                                      Logger&);
+Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
+                                                     Logger&,
+                                                     const StableConfig*);
 
 std::string to_string(const FinalizedSpanSamplerConfig::Rule&);
 

@@ -1,4 +1,5 @@
 #include <datadog/environment.h>
+#include <datadog/stable_config.h>
 
 #include <cstdlib>
 
@@ -17,6 +18,22 @@ Optional<StringView> lookup(Variable variable) {
     return nullopt;
   }
   return StringView{value};
+}
+
+Optional<StringView> lookup(Variable variable,
+                            const StableConfig *stable_config) {
+  const StableConfigEntry *entry =
+      stable_config ? stable_config->find(name(variable)) : nullptr;
+  if (entry && entry->source == StableConfigSource::FLEET) {
+    return StringView{entry->value.data(), entry->value.size()};
+  }
+  if (Optional<StringView> value = lookup(variable)) {
+    return value;
+  }
+  if (entry) {
+    return StringView{entry->value.data(), entry->value.size()};
+  }
+  return nullopt;
 }
 
 std::string to_json() {

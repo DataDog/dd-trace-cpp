@@ -1,0 +1,14 @@
+[package]
+name = "dd-trace-cpp-stable-config-bazel-deps"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+# Keep these versions and features in sync with libdd-library-config.
+[dependencies]
+anyhow = { version = "1.0", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+thiserror = { version = "2.0.3", default-features = false }
+yaml_serde = { version = "0.10.7", default-features = false }
