@@ -17,11 +17,13 @@ namespace tracing {
 namespace {
 
 Expected<TraceSamplerConfig> load_trace_sampler_env_config(
-    const StableConfig *stable_config) {
+    const StableConfig *stable_config, const TraceSamplerConfig &user_config) {
   TraceSamplerConfig env_config;
 
   if (auto rules_env =
-          lookup(environment::DD_TRACE_SAMPLING_RULES, stable_config)) {
+          lookup(environment::DD_TRACE_SAMPLING_RULES, stable_config);
+      rules_env && !(stable_config && (user_config.rules_configured ||
+                                       !user_config.rules.empty()))) {
     nlohmann::json json_rules;
     try {
       json_rules = nlohmann::json::parse(*rules_env);
@@ -48,6 +50,7 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config(
       append(message, *rules_env);
       return Error{Error::TRACE_SAMPLING_RULES_WRONG_TYPE, std::move(message)};
     }
+    env_config.rules_configured = true;
 
     const std::unordered_set<std::string> allowed_properties{
         "service", "name", "resource", "tags", "sample_rate"};
@@ -114,26 +117,32 @@ Expected<TraceSamplerConfig> load_trace_sampler_env_config(
           lookup(environment::DD_TRACE_SAMPLE_RATE, stable_config)) {
     auto maybe_sample_rate = parse_double(*sample_rate_env);
     if (auto *error = maybe_sample_rate.if_error()) {
-      std::string prefix;
-      prefix += "While parsing ";
-      append(prefix, name(environment::DD_TRACE_SAMPLE_RATE));
-      prefix += ": ";
-      return error->with_prefix(prefix);
+      if (!(stable_config && user_config.sample_rate)) {
+        std::string prefix;
+        prefix += "While parsing ";
+        append(prefix, name(environment::DD_TRACE_SAMPLE_RATE));
+        prefix += ": ";
+        return error->with_prefix(prefix);
+      }
+    } else {
+      env_config.sample_rate = *maybe_sample_rate;
     }
-    env_config.sample_rate = *maybe_sample_rate;
   }
 
   if (auto limit_env =
           lookup(environment::DD_TRACE_RATE_LIMIT, stable_config)) {
     auto maybe_max_per_second = parse_double(*limit_env);
     if (auto *error = maybe_max_per_second.if_error()) {
-      std::string prefix;
-      prefix += "While parsing ";
-      append(prefix, name(environment::DD_TRACE_RATE_LIMIT));
-      prefix += ": ";
-      return error->with_prefix(prefix);
+      if (!(stable_config && user_config.max_per_second)) {
+        std::string prefix;
+        prefix += "While parsing ";
+        append(prefix, name(environment::DD_TRACE_RATE_LIMIT));
+        prefix += ": ";
+        return error->with_prefix(prefix);
+      }
+    } else {
+      env_config.max_per_second = *maybe_max_per_second;
     }
-    env_config.max_per_second = *maybe_max_per_second;
   }
 
   return env_config;
@@ -162,7 +171,7 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 Expected<FinalizedTraceSamplerConfig> finalize_config(
     const TraceSamplerConfig &config, const StableConfig *stable_config) {
   Expected<TraceSamplerConfig> env_config =
-      load_trace_sampler_env_config(stable_config);
+      load_trace_sampler_env_config(stable_config, config);
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -171,19 +180,19 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   std::vector<TraceSamplerConfig::Rule> rules;
 
-  if (stable_config && !config.rules.empty()) {
+  if (stable_config && (config.rules_configured || !config.rules.empty())) {
     rules = config.rules;
     result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
                        ConfigMetadata::Origin::CODE)};
-  } else if (!env_config->rules.empty()) {
+  } else if (env_config->rules_configured || !env_config->rules.empty()) {
     rules = std::move(env_config->rules);
     const ConfigValueSource source = config_value_source(
         environment::DD_TRACE_SAMPLING_RULES, stable_config);
     result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
                        source.origin, nullopt, source.config_id)};
-  } else if (!config.rules.empty()) {
+  } else if (config.rules_configured || !config.rules.empty()) {
     rules = std::move(config.rules);
     result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
         ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),

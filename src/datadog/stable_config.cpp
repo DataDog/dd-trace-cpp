@@ -27,4 +27,21 @@ ConfigValueSource config_value_source(environment::Variable variable,
   return {ConfigMetadata::Origin::ENVIRONMENT_VARIABLE, nullopt};
 }
 
+int config_value_priority(environment::Variable variable,
+                          const StableConfig* stable_config) {
+  if (!environment::lookup(variable, stable_config)) return -1;
+  if (!stable_config) return 0;
+
+  switch (config_value_source(variable, stable_config).origin) {
+    case ConfigMetadata::Origin::LOCAL_STABLE_CONFIG:
+      return 0;
+    case ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
+      return 1;
+    case ConfigMetadata::Origin::FLEET_STABLE_CONFIG:
+      return 2;
+    default:
+      return -1;
+  }
+}
+
 }  // namespace datadog::tracing

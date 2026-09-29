@@ -82,3 +82,111 @@ STABLE_CONFIG_TEST("invalid stable config is reported") {
   auto loaded = load_stable_config("cpp", invalid, "/nonexistent/fleet.yaml");
   CHECK_FALSE(loaded);
 }
+
+STABLE_CONFIG_TEST("fleet propagation style outranks local aliases") {
+  EnvGuard global_env{"DD_TRACE_PROPAGATION_STYLE"};
+  EnvGuard extract_env{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "datadog"};
+  EnvGuard legacy_extract_env{"DD_PROPAGATION_STYLE_EXTRACT"};
+  EnvGuard inject_env{"DD_TRACE_PROPAGATION_STYLE_INJECT", "datadog"};
+  EnvGuard legacy_inject_env{"DD_PROPAGATION_STYLE_INJECT"};
+  StableConfig stable;
+  stable.set("DD_TRACE_PROPAGATION_STYLE",
+             {"b3", StableConfigSource::FLEET, "fleet-style"});
+  stable.set("DD_TRACE_PROPAGATION_STYLE_EXTRACT",
+             {"datadog", StableConfigSource::LOCAL, "local-style"});
+  stable.set("DD_TRACE_PROPAGATION_STYLE_INJECT",
+             {"datadog", StableConfigSource::LOCAL, "local-style"});
+
+  TracerConfig code;
+  code.agent.http_client = std::make_shared<MockHTTPClient>();
+  auto finalized = finalize_config(code, stable);
+  REQUIRE(finalized);
+  REQUIRE(finalized->extraction_styles.size() == 1);
+  CHECK(finalized->extraction_styles.front() == PropagationStyle::B3);
+  REQUIRE(finalized->injection_styles.size() == 1);
+  CHECK(finalized->injection_styles.front() == PropagationStyle::B3);
+  CHECK(finalized->metadata.at(ConfigName::EXTRACTION_STYLES).back().origin ==
+        ConfigMetadata::Origin::FLEET_STABLE_CONFIG);
+}
+
+STABLE_CONFIG_TEST("fleet span rules file outranks inline environment rules") {
+  EnvGuard rules_env{"DD_SPAN_SAMPLING_RULES", "invalid JSON"};
+  EnvGuard file_env{"DD_SPAN_SAMPLING_RULES_FILE"};
+  StableConfig stable;
+  stable.set("DD_SPAN_SAMPLING_RULES_FILE",
+             {std::string{DD_TRACE_SOURCE_DIR} +
+                  "/test/fixtures/stable_config/span_rules.json",
+              StableConfigSource::FLEET, "fleet-span-rules"});
+
+  TracerConfig code;
+  code.agent.http_client = std::make_shared<MockHTTPClient>();
+  auto finalized = finalize_config(code, stable);
+  REQUIRE(finalized);
+  CHECK(finalized->span_sampler.rules.empty());
+  CHECK(finalized->metadata.at(ConfigName::SPAN_SAMPLING_RULES).back().origin ==
+        ConfigMetadata::Origin::FLEET_STABLE_CONFIG);
+}
+
+STABLE_CONFIG_TEST("code clears stable sampling rules") {
+  EnvGuard trace_rules_env{"DD_TRACE_SAMPLING_RULES"};
+  EnvGuard span_rules_env{"DD_SPAN_SAMPLING_RULES"};
+  EnvGuard sample_rate_env{"DD_TRACE_SAMPLE_RATE"};
+  StableConfig stable;
+  stable.set("DD_TRACE_SAMPLING_RULES",
+             {"[{\"sample_rate\":0.5}]", StableConfigSource::FLEET, "fleet"});
+  stable.set("DD_SPAN_SAMPLING_RULES",
+             {"[{\"sample_rate\":0.5}]", StableConfigSource::FLEET, "fleet"});
+
+  TracerConfig code;
+  code.agent.http_client = std::make_shared<MockHTTPClient>();
+  code.trace_sampler.clear_rules();
+  code.span_sampler.clear_rules();
+  auto finalized = finalize_config(code, stable);
+  REQUIRE(finalized);
+  CHECK(finalized->trace_sampler.rules.empty());
+  CHECK(finalized->span_sampler.rules.empty());
+  CHECK(
+      finalized->metadata.at(ConfigName::TRACE_SAMPLING_RULES).back().origin ==
+      ConfigMetadata::Origin::CODE);
+  CHECK(finalized->metadata.at(ConfigName::SPAN_SAMPLING_RULES).back().origin ==
+        ConfigMetadata::Origin::CODE);
+}
+
+STABLE_CONFIG_TEST("code shadows invalid lower-priority values") {
+  EnvGuard sample_rate_env{"DD_TRACE_SAMPLE_RATE", "invalid"};
+  EnvGuard styles_env{"DD_TRACE_PROPAGATION_STYLE_EXTRACT", "invalid"};
+  EnvGuard telemetry_interval_env{"DD_TELEMETRY_METRICS_INTERVAL_SECONDS",
+                                  "invalid"};
+  StableConfig stable;
+  TracerConfig code;
+  code.agent.http_client = std::make_shared<MockHTTPClient>();
+  code.trace_sampler.sample_rate = 0.5;
+  code.extraction_styles = std::vector<PropagationStyle>{PropagationStyle::B3};
+  code.telemetry.metrics_interval_seconds = 30.0;
+
+  auto finalized = finalize_config(code, stable);
+  REQUIRE(finalized);
+  CHECK(finalized->metadata.at(ConfigName::TRACE_SAMPLING_RATE).back().origin ==
+        ConfigMetadata::Origin::CODE);
+  REQUIRE(finalized->extraction_styles.size() == 1);
+  CHECK(finalized->extraction_styles.front() == PropagationStyle::B3);
+  CHECK(finalized->telemetry.metrics_interval == std::chrono::seconds(30));
+}
+
+STABLE_CONFIG_TEST("stable telemetry honors fleet and code precedence") {
+  EnvGuard enabled_env{"DD_INSTRUMENTATION_TELEMETRY_ENABLED", "true"};
+  StableConfig stable;
+  stable.set("DD_INSTRUMENTATION_TELEMETRY_ENABLED",
+             {"false", StableConfigSource::FLEET, "fleet-telemetry"});
+
+  TracerConfig code;
+  code.agent.http_client = std::make_shared<MockHTTPClient>();
+  auto fleet = finalize_config(code, stable);
+  REQUIRE(fleet);
+  CHECK_FALSE(fleet->telemetry.enabled);
+
+  code.telemetry.enabled = true;
+  auto overridden = finalize_config(code, stable);
+  REQUIRE(overridden);
+  CHECK(overridden->telemetry.enabled);
+}

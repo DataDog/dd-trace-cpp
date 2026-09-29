@@ -1,5 +1,8 @@
 find_program(DD_TRACE_CARGO cargo REQUIRED)
 
+file(GLOB_RECURSE DD_TRACE_LIBDD_LIBRARY_CONFIG_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/libdatadog/libdd-library-config/src/*.rs")
+
 set(DD_TRACE_RUST_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/stable-config-rust")
 set(DD_TRACE_RUST_FILE_NAME
     "${CMAKE_STATIC_LIBRARY_PREFIX}dd_trace_cpp_stable_config_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}")
@@ -16,8 +19,8 @@ add_custom_command(
     rust/stable-config-ffi/Cargo.toml
     rust/stable-config-ffi/Cargo.lock
     rust/stable-config-ffi/src/lib.rs
-    vendor/libdatadog/libdd-library-config/src/lib.rs
-    vendor/libdatadog/libdd-library-config/src/config_read.rs
+    vendor/libdatadog/libdd-library-config/Cargo.toml
+    ${DD_TRACE_LIBDD_LIBRARY_CONFIG_SOURCES}
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   VERBATIM
 )
@@ -34,6 +37,7 @@ add_library(dd-trace-cpp-stable-config STATIC
   src/datadog/stable_config_loader.cpp)
 add_library(dd-trace-cpp::stable-config ALIAS dd-trace-cpp-stable-config)
 set_target_properties(dd-trace-cpp-stable-config PROPERTIES EXPORT_NAME stable-config)
+set_target_properties(dd-trace-cpp-stable-config PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(dd-trace-cpp-stable-config PUBLIC cxx_std_17)
 target_include_directories(dd-trace-cpp-stable-config PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"

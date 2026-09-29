@@ -6,5 +6,5 @@
 	url = https://github.com/TinyCC/tinycc.git
 [submodule "vendor/libdatadog"]
 	path = vendor/libdatadog
-	url = https://github.com/DataDog/libdatadog.git
+	url = https://github.com/datadog/libdatadog.git
 	branch = pawel/no-std-library-config

@@ -9,6 +9,10 @@
 #include <string>
 #include <vector>
 
+namespace datadog::tracing {
+class StableConfig;
+}
+
 namespace datadog::telemetry {
 
 struct Configuration {
@@ -69,9 +73,13 @@ struct FinalizedConfiguration {
 
   friend tracing::Expected<FinalizedConfiguration> finalize_config(
       const Configuration&);
+  friend tracing::Expected<FinalizedConfiguration> finalize_config(
+      const Configuration&, const tracing::StableConfig*);
 };
 
 tracing::Expected<FinalizedConfiguration> finalize_config(
     const Configuration& = Configuration{});
+tracing::Expected<FinalizedConfiguration> finalize_config(
+    const Configuration&, const tracing::StableConfig*);
 
 }  // namespace datadog::telemetry

@@ -34,6 +34,8 @@ class StableConfig {
 
 ConfigValueSource config_value_source(environment::Variable variable,
                                       const StableConfig* stable_config);
+int config_value_priority(environment::Variable variable,
+                          const StableConfig* stable_config);
 
 template <typename Value, typename DefaultValue = std::nullptr_t,
           typename Stringifier = std::nullptr_t>

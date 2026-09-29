@@ -35,6 +35,12 @@ struct SpanSamplerConfig {
   // Also, the `DD_TRACE_SAMPLE_RATE` environment variable, if present, causes a
   // corresponding `Rule` to be appended to `rules`.
   std::vector<Rule> rules;
+  bool rules_configured = false;
+
+  void clear_rules() {
+    rules.clear();
+    rules_configured = true;
+  }
 };
 
 class FinalizedSpanSamplerConfig {

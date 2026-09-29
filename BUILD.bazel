@@ -2,7 +2,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 filegroup(
     name = "libdd_library_config_sources",
-    srcs = glob(["vendor/libdatadog/libdd-library-config/src/**/*.rs"]),
+    srcs = glob(["vendor/libdatadog/libdd-library-config/src/**/*.rs"], allow_empty = True),
     visibility = ["//visibility:public"],
 )
 

@@ -130,6 +130,8 @@ Settings resolve in this order: defaults, local YAML, environment variables,
 fleet YAML, and values in `TracerConfig`. The stable configuration overload
 records the source and config ID in configuration telemetry. The existing
 `finalize_config(config)` overload keeps its original behavior.
+Call `clear_rules()` on `trace_sampler` or `span_sampler` to override stable
+sampling rules with an empty list.
 
 ### Optional: Linking to the shared library
 

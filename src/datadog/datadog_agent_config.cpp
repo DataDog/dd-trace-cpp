@@ -44,18 +44,7 @@ int agent_url_source_rank(environment::Variable variable,
                           const StableConfig* stable_config) {
   const Optional<StringView> value = lookup(variable, stable_config);
   if (!value || value->empty()) return -1;
-  if (!stable_config) return 0;
-
-  switch (config_value_source(variable, stable_config).origin) {
-    case ConfigMetadata::Origin::LOCAL_STABLE_CONFIG:
-      return 0;
-    case ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
-      return 1;
-    case ConfigMetadata::Origin::FLEET_STABLE_CONFIG:
-      return 2;
-    default:
-      return -1;
-  }
+  return config_value_priority(variable, stable_config);
 }
 
 environment::Variable agent_url_source(const StableConfig* stable_config) {
@@ -110,7 +99,7 @@ Optional<std::string> build_agent_url_from_environment_variables(
 }
 
 Expected<DatadogAgentConfig> load_datadog_agent_env_config(
-    const StableConfig* stable_config) {
+    const StableConfig* stable_config, const DatadogAgentConfig& user_config) {
   DatadogAgentConfig env_config;
 
   if (auto rc_enabled =
@@ -122,11 +111,14 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config(
           environment::DD_REMOTE_CONFIG_POLL_INTERVAL_SECONDS, stable_config)) {
     auto res = parse_double(*raw_rc_poll_interval_value);
     if (auto error = res.if_error()) {
-      return error->with_prefix(
-          "DatadogAgent: Remote Configuration poll interval error ");
+      if (!(stable_config &&
+            user_config.remote_configuration_poll_interval_seconds)) {
+        return error->with_prefix(
+            "DatadogAgent: Remote Configuration poll interval error ");
+      }
+    } else {
+      env_config.remote_configuration_poll_interval_seconds = *res;
     }
-
-    env_config.remote_configuration_poll_interval_seconds = *res;
   }
 
   if (Optional<std::string> agent_url =
@@ -148,7 +140,7 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
     const std::shared_ptr<Logger>& logger, const Clock& clock,
     const StableConfig* stable_config) {
   Expected<DatadogAgentConfig> env_config =
-      load_datadog_agent_env_config(stable_config);
+      load_datadog_agent_env_config(stable_config, user_config);
   if (auto error = env_config.if_error()) {
     return *error;
   }

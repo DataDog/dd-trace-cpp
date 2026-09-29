@@ -39,7 +39,13 @@ struct TraceSamplerConfig {
 
   Optional<double> sample_rate;
   std::vector<Rule> rules;
+  bool rules_configured = false;
   Optional<double> max_per_second;
+
+  void clear_rules() {
+    rules.clear();
+    rules_configured = true;
+  }
 };
 
 class FinalizedTraceSamplerConfig {

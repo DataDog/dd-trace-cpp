@@ -98,13 +98,22 @@ std::string json_quoted(StringView text) {
 environment::Variable propagation_style_source(
     environment::Variable specific, environment::Variable legacy,
     const StableConfig *stable_config) {
-  if (lookup(specific, stable_config)) return specific;
-  if (lookup(legacy, stable_config)) return legacy;
-  return environment::DD_TRACE_PROPAGATION_STYLE;
+  environment::Variable selected = specific;
+  int priority = config_value_priority(specific, stable_config);
+  for (const auto variable :
+       {legacy, environment::DD_TRACE_PROPAGATION_STYLE}) {
+    const int candidate = config_value_priority(variable, stable_config);
+    if (candidate > priority) {
+      selected = variable;
+      priority = candidate;
+    }
+  }
+  return priority < 0 ? environment::DD_TRACE_PROPAGATION_STYLE : selected;
 }
 
-Expected<TracerConfig> load_tracer_env_config(
-    Logger &logger, const StableConfig *stable_config) {
+Expected<TracerConfig> load_tracer_env_config(Logger &logger,
+                                              const StableConfig *stable_config,
+                                              const TracerConfig &user_config) {
   TracerConfig env_cfg;
 
   if (auto service_env = lookup(environment::DD_SERVICE, stable_config)) {
@@ -121,13 +130,16 @@ Expected<TracerConfig> load_tracer_env_config(
   if (auto tags_env = lookup(environment::DD_TAGS, stable_config)) {
     auto tags = parse_tags(*tags_env);
     if (auto *error = tags.if_error()) {
-      std::string prefix;
-      prefix += "Unable to parse ";
-      append(prefix, name(environment::DD_TAGS));
-      prefix += " environment variable: ";
-      return error->with_prefix(prefix);
+      if (!(stable_config && user_config.tags)) {
+        std::string prefix;
+        prefix += "Unable to parse ";
+        append(prefix, name(environment::DD_TAGS));
+        prefix += " environment variable: ";
+        return error->with_prefix(prefix);
+      }
+    } else {
+      env_cfg.tags = std::move(*tags);
     }
-    env_cfg.tags = std::move(*tags);
   }
 
   if (auto startup_env =
@@ -164,20 +176,20 @@ Expected<TracerConfig> load_tracer_env_config(
           lookup(environment::DD_TRACE_BAGGAGE_MAX_ITEMS, stable_config)) {
     auto maybe_value = parse_uint64(*baggage_items_env, 10);
     if (auto *error = maybe_value.if_error()) {
-      return *error;
+      if (!(stable_config && user_config.baggage_max_items)) return *error;
+    } else {
+      env_cfg.baggage_max_items = std::move(*maybe_value);
     }
-
-    env_cfg.baggage_max_items = std::move(*maybe_value);
   }
 
   if (auto baggage_bytes_env =
           lookup(environment::DD_TRACE_BAGGAGE_MAX_BYTES, stable_config)) {
     auto maybe_value = parse_uint64(*baggage_bytes_env, 10);
     if (auto *error = maybe_value.if_error()) {
-      return *error;
+      if (!(stable_config && user_config.baggage_max_bytes)) return *error;
+    } else {
+      env_cfg.baggage_max_bytes = std::move(*maybe_value);
     }
-
-    env_cfg.baggage_max_bytes = std::move(*maybe_value);
   }
 
   // PropagationStyle
@@ -232,22 +244,24 @@ Expected<TracerConfig> load_tracer_env_config(
     return message;
   };
 
-  for (const auto &[var, var_override] : questionable_combinations) {
-    const auto value = lookup(var, stable_config);
-    if (!value) {
-      continue;
-    }
-    const auto value_override = lookup(var_override, stable_config);
-    if (!value_override) {
-      continue;
-    }
+  if (!stable_config) {
+    for (const auto &[var, var_override] : questionable_combinations) {
+      const auto value = lookup(var, stable_config);
+      if (!value) {
+        continue;
+      }
+      const auto value_override = lookup(var_override, stable_config);
+      if (!value_override) {
+        continue;
+      }
 
-    const auto var_name = name(var);
-    const auto var_name_override = name(var_override);
+      const auto var_name = name(var);
+      const auto var_name_override = name(var_override);
 
-    logger.log_error(Error{
-        Error::MULTIPLE_PROPAGATION_STYLE_ENVIRONMENT_VARIABLES,
-        warn_message(var_name, *value, var_name_override, *value_override)});
+      logger.log_error(Error{
+          Error::MULTIPLE_PROPAGATION_STYLE_ENVIRONMENT_VARIABLES,
+          warn_message(var_name, *value, var_name_override, *value_override)});
+    }
   }
 
   const auto propagation_behavior_extract =
@@ -258,27 +272,50 @@ Expected<TracerConfig> load_tracer_env_config(
   }
 
   try {
-    const auto global_styles =
-        styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE, stable_config);
-
-    if (auto trace_extraction_styles = styles_from_env(
-            environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT, stable_config)) {
-      env_cfg.extraction_styles = std::move(*trace_extraction_styles);
-    } else if (auto extraction_styles = styles_from_env(
-                   environment::DD_PROPAGATION_STYLE_EXTRACT, stable_config)) {
-      env_cfg.extraction_styles = std::move(*extraction_styles);
+    if (stable_config) {
+      const auto styles_or_code = [&](environment::Variable variable,
+                                      bool code_set) {
+        try {
+          return styles_from_env(variable, stable_config);
+        } catch (Error &) {
+          if (!code_set) throw;
+          return Optional<std::vector<PropagationStyle>>{};
+        }
+      };
+      env_cfg.extraction_styles = styles_or_code(
+          propagation_style_source(
+              environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT,
+              environment::DD_PROPAGATION_STYLE_EXTRACT, stable_config),
+          bool(user_config.extraction_styles));
+      env_cfg.injection_styles = styles_or_code(
+          propagation_style_source(
+              environment::DD_TRACE_PROPAGATION_STYLE_INJECT,
+              environment::DD_PROPAGATION_STYLE_INJECT, stable_config),
+          bool(user_config.injection_styles));
     } else {
-      env_cfg.extraction_styles = global_styles;
-    }
+      const auto global_styles = styles_from_env(
+          environment::DD_TRACE_PROPAGATION_STYLE, stable_config);
 
-    if (auto trace_injection_styles = styles_from_env(
-            environment::DD_TRACE_PROPAGATION_STYLE_INJECT, stable_config)) {
-      env_cfg.injection_styles = std::move(*trace_injection_styles);
-    } else if (auto injection_styles = styles_from_env(
-                   environment::DD_PROPAGATION_STYLE_INJECT, stable_config)) {
-      env_cfg.injection_styles = std::move(*injection_styles);
-    } else {
-      env_cfg.injection_styles = global_styles;
+      if (auto trace_extraction_styles = styles_from_env(
+              environment::DD_TRACE_PROPAGATION_STYLE_EXTRACT, stable_config)) {
+        env_cfg.extraction_styles = std::move(*trace_extraction_styles);
+      } else if (auto extraction_styles =
+                     styles_from_env(environment::DD_PROPAGATION_STYLE_EXTRACT,
+                                     stable_config)) {
+        env_cfg.extraction_styles = std::move(*extraction_styles);
+      } else {
+        env_cfg.extraction_styles = global_styles;
+      }
+
+      if (auto trace_injection_styles = styles_from_env(
+              environment::DD_TRACE_PROPAGATION_STYLE_INJECT, stable_config)) {
+        env_cfg.injection_styles = std::move(*trace_injection_styles);
+      } else if (auto injection_styles = styles_from_env(
+                     environment::DD_PROPAGATION_STYLE_INJECT, stable_config)) {
+        env_cfg.injection_styles = std::move(*injection_styles);
+      } else {
+        env_cfg.injection_styles = global_styles;
+      }
     }
   } catch (Error &error) {
     return std::move(error);
@@ -316,7 +353,7 @@ Expected<FinalizedTracerConfig> finalize_config(
       user_config.logger ? user_config.logger : std::make_shared<NullLogger>();
 
   Expected<TracerConfig> env_config =
-      load_tracer_env_config(*logger, stable_config);
+      load_tracer_env_config(*logger, stable_config, user_config);
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -518,7 +555,7 @@ Expected<FinalizedTracerConfig> finalize_config(
 
   // telemetry
   if (auto telemetry_final_config =
-          telemetry::finalize_config(user_config.telemetry)) {
+          telemetry::finalize_config(user_config.telemetry, stable_config)) {
     final_config.telemetry = std::move(*telemetry_final_config);
   } else {
     return std::move(telemetry_final_config.error());
