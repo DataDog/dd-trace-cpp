@@ -39,8 +39,6 @@ struct SpanSamplerConfig {
 
 class FinalizedSpanSamplerConfig {
   friend Expected<FinalizedSpanSamplerConfig> finalize_config(
-      const SpanSamplerConfig&, Logger&);
-  friend Expected<FinalizedSpanSamplerConfig> finalize_config(
       const SpanSamplerConfig&, Logger&, const StableConfig*);
   friend class FinalizedTracerConfig;
 
@@ -56,11 +54,8 @@ class FinalizedSpanSamplerConfig {
   std::unordered_map<ConfigName, std::vector<ConfigMetadata>> metadata;
 };
 
-Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
-                                                     Logger&);
-Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
-                                                     Logger&,
-                                                     const StableConfig*);
+Expected<FinalizedSpanSamplerConfig> finalize_config(
+    const SpanSamplerConfig&, Logger&, const StableConfig* = nullptr);
 
 std::string to_string(const FinalizedSpanSamplerConfig::Rule&);
 

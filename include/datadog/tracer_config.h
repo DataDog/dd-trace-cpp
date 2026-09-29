@@ -270,10 +270,8 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config);
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config,
                                                 const Clock& clock);
 Expected<FinalizedTracerConfig> finalize_config(
-    const TracerConfig& config, const StableConfig& stable_config);
-Expected<FinalizedTracerConfig> finalize_config(
     const TracerConfig& config, const StableConfig& stable_config,
-    const Clock& clock);
+    const Clock& clock = default_clock);
 Expected<FinalizedTracerConfig> finalize_config(
     const TracerConfig& config, const StableConfig* stable_config,
     const Clock& clock);

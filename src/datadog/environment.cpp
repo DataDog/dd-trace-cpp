@@ -24,16 +24,12 @@ Optional<StringView> lookup(Variable variable,
                             const StableConfig *stable_config) {
   const StableConfigEntry *entry =
       stable_config ? stable_config->find(name(variable)) : nullptr;
-  if (entry && entry->source == StableConfigSource::FLEET) {
-    return StringView{entry->value.data(), entry->value.size()};
+  // Fleet config wins over the environment. Local config loses to it.
+  const Optional<StringView> value = lookup(variable);
+  if (entry && (entry->source == StableConfigSource::FLEET || !value)) {
+    return StringView{entry->value};
   }
-  if (Optional<StringView> value = lookup(variable)) {
-    return value;
-  }
-  if (entry) {
-    return StringView{entry->value.data(), entry->value.size()};
-  }
-  return nullopt;
+  return value;
 }
 
 std::string to_json() {

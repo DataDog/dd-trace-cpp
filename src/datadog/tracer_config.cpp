@@ -299,11 +299,6 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &config,
 }
 
 Expected<FinalizedTracerConfig> finalize_config(
-    const TracerConfig &config, const StableConfig &stable_config) {
-  return finalize_config(config, &stable_config, default_clock);
-}
-
-Expected<FinalizedTracerConfig> finalize_config(
     const TracerConfig &config, const StableConfig &stable_config,
     const Clock &clock) {
   return finalize_config(config, &stable_config, clock);

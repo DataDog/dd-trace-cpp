@@ -49,25 +49,14 @@ Expected<std::string> read_config_file(const std::string& path,
   std::error_code error;
   const std::uintmax_t size = std::filesystem::file_size(native_path, error);
   if (error == std::errc::no_such_file_or_directory) return std::string{};
-  if (error) {
-    return Error{Error::OTHER, prefix + error.message()};
-  }
+  if (error) return Error{Error::OTHER, prefix + error.message()};
   if (size > max_config_file_size) return std::string{};
   std::ifstream file(native_path, std::ios::binary);
-  if (!file) {
-    if (errno == ENOENT) return std::string{};
-    return Error{Error::OTHER, prefix + std::strerror(errno)};
-  }
-  std::string content;
-  content.reserve(static_cast<std::size_t>(size));
-  char buffer[8192];
-  while (file.read(buffer, sizeof(buffer)) || file.gcount() != 0) {
-    content.append(buffer, static_cast<std::size_t>(file.gcount()));
-    if (content.size() > max_config_file_size) return std::string{};
-  }
-  if (file.bad()) {
-    return Error{Error::OTHER, prefix + "read failed"};
-  }
+  if (!file) return Error{Error::OTHER, prefix + std::strerror(errno)};
+  std::string content(static_cast<std::size_t>(size), '\0');
+  file.read(content.data(), static_cast<std::streamsize>(content.size()));
+  if (file.bad()) return Error{Error::OTHER, prefix + "read failed"};
+  content.resize(static_cast<std::size_t>(file.gcount()));
   return content;
 }
 
@@ -94,29 +83,26 @@ std::string fleet_default_path() {
 }
 
 #if defined(_WIN32)
-std::string utf8(const wchar_t* value, int length) {
+std::string utf8(const wchar_t* value) {
+  const int length = static_cast<int>(std::wcslen(value));
   const int size = WideCharToMultiByte(CP_UTF8, 0, value, length, nullptr, 0,
                                        nullptr, nullptr);
   std::string result(static_cast<std::size_t>(size), '\0');
-  if (size != 0) {
-    WideCharToMultiByte(CP_UTF8, 0, value, length, result.data(), size, nullptr,
-                        nullptr);
-  }
+  WideCharToMultiByte(CP_UTF8, 0, value, length, result.data(), size, nullptr,
+                      nullptr);
   return result;
 }
 #endif
 
 stable_config_internal::ProcessInfo current_process(StringView language) {
   stable_config_internal::ProcessInfo result;
-  if (!language.empty())
-    result.language.assign(language.data(), language.size());
+  result.language = std::string{language};
 #if defined(_WIN32)
   int count = 0;
   wchar_t** args = CommandLineToArgvW(GetCommandLineW(), &count);
   if (args) {
     for (int index = 0; index < count; ++index) {
-      result.args.push_back(utf8(args[index], -1));
-      if (!result.args.back().empty()) result.args.back().pop_back();
+      result.args.push_back(utf8(args[index]));
     }
     LocalFree(args);
   }
@@ -124,9 +110,7 @@ stable_config_internal::ProcessInfo current_process(StringView language) {
   if (environment) {
     for (const wchar_t* entry = environment; *entry;
          entry += std::wcslen(entry) + 1) {
-      result.environment.push_back(utf8(entry, -1));
-      if (!result.environment.back().empty())
-        result.environment.back().pop_back();
+      result.environment.push_back(utf8(entry));
     }
     FreeEnvironmentStringsW(environment);
   }
@@ -153,15 +137,13 @@ stable_config_internal::ProcessInfo current_process(StringView language) {
 Expected<StableConfig> load_stable_config(StringView language,
                                           StringView local_path,
                                           StringView fleet_path) {
-  const std::string local =
-      local_path.empty() ? local_default_path()
-                         : std::string(local_path.data(), local_path.size());
-  const std::string fleet =
-      fleet_path.empty() ? fleet_default_path()
-                         : std::string(fleet_path.data(), fleet_path.size());
-  Expected<std::string> local_yaml = read_config_file(local, "local");
+  Expected<std::string> local_yaml = read_config_file(
+      local_path.empty() ? local_default_path() : std::string{local_path},
+      "local");
   if (Error* error = local_yaml.if_error()) return *error;
-  Expected<std::string> fleet_yaml = read_config_file(fleet, "fleet");
+  Expected<std::string> fleet_yaml = read_config_file(
+      fleet_path.empty() ? fleet_default_path() : std::string{fleet_path},
+      "fleet");
   if (Error* error = fleet_yaml.if_error()) return *error;
   return stable_config_internal::load_yaml(*local_yaml, *fleet_yaml,
                                            current_process(language));

@@ -44,8 +44,6 @@ struct TraceSamplerConfig {
 
 class FinalizedTraceSamplerConfig {
   friend Expected<FinalizedTraceSamplerConfig> finalize_config(
-      const TraceSamplerConfig& config);
-  friend Expected<FinalizedTraceSamplerConfig> finalize_config(
       const TraceSamplerConfig& config, const StableConfig* stable_config);
   friend class FinalizedTracerConfig;
 
@@ -62,9 +60,8 @@ class FinalizedTraceSamplerConfig {
 };
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig& config);
-Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig& config, const StableConfig* stable_config);
+    const TraceSamplerConfig& config,
+    const StableConfig* stable_config = nullptr);
 
 }  // namespace tracing
 }  // namespace datadog

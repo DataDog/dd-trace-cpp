@@ -155,11 +155,6 @@ std::string to_string(const std::vector<TraceSamplerConfig::Rule> &rules) {
 TraceSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedTraceSamplerConfig> finalize_config(
-    const TraceSamplerConfig &config) {
-  return finalize_config(config, nullptr);
-}
-
-Expected<FinalizedTraceSamplerConfig> finalize_config(
     const TraceSamplerConfig &config, const StableConfig *stable_config) {
   Expected<TraceSamplerConfig> env_config =
       load_trace_sampler_env_config(stable_config);
@@ -171,12 +166,9 @@ Expected<FinalizedTraceSamplerConfig> finalize_config(
 
   std::vector<TraceSamplerConfig::Rule> rules;
 
-  if (stable_config && !config.rules.empty()) {
-    rules = config.rules;
-    result.metadata[ConfigName::TRACE_SAMPLING_RULES] = {
-        ConfigMetadata(ConfigName::TRACE_SAMPLING_RULES, to_string(rules),
-                       ConfigMetadata::Origin::CODE)};
-  } else if (!env_config->rules.empty()) {
+  // With stable config, code rules win over the environment.
+  const bool code_wins = stable_config && !config.rules.empty();
+  if (!code_wins && !env_config->rules.empty()) {
     rules = std::move(env_config->rules);
     const ConfigValueSource source = config_value_source(
         environment::DD_TRACE_SAMPLING_RULES, stable_config);

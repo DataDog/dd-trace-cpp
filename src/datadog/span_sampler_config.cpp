@@ -224,11 +224,6 @@ Expected<SpanSamplerConfig> load_span_sampler_env_config(
 SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(
-    const SpanSamplerConfig &user_config, Logger &logger) {
-  return finalize_config(user_config, logger, nullptr);
-}
-
-Expected<FinalizedSpanSamplerConfig> finalize_config(
     const SpanSamplerConfig &user_config, Logger &logger,
     const StableConfig *stable_config) {
   Expected<SpanSamplerConfig> env_config =

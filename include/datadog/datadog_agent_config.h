@@ -65,8 +65,6 @@ struct DatadogAgentConfig {
 
 class FinalizedDatadogAgentConfig {
   friend Expected<FinalizedDatadogAgentConfig> finalize_config(
-      const DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&);
-  friend Expected<FinalizedDatadogAgentConfig> finalize_config(
       const DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&,
       const StableConfig*);
 
@@ -97,9 +95,6 @@ class FinalizedDatadogAgentConfig {
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
-    const Clock& clock);
-Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
-    const Clock& clock, const StableConfig* stable_config);
+    const Clock& clock, const StableConfig* stable_config = nullptr);
 
 }  // namespace datadog::tracing

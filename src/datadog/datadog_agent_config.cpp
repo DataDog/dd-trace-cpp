@@ -44,18 +44,10 @@ int agent_url_source_rank(environment::Variable variable,
                           const StableConfig* stable_config) {
   const Optional<StringView> value = lookup(variable, stable_config);
   if (!value || value->empty()) return -1;
-  if (!stable_config) return 0;
-
-  switch (config_value_source(variable, stable_config).origin) {
-    case ConfigMetadata::Origin::LOCAL_STABLE_CONFIG:
-      return 0;
-    case ConfigMetadata::Origin::ENVIRONMENT_VARIABLE:
-      return 1;
-    case ConfigMetadata::Origin::FLEET_STABLE_CONFIG:
-      return 2;
-    default:
-      return -1;
-  }
+  // Rank sources as local < environment < fleet.
+  const auto origin = config_value_source(variable, stable_config).origin;
+  if (origin == ConfigMetadata::Origin::FLEET_STABLE_CONFIG) return 2;
+  return origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE ? 1 : 0;
 }
 
 environment::Variable agent_url_source(const StableConfig* stable_config) {
@@ -76,11 +68,8 @@ environment::Variable agent_url_source(const StableConfig* stable_config) {
 
 Optional<std::string> build_agent_url_from_environment_variables(
     const StableConfig* stable_config) {
-  Optional<StringView> url_env =
-      lookup(environment::DD_TRACE_AGENT_URL, stable_config);
-  if (url_env && !url_env->empty() &&
-      agent_url_source(stable_config) == environment::DD_TRACE_AGENT_URL) {
-    return std::string{*url_env};
+  if (agent_url_source(stable_config) == environment::DD_TRACE_AGENT_URL) {
+    return std::string{*lookup(environment::DD_TRACE_AGENT_URL, stable_config)};
   }
 
   Optional<StringView> env_host =
@@ -135,12 +124,6 @@ Expected<DatadogAgentConfig> load_datadog_agent_env_config(
   }
 
   return env_config;
-}
-
-Expected<FinalizedDatadogAgentConfig> finalize_config(
-    const DatadogAgentConfig& user_config,
-    const std::shared_ptr<Logger>& logger, const Clock& clock) {
-  return finalize_config(user_config, logger, clock, nullptr);
 }
 
 Expected<FinalizedDatadogAgentConfig> finalize_config(
@@ -233,23 +216,19 @@ Expected<FinalizedDatadogAgentConfig> finalize_config(
       env_config->remote_configuration_enabled,
       user_config.remote_configuration_enabled, true, stable_config);
 
-  const auto [original_origin, url] =
-      stable_config
-          ? select_agent_url(user_config.url, env_config->url,
-                             std::filesystem::path{default_agent_socket_path})
-          : select_agent_url(env_config->url, user_config.url,
-                             std::filesystem::path{default_agent_socket_path});
-  ConfigMetadata::Origin origin = original_origin;
+  auto [origin, url] =
+      select_agent_url(env_config->url, user_config.url,
+                       std::filesystem::path{default_agent_socket_path});
   Optional<std::string> config_id;
-  if (stable_config) {
-    if (user_config.url) {
-      origin = ConfigMetadata::Origin::CODE;
-    } else if (env_config->url) {
-      const ConfigValueSource source =
-          config_value_source(agent_url_source(stable_config), stable_config);
-      origin = source.origin;
-      config_id = source.config_id;
-    }
+  if (stable_config && user_config.url) {
+    // With stable config, code wins over the environment.
+    origin = ConfigMetadata::Origin::CODE;
+    url = *user_config.url;
+  } else if (origin == ConfigMetadata::Origin::ENVIRONMENT_VARIABLE) {
+    const ConfigValueSource source =
+        config_value_source(agent_url_source(stable_config), stable_config);
+    origin = source.origin;
+    config_id = source.config_id;
   }
   auto parsed_url = HTTPClient::URL::parse(url);
   if (auto* error = parsed_url.if_error()) {

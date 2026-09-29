@@ -1,10 +1,10 @@
 #include <yaml-cpp/yaml.h>
 
 #include <algorithm>
+#include <initializer_list>
 #include <map>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "stable_config_loader_internal.h"
@@ -12,24 +12,40 @@
 namespace datadog::tracing::stable_config_internal {
 namespace {
 
+using Map = std::map<std::string, std::string>;
+
 struct Selector {
   std::string origin;
-  std::string key;
-  bool has_key = false;
+  Optional<std::string> key;
   std::string operation;
   std::vector<std::string> matches;
 };
 
 struct Rule {
   std::vector<Selector> selectors;
-  std::vector<std::pair<std::string, std::string>> configuration;
+  Map configuration;
 };
 
 struct ParsedConfig {
   std::string config_id;
-  std::vector<std::pair<std::string, std::string>> defaults;
-  std::map<std::string, std::string> tags;
+  Map defaults;
+  Map tags;
   std::vector<Rule> rules;
+};
+
+// Values a selector or template can read by key.
+struct Context {
+  const ProcessInfo& process;
+  const Map& tags;
+  Map args;
+  Map environment;
+
+  const Map* values(const std::string& origin) const {
+    if (origin == "tags") return &tags;
+    if (origin == "process_arguments") return &args;
+    if (origin == "environment_variables") return &environment;
+    return nullptr;
+  }
 };
 
 std::string scalar(const YAML::Node& node, const char* name) {
@@ -39,17 +55,26 @@ std::string scalar(const YAML::Node& node, const char* name) {
   return node.Scalar();
 }
 
-std::vector<std::pair<std::string, std::string>> parse_map(
-    const YAML::Node& node, const char* name) {
+std::string one_of(const YAML::Node& node, const char* name,
+                   std::initializer_list<StringView> allowed) {
+  std::string value = scalar(node, name);
+  if (std::find(allowed.begin(), allowed.end(), value) == allowed.end()) {
+    throw std::runtime_error("unknown " + std::string{name} + ": " + value);
+  }
+  return value;
+}
+
+// Later duplicate keys win. Non-scalar keys are skipped.
+Map parse_map(const YAML::Node& node, const char* name) {
   if (!node || !node.IsMap()) {
     throw std::runtime_error(std::string{name} + " must be a map");
   }
-  std::vector<std::pair<std::string, std::string>> entries;
+  Map entries;
   for (YAML::const_iterator entry = node.begin(); entry != node.end();
        ++entry) {
     if (!entry->first.IsScalar()) continue;
-    entries.emplace_back(entry->first.Scalar(),
-                         scalar(entry->second, "configuration value"));
+    entries.insert_or_assign(entry->first.Scalar(),
+                             scalar(entry->second, "map value"));
   }
   return entries;
 }
@@ -57,21 +82,15 @@ std::vector<std::pair<std::string, std::string>> parse_map(
 Selector parse_selector(const YAML::Node& node) {
   if (!node.IsMap()) throw std::runtime_error("selector must be a map");
   Selector result;
-  result.origin = scalar(node["origin"], "selector origin");
-  if (result.origin != "language" && result.origin != "process_arguments" &&
-      result.origin != "environment_variables" && result.origin != "tags") {
-    throw std::runtime_error("unknown selector origin: " + result.origin);
-  }
+  result.origin = one_of(
+      node["origin"], "selector origin",
+      {"language", "process_arguments", "environment_variables", "tags"});
   if (const YAML::Node key = node["key"]; key && !key.IsNull()) {
     result.key = scalar(key, "selector key");
-    result.has_key = true;
   }
-  result.operation = scalar(node["operator"], "selector operator");
-  if (result.operation != "exists" && result.operation != "equals" &&
-      result.operation != "prefix_matches" &&
-      result.operation != "suffix_matches") {
-    throw std::runtime_error("unknown selector operator: " + result.operation);
-  }
+  result.operation =
+      one_of(node["operator"], "selector operator",
+             {"exists", "equals", "prefix_matches", "suffix_matches"});
   if (result.operation != "exists") {
     const YAML::Node matches = node["matches"];
     if (!matches || !matches.IsSequence()) {
@@ -99,27 +118,18 @@ Rule parse_rule(const YAML::Node& node) {
 }
 
 ParsedConfig parse_yaml(StringView content) {
-  const std::string text = content.empty()
-                               ? std::string{}
-                               : std::string(content.data(), content.size());
-  const YAML::Node document = YAML::Load(text);
+  const YAML::Node document = YAML::Load(std::string{content});
   ParsedConfig result;
   if (!document || document.IsNull()) return result;
   if (!document.IsMap()) throw std::runtime_error("root must be a map");
   if (const YAML::Node id = document["config_id"]; id && !id.IsNull()) {
     result.config_id = scalar(id, "config_id");
   }
-  if (const YAML::Node defaults = document["apm_configuration_default"];
-      defaults) {
-    result.defaults = parse_map(defaults, "apm_configuration_default");
+  if (document["apm_configuration_default"]) {
+    result.defaults = parse_map(document["apm_configuration_default"],
+                                "apm_configuration_default");
   }
-  if (const YAML::Node tags = document["tags"]; tags) {
-    if (!tags.IsMap()) throw std::runtime_error("tags must be a map");
-    for (YAML::const_iterator tag = tags.begin(); tag != tags.end(); ++tag) {
-      result.tags.insert_or_assign(scalar(tag->first, "tag key"),
-                                   scalar(tag->second, "tag value"));
-    }
-  }
+  if (document["tags"]) result.tags = parse_map(document["tags"], "tags");
   if (const YAML::Node rules = document["rules"]; rules) {
     if (!rules.IsSequence())
       throw std::runtime_error("rules must be a sequence");
@@ -154,9 +164,9 @@ bool valid_utf8(const std::string& value) {
   return true;
 }
 
-std::map<std::string, std::string> split_entries(
-    const std::vector<std::string>& entries, bool include_without_equals) {
-  std::map<std::string, std::string> result;
+Map split_entries(const std::vector<std::string>& entries,
+                  bool include_without_equals) {
+  Map result;
   for (const std::string& entry : entries) {
     if (!valid_utf8(entry)) continue;
     const std::size_t equal = entry.find('=');
@@ -184,30 +194,22 @@ bool string_match(const Selector& selector, const std::string& value) {
   return false;
 }
 
-bool selector_matches(const Selector& selector, const ParsedConfig& source,
-                      const ProcessInfo& process,
-                      const std::map<std::string, std::string>& args,
-                      const std::map<std::string, std::string>& environment) {
-  if (selector.origin == "language")
-    return string_match(selector, process.language);
-  if (selector.origin == "tags") {
-    if (!selector.has_key) return false;
-    const auto found = source.tags.find(selector.key);
-    return found != source.tags.end() && string_match(selector, found->second);
+bool selector_matches(const Selector& selector, const Context& context) {
+  if (selector.origin == "language") {
+    return string_match(selector, context.process.language);
   }
-  if (selector.has_key) {
-    const std::map<std::string, std::string>& values =
-        selector.origin == "process_arguments" ? args : environment;
-    const auto found = values.find(selector.key);
+  if (selector.key) {
+    const Map& values = *context.values(selector.origin);
+    const auto found = values.find(*selector.key);
     return found != values.end() && string_match(selector, found->second);
   }
+  if (selector.origin == "tags") return false;
   const std::vector<std::string>& values =
-      selector.origin == "process_arguments" ? process.args
-                                             : process.environment;
-  for (const std::string& value : values) {
-    if (string_match(selector, value)) return true;
-  }
-  return false;
+      selector.origin == "process_arguments" ? context.process.args
+                                             : context.process.environment;
+  return std::any_of(values.begin(), values.end(), [&](const std::string& v) {
+    return string_match(selector, v);
+  });
 }
 
 std::string trim(std::string value) {
@@ -217,32 +219,21 @@ std::string trim(std::string value) {
   return value.substr(start, end - start + 1);
 }
 
-std::string resolve_template_variable(
-    const std::string& variable, const ParsedConfig& source,
-    const ProcessInfo& process, const std::map<std::string, std::string>& args,
-    const std::map<std::string, std::string>& environment) {
+// Resolve `language` or `origin[key]`. Unknown values become "UNDEFINED".
+std::string resolve_template_variable(const std::string& variable,
+                                      const Context& context) {
   const std::size_t bracket = variable.find('[');
   const std::string name = variable.substr(0, bracket);
-  if (name == "language") return process.language;
-  if (bracket == std::string::npos) return "UNDEFINED";
-  const std::size_t end = variable.find(']', bracket + 1);
-  if (end == std::string::npos) return "UNDEFINED";
-
-  const std::map<std::string, std::string>* values = nullptr;
-  if (name == "tags") values = &source.tags;
-  if (name == "process_arguments") values = &args;
-  if (name == "environment_variables") values = &environment;
-  if (!values) return "UNDEFINED";
-
-  const std::string key = trim(variable.substr(bracket + 1, end - bracket - 1));
-  const auto found = values->find(key);
+  if (name == "language") return context.process.language;
+  const std::size_t end = variable.find(']', bracket);
+  const Map* values = context.values(name);
+  if (end == std::string::npos || !values) return "UNDEFINED";
+  const auto found =
+      values->find(trim(variable.substr(bracket + 1, end - bracket - 1)));
   return found == values->end() ? "UNDEFINED" : found->second;
 }
 
-std::string template_value(
-    const std::string& input, const ParsedConfig& source,
-    const ProcessInfo& process, const std::map<std::string, std::string>& args,
-    const std::map<std::string, std::string>& environment) {
+std::string template_value(const std::string& input, const Context& context) {
   std::string output;
   std::size_t cursor = 0;
   while (true) {
@@ -253,35 +244,32 @@ std::string template_value(
     if (close == std::string::npos)
       throw std::runtime_error("unterminated template in config");
     const std::string variable = trim(input.substr(open + 2, close - open - 2));
-    output +=
-        resolve_template_variable(variable, source, process, args, environment);
+    output += resolve_template_variable(variable, context);
     cursor = close + 2;
   }
 }
 
+// Apply the defaults, then the first rule that matches.
 void apply_source(StableConfig& result, const ParsedConfig& source,
                   StableConfigSource origin, const ProcessInfo& process) {
-  for (const std::pair<std::string, std::string>& entry : source.defaults) {
-    result.set(entry.first, {entry.second, origin, source.config_id});
+  for (const auto& [name, value] : source.defaults) {
+    result.set(name, {value, origin, source.config_id});
   }
-  const std::map<std::string, std::string> args =
-      split_entries(process.args, false);
-  const std::map<std::string, std::string> environment =
-      split_entries(process.environment, true);
+  const Context context{process, source.tags,
+                        split_entries(process.args, false),
+                        split_entries(process.environment, true)};
   for (const Rule& rule : source.rules) {
-    const bool matches = std::all_of(
-        rule.selectors.begin(), rule.selectors.end(),
-        [&](const Selector& selector) {
-          return selector_matches(selector, source, process, args, environment);
-        });
-    if (!matches) continue;
-    for (const std::pair<std::string, std::string>& entry :
-         rule.configuration) {
-      result.set(entry.first, {template_value(entry.second, source, process,
-                                              args, environment),
-                               origin, source.config_id});
+    if (!std::all_of(rule.selectors.begin(), rule.selectors.end(),
+                     [&](const Selector& selector) {
+                       return selector_matches(selector, context);
+                     })) {
+      continue;
     }
-    break;
+    for (const auto& [name, value] : rule.configuration) {
+      result.set(name,
+                 {template_value(value, context), origin, source.config_id});
+    }
+    return;
   }
 }
 
