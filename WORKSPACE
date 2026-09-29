@@ -15,6 +15,12 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
+    name = "yaml-cpp",
+    sha256 = "298593d9c440fd9034b8b193d96318b76d49bc97c6ceadb7b0836edf0b6d7539",
+    urls = ["https://github.com/jbeder/yaml-cpp/releases/download/yaml-cpp-0.9.0/yaml-cpp-yaml-cpp-0.9.0.tar.gz"],
+)
+
+http_archive(
     name = "com_google_absl",
     sha256 = "1692f77d1739bacf3f94337188b78583cf09bab7e420d2dc6c5605a4f86785a1",
     strip_prefix = "abseil-cpp-20250814.1",

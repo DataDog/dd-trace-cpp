@@ -9,4 +9,8 @@ if(DD_TRACE_TRANSPORT STREQUAL "curl")
   find_dependency(CURL)
 endif()
 
+if(@DD_TRACE_BUILD_STABLE_CONFIG@)
+  find_dependency(yaml-cpp 0.9.0 CONFIG)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/dd-trace-cpp-targets.cmake")

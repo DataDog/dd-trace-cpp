@@ -23,6 +23,7 @@ namespace datadog::tracing {
 
 class EventScheduler;
 class Logger;
+class StableConfig;
 
 struct DatadogAgentConfig {
   // The `HTTPClient` used to submit traces to the Datadog Agent. If this
@@ -65,6 +66,9 @@ struct DatadogAgentConfig {
 class FinalizedDatadogAgentConfig {
   friend Expected<FinalizedDatadogAgentConfig> finalize_config(
       const DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&);
+  friend Expected<FinalizedDatadogAgentConfig> finalize_config(
+      const DatadogAgentConfig&, const std::shared_ptr<Logger>&, const Clock&,
+      const StableConfig*);
 
   FinalizedDatadogAgentConfig() = default;
 
@@ -94,5 +98,8 @@ class FinalizedDatadogAgentConfig {
 Expected<FinalizedDatadogAgentConfig> finalize_config(
     const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
     const Clock& clock);
+Expected<FinalizedDatadogAgentConfig> finalize_config(
+    const DatadogAgentConfig& config, const std::shared_ptr<Logger>& logger,
+    const Clock& clock, const StableConfig* stable_config);
 
 }  // namespace datadog::tracing

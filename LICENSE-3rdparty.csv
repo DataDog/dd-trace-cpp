@@ -4,3 +4,4 @@ vendored,Catch2,Boost,Copyright (c) 2022 Two Blue Cubes Ltd. All rights reserved
 vendored,picosha2,MIT,Copyright (C) 2017 okdshin
 vendored,cpp-httplib,MIT,Copyright (c) 2023 Yuji Hirose. All rights reserved.
 vendored,open-telemetry/sig-profiling (process-context),Apache-2.0,"Copyright 2025 Datadog, Inc."
+dependency,jbeder/yaml-cpp,MIT,"Copyright (c) 2008-2015 Jesse Beder"

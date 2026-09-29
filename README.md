@@ -91,6 +91,49 @@ Installation places a shared library and public headers into the appropriate sys
 cmake --install build --prefix=.install
 ```
 
+### Stable configuration
+
+The optional stable configuration loader uses native C++ and
+[yaml-cpp 0.9.0](https://github.com/jbeder/yaml-cpp/releases/tag/yaml-cpp-0.9.0).
+Both CMake and Bazel pin the release archive by SHA-256. No Rust toolchain is
+needed.
+
+```shell
+cmake -B build -DDD_TRACE_BUILD_STABLE_CONFIG=ON .
+cmake --build build -j
+bazel test //:stable_config_loader_test
+```
+
+Link `dd-trace-cpp::stable-config` with CMake or
+`//:dd_trace_cpp_stable_config` with Bazel, then load and finalize the
+configuration before creating a tracer:
+
+```c++
+#include <datadog/stable_config_loader.h>
+
+datadog::tracing::TracerConfig config;
+auto finalized =
+    datadog::tracing::finalize_config_with_stable_config(config, "cpp");
+if (!finalized) {
+    // Handle finalized.error().
+}
+```
+
+The loader reads the platform's local and fleet `application_monitoring.yaml`
+files by default. Pass explicit paths as the third and fourth arguments to
+`finalize_config_with_stable_config`, or the second and third arguments to
+`load_stable_config`. Files may contain `config_id`,
+`apm_configuration_default`, `tags`, and `rules`. Rules select by language,
+process arguments, environment variables, or tags. The first matching rule in
+each file applies, and its values can contain `{{ language }}` or indexed
+variables such as `{{ environment_variables[REGION] }}`.
+
+Settings resolve in this order: defaults, local YAML, environment variables,
+fleet YAML, and values in `TracerConfig`. Stable configuration records the
+winning source and config ID in configuration telemetry. The existing
+`finalize_config(config)` overload keeps its original behavior. Missing or
+oversized files are ignored; malformed YAML and other read errors are reported.
+
 ### Optional: Linking to the shared library
 
 In case you decided to build the shared library:

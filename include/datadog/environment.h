@@ -16,6 +16,7 @@
 
 namespace datadog {
 namespace tracing {
+class StableConfig;
 namespace environment {
 
 // Central registry for supported environment variables.
@@ -117,6 +118,8 @@ StringView name(Variable variable);
 // Return the value of the specified environment `variable`, or return
 // `nullopt` if that variable is not set in the environment.
 Optional<StringView> lookup(Variable variable);
+Optional<StringView> lookup(Variable variable,
+                            const StableConfig* stable_config);
 
 std::string to_json();
 
