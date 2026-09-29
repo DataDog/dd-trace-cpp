@@ -36,6 +36,7 @@ const std::string w3c_parent_id = "_dd.parent_id";
 const std::string trace_source = "_dd.p.ts";
 const std::string apm_enabled = "_dd.apm.enabled";
 const std::string ksr = "_dd.p.ksr";
+const std::string sdk_otlp_export = "_dd.sdk.otlp_export";
 
 }  // namespace internal
 
