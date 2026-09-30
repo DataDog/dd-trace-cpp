@@ -7,9 +7,7 @@ benchmarks:
   tags: ["runner:apm-k8s-tweaked-metal"]
   image: $BENCHMARKS_CI_IMAGE
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      interruptible: false
-    - interruptible: true
+    - when: always
   timeout: 15m
   script:
     - export ARTIFACTS_DIR="$(pwd)/reports" && (mkdir "${ARTIFACTS_DIR}" || :)
@@ -42,9 +40,7 @@ check-big-regressions:
   needs: [ benchmarks ]
   when: on_success
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      interruptible: false
-    - interruptible: true
+    - when: never
   tags: ["arch:amd64"]
   image: $BENCHMARKS_CI_IMAGE
   script: |
