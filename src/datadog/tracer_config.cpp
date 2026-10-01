@@ -243,6 +243,11 @@ Expected<TracerConfig> load_tracer_env_config(Logger &logger) {
         propagation_behavior_extract.value());
   }
 
+  if (auto propagation_extract_first =
+          lookup(environment::DD_TRACE_PROPAGATION_EXTRACT_FIRST)) {
+    env_cfg.propagation_extract_first = !falsy(*propagation_extract_first);
+  }
+
   try {
     const auto global_styles =
         styles_from_env(environment::DD_TRACE_PROPAGATION_STYLE);
@@ -420,6 +425,12 @@ Expected<FinalizedTracerConfig> finalize_config(const TracerConfig &user_config,
       [](const PropagationBehaviorExtract &behavior) {
         return std::string{to_string_view(behavior)};
       });
+
+  final_config.propagation_extract_first = resolve_and_record_config(
+      env_config->propagation_extract_first,
+      user_config.propagation_extract_first, &final_config.metadata,
+      ConfigName::PROPAGATION_EXTRACT_FIRST, false,
+      [](const bool &value) { return to_string(value); });
 
   final_config.runtime_id = user_config.runtime_id;
   final_config.root_session_id = user_config.root_session_id;

@@ -48,6 +48,7 @@ class Tracer {
   std::vector<PropagationStyle> injection_styles_;
   std::vector<PropagationStyle> extraction_styles_;
   PropagationBehaviorExtract propagation_behavior_extract_;
+  bool propagation_extract_first_;
   Optional<std::string> hostname_;
   std::size_t tags_header_max_size_;
   // Store the tracer configuration in an in-memory file, allowing it to be
