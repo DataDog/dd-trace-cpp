@@ -12,7 +12,7 @@ This describes the GitLab CI configuration for the benchmarks that run on the
       `bp-runner.fail-on-regression.yml` in the `dd-trace-cpp` branch of
       [benchmarking-platform](https://github.com/DataDog/benchmarking-platform).
 
-## Marking a benchmark as flaky
+## Marking a Benchmark as Flaky
 
 Add it to `FLAKY_BENCHMARKS_REGEX` in the `benchmarks` job's `variables` in `benchmarks.yml`.
 
