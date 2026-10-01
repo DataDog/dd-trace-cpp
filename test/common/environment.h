@@ -15,12 +15,17 @@ class EnvGuard {
   tracing::Optional<std::string> former_value_;
 
  public:
-  EnvGuard(std::string name, std::string value) : name_(std::move(name)) {
+  EnvGuard(std::string name, std::string value) : EnvGuard(std::move(name)) {
+    set_value(value);
+  }
+
+  // Unset the variable until a value is set or this object is destroyed.
+  explicit EnvGuard(std::string name) : name_(std::move(name)) {
     const char* current = std::getenv(name_.c_str());
     if (current) {
       former_value_ = current;
     }
-    set_value(value);
+    unset();
   }
 
   ~EnvGuard() {
