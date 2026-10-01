@@ -27,4 +27,4 @@ FLAKY_BENCHMARKS_REGEX: "^BM_TraceTinyCCSource$"
 ```
 
 Open a ticket to fix or remove it. See
-[Flaky Benchmarks Monitoring](https://datadoghq.atlassian.net/wiki/spaces/APMINT/pages/7223313012/Flaky+Benchmarks+Monitoring).
+[Flaky Benchmarks Monitoring](https://datadoghq.atlassian.net/wiki/x/dAKLrgE) for more details.
