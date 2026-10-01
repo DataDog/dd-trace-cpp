@@ -1,7 +1,7 @@
 # Benchmarks
 
 This describes the GitLab CI configuration for the benchmarks that run on the
-[Benchmarking Platform](https://datadoghq.atlassian.net/wiki/spaces/APMINT/pages/2419261562/Benchmarking+Platform).
+[Benchmarking Platform](https://datadoghq.atlassian.net/wiki/x/egAzk).
 
 ## Layout
 
