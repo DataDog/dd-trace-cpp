@@ -1,0 +1,16 @@
+# Copyright 2021-Present Datadog, Inc. https://www.datadoghq.com/
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "dd-trace-cpp-stable-config-ffi"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+libdd-library-config = { path = "../../vendor/libdatadog/libdd-library-config", default-features = false }

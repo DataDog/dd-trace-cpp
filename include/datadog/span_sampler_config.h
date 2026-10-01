@@ -20,6 +20,8 @@
 namespace datadog {
 namespace tracing {
 
+class StableConfig;
+
 struct SpanSamplerConfig {
   struct Rule : public SpanMatcher {
     double sample_rate = 1.0;
@@ -33,11 +35,19 @@ struct SpanSamplerConfig {
   // Also, the `DD_TRACE_SAMPLE_RATE` environment variable, if present, causes a
   // corresponding `Rule` to be appended to `rules`.
   std::vector<Rule> rules;
+  bool rules_configured = false;
+
+  void clear_rules() {
+    rules.clear();
+    rules_configured = true;
+  }
 };
 
 class FinalizedSpanSamplerConfig {
   friend Expected<FinalizedSpanSamplerConfig> finalize_config(
       const SpanSamplerConfig&, Logger&);
+  friend Expected<FinalizedSpanSamplerConfig> finalize_config(
+      const SpanSamplerConfig&, Logger&, const StableConfig*);
   friend class FinalizedTracerConfig;
 
   FinalizedSpanSamplerConfig() = default;
@@ -54,6 +64,9 @@ class FinalizedSpanSamplerConfig {
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
                                                      Logger&);
+Expected<FinalizedSpanSamplerConfig> finalize_config(const SpanSamplerConfig&,
+                                                     Logger&,
+                                                     const StableConfig*);
 
 std::string to_string(const FinalizedSpanSamplerConfig::Rule&);
 

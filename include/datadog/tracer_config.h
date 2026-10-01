@@ -28,6 +28,7 @@ namespace tracing {
 
 class Collector;
 class Logger;
+class StableConfig;
 class SpanSampler;
 class TraceSampler;
 
@@ -217,6 +218,9 @@ struct TracerConfig {
 class FinalizedTracerConfig final {
   friend Expected<FinalizedTracerConfig> finalize_config(
       const TracerConfig& config, const Clock& clock);
+  friend Expected<FinalizedTracerConfig> finalize_config(
+      const TracerConfig& config, const StableConfig* stable_config,
+      const Clock& clock);
   FinalizedTracerConfig() = default;
 
  public:
@@ -265,6 +269,14 @@ class FinalizedTracerConfig final {
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config);
 Expected<FinalizedTracerConfig> finalize_config(const TracerConfig& config,
                                                 const Clock& clock);
+Expected<FinalizedTracerConfig> finalize_config(
+    const TracerConfig& config, const StableConfig& stable_config);
+Expected<FinalizedTracerConfig> finalize_config(
+    const TracerConfig& config, const StableConfig& stable_config,
+    const Clock& clock);
+Expected<FinalizedTracerConfig> finalize_config(
+    const TracerConfig& config, const StableConfig* stable_config,
+    const Clock& clock);
 
 }  // namespace tracing
 }  // namespace datadog

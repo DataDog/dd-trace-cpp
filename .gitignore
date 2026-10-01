@@ -11,3 +11,4 @@ build/
 dist/
 MODULE.bazel.lock
 out/
+rust/**/target/

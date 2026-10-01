@@ -1,6 +1,7 @@
 #include <datadog/environment.h>
 #include <datadog/expected.h>
 #include <datadog/span_sampler_config.h>
+#include <datadog/stable_config.h>
 
 #include <cmath>
 #include <fstream>
@@ -143,75 +144,83 @@ Expected<std::vector<SpanSamplerConfig::Rule>> parse_rules(StringView rules_raw,
   return rules;
 }
 
-Expected<SpanSamplerConfig> load_span_sampler_env_config(Logger &logger) {
+environment::Variable span_rules_source(const StableConfig *stable_config) {
+  const auto rules = environment::DD_SPAN_SAMPLING_RULES;
+  const auto file = environment::DD_SPAN_SAMPLING_RULES_FILE;
+  return config_value_priority(file, stable_config) >
+                 config_value_priority(rules, stable_config)
+             ? file
+             : rules;
+}
+
+void log_rule_conflict(Logger &logger, environment::Variable selected) {
+  const auto ignored = selected == environment::DD_SPAN_SAMPLING_RULES
+                           ? environment::DD_SPAN_SAMPLING_RULES_FILE
+                           : environment::DD_SPAN_SAMPLING_RULES;
+  std::string message;
+  append(message, name(ignored));
+  message += " is overridden by ";
+  append(message, name(selected));
+  message += ". Since both are set, ";
+  append(message, name(selected));
+  message += " takes precedence, and ";
+  append(message, name(ignored));
+  message += " will be ignored.";
+  logger.log_error(message);
+}
+
+Expected<std::vector<SpanSamplerConfig::Rule>> read_span_rules_file(
+    StringView path) {
+  const auto file_name = std::string(path);
+  const auto file_error = [&](const char *operation) {
+    std::string message = "Unable to ";
+    message += operation;
+    message += " file \"" + file_name +
+               "\" specified as value of environment variable ";
+    append(message, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
+    return Error{Error::SPAN_SAMPLING_RULES_FILE_IO, std::move(message)};
+  };
+
+  std::ifstream file(file_name);
+  if (!file) return file_error("open");
+  std::ostringstream stream;
+  stream << file.rdbuf();
+  if (!file) return file_error("read");
+
+  auto parsed =
+      parse_rules(stream.str(), name(environment::DD_SPAN_SAMPLING_RULES_FILE));
+  if (auto *error = parsed.if_error()) {
+    std::string prefix = "With ";
+    append(prefix, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
+    prefix += '=';
+    append(prefix, path);
+    prefix += ": ";
+    return error->with_prefix(prefix);
+  }
+  return *parsed;
+}
+
+Expected<SpanSamplerConfig> load_span_sampler_env_config(
+    Logger &logger, const StableConfig *stable_config,
+    const SpanSamplerConfig &user_config) {
   SpanSamplerConfig env_config;
-
-  auto rules_env = lookup(environment::DD_SPAN_SAMPLING_RULES);
-  if (rules_env) {
-    auto maybe_rules =
-        parse_rules(*rules_env, name(environment::DD_SPAN_SAMPLING_RULES));
-    if (auto *error = maybe_rules.if_error()) {
-      return std::move(*error);
-    }
-    env_config.rules = std::move(*maybe_rules);
+  if (stable_config &&
+      (user_config.rules_configured || !user_config.rules.empty())) {
+    return env_config;
   }
 
-  if (auto file_env = lookup(environment::DD_SPAN_SAMPLING_RULES_FILE)) {
-    if (rules_env) {
-      const auto rules_file_name =
-          name(environment::DD_SPAN_SAMPLING_RULES_FILE);
-      const auto rules_name = name(environment::DD_SPAN_SAMPLING_RULES);
-      std::string message;
-      append(message, rules_file_name);
-      message += " is overridden by ";
-      append(message, rules_name);
-      message += ". Since both are set, ";
-      append(message, rules_name);
-      message += " takes precedence, and ";
-      append(message, rules_file_name);
-      message += " will be ignored.";
-      logger.log_error(message);
-    } else {
-      const auto span_rules_file = std::string(*file_env);
-
-      const auto file_error = [&](const char *operation) {
-        std::string message;
-        message += "Unable to ";
-        message += operation;
-        message += " file \"";
-        message += span_rules_file;
-        message += "\" specified as value of environment variable ";
-        append(message, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
-
-        return Error{Error::SPAN_SAMPLING_RULES_FILE_IO, std::move(message)};
-      };
-
-      std::ifstream file(span_rules_file);
-      if (!file) {
-        return file_error("open");
-      }
-
-      std::ostringstream rules_stream;
-      rules_stream << file.rdbuf();
-      if (!file) {
-        return file_error("read");
-      }
-
-      auto maybe_rules = parse_rules(
-          rules_stream.str(), name(environment::DD_SPAN_SAMPLING_RULES_FILE));
-      if (auto *error = maybe_rules.if_error()) {
-        std::string prefix;
-        prefix += "With ";
-        append(prefix, name(environment::DD_SPAN_SAMPLING_RULES_FILE));
-        prefix += '=';
-        append(prefix, *file_env);
-        prefix += ": ";
-        return error->with_prefix(prefix);
-      }
-
-      env_config.rules = std::move(*maybe_rules);
-    }
-  }
+  auto rules_env = lookup(environment::DD_SPAN_SAMPLING_RULES, stable_config);
+  auto file_env =
+      lookup(environment::DD_SPAN_SAMPLING_RULES_FILE, stable_config);
+  if (!rules_env && !file_env) return env_config;
+  const auto selected = span_rules_source(stable_config);
+  if (rules_env && file_env) log_rule_conflict(logger, selected);
+  auto parsed = selected == environment::DD_SPAN_SAMPLING_RULES_FILE
+                    ? read_span_rules_file(*file_env)
+                    : parse_rules(*rules_env, name(selected));
+  if (auto *error = parsed.if_error()) return *error;
+  env_config.rules = std::move(*parsed);
+  env_config.rules_configured = true;
 
   return env_config;
 }
@@ -222,7 +231,14 @@ SpanSamplerConfig::Rule::Rule(const SpanMatcher &base) : SpanMatcher(base) {}
 
 Expected<FinalizedSpanSamplerConfig> finalize_config(
     const SpanSamplerConfig &user_config, Logger &logger) {
-  Expected<SpanSamplerConfig> env_config = load_span_sampler_env_config(logger);
+  return finalize_config(user_config, logger, nullptr);
+}
+
+Expected<FinalizedSpanSamplerConfig> finalize_config(
+    const SpanSamplerConfig &user_config, Logger &logger,
+    const StableConfig *stable_config) {
+  Expected<SpanSamplerConfig> env_config =
+      load_span_sampler_env_config(logger, stable_config, user_config);
   if (auto error = env_config.if_error()) {
     return *error;
   }
@@ -230,16 +246,17 @@ Expected<FinalizedSpanSamplerConfig> finalize_config(
   FinalizedSpanSamplerConfig result;
   Optional<std::vector<SpanSamplerConfig::Rule>> env_rules;
   Optional<std::vector<SpanSamplerConfig::Rule>> user_rules;
-  if (!env_config->rules.empty()) {
+  if (env_config->rules_configured || !env_config->rules.empty()) {
     env_rules = env_config->rules;
   }
-  if (!user_config.rules.empty()) {
+  if (user_config.rules_configured || !user_config.rules.empty()) {
     user_rules = user_config.rules;
   }
 
-  std::vector<SpanSamplerConfig::Rule> rules = resolve_and_record_config(
+  std::vector<SpanSamplerConfig::Rule> rules = resolve_with_stable_config(
       env_rules, user_rules, &result.metadata, ConfigName::SPAN_SAMPLING_RULES,
-      nullptr, [](const std::vector<SpanSamplerConfig::Rule> &r) {
+      span_rules_source(stable_config), stable_config, nullptr,
+      [](const std::vector<SpanSamplerConfig::Rule> &r) {
         return to_string(r);
       });
 

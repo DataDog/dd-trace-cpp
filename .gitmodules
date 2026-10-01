@@ -4,3 +4,7 @@
 [submodule "benchmark/tinycc"]
 	path = benchmark/tinycc
 	url = https://github.com/TinyCC/tinycc.git
+[submodule "vendor/libdatadog"]
+	path = vendor/libdatadog
+	url = https://github.com/datadog/libdatadog.git
+	branch = pawel/no-std-library-config

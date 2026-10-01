@@ -45,7 +45,9 @@ struct ConfigMetadata {
     ENVIRONMENT_VARIABLE,  // Originating from environment variables
     CODE,                  // Defined in code
     REMOTE_CONFIG,         // Retrieved from remote configuration
-    DEFAULT                // Default value
+    DEFAULT,               // Default value
+    LOCAL_STABLE_CONFIG,
+    FLEET_STABLE_CONFIG
   };
 
   // Name of the configuration parameter
@@ -56,11 +58,17 @@ struct ConfigMetadata {
   Origin origin;
   // Optional error associated with the configuration parameter
   Optional<Error> error;
+  Optional<std::string> config_id;
 
   ConfigMetadata() = default;
   ConfigMetadata(ConfigName n, std::string v, Origin orig,
-                 Optional<Error> err = nullopt)
-      : name(n), value(std::move(v)), origin(orig), error(std::move(err)) {}
+                 Optional<Error> err = nullopt,
+                 Optional<std::string> id = nullopt)
+      : name(n),
+        value(std::move(v)),
+        origin(orig),
+        error(std::move(err)),
+        config_id(std::move(id)) {}
 };
 
 // Returns the final configuration value using the following
@@ -96,7 +104,11 @@ Value resolve_and_record_config(
     const Optional<Value>& from_env, const Optional<Value>& from_user,
     std::unordered_map<ConfigName, std::vector<ConfigMetadata>>* metadata,
     ConfigName config_name, DefaultValue fallback = nullptr,
-    Stringifier to_string_fn = nullptr) {
+    Stringifier to_string_fn = nullptr,
+    ConfigMetadata::Origin from_env_origin =
+        ConfigMetadata::Origin::ENVIRONMENT_VARIABLE,
+    Optional<std::string> from_env_config_id = nullopt,
+    bool programmatic_wins = false) {
   auto stringify = [&](const Value& v) -> std::string {
     if constexpr (!std::is_same_v<Stringifier, std::nullptr_t>) {
       return to_string_fn(v);  // use provided function
@@ -112,9 +124,11 @@ Value resolve_and_record_config(
   std::vector<ConfigMetadata> metadata_entries;
   Optional<Value> chosen_value;
 
-  auto add_entry = [&](ConfigMetadata::Origin origin, const Value& val) {
+  auto add_entry = [&](ConfigMetadata::Origin origin, const Value& val,
+                       Optional<std::string> config_id = nullopt) {
     std::string val_str = stringify(val);
-    metadata_entries.emplace_back(ConfigMetadata{config_name, val_str, origin});
+    metadata_entries.emplace_back(
+        ConfigMetadata{config_name, val_str, origin, nullopt, config_id});
     chosen_value = val;
   };
 
@@ -123,12 +137,12 @@ Value resolve_and_record_config(
     add_entry(ConfigMetadata::Origin::DEFAULT, fallback);
   }
 
-  if (from_user) {
-    add_entry(ConfigMetadata::Origin::CODE, *from_user);
-  }
-
-  if (from_env) {
-    add_entry(ConfigMetadata::Origin::ENVIRONMENT_VARIABLE, *from_env);
+  if (programmatic_wins) {
+    if (from_env) add_entry(from_env_origin, *from_env, from_env_config_id);
+    if (from_user) add_entry(ConfigMetadata::Origin::CODE, *from_user);
+  } else {
+    if (from_user) add_entry(ConfigMetadata::Origin::CODE, *from_user);
+    if (from_env) add_entry(from_env_origin, *from_env, from_env_config_id);
   }
 
   if (!metadata_entries.empty()) {

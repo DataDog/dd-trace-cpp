@@ -91,6 +91,48 @@ Installation places a shared library and public headers into the appropriate sys
 cmake --install build --prefix=.install
 ```
 
+### Stable configuration
+
+The optional stable configuration loader uses the `libdd-library-config` crate
+from the pinned `vendor/libdatadog` submodule. The CMake build requires Cargo
+and Rust.
+
+```shell
+git submodule update --init vendor/libdatadog
+cmake -B build -DDD_TRACE_BUILD_STABLE_CONFIG=ON .
+cmake --build build -j
+```
+
+With Bazel and Bzlmod, build and test the loader with:
+
+```shell
+bazel test //:stable_config_loader_test
+```
+
+Link the CMake target `dd-trace-cpp::stable-config` or the Bazel target
+`//:dd_trace_cpp_stable_config`. Bazel manages Rust dependencies and the
+toolchain through `rules_rs` in `MODULE.bazel`. Load configuration before
+creating a tracer:
+
+```c++
+#include <datadog/stable_config_loader.h>
+
+datadog::tracing::TracerConfig config;
+auto finalized = datadog::tracing::finalize_config_with_stable_config(config, "cpp");
+if (!finalized) {
+    // Handle finalized.error().
+}
+```
+
+The loader reads the standard local and fleet YAML paths used by libdatadog.
+Pass local and fleet paths as the third and fourth arguments to use other files.
+Settings resolve in this order: defaults, local YAML, environment variables,
+fleet YAML, and values in `TracerConfig`. The stable configuration overload
+records the source and config ID in configuration telemetry. The existing
+`finalize_config(config)` overload keeps its original behavior.
+Call `clear_rules()` on `trace_sampler` or `span_sampler` to override stable
+sampling rules with an empty list.
+
 ### Optional: Linking to the shared library
 
 In case you decided to build the shared library:
