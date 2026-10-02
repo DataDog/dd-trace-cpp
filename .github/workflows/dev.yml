@@ -148,14 +148,19 @@ jobs:
           Join-Path (Resolve-Path ~).Path "scoop\shims" >> $Env:GITHUB_PATH
       - name: Install Dependencies
         run: scoop install main/cmake@4.0.1 main/ninja
+      - name: Locate Visual Studio
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -property installationPath
+          "VS_DEV_SHELL=$(Join-Path $vs 'Common7\Tools\Launch-VsDevShell.ps1')" >> $env:GITHUB_ENV
       - name: Build
         run: |
-          & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }}
+          & $env:VS_DEV_SHELL -arch ${{ matrix.arch }}
           cmake --preset=ci-msvc -B build -DCMAKE_BUILD_TYPE=Debug .
           cmake --build build -j $env:MAKE_JOB_COUNT -v
       - name: Test
         run: |
-          & 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\Tools\\Launch-VsDevShell.ps1' -arch ${{ matrix.arch }}
+          & $env:VS_DEV_SHELL -arch ${{ matrix.arch }}
           .\build\test\tests.exe -r junit -o report.xml
       - name: Get Datadog credentials
         if: ${{ !cancelled() && github.event_name != 'pull_request' }}
