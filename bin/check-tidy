@@ -1,0 +1,95 @@
+#!/bin/sh
+# Run the pinned clang-tidy through CMake in the CI container.
+#
+# clang-tidy must use the same compiler, flags, and stdlib as the real
+# build (ci-clang + libc++). CMake's CXX_CLANG_TIDY on
+# dd-trace-cpp-objects does that: it invokes tidy with the exact compile
+# line after `--`. Do not run tidy against a host compilation database.
+#
+# Usage: bin/check-tidy
+
+set -e
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+cd "$REPO_ROOT"
+
+# Keep this in sync with .github/workflows/dev.yml and cmake/compiler/clang.cmake.
+CLANG_TIDY_VERSION=14
+CI_IMAGE_BASE=datadog/docker-library:dd-trace-cpp-ci-23768e9
+
+in_container() {
+    [ -f /.dockerenv ] || [ -n "${KUBERNETES_SERVICE_HOST:-}" ] || \
+        [ "${DD_TRACE_CPP_TIDY_IN_CONTAINER:-}" = "1" ]
+}
+
+docker_arch() {
+    case "$(uname -m)" in
+        arm64|aarch64) echo arm64 ;;
+        *) echo amd64 ;;
+    esac
+}
+
+if ! in_container; then
+    if ! command -v docker >/dev/null 2>&1; then
+        >&2 echo "docker is required to run clang-tidy-$CLANG_TIDY_VERSION."
+        exit 1
+    fi
+    if ! docker info >/dev/null 2>&1; then
+        >&2 echo "Docker is not running. Please start Docker."
+        exit 1
+    fi
+    arch=$(docker_arch)
+    image="${CI_IMAGE_BASE}-${arch}"
+    exec docker run --rm -t \
+        --platform "linux/${arch}" \
+        -e DD_TRACE_CPP_TIDY_IN_CONTAINER=1 \
+        -e BUILD_DIR=.clang-tidy-build \
+        -v "$REPO_ROOT:$REPO_ROOT" \
+        -w "$REPO_ROOT" \
+        "$image" \
+        bin/check-tidy
+fi
+
+build_dir=${BUILD_DIR:-.clang-tidy-build}
+tidy=clang-tidy-$CLANG_TIDY_VERSION
+
+if ! command -v "$tidy" >/dev/null 2>&1; then
+    if [ -f /etc/debian_version ]; then
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install --yes "$tidy"
+    else
+        >&2 echo "$tidy is required (pinned). Install it in this container."
+        exit 1
+    fi
+fi
+
+if ! command -v "$tidy" >/dev/null 2>&1; then
+    >&2 echo "$tidy is not installed."
+    exit 1
+fi
+
+compiler=${CXX:-clang++}
+if ! command -v "$compiler" >/dev/null 2>&1; then
+    >&2 echo "$compiler is required (same toolchain as CMake)."
+    exit 1
+fi
+
+compiler_major=$("$compiler" -dumpversion | cut -d. -f1)
+tidy_major=$("$tidy" --version | sed -n 's/.*version \([0-9][0-9]*\).*/\1/p' | head -n 1)
+if [ "$compiler_major" != "$CLANG_TIDY_VERSION" ] || [ "$tidy_major" != "$CLANG_TIDY_VERSION" ]; then
+    >&2 echo "clang-tidy and the CMake compiler must both be LLVM $CLANG_TIDY_VERSION."
+    >&2 echo "  $compiler: $compiler_major"
+    >&2 echo "  $tidy: $tidy_major"
+    exit 1
+fi
+
+# Reconfigure so CXX_CLANG_TIDY is attached to dd-trace-cpp-objects, then
+# compile that target. CMake passes the exact ci-clang compile line
+# (including -stdlib=libc++) to tidy. First-party src/ only; no extra-args.
+bin/with-toolchain llvm cmake . -B "$build_dir" --preset ci-clang \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+    -DDD_TRACE_ENABLE_CLANG_TIDY=ON \
+    -DDD_TRACE_CLANG_TIDY="$tidy"
+
+cmake --build "$build_dir" --target dd-trace-cpp-objects -j

@@ -18,7 +18,7 @@ run apt-get update && apt-get install --yes software-properties-common && \
     add-apt-repository ppa:git-core/ppa --yes && \
     apt-get update && apt-get upgrade --yes && \
     apt-get install --yes \
-        wget build-essential clang sed gdb clang-format git ssh shellcheck \
+        wget build-essential clang sed gdb clang-format clang-tidy git ssh shellcheck \
         libc++-dev libc++abi-dev python3 pip coreutils curl gnupg nodejs
 
 # bazelisk, a launcher for bazel. `bazelisk --help` will cause the latest
