@@ -32,5 +32,4 @@ Checks: >
 # readability-redundant-member-init
 # readability-simplify-boolean-expr
 WarningsAsErrors: '*'
-HeaderFilterRegex: '^src/'
 FormatStyle: file

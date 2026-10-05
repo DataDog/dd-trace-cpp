@@ -1,10 +1,8 @@
 #!/bin/sh
-# Run the pinned clang-tidy through CMake in the CI container.
+# Run clang-tidy in the CI container.
 #
-# clang-tidy must use the same compiler, flags, and stdlib as the real
-# build (ci-clang + libc++). CMake's CXX_CLANG_TIDY on
-# dd-trace-cpp-objects does that: it invokes tidy with the exact compile
-# line after `--`. Do not run tidy against a host compilation database.
+# Configures CMake with preset ci-clang, then run-clang-tidy -p on src/
+# so tidy uses that compile_commands.json (no -extra-arg).
 #
 # Usage: bin/check-tidy
 
@@ -14,8 +12,8 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 cd "$REPO_ROOT"
 
-# Keep this in sync with .github/workflows/dev.yml and cmake/compiler/clang.cmake.
 CLANG_TIDY_VERSION=14
+# Keep this image digest in sync with .github/workflows/*.yml.
 CI_IMAGE_BASE=datadog/docker-library:dd-trace-cpp-ci-23768e9
 
 in_container() {
@@ -52,44 +50,95 @@ if ! in_container; then
 fi
 
 build_dir=${BUILD_DIR:-.clang-tidy-build}
-tidy=clang-tidy-$CLANG_TIDY_VERSION
+clang_tidy=clang-tidy-$CLANG_TIDY_VERSION
+run_clang_tidy=run-clang-tidy-$CLANG_TIDY_VERSION
 
-if ! command -v "$tidy" >/dev/null 2>&1; then
+if ! command -v "$clang_tidy" >/dev/null 2>&1; then
     if [ -f /etc/debian_version ]; then
         apt-get update
-        DEBIAN_FRONTEND=noninteractive apt-get install --yes "$tidy"
+        DEBIAN_FRONTEND=noninteractive apt-get install --yes "$clang_tidy"
     else
-        >&2 echo "$tidy is required (pinned). Install it in this container."
+        >&2 echo "$clang_tidy is required (pinned). Install it in this container."
         exit 1
     fi
 fi
 
-if ! command -v "$tidy" >/dev/null 2>&1; then
-    >&2 echo "$tidy is not installed."
+if ! command -v "$clang_tidy" >/dev/null 2>&1; then
+    >&2 echo "$clang_tidy is not installed."
     exit 1
 fi
 
-compiler=${CXX:-clang++}
-if ! command -v "$compiler" >/dev/null 2>&1; then
-    >&2 echo "$compiler is required (same toolchain as CMake)."
+if ! command -v "$run_clang_tidy" >/dev/null 2>&1; then
+    if command -v run-clang-tidy >/dev/null 2>&1; then
+        run_clang_tidy=run-clang-tidy
+    else
+        >&2 echo "$run_clang_tidy is required (pinned)."
+        exit 1
+    fi
+fi
+
+bin/with-toolchain llvm cmake . -B "$build_dir" --preset ci-clang
+
+# Fail fast if BUILD_DIR is not the ci-clang / libc++ database tidy expects.
+compiler=$(sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p' "$build_dir/CMakeCache.txt" | head -n 1)
+if [ -z "$compiler" ] || ! command -v "$compiler" >/dev/null 2>&1; then
+    >&2 echo "CMAKE_CXX_COMPILER is missing from $build_dir/CMakeCache.txt."
     exit 1
 fi
+case "$compiler" in
+    *clang*) ;;
+    *)
+        >&2 echo "BUILD_DIR was not configured with preset ci-clang; refusing to run tidy."
+        >&2 echo "  CMAKE_CXX_COMPILER=$compiler"
+        exit 1
+        ;;
+esac
 
 compiler_major=$("$compiler" -dumpversion | cut -d. -f1)
-tidy_major=$("$tidy" --version | sed -n 's/.*version \([0-9][0-9]*\).*/\1/p' | head -n 1)
-if [ "$compiler_major" != "$CLANG_TIDY_VERSION" ] || [ "$tidy_major" != "$CLANG_TIDY_VERSION" ]; then
+clang_tidy_major=$("$clang_tidy" --version | sed -n 's/.*version \([0-9][0-9]*\).*/\1/p' | head -n 1)
+if [ "$compiler_major" != "$CLANG_TIDY_VERSION" ] || [ "$clang_tidy_major" != "$CLANG_TIDY_VERSION" ]; then
     >&2 echo "clang-tidy and the CMake compiler must both be LLVM $CLANG_TIDY_VERSION."
     >&2 echo "  $compiler: $compiler_major"
-    >&2 echo "  $tidy: $tidy_major"
+    >&2 echo "  $clang_tidy: $clang_tidy_major"
     exit 1
 fi
 
-# Reconfigure so CXX_CLANG_TIDY is attached to dd-trace-cpp-objects, then
-# compile that target. CMake passes the exact ci-clang compile line
-# (including -stdlib=libc++) to tidy. First-party src/ only; no extra-args.
-bin/with-toolchain llvm cmake . -B "$build_dir" --preset ci-clang \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    -DDD_TRACE_ENABLE_CLANG_TIDY=ON \
-    -DDD_TRACE_CLANG_TIDY="$tidy"
+if ! [ -f "$build_dir/compile_commands.json" ]; then
+    >&2 echo "$build_dir/compile_commands.json is missing."
+    exit 1
+fi
 
-cmake --build "$build_dir" --target dd-trace-cpp-objects -j
+python3 - "$build_dir/compile_commands.json" "$REPO_ROOT" <<'PY'
+import json, os, sys
+db_path, root = sys.argv[1], sys.argv[2]
+ok = 0
+for ent in json.load(open(db_path)):
+    path = ent.get("file") or ""
+    if not os.path.isabs(path):
+        path = os.path.normpath(os.path.join(ent.get("directory", root), path))
+    try:
+        rel = os.path.relpath(path, root)
+    except ValueError:
+        continue
+    if not rel.startswith("src/") or not rel.endswith((".c", ".cc", ".cpp", ".cxx")):
+        continue
+    cmd = ent.get("command") or " ".join(ent.get("arguments") or [])
+    if "-stdlib=libc++" not in cmd:
+        sys.stderr.write(
+            "BUILD_DIR was not configured with preset ci-clang; refusing to run tidy.\n"
+            "  missing -stdlib=libc++ in " + rel + "\n"
+        )
+        sys.exit(1)
+    ok += 1
+if ok == 0:
+    sys.stderr.write("No src/ entries in " + db_path + ".\n")
+    sys.exit(1)
+PY
+
+if ! echo '#include <string>' | "$compiler" -stdlib=libc++ -x c++ - -fsyntax-only; then
+    >&2 echo "libc++ headers are not usable with $compiler; refusing to run tidy."
+    exit 1
+fi
+
+"$run_clang_tidy" -p "$build_dir" -clang-tidy-binary "$clang_tidy" \
+    -header-filter "^$REPO_ROOT/(src|include)/" -quiet "^$REPO_ROOT/src/"
