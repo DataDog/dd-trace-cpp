@@ -28,9 +28,12 @@ void BM_TraceID_ParseHex(benchmark::State& state, std::string input) {
     }
   }
 }
-BENCHMARK_CAPTURE(BM_TraceID_ParseHex, 64bit, std::string{"deadbeefcafebabe"});
+constexpr double parsehex_warm_up_seconds = 3.0;
+BENCHMARK_CAPTURE(BM_TraceID_ParseHex, 64bit, std::string{"deadbeefcafebabe"})
+    ->MinWarmUpTime(parsehex_warm_up_seconds);
 BENCHMARK_CAPTURE(BM_TraceID_ParseHex, 128bit,
-                  std::string{"0102030405060708deadbeefcafebabe"});
+                  std::string{"0102030405060708deadbeefcafebabe"})
+    ->MinWarmUpTime(parsehex_warm_up_seconds);
 
 void BM_HexPadded_uint64(benchmark::State& state, std::uint64_t value) {
   for (auto _ : state) {
