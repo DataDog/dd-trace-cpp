@@ -470,6 +470,55 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
     REQUIRE(message_batch["payload"].size() >= 1);
 
     REQUIRE(find_payload(message_batch["payload"], "app-heartbeat"));
+    CHECK(!find_payload(message_batch["payload"], "app-product-change"));
+  }
+
+  SECTION("heartbeat sends the latest product changes once") {
+    telemetry->capture_product_change(
+        Product{Product::Name::appsec, true, "1.0.0", {}, {}, {}});
+    telemetry->capture_product_change(Product{
+        Product::Name::appsec, false, "1.0.1", 3, "WAF init failed", {}});
+    telemetry->capture_product_change(
+        Product{Product::Name::profiler, true, "2.0.0", {}, {}, {}});
+    telemetry->capture_product_change(
+        Product{Product::Name::tracing, true, "3.0.0", {}, {}, {}});
+
+    client->clear();
+    scheduler->trigger_heartbeat();
+
+    auto message_batch = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(message_batch));
+    auto product_change =
+        find_payload(message_batch["payload"], "app-product-change");
+    REQUIRE(product_change);
+    CHECK((*product_change)["payload"] ==
+          nlohmann::json{
+              {"products",
+               {
+                   {"appsec",
+                    {{"version", "1.0.1"},
+                     {"enabled", false},
+                     {"error", {{"code", 3}, {"message", "WAF init failed"}}}}},
+                   {"profiler", {{"version", "2.0.0"}, {"enabled", true}}},
+               }},
+          });
+
+    client->clear();
+    scheduler->trigger_heartbeat();
+
+    message_batch = nlohmann::json::parse(client->request_body);
+    CHECK(!find_payload(message_batch["payload"], "app-product-change"));
+  }
+
+  SECTION("tracing product change alone is not sent") {
+    telemetry->capture_product_change(
+        Product{Product::Name::tracing, false, "3.0.0", {}, {}, {}});
+
+    client->clear();
+    scheduler->trigger_heartbeat();
+
+    auto message_batch = nlohmann::json::parse(client->request_body);
+    CHECK(!find_payload(message_batch["payload"], "app-product-change"));
   }
 
   SECTION("generates an extended heartbeat with configuration") {
