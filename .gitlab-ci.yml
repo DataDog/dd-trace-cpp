@@ -9,6 +9,7 @@ variables:
 include:
   - local: ".gitlab/config-registry.yml"
   - local: ".gitlab/benchmarks.yml"
+  - local: ".gitlab/benchmark-experiment.yml"
 
 
 # Config Registry CI Jobs

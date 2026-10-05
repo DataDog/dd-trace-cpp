@@ -1,0 +1,18 @@
+# One-off experiment on benchmark flakiness. Not meant to be merged.
+# See benchmark-experiment.sh.
+benchmark-experiment:
+  stage: benchmarks
+  when: on_success
+  tags: ["runner:apm-k8s-tweaked-metal"]
+  image: $BENCHMARKS_CI_IMAGE
+  timeout: 90m
+  script:
+    - export ARTIFACTS_DIR="$(pwd)/reports" && mkdir -p "${ARTIFACTS_DIR}"
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
+    - bash .gitlab/benchmark-experiment.sh
+  artifacts:
+    name: "experiment"
+    when: always
+    paths:
+      - reports/
+    expire_in: 1 month
