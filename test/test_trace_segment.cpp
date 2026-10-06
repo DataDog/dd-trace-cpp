@@ -289,6 +289,22 @@ TEST_CASE("TraceSegment finalization of spans") {
               get_hostname());
     }
 
+    SECTION("OTLP export marker is on the first span of the chunk only") {
+      auto finalized = finalize_config(config);
+      REQUIRE(finalized);
+      Tracer tracer{*finalized};
+      {
+        auto root = tracer.create_span();
+        auto child = root.create_child();
+        (void)child;
+      }
+      REQUIRE(collector->chunks.size() == 1);
+      const auto& chunk = collector->chunks.front();
+      REQUIRE(chunk.size() == 2);
+      REQUIRE(chunk[0]->tags.at(tags::internal::sdk_otlp_export) == "false");
+      REQUIRE(chunk[1]->tags.count(tags::internal::sdk_otlp_export) == 0);
+    }
+
     SECTION("x-datadog-tags") {
       auto finalized = finalize_config(config);
       REQUIRE(finalized);

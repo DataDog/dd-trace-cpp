@@ -371,6 +371,8 @@ void TraceSegment::span_finished() {
   if (hostname_) {
     local_root.tags[tags::internal::hostname] = *hostname_;
   }
+  // Mark the chunk as sent in Datadog format, not OTLP. One per chunk.
+  local_root.tags[tags::internal::sdk_otlp_export] = "false";
   if (decision.origin == SamplingDecision::Origin::LOCAL) {
     if (decision.mechanism == int(SamplingMechanism::AGENT_RATE) ||
         decision.mechanism == int(SamplingMechanism::DEFAULT)) {
