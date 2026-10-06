@@ -493,7 +493,6 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
 
 void RequestHandler::on_span_flush(const httplib::Request& /* req */,
                                    httplib::Response& res) {
-  scheduler_->flush_telemetry();
   active_spans_.clear();
   tracing_context_.clear();
   link_contexts_.clear();
