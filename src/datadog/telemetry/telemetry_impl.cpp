@@ -209,6 +209,27 @@ nlohmann::json encode_distributions(
   return j;
 }
 
+nlohmann::json encode_product(const Product& product) {
+  auto encoded = nlohmann::json{
+      {"version", product.version},
+      {"enabled", product.enabled},
+  };
+
+  if (product.error_code || product.error_message) {
+    auto product_error = nlohmann::json{};
+    if (product.error_code) {
+      product_error.emplace("code", *product.error_code);
+    }
+    if (product.error_message) {
+      product_error.emplace("message", *product.error_message);
+    }
+
+    encoded.emplace("error", std::move(product_error));
+  }
+
+  return encoded;
+}
+
 }  // namespace
 
 Telemetry::Telemetry(FinalizedConfiguration config,
@@ -465,6 +486,7 @@ std::string Telemetry::heartbeat_and_telemetry() {
       {"request_type", "app-heartbeat"},
   });
   batch_payloads.emplace_back(std::move(heartbeat));
+  append_product_change(batch_payloads);
 
   std::unordered_map<MetricContext<Distribution>, std::vector<uint64_t>>
       distributions;
@@ -617,24 +639,7 @@ std::string Telemetry::app_started_payload() {
     /// is no need to declare it.
     if (product.name == Product::Name::tracing) continue;
 
-    auto product_details = nlohmann::json{
-        {"version", product.version},
-        {"enabled", product.enabled},
-    };
-
-    if (product.error_code || product.error_message) {
-      auto product_error = nlohmann::json{};
-      if (product.error_code) {
-        product_error.emplace("code", *product.error_code);
-      }
-      if (product.error_message) {
-        product_error.emplace("message", *product.error_message);
-      }
-
-      product_details.emplace("error", std::move(product_error));
-    }
-
-    product_json.emplace(to_string(product.name), std::move(product_details));
+    product_json.emplace(to_string(product.name), encode_product(product));
   }
 
   auto app_started_msg = nlohmann::json{
@@ -790,6 +795,34 @@ void Telemetry::capture_configuration_change(
   configuration_snapshot_.insert(configuration_snapshot_.begin(),
                                  new_configuration.begin(),
                                  new_configuration.end());
+}
+
+void Telemetry::capture_product_change(const Product& product) {
+  // Tracing is always enabled. The backend does not expect it as a product.
+  if (product.name == Product::Name::tracing) return;
+
+  std::lock_guard lock{product_changes_mutex_};
+  product_changes_.insert_or_assign(product.name, product);
+}
+
+void Telemetry::append_product_change(nlohmann::json& batch_payloads) {
+  std::unordered_map<Product::Name, Product> product_changes;
+  {
+    std::lock_guard lock{product_changes_mutex_};
+    std::swap(product_changes, product_changes_);
+  }
+
+  if (product_changes.empty()) return;
+
+  auto products_json = nlohmann::json::object();
+  for (const auto& [name, product] : product_changes) {
+    products_json.emplace(to_string(name), encode_product(product));
+  }
+
+  batch_payloads.emplace_back(nlohmann::json{
+      {"request_type", "app-product-change"},
+      {"payload", nlohmann::json{{"products", std::move(products_json)}}},
+  });
 }
 
 void Telemetry::capture_metrics() {
