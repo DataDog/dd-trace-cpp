@@ -2,7 +2,7 @@
 # Run clang-tidy in the CI container.
 #
 # Configures CMake with preset ci-clang, then run-clang-tidy -p on src/
-# so tidy uses that compile_commands.json (no -extra-arg).
+# so tidy uses that compile_commands.json.
 #
 # Usage: bin/check-tidy
 
@@ -29,14 +29,6 @@ docker_arch() {
 }
 
 if ! in_container; then
-    if ! command -v docker >/dev/null 2>&1; then
-        >&2 echo "docker is required to run clang-tidy-$CLANG_TIDY_VERSION."
-        exit 1
-    fi
-    if ! docker info >/dev/null 2>&1; then
-        >&2 echo "Docker is not running. Please start Docker."
-        exit 1
-    fi
     arch=$(docker_arch)
     image="${CI_IMAGE_BASE}-${arch}"
     exec docker run --rm -t \
@@ -63,50 +55,15 @@ if ! command -v "$clang_tidy" >/dev/null 2>&1; then
     fi
 fi
 
-if ! command -v "$clang_tidy" >/dev/null 2>&1; then
-    >&2 echo "$clang_tidy is not installed."
-    exit 1
-fi
-
 if ! command -v "$run_clang_tidy" >/dev/null 2>&1; then
-    if command -v run-clang-tidy >/dev/null 2>&1; then
-        run_clang_tidy=run-clang-tidy
-    else
-        >&2 echo "$run_clang_tidy is required (pinned)."
-        exit 1
-    fi
-fi
-
-bin/with-toolchain llvm cmake . -B "$build_dir" --preset ci-clang
-
-# Fail fast if BUILD_DIR is not the ci-clang / libc++ database tidy expects.
-compiler=$(sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p' "$build_dir/CMakeCache.txt" | head -n 1)
-if [ -z "$compiler" ] || ! command -v "$compiler" >/dev/null 2>&1; then
-    >&2 echo "CMAKE_CXX_COMPILER is missing from $build_dir/CMakeCache.txt."
-    exit 1
-fi
-case "$compiler" in
-    *clang*) ;;
-    *)
-        >&2 echo "BUILD_DIR was not configured with preset ci-clang; refusing to run tidy."
-        >&2 echo "  CMAKE_CXX_COMPILER=$compiler"
-        exit 1
-        ;;
-esac
-
-compiler_major=$("$compiler" -dumpversion | cut -d. -f1)
-clang_tidy_major=$("$clang_tidy" --version | sed -n 's/.*version \([0-9][0-9]*\).*/\1/p' | head -n 1)
-if [ "$compiler_major" != "$CLANG_TIDY_VERSION" ] || [ "$clang_tidy_major" != "$CLANG_TIDY_VERSION" ]; then
-    >&2 echo "clang-tidy and the CMake compiler must both be LLVM $CLANG_TIDY_VERSION."
-    >&2 echo "  $compiler: $compiler_major"
-    >&2 echo "  $clang_tidy: $clang_tidy_major"
+    >&2 echo "$run_clang_tidy is required (pinned)."
     exit 1
 fi
 
-if ! [ -f "$build_dir/compile_commands.json" ]; then
-    >&2 echo "$build_dir/compile_commands.json is missing."
-    exit 1
-fi
+# Use the same LLVM bin dir as clang-tidy so libc++ headers resolve.
+llvm_bin=/usr/lib/llvm-$CLANG_TIDY_VERSION/bin
+CC=$llvm_bin/clang CXX=$llvm_bin/clang++ cmake . -B "$build_dir" \
+    --preset ci-clang --fresh
 
 python3 - "$build_dir/compile_commands.json" "$REPO_ROOT" <<'PY'
 import json, os, sys
@@ -135,8 +92,8 @@ if ok == 0:
     sys.exit(1)
 PY
 
-if ! echo '#include <string>' | "$compiler" -stdlib=libc++ -x c++ - -fsyntax-only; then
-    >&2 echo "libc++ headers are not usable with $compiler; refusing to run tidy."
+if ! echo '#include <string>' | "$llvm_bin/clang++" -stdlib=libc++ -x c++ - -fsyntax-only; then
+    >&2 echo "libc++ headers are not usable with $llvm_bin/clang++; refusing to run tidy."
     exit 1
 fi
 
