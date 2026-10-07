@@ -68,26 +68,23 @@ CC=$llvm_bin/clang CXX=$llvm_bin/clang++ cmake . -B "$build_dir" \
 python3 - "$build_dir/compile_commands.json" "$REPO_ROOT" <<'PY'
 import json, os, sys
 db_path, root = sys.argv[1], sys.argv[2]
-ok = 0
-for ent in json.load(open(db_path)):
-    path = ent.get("file") or ""
+verified_source_count = 0
+for entry in json.load(open(db_path)):
+    path = entry.get("file") or ""
     if not os.path.isabs(path):
-        path = os.path.normpath(os.path.join(ent.get("directory", root), path))
-    try:
-        rel = os.path.relpath(path, root)
-    except ValueError:
+        path = os.path.normpath(os.path.join(entry.get("directory", root), path))
+    relative_path = os.path.relpath(path, root)
+    if not relative_path.startswith("src/") or not relative_path.endswith((".c", ".cc", ".cpp", ".cxx")):
         continue
-    if not rel.startswith("src/") or not rel.endswith((".c", ".cc", ".cpp", ".cxx")):
-        continue
-    cmd = ent.get("command") or " ".join(ent.get("arguments") or [])
-    if "-stdlib=libc++" not in cmd:
+    command = entry.get("command") or ""
+    if "-stdlib=libc++" not in command:
         sys.stderr.write(
             "BUILD_DIR was not configured with preset ci-clang; refusing to run tidy.\n"
-            "  missing -stdlib=libc++ in " + rel + "\n"
+            "  missing -stdlib=libc++ in " + relative_path + "\n"
         )
         sys.exit(1)
-    ok += 1
-if ok == 0:
+    verified_source_count += 1
+if verified_source_count == 0:
     sys.stderr.write("No src/ entries in " + db_path + ".\n")
     sys.exit(1)
 PY
