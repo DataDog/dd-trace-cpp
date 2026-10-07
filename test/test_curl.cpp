@@ -192,40 +192,37 @@ CURL_TEST("parse response headers and body") {
     // Without using a tracer, just make a request using `Curl::post`, and
     // verify that the received response headers are as expected.
     Optional<Error> post_error;
-    std::exception_ptr exception;
+    int status = 0;
+    std::string foo_bar_header_value;
+    std::unordered_map<std::string, std::string> visited_headers;
+    std::string body;
     const HTTPClient::URL url = {"http", "whatever", "", ""};
     const auto result = client->post(
         url, ignore, "whatever",
-        [&](int status, const DictReader &headers, std::string body) {
-          try {
-            REQUIRE(status == 200);
-            REQUIRE(headers.lookup("foo-bar") == "baz");
-            REQUIRE(headers.lookup("boom-boom") == "boom, boom, boom, boom");
-            REQUIRE_FALSE(headers.lookup("snafu"));
-            headers.visit([](StringView key, StringView value) {
-              if (key == "foo-bar") {
-                REQUIRE(value == "baz");
-              } else {
-                REQUIRE(key == "boom-boom");
-                REQUIRE(value == "boom, boom, boom, boom");
-              }
-            });
-
-            REQUIRE(body ==
-                    "{\"message\": \"Dogs don't know it's not libcurl!\"}");
-          } catch (...) {
-            exception = std::current_exception();
-          }
+        [&](int response_status, const DictReader &headers,
+            std::string response_body) {
+          // Do not call `REQUIRE()` here because it is not thread-safe and this
+          // callback runs on the `Curl` event loop thread.
+          status = response_status;
+          foo_bar_header_value =
+              std::string(headers.lookup("foo-bar").value_or(""));
+          headers.visit([&](StringView key, StringView value) {
+            visited_headers.emplace(key, value);
+          });
+          body = std::move(response_body);
         },
         [&](const Error &error) { post_error = error; },
         clock().tick + std::chrono::seconds(10));
 
     REQUIRE(result);
     client->drain(clock().tick + std::chrono::seconds(1));
-    if (exception) {
-      std::rethrow_exception(exception);
-    }
     REQUIRE_FALSE(post_error);
+    REQUIRE(status == 200);
+    REQUIRE(foo_bar_header_value == "baz");
+    REQUIRE(visited_headers ==
+            std::unordered_map<std::string, std::string>{
+                {"foo-bar", "baz"}, {"boom-boom", "boom, boom, boom, boom"}});
+    REQUIRE(body == "{\"message\": \"Dogs don't know it's not libcurl!\"}");
   }
 }
 
@@ -426,28 +423,26 @@ CURL_TEST("handles are always cleaned up") {
 
   SECTION("when the response is delivered") {
     Optional<Error> post_error;
-    std::exception_ptr exception;
+    int status = 0;
+    std::string body;
     const HTTPClient::URL url = {"http", "whatever", "", ""};
     const auto dummy_deadline = clock().tick + std::chrono::seconds(10);
     const auto result = client->post(
         url, ignore, "whatever",
-        [&](int status, const DictReader & /*headers*/, std::string body) {
-          try {
-            REQUIRE(status == 200);
-            REQUIRE(body ==
-                    "{\"message\": \"Dogs don't know it's not libcurl!\"}");
-          } catch (...) {
-            exception = std::current_exception();
-          }
+        [&](int response_status, const DictReader & /*headers*/,
+            std::string response_body) {
+          // Do not call `REQUIRE()` here because it is not thread-safe and this
+          // callback runs on the `Curl` event loop thread.
+          status = response_status;
+          body = std::move(response_body);
         },
         [&](const Error &error) { post_error = error; }, dummy_deadline);
 
     REQUIRE(result);
     client->drain(clock().tick + std::chrono::seconds(1));
-    if (exception) {
-      std::rethrow_exception(exception);
-    }
     REQUIRE_FALSE(post_error);
+    REQUIRE(status == 200);
+    REQUIRE(body == "{\"message\": \"Dogs don't know it's not libcurl!\"}");
   }
 
   SECTION("when an error occurs") {
