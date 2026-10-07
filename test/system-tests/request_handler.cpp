@@ -46,6 +46,7 @@ RequestHandler::RequestHandler(
     std::shared_ptr<DeveloperNoiseLogger> logger)
     : tracer_(tracerConfig),
       scheduler_(scheduler),
+      http_client_(tracerConfig.http_client),
       logger_(std::move(logger)) {}
 
 void RequestHandler::set_error(const char* const file, int line,
@@ -492,7 +493,6 @@ void RequestHandler::on_extract_headers(const httplib::Request& req,
 
 void RequestHandler::on_span_flush(const httplib::Request& /* req */,
                                    httplib::Response& res) {
-  scheduler_->flush_telemetry();
   active_spans_.clear();
   tracing_context_.clear();
   link_contexts_.clear();
@@ -502,6 +502,10 @@ void RequestHandler::on_span_flush(const httplib::Request& /* req */,
 void RequestHandler::on_stats_flush(const httplib::Request& /* req */,
                                     httplib::Response& res) {
   scheduler_->flush_traces();
+  // Wait for the traces to reach the agent before replying.
+  // 2 seconds is the agent default request timeout.
+  http_client_->drain(std::chrono::steady_clock::now() +
+                      std::chrono::seconds(2));
   res.status = 200;
 }
 

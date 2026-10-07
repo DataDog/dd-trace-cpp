@@ -85,6 +85,17 @@ void send_configuration_change();
 void capture_configuration_change(
     const std::vector<tracing::ConfigMetadata>& new_configuration);
 
+/// Captures a change in a product state, for example when remote
+/// configuration enables or disables it.
+///
+/// The change is sent as an `app-product-change` event with the next
+/// heartbeat. If a product changes several times before that, only its latest
+/// state is sent.
+///
+/// @param product The new state of the product. Its `configurations` field is
+/// not sent.
+void capture_product_change(const Product& product);
+
 /// The `log` namespace provides functions for reporting logs.
 namespace log {
 /// Report internal warning message to Datadog.

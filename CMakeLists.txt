@@ -50,6 +50,11 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   option(DD_TRACE_ENABLE_SANITIZE "Build with address sanitizer and undefined behavior sanitizer" OFF)
 endif()
 
+if (DD_TRACE_BUILD_BENCHMARK)
+  # For benchmark tests, align code to avoid flakiness due to code placement.
+  add_compile_options(-falign-functions=64 -falign-loops=64)
+endif ()
+
 # Include mandatory files
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -125,7 +130,7 @@ target_sources(dd-trace-cpp-objects
     FILE_SET public_headers
     TYPE HEADERS
     BASE_DIRS include
-    FILES 
+    FILES
       include/datadog/remote_config/capability.h
       include/datadog/remote_config/listener.h
       include/datadog/remote_config/product.h
@@ -302,7 +307,7 @@ if (BUILD_SHARED_LIBS)
   )
 
   set_target_properties(dd-trace-cpp-shared
-    PROPERTIES 
+    PROPERTIES
       OUTPUT_NAME "dd-trace-cpp"
   )
 
@@ -330,7 +335,7 @@ if (BUILD_STATIC_LIBS)
         src/datadog/default_http_client_curl.cpp
     )
 
-    target_link_libraries(dd-trace-cpp-static 
+    target_link_libraries(dd-trace-cpp-static
       PRIVATE
         CURL::libcurl_static
     )
@@ -343,18 +348,18 @@ if (BUILD_STATIC_LIBS)
     target_sources(dd-trace-cpp-static
       PRIVATE
         src/datadog/default_http_client_null.cpp
-    ) 
+    )
   endif ()
 
-  target_link_libraries(dd-trace-cpp-static 
+  target_link_libraries(dd-trace-cpp-static
     PUBLIC
       dd-trace-cpp::obj
     PRIVATE
       dd-trace-cpp::specs
   )
 
-  set_target_properties(dd-trace-cpp-static 
-    PROPERTIES 
+  set_target_properties(dd-trace-cpp-static
+    PROPERTIES
       OUTPUT_NAME "dd-trace-cpp"
   )
 
@@ -390,7 +395,7 @@ install(
 )
 
 install(
-  FILES 
+  FILES
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"

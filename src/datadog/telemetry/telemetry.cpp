@@ -99,6 +99,16 @@ void capture_configuration_change(
              instance());
 }
 
+void capture_product_change(const Product& product) {
+  std::visit(details::Overload{
+                 [&](std::shared_ptr<Telemetry>& telemetry) {
+                   telemetry->capture_product_change(product);
+                 },
+                 [](NoopTelemetry) {},
+             },
+             instance());
+}
+
 namespace log {
 void warning(std::string message) {
   std::visit(details::Overload{

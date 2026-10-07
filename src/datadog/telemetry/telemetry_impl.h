@@ -59,6 +59,10 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   // Configuration
   std::vector<tracing::ConfigMetadata> configuration_snapshot_;
 
+  // Product
+  std::mutex product_changes_mutex_;
+  std::unordered_map<Product::Name, Product> product_changes_;
+
   std::mutex log_mutex_;
   std::vector<telemetry::LogMessage> logs_;
 
@@ -108,6 +112,8 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   void capture_configuration_change(
       const std::vector<tracing::ConfigMetadata>& new_configuration);
 
+  void capture_product_change(const Product& product);
+
   // Deterministic shutdown: cancels scheduled tasks, sends the app-closing
   // payload, drains in-flight HTTP requests, and releases the HTTP client
   // (joining the background thread if this is the last reference).
@@ -147,6 +153,8 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
 
   void log(std::string message, telemetry::LogLevel level,
            tracing::Optional<std::string> stacktrace = tracing::nullopt);
+
+  void append_product_change(nlohmann::json& batch_payloads);
 
   nlohmann::json generate_telemetry_body(std::string request_type);
   nlohmann::json serialize_configuration_field(
