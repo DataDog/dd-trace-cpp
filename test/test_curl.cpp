@@ -146,9 +146,12 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
  private:
   // In the `Curl` event loop thread, use the following `require()` instead of
   // Catch2 `REQUIRE()` because it is not thread-safe.
-  static void require(bool condition) {
+  // `line` defaults to the line of the caller.
+  static void require(bool condition, int line = __builtin_LINE()) {
     if (!condition) {
-      throw std::logic_error("SingleRequestMockCurlLibrary check failed");
+      throw std::logic_error(
+          "SingleRequestMockCurlLibrary check failed at line " +
+          std::to_string(line));
     }
   }
 };
