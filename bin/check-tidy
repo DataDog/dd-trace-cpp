@@ -1,0 +1,98 @@
+#!/bin/sh
+# Run clang-tidy in the CI container.
+#
+# Configures CMake with preset ci-clang, then run-clang-tidy -p on src/
+# so tidy uses that compile_commands.json.
+#
+# Usage: bin/check-tidy
+
+set -e
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+cd "$REPO_ROOT"
+
+CLANG_TIDY_VERSION=14
+# Keep this image digest in sync with .github/workflows/*.yml.
+CI_IMAGE_BASE=datadog/docker-library:dd-trace-cpp-ci-23768e9
+
+in_container() {
+    [ -f /.dockerenv ] || [ -n "${KUBERNETES_SERVICE_HOST:-}" ] || \
+        [ "${DD_TRACE_CPP_TIDY_IN_CONTAINER:-}" = "1" ]
+}
+
+docker_arch() {
+    case "$(uname -m)" in
+        arm64|aarch64) echo arm64 ;;
+        *) echo amd64 ;;
+    esac
+}
+
+if ! in_container; then
+    arch=$(docker_arch)
+    image="${CI_IMAGE_BASE}-${arch}"
+    exec docker run --rm -t \
+        --platform "linux/${arch}" \
+        -e DD_TRACE_CPP_TIDY_IN_CONTAINER=1 \
+        -e BUILD_DIR=.clang-tidy-build \
+        -v "$REPO_ROOT:$REPO_ROOT" \
+        -w "$REPO_ROOT" \
+        "$image" \
+        bin/check-tidy
+fi
+
+build_dir=${BUILD_DIR:-.clang-tidy-build}
+clang_tidy=clang-tidy-$CLANG_TIDY_VERSION
+run_clang_tidy=run-clang-tidy-$CLANG_TIDY_VERSION
+
+if ! command -v "$clang_tidy" >/dev/null 2>&1; then
+    if [ -f /etc/debian_version ]; then
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install --yes "$clang_tidy"
+    else
+        >&2 echo "$clang_tidy is required (pinned). Install it in this container."
+        exit 1
+    fi
+fi
+
+if ! command -v "$run_clang_tidy" >/dev/null 2>&1; then
+    >&2 echo "$run_clang_tidy is required (pinned)."
+    exit 1
+fi
+
+# Use the same LLVM bin dir as clang-tidy so libc++ headers resolve.
+llvm_bin=/usr/lib/llvm-$CLANG_TIDY_VERSION/bin
+CC=$llvm_bin/clang CXX=$llvm_bin/clang++ cmake . -B "$build_dir" \
+    --preset ci-clang --fresh
+
+python3 - "$build_dir/compile_commands.json" "$REPO_ROOT" <<'PY'
+import json, os, sys
+db_path, root = sys.argv[1], sys.argv[2]
+verified_source_count = 0
+for entry in json.load(open(db_path)):
+    path = entry.get("file") or ""
+    if not os.path.isabs(path):
+        path = os.path.normpath(os.path.join(entry.get("directory", root), path))
+    relative_path = os.path.relpath(path, root)
+    if not relative_path.startswith("src/") or not relative_path.endswith((".c", ".cc", ".cpp", ".cxx")):
+        continue
+    command = entry.get("command") or ""
+    if "-stdlib=libc++" not in command:
+        sys.stderr.write(
+            "BUILD_DIR was not configured with preset ci-clang; refusing to run tidy.\n"
+            "  missing -stdlib=libc++ in " + relative_path + "\n"
+        )
+        sys.exit(1)
+    verified_source_count += 1
+if verified_source_count == 0:
+    sys.stderr.write("No src/ entries in " + db_path + ".\n")
+    sys.exit(1)
+PY
+
+if ! echo '#include <string>' | "$llvm_bin/clang++" -stdlib=libc++ -x c++ - -fsyntax-only; then
+    >&2 echo "libc++ headers are not usable with $llvm_bin/clang++; refusing to run tidy."
+    exit 1
+fi
+
+"$run_clang_tidy" -p "$build_dir" -clang-tidy-binary "$clang_tidy" \
+    -header-filter "^$REPO_ROOT/(src|include)/" -quiet "^$REPO_ROOT/src/"

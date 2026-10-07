@@ -11,6 +11,7 @@ This directory contains scripts that are useful during development.
   before pushing changes.
 - [check-format](check-format) verifies that the source code is formatted as
   [format](format) prefers.
+- [check-tidy](check-tidy) runs clang-tidy.
 - [check-version](check-version) accepts a version string as a command line
   argument (e.g. "v1.2.3") and checks whether the version within the source code
   matches. This is a good check to perform before publishing a source release.
