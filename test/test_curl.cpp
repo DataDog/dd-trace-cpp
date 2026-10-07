@@ -106,41 +106,50 @@ class SingleRequestMockCurlLibrary : public CurlLibrary {
       return on_multi_perform();
     }
 
-    // If any of these `REQUIRE`s fail, an exception will be thrown and the
+    // If any of these `require`s fail, an exception will be thrown and the
     // test will abort. The runtime will print the exception first, though.
-    REQUIRE(on_header_);
-    REQUIRE(user_data_on_header_);
+    require(on_header_ != nullptr);
+    require(user_data_on_header_ != nullptr);
     *running_handles = 1;
     std::string header = "200 OK";
-    REQUIRE(on_header_(header.data(), 1, header.size(), user_data_on_header_) ==
+    require(on_header_(header.data(), 1, header.size(), user_data_on_header_) ==
             header.size());
     header = "Foo-Bar: baz";
-    REQUIRE(on_header_(header.data(), 1, header.size(), user_data_on_header_) ==
+    require(on_header_(header.data(), 1, header.size(), user_data_on_header_) ==
             header.size());
     header = "BOOM-BOOM: boom, boom, boom, boom    ";
-    REQUIRE(on_header_(header.data(), 1, header.size(), user_data_on_header_) ==
+    require(on_header_(header.data(), 1, header.size(), user_data_on_header_) ==
             header.size());
     header = "BOOM-boom: ignored";
-    REQUIRE(on_header_(header.data(), 1, header.size(), user_data_on_header_) ==
+    require(on_header_(header.data(), 1, header.size(), user_data_on_header_) ==
             header.size());
 
-    REQUIRE(on_write_);
-    REQUIRE(user_data_on_write_);
+    require(on_write_ != nullptr);
+    require(user_data_on_write_ != nullptr);
     std::string body = "{\"message\": \"Dogs don't know it's not libcurl!\"}";
     // Send the body in two pieces.
-    REQUIRE(on_write_(body.data(), 1, body.size() / 2, user_data_on_write_) ==
+    require(on_write_(body.data(), 1, body.size() / 2, user_data_on_write_) ==
             body.size() / 2);
     const auto remaining = body.size() - (body.size() / 2);
-    REQUIRE(on_write_(body.data() + body.size() / 2, 1, remaining,
+    require(on_write_(body.data() + body.size() / 2, 1, remaining,
                       user_data_on_write_) == remaining);
 
     state_ = state::performed;
     return CURLM_OK;
   }
   CURLMcode multi_remove_handle(CURLM *, CURL *easy_handle) override {
-    REQUIRE(easy_handle == added_handle_);
+    require(easy_handle == added_handle_);
     added_handle_ = nullptr;
     return CURLM_OK;
+  }
+
+ private:
+  // In the `Curl` event loop thread, use the following `require()` instead of
+  // Catch2 `REQUIRE()` because it is not thread-safe.
+  static void require(bool condition) {
+    if (!condition) {
+      throw std::logic_error("SingleRequestMockCurlLibrary check failed");
+    }
   }
 };
 
