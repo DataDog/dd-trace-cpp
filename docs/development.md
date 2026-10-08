@@ -22,3 +22,18 @@ command:
 ```shell
 bin/format
 ```
+
+To check formatting without writing files:
+
+```shell
+bin/check-format
+```
+
+## Static Analysis
+
+C++ code is analyzed with Clang Tidy. Run it with the following command:
+
+```shell
+bin/check-tidy
+```
+

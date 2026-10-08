@@ -18,8 +18,8 @@ run apt-get update && apt-get install --yes software-properties-common && \
     add-apt-repository ppa:git-core/ppa --yes && \
     apt-get update && apt-get upgrade --yes && \
     apt-get install --yes \
-        wget build-essential clang sed gdb clang-format git ssh shellcheck \
-        libc++-dev libc++abi-dev python3 pip coreutils curl gnupg nodejs
+        build-essential clang clang-format clang-tidy gdb git sed shellcheck ssh wget \
+        coreutils curl gnupg libc++-dev libc++abi-dev nodejs pip python3
 
 # bazelisk, a launcher for bazel. `bazelisk --help` will cause the latest
 # version to be downloaded.

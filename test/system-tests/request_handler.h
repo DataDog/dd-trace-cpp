@@ -39,21 +39,14 @@ class RequestHandler final {
  private:
   datadog::tracing::Tracer tracer_;
   std::shared_ptr<ManualScheduler> scheduler_;
+  std::shared_ptr<datadog::tracing::HTTPClient> http_client_;
   std::shared_ptr<DeveloperNoiseLogger> logger_;
   std::unordered_map<uint64_t, datadog::tracing::Span> active_spans_;
   std::unordered_map<uint64_t, nlohmann::json::array_t> tracing_context_;
   std::unordered_map<uint64_t, datadog::tracing::SpanContext> link_contexts_;
 
-  // Previously, `/trace/span/start` was used to create new spans or create
-  // child spans from the extracted tracing context.
-  //
-  // The logic has been split into two distinct endpoint, with the addition of
-  // `extract_headers`. However, the public API does not expose a method to just
-  // extract tracing context.
-  //
-  // For now, the workaround is to extract and create a span from tracing
-  // context and keep the span alive until the process terminate, thus
-  // explaining the name :)
+  // We can't extract a tracing context without creating a span. So, the span is
+  // kept in this blackhole_ to avoid being finished and sent to the agent.
   std::vector<datadog::tracing::Span> blackhole_;
 
   static datadog::tracing::SpanContext make_link_context(
