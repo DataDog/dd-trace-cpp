@@ -116,6 +116,11 @@ struct TracerConfig {
   // DD_TRACE_PROPAGATION_BEHAVIOR_EXTRACT
   Optional<PropagationBehaviorExtract> propagation_behavior_extract;
 
+  // `propagation_extract_first` indicates whether extraction stops after the
+  // first successful trace context. Overridden by
+  // DD_TRACE_PROPAGATION_EXTRACT_FIRST.
+  Optional<bool> propagation_extract_first;
+
   // `report_hostname` indicates whether the tracer will include the result of
   // `gethostname` with traces sent to the collector.
   Optional<bool> report_hostname;
@@ -234,6 +239,7 @@ class FinalizedTracerConfig final {
   std::vector<PropagationStyle> extraction_styles;
 
   PropagationBehaviorExtract propagation_behavior_extract;
+  bool propagation_extract_first;
 
   bool report_hostname;
   std::size_t tags_header_size;
