@@ -1,16 +1,26 @@
-# Description
+## Overview
 
-# Motivation
+<!-- What does this change do? Keep it short. -->
 
-# Additional Notes
+## Motivation
 
-Jira ticket: [PROJ-IDENT]
+<!-- Why is this change needed? Give context if not obvious. -->
 
-<!--
-# Opening vs Drafting a PR:
-When opening a pull request, please open it as a draft to not auto assign reviewers before you feel the pull request is in a reviewable state.
+## Additional Notes
 
-# Linking a JIRA ticket:
-Please link your JIRA ticket by adding its identifier between brackets (ex [PROJ-IDENT]) in the PR description, not the title.
-This requirement only applies to Datadog employees.
--->
+<!-- Optional. Anything else the reviewer should know. -->
+
+## References
+
+Jira ticket:
+<!-- Datadog employees only. -->
+
+## Contributor Checklist
+
+<!-- Check every item before requesting review. -->
+
+- [ ] I am the author of this pull request and I own it.
+- [ ] I reviewed every line of this pull request.
+- [ ] This pull request follows the [Contributing Guidelines](https://github.com/DataDog/dd-trace-cpp/blob/main/CONTRIBUTING.md).
+
+<!-- If it is not ready for review, open this pull request as a draft. Draft pull requests are not reviewed. -->
