@@ -222,6 +222,25 @@ handle_trace_flag:
   return nullopt;
 }
 
+bool is_valid_datadog_trace_state(StringView datadog_trace_state) {
+  const std::size_t end = datadog_trace_state.size();
+  std::size_t item_begin = 0;
+  while (item_begin < end) {
+    const std::size_t item_end = datadog_trace_state.find(';', item_begin);
+    const StringView item =
+        datadog_trace_state.substr(item_begin, item_end - item_begin);
+    item_begin = item_end == StringView::npos ? end : item_end + 1;
+
+    const StringView trimmed_item = trim(item);
+    if (trimmed_item.data() != item.data() ||
+        trimmed_item.size() != item.size()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // Fill the specified `result` with information parsed from the specified
 // `datadog_trace_state`. `datadog_trace_state` is the value of the "dd" entry
 // in the W3C "tracestate" header.
@@ -326,16 +345,18 @@ void parse_w3c_tracestate_member(
     ExtractedData& result, StringView member,
     std::unordered_map<std::string, std::string>& span_tags,
     std::string& other_w3c_tracestate,
-    std::size_t& other_w3c_tracestate_member_count) {
+    std::size_t& other_w3c_tracestate_member_count,
+    bool& has_datadog_trace_state) {
   const std::size_t separator = member.find('=');
   const StringView key = member.substr(0, separator);
   const StringView member_value = separator == StringView::npos
                                       ? StringView{}
                                       : member.substr(separator + 1);
   if (key == "dd") {
+    has_datadog_trace_state = true;
     if (member_value.size() > max_datadog_tracestate_value_size) {
       span_tags[tags::internal::propagation_error] = "extract_max_size";
-    } else {
+    } else if (is_valid_datadog_trace_state(member_value)) {
       parse_datadog_trace_state(result, member_value);
     }
   } else if (key == "ot") {
@@ -367,11 +388,28 @@ void parse_w3c_tracestate(
     std::unordered_map<std::string, std::string>& span_tags) {
   std::string other_w3c_tracestate;
   std::size_t other_w3c_tracestate_member_count = 0;
+  bool has_datadog_trace_state = false;
   for_each_w3c_tracestate_member(w3c_tracestate, [&](StringView member) {
     parse_w3c_tracestate_member(result, member, span_tags, other_w3c_tracestate,
-                                other_w3c_tracestate_member_count);
+                                other_w3c_tracestate_member_count,
+                                has_datadog_trace_state);
     return true;
   });
+
+  if (has_datadog_trace_state) {
+    std::string canonical_other_w3c_tracestate;
+    for_each_w3c_tracestate_member(
+        other_w3c_tracestate, [&](StringView member) {
+          if (!member.empty()) {
+            if (!canonical_other_w3c_tracestate.empty()) {
+              canonical_other_w3c_tracestate += ',';
+            }
+            append(canonical_other_w3c_tracestate, member);
+          }
+          return true;
+        });
+    other_w3c_tracestate = std::move(canonical_other_w3c_tracestate);
+  }
 
   if (!other_w3c_tracestate.empty()) {
     result.additional_w3c_tracestate = std::move(other_w3c_tracestate);
