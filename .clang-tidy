@@ -17,6 +17,7 @@ Checks: >
   bugprone-unused-raii,
   bugprone-virtual-near-miss,
   misc-unused-using-decls,
+  readability-braces-around-statements,
   readability-delete-null-pointer,
   readability-redundant-control-flow,
   readability-redundant-string-cstr
