@@ -172,8 +172,9 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
         if (traceparent[i] == '-') {
           auto maybe_trace_id =
               TraceID::parse_hex(StringView(traceparent.data() + beg, i - beg));
-          if (maybe_trace_id.if_error() || *maybe_trace_id == 0)
+          if (maybe_trace_id.if_error() || *maybe_trace_id == 0) {
             return "malformed_traceid";
+          }
 
           result.trace_id = *maybe_trace_id;
 
@@ -187,8 +188,9 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
         if (traceparent[i] == '-') {
           auto maybe_parent_id =
               parse_uint64(StringView(traceparent.data() + beg, i - beg), 16);
-          if (maybe_parent_id.if_error() || *maybe_parent_id == 0)
+          if (maybe_parent_id.if_error() || *maybe_parent_id == 0) {
             return "malformed_parentid";
+          }
 
           result.parent_id = *maybe_parent_id;
 
@@ -210,8 +212,9 @@ Optional<std::string> extract_traceparent(ExtractedData& result,
 handle_trace_flag:
   auto left = traceparent.size() - beg;
   if (left < 2 ||
-      (left > 2 && (version == "00" || traceparent[beg + 2] != '-')))
+      (left > 2 && (version == "00" || traceparent[beg + 2] != '-'))) {
     return "malformed_traceparent";
+  }
 
   auto maybe_trace_flags =
       parse_uint64(StringView(traceparent.data() + beg, 2), 16);

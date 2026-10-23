@@ -180,10 +180,11 @@ Optional<Cgroup> get_cgroup_version() {
     return nullopt;
   }
 
-  if (buf.f_type == CGROUP_SUPER_MAGIC || buf.f_type == TMPFS_MAGIC)
+  if (buf.f_type == CGROUP_SUPER_MAGIC || buf.f_type == TMPFS_MAGIC) {
     return Cgroup::v1;
-  else if (buf.f_type == CGROUP2_SUPER_MAGIC)
+  } else if (buf.f_type == CGROUP2_SUPER_MAGIC) {
     return Cgroup::v2;
+  }
 
   return nullopt;
 }
