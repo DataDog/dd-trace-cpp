@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <iterator>
 #include <sstream>
 
 namespace datadog {
