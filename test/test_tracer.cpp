@@ -999,6 +999,19 @@ TEST_TRACER("span extraction") {
 
         {
             __LINE__,
+            "dd entry with whitespace-padded subentries",
+            traceparent_drop,                          // traceparent
+            "dd=foo:bar; t.x:y;  ;baz:bam ;o:France",  // tracestate
+            0,                   // expected_sampling_priority
+            "France",            // expected_origin
+            {},                  // expected_trace_tags
+            nullopt,             // expected_additional_w3c_tracestate
+            "foo:bar",           // expected_additional_datadog_w3c_tracestate
+            "0000000000000000",  // expected_datadog_w3c_parent_id,
+        },
+
+        {
+            __LINE__,
             "origin, trace tags, parent, and extra fields",
             traceparent_drop,  // traceparent
             "dd=o:France;p:00000000000d69ac;t.ksr:0.728;t.foo:thing1;t.bar:"

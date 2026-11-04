@@ -245,7 +245,7 @@ void parse_datadog_trace_state(ExtractedData& result,
     const auto pair =
         datadog_trace_state.substr(pair_begin, pair_end - pair_begin);
     pair_begin = (pair_end == StringView::npos) ? end : pair_end + 1;
-    if (pair.empty()) {
+    if (pair.empty() || trim(pair).size() != pair.size()) {
       continue;
     }
 
