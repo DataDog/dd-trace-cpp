@@ -825,6 +825,14 @@ TEST_SPAN("injecting W3C tracestate header") {
        "dd=s:0;p:$parent_id;foo:bar"},
 
       {__LINE__,
+       "keep spaces at the end of values",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate", "dd=o:France ;t.foo:x ;foo:bar ;boing:boing"},
+       },
+       "dd=s:0;p:$parent_id;o:France ;t.foo:x ;foo:bar ;boing:boing"},
+
+      {__LINE__,
        "all of the above",
        {
            {"traceparent", traceparent_drop},
