@@ -816,6 +816,23 @@ TEST_SPAN("injecting W3C tracestate header") {
        "dd=s:0;p:$parent_id;foo:bar;boing:boing"},
 
       {__LINE__,
+       "drop whitespace-padded fields",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate", "dd=foo:bar;  boing:boing; t.x:y"},
+       },
+       // The "s:0" comes from the sampling decision in `traceparent_drop`.
+       "dd=s:0;p:$parent_id;foo:bar"},
+
+      {__LINE__,
+       "keep spaces at the end of values",
+       {
+           {"traceparent", traceparent_drop},
+           {"tracestate", "dd=o:France ;t.foo:x ;foo:bar ;boing:boing"},
+       },
+       "dd=s:0;p:$parent_id;o:France ;t.foo:x ;foo:bar ;boing:boing"},
+
+      {__LINE__,
        "all of the above",
        {
            {"traceparent", traceparent_drop},

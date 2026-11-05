@@ -255,6 +255,10 @@ void parse_datadog_trace_state(ExtractedData& result,
     }
 
     const auto key = pair.substr(0, kv_separator);
+    const bool has_padding = trim(key).size() != key.size();
+    if (has_padding) {
+      continue;
+    }
     const auto value = pair.substr(kv_separator + 1);
     if (key == "o") {
       result.origin = std::string{value};
