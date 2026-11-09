@@ -16,6 +16,8 @@
 #  define DD_SDK_CPU_ARCH "x86"
 #elif defined(__aarch64__) || defined(_M_ARM64)
 #  define DD_SDK_CPU_ARCH "arm64"
+#elif defined(_AIX) && defined(_ARCH_PPC64)
+#  define DD_SDK_CPU_ARCH "ppc64"
 #else
 #  define DD_SDK_CPU_ARCH "unknown"
 #endif
