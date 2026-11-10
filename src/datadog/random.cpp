@@ -3,6 +3,12 @@
 #include <bitset>
 #include <random>
 
+#if defined(_AIX)
+#include <pthread.h>
+
+#include <cstdlib>
+#endif
+
 #include "hex.h"
 #include "platform_util.h"
 
@@ -34,13 +40,52 @@ class Uint64Generator {
   void seed_with_random() { generator_.seed(std::random_device{}()); }
 };
 
-thread_local Uint64Generator thread_local_generator;
+#if defined(_AIX)
+// The GNU AIX linker misallocates hidden C++ TLS common symbols.
+class GeneratorStorage {
+  pthread_key_t key_;
 
-void on_fork() { thread_local_generator.seed_with_random(); }
+ public:
+  GeneratorStorage() {
+    if (pthread_key_create(&key_, [](void* value) {
+          delete static_cast<Uint64Generator*>(value);
+        }) != 0) {
+      std::abort();
+    }
+  }
+
+  ~GeneratorStorage() {
+    delete static_cast<Uint64Generator*>(pthread_getspecific(key_));
+    pthread_key_delete(key_);
+  }
+
+  Uint64Generator& get() {
+    auto* generator = static_cast<Uint64Generator*>(pthread_getspecific(key_));
+    if (!generator) {
+      generator = new Uint64Generator;
+      if (pthread_setspecific(key_, generator) != 0) {
+        delete generator;
+        std::abort();
+      }
+    }
+    return *generator;
+  }
+};
+
+Uint64Generator& get_generator() {
+  static GeneratorStorage generators;
+  return generators.get();
+}
+#else
+thread_local Uint64Generator thread_local_generator;
+Uint64Generator& get_generator() { return thread_local_generator; }
+#endif
+
+void on_fork() { get_generator().seed_with_random(); }
 
 }  // namespace
 
-std::uint64_t random_uint64() { return thread_local_generator(); }
+std::uint64_t random_uint64() { return get_generator()(); }
 
 std::string uuid() {
   // clang-format off
