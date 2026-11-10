@@ -57,7 +57,7 @@ target_include_directories(tests
     ${CMAKE_SOURCE_DIR}/include/datadog
 )
 
-# Enable Catch2 std stringification 
+# Enable Catch2 std stringification
 # <https://github.com/catchorg/Catch2/blob/devel/docs/configuration.md#enabling-stringification>
 target_compile_definitions(tests
   PUBLIC
@@ -73,12 +73,22 @@ target_link_libraries(tests
 
 if(DD_TRACE_TRANSPORT STREQUAL "curl")
   target_sources(tests PRIVATE test_curl.cpp)
-  target_link_libraries(tests 
-    PRIVATE
-      # TODO: Remove dependency on libcurl
-      CURL::libcurl_static
-  )
+  target_link_libraries(tests PRIVATE CURL::libcurl_static)
 endif()
 
-catch_discover_tests(tests)
+# Dedicated executable run by a test in test_otel_process_ctx.cpp
+add_executable(exit_with_live_tracer exit_with_live_tracer.cpp)
+target_link_libraries(exit_with_live_tracer
+  PRIVATE
+    dd-trace-cpp::static
+    dd-trace-cpp::specs
+)
 
+add_dependencies(tests exit_with_live_tracer)
+
+target_compile_definitions(tests
+  PRIVATE
+    EXIT_WITH_LIVE_TRACER_EXECUTABLE="$<TARGET_FILE:exit_with_live_tracer>"
+)
+
+catch_discover_tests(tests)

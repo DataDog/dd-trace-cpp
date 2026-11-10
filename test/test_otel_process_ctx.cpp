@@ -242,3 +242,15 @@ OTEL_CTX_TEST(
   }
 #endif
 }
+
+OTEL_CTX_TEST("exit() with a live Tracer in a static wrapper exits cleanly") {
+#ifndef __linux__
+  SUCCEED("OpenTelemetry process context is Linux-only");
+#else
+  // Run a dedicated process and check that it exits cleanly. It must be
+  // independent of other tests, to control the order of statics creation.
+  const int status = std::system(EXIT_WITH_LIVE_TRACER_EXECUTABLE);
+  REQUIRE(WIFEXITED(status));
+  REQUIRE(WEXITSTATUS(status) == EXIT_SUCCESS);
+#endif
+}
