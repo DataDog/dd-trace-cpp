@@ -6,10 +6,9 @@ include:
     file: 'images/templates/gitlab/build-ci-images.template.yml'
 
 variables:
-  # Consumed by the benchmark jobs below. Repin after a `build-benchmark-ci-images`
-  # run to the tag it pushes.
-  # Placeholder pin: `build-benchmark-ci-images` has not run on this branch yet.
-  # Run it once, then replace this tag with the produced one.
+  # Consumed by the benchmark jobs below. To rebuild the image, run the manual
+  # `build-benchmark-ci-images` job and repin to the tag it pushes
+  # (dd-trace-cpp-<pipeline id>).
   BENCHMARKS_CI_IMAGE: registry.ddbuild.io/ci/benchmarking-platform:dd-trace-cpp-152738462
 
   # Consumed by the included build-ci-images template. The per-pipeline
