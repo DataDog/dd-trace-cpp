@@ -33,6 +33,7 @@ add_executable(tests
     test_msgpack.cpp
     test_otel_process_ctx.cpp
     test_platform_util.cpp
+    test_random.cpp
     test_parse_util.cpp
     test_smoke.cpp
     test_span.cpp
