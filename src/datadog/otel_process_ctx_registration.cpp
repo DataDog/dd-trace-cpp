@@ -28,7 +28,9 @@ struct StaticOtelCtxState {
 };
 
 StaticOtelCtxState& get_otel_ctx_state() {
-  static StaticOtelCtxState state;
+  // The StaticOtelCtxState singleton is, on purpose, never destroyed, because
+  // the Tracer's destructor needs it.
+  static StaticOtelCtxState& state = *new StaticOtelCtxState;
   return state;
 }
 
