@@ -10,7 +10,7 @@ variables:
   # run to the tag it pushes.
   # Placeholder pin: `build-benchmark-ci-images` has not run on this branch yet.
   # Run it once, then replace this tag with the produced one.
-  BENCHMARKS_CI_IMAGE: registry.ddbuild.io/ci/benchmarking-platform:dd-trace-cpp-PLACEHOLDER
+  BENCHMARKS_CI_IMAGE: registry.ddbuild.io/ci/benchmarking-platform:dd-trace-cpp-152738462
 
   # Consumed by the included build-ci-images template. The per-pipeline
   # suffix gives each build a unique tag.
