@@ -1,4 +1,5 @@
 stages:
+  - ci-image
   - config-validation
   - benchmarks
   - benchmarks-report
