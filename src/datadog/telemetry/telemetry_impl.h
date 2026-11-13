@@ -6,6 +6,7 @@
 #include <datadog/http_client.h>
 #include <datadog/logger.h>
 #include <datadog/telemetry/configuration.h>
+#include <datadog/telemetry/metric_handle.h>
 #include <datadog/telemetry/metrics.h>
 #include <datadog/tracer_signature.h>
 
@@ -55,6 +56,9 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   std::mutex distributions_mutex_;
   std::unordered_map<MetricContext<Distribution>, std::vector<uint64_t>>
       distributions_;
+
+  // The metric handles created with this Telemetry.
+  details::MetricRegistry metrics_;
 
   // Configuration
   std::vector<tracing::ConfigMetadata> configuration_snapshot_;
@@ -140,6 +144,9 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   void add_datapoint(const Distribution& distribution, uint64_t value);
   void add_datapoint(const Distribution& distribution,
                      const std::vector<std::string>& tags, uint64_t value);
+
+  // Creates the metric handles that this Telemetry sends.
+  details::MetricRegistry& metrics() { return metrics_; }
 
  private:
   void app_started();

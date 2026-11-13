@@ -9,7 +9,9 @@
 #include <unordered_set>
 
 #include "../common/environment.h"
+#include "datadog/base64.h"
 #include "datadog/runtime_id.h"
+#include "datadog/telemetry/log_binned_distr.h"
 #include "datadog/telemetry/telemetry_impl.h"
 #include "mocks/http_clients.h"
 #include "mocks/loggers.h"
@@ -41,6 +43,20 @@ std::optional<nlohmann::json> find_payload(const nlohmann::json& messages,
 
   return std::nullopt;
 };
+
+struct StatusTags {
+  bool error = false;
+
+  static auto tag_fields() {
+    return std::tuple{tag("error", &StatusTags::error)};
+  }
+};
+
+std::string sketch_b64(std::initializer_list<double> values) {
+  LogBinnedDistr sketch;
+  for (double value : values) sketch.record(value);
+  return base64_encode(sketch.encode_protobuf());
+}
 
 struct FakeEventScheduler : public EventScheduler {
   size_t count_tasks = 0;
@@ -814,6 +830,79 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
       REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
       REQUIRE(message_batch2["payload"].size() >= 1);
       CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
+    }
+
+    SECTION("counter and rate handles are sent with the metrics") {
+      client->clear();
+      auto requests = telemetry->metrics().counter<StatusTags>(
+          {"handle_requests", "handle-test", true},
+          {"integration_name:datadog"});
+      auto rate =
+          telemetry->metrics().rate({"handle_rate", "handle-test", false});
+      requests->record({true}, 1);
+      requests->record({true}, 2);
+      rate->record({}, 7);
+
+      scheduler->trigger_metrics_capture();
+      scheduler->trigger_heartbeat();
+
+      auto message_batch = nlohmann::json::parse(client->request_body);
+      auto generate_metrics =
+          find_payload(message_batch["payload"], "generate-metrics");
+      REQUIRE(generate_metrics);
+      std::vector<nlohmann::json> handle_series;
+      for (const auto& series : (*generate_metrics)["payload"]["series"]) {
+        if (series["namespace"] == "handle-test") {
+          handle_series.push_back(series);
+        }
+      }
+
+      const auto expected = nlohmann::json::parse(R"([
+        {
+          "common": true,
+          "metric": "handle_requests",
+          "namespace": "handle-test",
+          "points": [[1672484400, 3]],
+          "tags": ["integration_name:datadog", "error:true"],
+          "type": "count"
+        },
+        {
+          "common": false,
+          "metric": "handle_rate",
+          "namespace": "handle-test",
+          "points": [[1672484400, 7]],
+          "type": "rate"
+        }
+      ])");
+      REQUIRE(handle_series.size() == 2);
+      for (const auto& series : expected) {
+        CHECK(std::count(handle_series.begin(), handle_series.end(), series) ==
+              1);
+      }
+    }
+
+    SECTION("distribution handles are sent as sketches") {
+      client->clear();
+      auto duration = telemetry->metrics().distribution<StatusTags>(
+          {"handle_duration", "handle-test", true});
+      duration->record({false}, 100);
+      duration->record({false}, 250);
+
+      scheduler->trigger_heartbeat();
+
+      auto message_batch = nlohmann::json::parse(client->request_body);
+      auto sketches = find_payload(message_batch["payload"], "sketches");
+      REQUIRE(sketches);
+      auto expected = nlohmann::json::parse(R"([
+        {
+          "common": true,
+          "metric": "handle_duration",
+          "namespace": "handle-test",
+          "tags": ["error:false"]
+        }
+      ])");
+      expected[0]["sketch_b64"] = sketch_b64({100, 250});
+      CHECK((*sketches)["payload"]["series"] == expected);
     }
 
     SECTION("distribution") {
