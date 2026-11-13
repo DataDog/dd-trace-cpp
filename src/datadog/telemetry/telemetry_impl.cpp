@@ -850,6 +850,7 @@ void Telemetry::capture_metrics() {
 
 void Telemetry::log(std::string message, telemetry::LogLevel level,
                     Optional<std::string> stacktrace) {
+  if (is_shut_down_) return;
   auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
                        clock_().wall.time_since_epoch())
                        .count();
