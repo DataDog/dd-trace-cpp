@@ -364,6 +364,7 @@ void Telemetry::app_started() {
 }
 
 void Telemetry::shutdown() {
+  is_shut_down_ = true;
   // cancel_tasks clears tasks_, so ~Telemetry() becomes a no-op after this.
   cancel_tasks(tasks_);
   app_closing();
@@ -372,11 +373,20 @@ void Telemetry::shutdown() {
 }
 
 void Telemetry::app_closing() {
+  std::shared_ptr<tracing::HTTPClient> client;
+  {
+    std::lock_guard l{http_client_mutex_};
+    client = http_client_;
+  }
+  // Already shut down: shutdown() may be called twice, e.g. by the host and at
+  // exit.
+  if (!client) return;
+
   // Capture metrics in-between two ticks to be sent with the last payload.
   capture_metrics();
 
   send_payload("app-closing", app_closing_payload());
-  http_client_->drain(clock_().tick + request_timeout);
+  client->drain(clock_().tick + request_timeout);
 }
 
 void Telemetry::send_payload(StringView request_type, std::string payload) {
@@ -869,6 +879,7 @@ void Telemetry::increment_counter(const Counter& id) {
 
 void Telemetry::increment_counter(const Counter& id,
                                   const std::vector<std::string>& tags) {
+  if (is_shut_down_) return;
   std::lock_guard l{counter_mutex_};
   counters_[{id, tags}] += 1;
 }
@@ -879,6 +890,7 @@ void Telemetry::decrement_counter(const Counter& id) {
 
 void Telemetry::decrement_counter(const Counter& id,
                                   const std::vector<std::string>& tags) {
+  if (is_shut_down_) return;
   std::lock_guard l{counter_mutex_};
   auto& v = counters_[{id, tags}];
   if (v > 0) v -= 1;
@@ -891,6 +903,7 @@ void Telemetry::set_counter(const Counter& id, uint64_t value) {
 void Telemetry::set_counter(const Counter& id,
                             const std::vector<std::string>& tags,
                             uint64_t value) {
+  if (is_shut_down_) return;
   std::lock_guard l{counter_mutex_};
   counters_[{id, tags}] = value;
 }
@@ -901,6 +914,7 @@ void Telemetry::set_rate(const Rate& id, uint64_t value) {
 
 void Telemetry::set_rate(const Rate& id, const std::vector<std::string>& tags,
                          uint64_t value) {
+  if (is_shut_down_) return;
   std::lock_guard l{rate_mutex_};
   rates_[{id, tags}] = value;
 }
@@ -912,6 +926,7 @@ void Telemetry::add_datapoint(const Distribution& id, uint64_t value) {
 void Telemetry::add_datapoint(const Distribution& id,
                               const std::vector<std::string>& tags,
                               uint64_t value) {
+  if (is_shut_down_) return;
   std::lock_guard l{distributions_mutex_};
   distributions_[{id, tags}].emplace_back(value);
 }

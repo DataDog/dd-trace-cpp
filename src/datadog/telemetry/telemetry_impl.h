@@ -9,6 +9,7 @@
 #include <datadog/telemetry/metrics.h>
 #include <datadog/tracer_signature.h>
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 
@@ -77,6 +78,11 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   tracing::HostInfo host_info_;
 
   std::mutex http_client_mutex_;
+
+  // Set by shutdown(). After it, recording methods return early: their data
+  // can no longer be sent, and the metric definitions they get may already be
+  // destroyed by exit().
+  std::atomic<bool> is_shut_down_{false};
 
  public:
   static std::shared_ptr<Telemetry> create(
