@@ -135,6 +135,7 @@ target_sources(dd-trace-cpp-objects
       include/datadog/remote_config/listener.h
       include/datadog/remote_config/product.h
       include/datadog/telemetry/configuration.h
+      include/datadog/telemetry/metric_handle.h
       include/datadog/telemetry/metrics.h
       include/datadog/telemetry/product.h
       include/datadog/telemetry/telemetry.h
@@ -185,6 +186,7 @@ target_sources(dd-trace-cpp-objects
     src/datadog/telemetry/configuration.cpp
     src/datadog/telemetry/log_bin_index.cpp
     src/datadog/telemetry/log_binned_distr.cpp
+    src/datadog/telemetry/metric_handle.cpp
     src/datadog/telemetry/telemetry.cpp
     src/datadog/telemetry/telemetry_impl.cpp
     src/datadog/baggage.cpp
