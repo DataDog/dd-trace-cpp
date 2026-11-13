@@ -151,42 +151,6 @@ std::shared_ptr<CounterHandle<Tags>> create(
   });
 }
 
-/// Increments the specified counter by 1.
-///
-/// @param `counter` the counter to increment.
-void increment(const Counter& counter);
-
-/// Increments the specified counter by 1.
-///
-/// @param `counter` the counter to increment.
-/// @param `tags` the distribution tags.
-void increment(const Counter& counter, const std::vector<std::string>& tags);
-
-/// Decrements the specified counter by 1.
-///
-/// @param `counter` the counter to decrement.
-void decrement(const Counter& counter);
-
-/// Decrements the specified counter by 1.
-///
-/// @param `counter` the counter to decrement.
-/// @param `tags` the distribution tags.
-void decrement(const Counter& counter, const std::vector<std::string>& tags);
-
-/// Sets the counter to a specific value.
-///
-/// @param `counter` the counter to update.
-/// @param `value` the value to assign to the counter.
-void set(const Counter& counter, uint64_t value);
-
-/// Sets the counter to a specific value.
-///
-/// @param `counter` the counter to update.
-/// @param `tags` the distribution tags.
-/// @param `value` the value to assign to the counter.
-void set(const Counter& counter, const std::vector<std::string>& tags,
-         uint64_t value);
-
 }  // namespace counter
 
 /// The `rate` namespace provides support for rate metrics-values.
@@ -206,19 +170,6 @@ std::shared_ptr<RateHandle<Tags>> create(
     return registry.rate<Tags>(std::move(metric), std::move(fixed_tags));
   });
 }
-
-/// Sets the rate to a specific value.
-///
-/// @param `rate` the rate to update.
-/// @param `value` the value to assign to the counter.
-void set(const Rate& rate, uint64_t value);
-
-/// Sets the rate to a specific value.
-///
-/// @param `rate` the rate to update.
-/// @param `tags` the distribution tags.
-/// @param `value` the value to assign to the counter.
-void set(const Rate& rate, const std::vector<std::string>&, uint64_t value);
 
 }  // namespace rate
 
@@ -241,20 +192,6 @@ std::shared_ptr<DistributionHandle<Tags>> create(
                                        std::move(fixed_tags));
   });
 }
-
-/// Adds a value to the distribution.
-///
-/// @param `distribution` the distribution to update.
-/// @param `value` the value to add to the distribution.
-void add(const Distribution& distribution, uint64_t value);
-
-/// Adds a value to the distribution.
-///
-/// @param `distribution` the distribution to update.
-/// @param `tags` the distribution tags.
-/// @param `value` the value to add to the distribution.
-void add(const Distribution& distribution, const std::vector<std::string>& tags,
-         uint64_t value);
 
 }  // namespace distribution
 

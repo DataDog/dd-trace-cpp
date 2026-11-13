@@ -304,8 +304,7 @@ Optional<W3CLinkContext> TraceSegment::w3c_link_context(
 Logger& TraceSegment::logger() const { return *logger_; }
 
 void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
-  telemetry::counter::increment(metrics::tracer::spans_created,
-                                {"integration_name:datadog"});
+  metrics::tracer_metrics().spans_created->record({}, 1);
 
   std::lock_guard<std::mutex> lock(mutex_);
   assert(spans_.empty() || num_finished_spans_ < spans_.size());
@@ -314,8 +313,7 @@ void TraceSegment::register_span(std::unique_ptr<SpanData> span) {
 
 void TraceSegment::span_finished() {
   {
-    telemetry::counter::increment(metrics::tracer::spans_finished,
-                                  {"integration_name:datadog"});
+    metrics::tracer_metrics().spans_finished->record({}, 1);
     std::lock_guard<std::mutex> lock(mutex_);
     ++num_finished_spans_;
     assert(num_finished_spans_ <= spans_.size());
@@ -324,7 +322,7 @@ void TraceSegment::span_finished() {
     }
   }
 
-  telemetry::counter::increment(metrics::tracer::trace_chunks_enqueued);
+  metrics::tracer_metrics().trace_chunks_enqueued->record({}, 1);
 
   // We don't need the lock anymore. There's nobody left to call our methods.
   // On the other hand, there's nobody left to contend for the mutex, so it
@@ -335,8 +333,7 @@ void TraceSegment::span_finished() {
   // All of our spans are finished. Run the span sampler, finalize the spans,
   // and then send the spans to the collector.
   if (sampling_decision_->priority <= 0) {
-    telemetry::counter::increment(metrics::tracer::trace_chunks_dropped,
-                                  {"reason:p0_drop"});
+    metrics::tracer_metrics().trace_chunks_dropped->record({}, 1);
     // Span sampling happens when the trace is dropped.
     for (const auto& span_ptr : spans_) {
       SpanData& span = *span_ptr;
@@ -346,8 +343,7 @@ void TraceSegment::span_finished() {
       }
       const SamplingDecision decision = rule->decide(span);
       if (decision.priority <= 0) {
-        telemetry::counter::increment(metrics::tracer::spans_dropped,
-                                      {"reason:p0_drop"});
+        metrics::tracer_metrics().spans_dropped->record({}, 1);
         continue;
       }
 
@@ -408,10 +404,9 @@ void TraceSegment::span_finished() {
   maybe_calculate_http_endpoint(resource_renaming_mode_, local_root);
 
   if (config_manager_->report_traces()) {
-    telemetry::distribution::add(metrics::tracer::trace_chunk_size,
-                                 spans_.size());
+    metrics::tracer_metrics().trace_chunk_size->record({}, spans_.size());
 
-    telemetry::counter::increment(metrics::tracer::trace_chunks_sent);
+    metrics::tracer_metrics().trace_chunks_sent->record({}, 1);
     const auto result = collector_->send(std::move(spans_), trace_sampler_);
     if (auto* error = result.if_error()) {
       logger_->log_error(
@@ -419,7 +414,7 @@ void TraceSegment::span_finished() {
     }
   }
 
-  telemetry::counter::increment(metrics::tracer::trace_segments_closed);
+  metrics::tracer_metrics().trace_segments_closed->record({}, 1);
 }
 
 void TraceSegment::override_sampling_priority(SamplingPriority priority) {
@@ -562,8 +557,8 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
           trace_tags_too_large = true;
         }
 
-        telemetry::counter::increment(metrics::tracer::trace_context::injected,
-                                      {"header_style:datadog"});
+        metrics::tracer_metrics().context_injected->record(
+            {metrics::HeaderStyle::datadog}, 1);
         break;
       case PropagationStyle::B3:
         if (span.trace_id.high) {
@@ -581,8 +576,8 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
                               *logger_)) {
           trace_tags_too_large = true;
         }
-        telemetry::counter::increment(metrics::tracer::trace_context::injected,
-                                      {"header_style:b3multi"});
+        metrics::tracer_metrics().context_injected->record(
+            {metrics::HeaderStyle::b3multi}, 1);
         break;
       case PropagationStyle::W3C: {
         const Optional<OtelTraceState> resolved_otel_w3c_tracestate =
@@ -597,8 +592,8 @@ bool TraceSegment::inject(DictWriter& writer, const SpanData& span,
                               trace_tags, additional_datadog_w3c_tracestate_,
                               resolved_otel_w3c_tracestate,
                               additional_w3c_tracestate_));
-        telemetry::counter::increment(metrics::tracer::trace_context::injected,
-                                      {"header_style:tracecontext"});
+        metrics::tracer_metrics().context_injected->record(
+            {metrics::HeaderStyle::tracecontext}, 1);
         break;
       }
       default:
