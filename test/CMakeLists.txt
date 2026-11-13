@@ -82,8 +82,6 @@ target_include_directories(exit_with_live_tracer
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/datadog
 )
 target_link_libraries(exit_with_live_tracer
   PRIVATE
