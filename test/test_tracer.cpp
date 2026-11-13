@@ -2586,3 +2586,17 @@ TEST_TRACER("_dd.p.ksr is NOT set when overriding the sampling decision") {
   auto c = collector->first_span();
   CHECK(c.tags.count(tags::internal::ksr) == 0);
 }
+
+TEST_TRACER("exit() with a live Tracer in a static wrapper exits cleanly") {
+#ifndef __linux__
+  SUCCEED("Runs on Linux only: it needs a POSIX shell");
+#else
+  // Run a dedicated process and check that it exits cleanly. It must be
+  // independent of other tests, to control the order of statics creation.
+  const std::string command =
+      std::string("'") + EXIT_WITH_LIVE_TRACER_EXECUTABLE + "'";
+  const int status = std::system(command.c_str());
+  REQUIRE(WIFEXITED(status));
+  REQUIRE(WEXITSTATUS(status) == EXIT_SUCCESS);
+#endif
+}

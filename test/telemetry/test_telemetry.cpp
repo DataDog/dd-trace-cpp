@@ -376,6 +376,21 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry lifecycle") {
         find_payload(message_batch["payload"], "app-closing");
     REQUIRE(app_closing_payload.has_value());
   }
+
+  SECTION("shutdown() sends app-closing once, and a second call is safe") {
+    auto telemetry = Telemetry::create(*finalize_config(), tracer_signature,
+                                       logger, client, scheduler, *url);
+    client->clear();
+
+    telemetry->shutdown();
+    auto message_batch = nlohmann::json::parse(client->request_body);
+    REQUIRE(is_valid_telemetry_payload(message_batch));
+    REQUIRE(find_payload(message_batch["payload"], "app-closing"));
+
+    client->clear();
+    telemetry->shutdown();
+    CHECK(client->request_body.empty());
+  }
 }
 
 TELEMETRY_IMPLEMENTATION_TEST("session ID headers") {

@@ -37,14 +37,26 @@ struct Ctor_param final {
 
 TelemetryProxy make_telemetry(const tracing::Optional<Ctor_param>& init) {
   if (!init || !init->configuration.enabled) return NoopTelemetry{};
-  return Telemetry::create(init->configuration, init->tracer_signature,
-                           init->logger, init->client, init->scheduler,
-                           init->agent_url, init->clock);
+
+  std::shared_ptr<Telemetry> telemetry = Telemetry::create(
+      init->configuration, init->tracer_signature, init->logger, init->client,
+      init->scheduler, init->agent_url, init->clock);
+
+  // Send the app-closing message when statics are destroyed.
+  struct ShutdownTelemetryAtExit {
+    std::shared_ptr<Telemetry> telemetry_;
+    ~ShutdownTelemetryAtExit() { telemetry_->shutdown(); }
+  };
+  static const ShutdownTelemetryAtExit shutdown_telemetry_at_exit{telemetry};
+
+  return telemetry;
 }
 
 TelemetryProxy& instance(
     const tracing::Optional<Ctor_param>& init = tracing::nullopt) {
-  static TelemetryProxy telemetry = make_telemetry(init);
+  // This singleton is never destroyed on purpose because the Tracer's
+  // destructor needs it.
+  static TelemetryProxy& telemetry = *new TelemetryProxy{make_telemetry(init)};
   return telemetry;
 }
 
