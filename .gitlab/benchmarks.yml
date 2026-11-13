@@ -16,6 +16,11 @@ variables:
   BASE_CI_IMAGE_SUFFIX: dd-trace-cpp-${CI_PIPELINE_ID}
   BASE_CI_IMAGE_CONTAINER_DIR: .gitlab/benchmarks/container
 
+# The template puts this job in the ci-image stage; run it next to the
+# benchmarks it builds for instead.
+build-benchmark-ci-images:
+  stage: benchmarks
+
 benchmarks:
   stage: benchmarks
   when: on_success
