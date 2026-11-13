@@ -288,12 +288,7 @@ void Telemetry::schedule_tasks() {
       }));
 }
 
-Telemetry::~Telemetry() {
-  if (!tasks_.empty()) {
-    cancel_tasks(tasks_);
-    app_closing();
-  }
-}
+Telemetry::~Telemetry() { shutdown(); }
 
 void Telemetry::log_error(std::string message) {
   if (!config_.report_logs) return;
@@ -364,8 +359,7 @@ void Telemetry::app_started() {
 }
 
 void Telemetry::shutdown() {
-  is_shut_down_ = true;
-  // cancel_tasks clears tasks_, so ~Telemetry() becomes a no-op after this.
+  if (is_shut_down_.exchange(true)) return;
   cancel_tasks(tasks_);
   app_closing();
   std::lock_guard l{http_client_mutex_};
@@ -373,20 +367,11 @@ void Telemetry::shutdown() {
 }
 
 void Telemetry::app_closing() {
-  // Check if the HTTP client is still available, as shutdown() may have already
-  // been called.
-  std::shared_ptr<tracing::HTTPClient> client;
-  {
-    std::lock_guard l{http_client_mutex_};
-    client = http_client_;
-  }
-  if (!client) return;
-
   // Capture metrics in-between two ticks to be sent with the last payload.
   capture_metrics();
 
   send_payload("app-closing", app_closing_payload());
-  client->drain(clock_().tick + request_timeout);
+  http_client_->drain(clock_().tick + request_timeout);
 }
 
 void Telemetry::send_payload(StringView request_type, std::string payload) {
