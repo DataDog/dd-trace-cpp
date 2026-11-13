@@ -21,6 +21,7 @@ add_executable(tests
     # telemetry test cases
     telemetry/test_configuration.cpp
     telemetry/test_log_binned_distribution.cpp
+    telemetry/test_metric_handle.cpp
     telemetry/test_telemetry.cpp
 
     # test cases
