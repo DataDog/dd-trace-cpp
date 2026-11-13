@@ -76,8 +76,15 @@ if(DD_TRACE_TRANSPORT STREQUAL "curl")
   target_link_libraries(tests PRIVATE CURL::libcurl_static)
 endif()
 
-# Dedicated executable run by a test in test_otel_process_ctx.cpp
+# Dedicated executable run by a test in test_tracer.cpp
 add_executable(exit_with_live_tracer exit_with_live_tracer.cpp)
+target_include_directories(exit_with_live_tracer
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/datadog
+)
 target_link_libraries(exit_with_live_tracer
   PRIVATE
     dd-trace-cpp::static
