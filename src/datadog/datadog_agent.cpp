@@ -261,6 +261,8 @@ void DatadogAgent::flush() {
   auto encode_result = msgpack_encode(body, trace_chunks);
   auto end = std::chrono::steady_clock::now();
 
+  // TODO: wrong unit?!: trace_chunk_serialization_duration is
+  // "trace_chunk_serialization.ms", but we're sending microseconds!
   telemetry::distribution::add(
       metrics::tracer::trace_chunk_serialization_duration,
       std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count());

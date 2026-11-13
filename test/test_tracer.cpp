@@ -1,6 +1,3 @@
-// These are tests for `Tracer`. `Tracer` is responsible for creating root
-// spans and for extracting spans from propagated trace context.
-
 #include <datadog/error.h>
 #include <datadog/hex.h>
 #include <datadog/null_collector.h>
@@ -39,8 +36,7 @@
 #include "null_logger.h"
 #include "test.h"
 
-namespace datadog {
-namespace tracing {
+namespace datadog::tracing {
 
 std::ostream& operator<<(std::ostream& stream,
                          const Optional<Error::Code>& code) {
@@ -50,8 +46,7 @@ std::ostream& operator<<(std::ostream& stream,
   return stream << "null";
 }
 
-}  // namespace tracing
-}  // namespace datadog
+}  // namespace datadog::tracing
 
 using namespace datadog::tracing;
 using namespace std::chrono_literals;
