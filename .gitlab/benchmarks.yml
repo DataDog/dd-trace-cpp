@@ -1,5 +1,25 @@
+# The benchmarks CI image is built in-repo from .gitlab/benchmarks/container/
+# by the `build-benchmark-ci-images` job of the shared template.
+# @see https://github.com/DataDog/benchmarking-platform-tools/blob/main/images/templates/gitlab/build-ci-images.template.yml
+include:
+  - project: 'DataDog/benchmarking-platform-tools'
+    file: 'images/templates/gitlab/build-ci-images.template.yml'
+
 variables:
-  BENCHMARKS_CI_IMAGE: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/benchmarking-platform:dd-trace-cpp
+  # Consumed by the benchmark jobs below. To rebuild the image, run the manual
+  # `build-benchmark-ci-images` job and repin to the tag it pushes
+  # (dd-trace-cpp-<pipeline id>).
+  BENCHMARKS_CI_IMAGE: registry.ddbuild.io/ci/benchmarking-platform:dd-trace-cpp-152931925
+
+  # Consumed by the included build-ci-images template. The per-pipeline
+  # suffix gives each build a unique tag.
+  BASE_CI_IMAGE_SUFFIX: dd-trace-cpp-${CI_PIPELINE_ID}
+  BASE_CI_IMAGE_CONTAINER_DIR: .gitlab/benchmarks/container
+
+# The template puts this job in the ci-image stage; run it next to the
+# benchmarks it builds for instead.
+build-benchmark-ci-images:
+  stage: benchmarks
 
 benchmarks:
   stage: benchmarks
@@ -14,8 +34,7 @@ benchmarks:
   script:
     - export ARTIFACTS_DIR="$(pwd)/reports" && (mkdir "${ARTIFACTS_DIR}" || :)
     - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
-    - git clone --branch dd-trace-cpp https://github.com/DataDog/benchmarking-platform /platform
-    - export PATH="$PATH:/platform/steps"
+    - export PATH="$PATH:${CI_PROJECT_DIR}/.gitlab/benchmarks/steps"
     - capture-hardware-software-info.sh
     - run-benchmarks.sh
     - analyze-results.sh
@@ -55,7 +74,5 @@ check-big-regressions:
     then
       git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
     fi
-    git clone --branch dd-trace-cpp https://github.com/DataDog/benchmarking-platform /platform
-    export PATH="$PATH:/platform/steps"
 
-    bp-runner /platform/bp-runner.fail-on-regression.yml --debug
+    bp-runner "$CI_PROJECT_DIR/.gitlab/benchmarks/bp-runner.fail-on-regression.yml" --debug
