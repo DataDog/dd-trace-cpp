@@ -879,8 +879,8 @@ void Telemetry::decrement_counter(const Counter& id,
                                   const std::vector<std::string>& tags) {
   if (is_shut_down_) return;
   std::lock_guard lock{counter_mutex_};
-  auto& v = counters_[{id, tags}];
-  if (v > 0) v -= 1;
+  auto& value = counters_[{id, tags}];
+  if (value > 0) value -= 1;
 }
 
 void Telemetry::set_counter(const Counter& id, uint64_t value) {
