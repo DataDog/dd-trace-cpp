@@ -17,35 +17,36 @@ using namespace datadog::tracing;
 using namespace std::chrono_literals;
 
 namespace datadog::telemetry {
+
 namespace internal_metrics {
 
-/// The number of logs created with a given log level. Useful for calculating
-/// impact for other features (automatic sending of logs). Levels should be one
-/// of `debug`, `info`, `warn`, `error`, `critical`.
+// The number of logs created with a given log level. Useful for calculating
+// impact for other features (automatic sending of logs). Levels should be one
+// of `debug`, `info`, `warn`, `error`, `critical`.
 const telemetry::Counter logs_created{"logs_created", "general", true};
 
-/// The number of requests sent to the api endpoint in the agent that errored,
-/// tagged by the error type (e.g. `type:timeout`, `type:network`,
-/// `type:status_code`) and Endpoint (`endpoint:agent`, `endpoint:agentless`).
+// The number of requests sent to the api endpoint in the agent that errored,
+// tagged by the error type (e.g. `type:timeout`, `type:network`,
+// `type:status_code`) and Endpoint (`endpoint:agent`, `endpoint:agentless`).
 const telemetry::Counter errors{"telemetry_api.errors", "telemetry", true};
 
-/// The number of requests sent to a telemetry endpoint, regardless of success,
-/// tagged by the endpoint (`endpoint:agent`, `endpoint:agentless`).
+// The number of requests sent to a telemetry endpoint, regardless of success,
+// tagged by the endpoint (`endpoint:agent`, `endpoint:agentless`).
 const telemetry::Counter requests{"telemetry_api.requests", "telemetry", true};
 
-/// The number of responses received from the endpoint, tagged with status code
-/// (`status_code:200`, `status_code:404`) and endpoint (`endpoint:agent`,
-/// `endpoint:agentless`).
+// The number of responses received from the endpoint, tagged with status code
+// (`status_code:200`, `status_code:404`) and endpoint (`endpoint:agent`,
+// `endpoint:agentless`).
 const telemetry::Counter responses{"telemetry_api.responses", "telemetry",
                                    true};
 
-/// The size of the payload sent to the stats endpoint in bytes, tagged by the
-/// endpoint (`endpoint:agent`, `endpoint:agentless`).
+// The size of the payload sent to the stats endpoint in bytes, tagged by the
+// endpoint (`endpoint:agent`, `endpoint:agentless`).
 const telemetry::Distribution bytes_sent{"telemetry_api.bytes", "telemetry",
                                          true};
 
-/// The time it takes to send the payload sent to the endpoint in ms, tagged by
-/// the endpoint (`endpoint:agent`, `endpoint:agentless`).
+// The time it takes to send the payload sent to the endpoint in ms, tagged by
+// the endpoint (`endpoint:agent`, `endpoint:agentless`).
 [[maybe_unused]] const telemetry::Distribution request_duration{
     "telemetry_api.ms", "telemetry", true};
 
@@ -362,7 +363,7 @@ void Telemetry::shutdown() {
   if (is_shut_down_.exchange(true)) return;
   cancel_tasks(tasks_);
   app_closing();
-  std::lock_guard l{http_client_mutex_};
+  std::lock_guard lock{http_client_mutex_};
   http_client_.reset();
 }
 
@@ -377,7 +378,7 @@ void Telemetry::app_closing() {
 void Telemetry::send_payload(StringView request_type, std::string payload) {
   std::shared_ptr<tracing::HTTPClient> client;
   {
-    std::lock_guard l{http_client_mutex_};
+    std::lock_guard lock{http_client_mutex_};
     client = http_client_;
   }
   if (!client) return;
@@ -486,19 +487,19 @@ std::string Telemetry::heartbeat_and_telemetry() {
   std::unordered_map<MetricContext<Distribution>, std::vector<uint64_t>>
       distributions;
   {
-    std::lock_guard l{distributions_mutex_};
+    std::lock_guard lock{distributions_mutex_};
     std::swap(distributions_, distributions);
   }
 
   std::unordered_map<MetricContext<Counter>, MetricSnapshot> counters_snapshot;
   {
-    std::lock_guard l{counter_mutex_};
+    std::lock_guard lock{counter_mutex_};
     std::swap(counters_snapshot_, counters_snapshot);
   }
 
   std::unordered_map<MetricContext<Rate>, MetricSnapshot> rates_snapshot;
   {
-    std::lock_guard l{rate_mutex_};
+    std::lock_guard lock{rate_mutex_};
     std::swap(rates_snapshot_, rates_snapshot);
   }
 
@@ -531,7 +532,7 @@ std::string Telemetry::heartbeat_and_telemetry() {
 
   std::vector<telemetry::LogMessage> old_logs;
   {
-    std::lock_guard l{log_mutex_};
+    std::lock_guard lock{log_mutex_};
     std::swap(old_logs, logs_);
   }
 
@@ -827,7 +828,7 @@ void Telemetry::capture_metrics() {
 
   std::unordered_map<MetricContext<Counter>, uint64_t> counter_snapshot;
   {
-    std::lock_guard l{counter_mutex_};
+    std::lock_guard lock{counter_mutex_};
     std::swap(counter_snapshot, counters_);
   }
 
@@ -838,7 +839,7 @@ void Telemetry::capture_metrics() {
 
   std::unordered_map<MetricContext<Rate>, uint64_t> rate_snapshot;
   {
-    std::lock_guard l{rate_mutex_};
+    std::lock_guard lock{rate_mutex_};
     std::swap(rate_snapshot, rates_);
   }
 
@@ -854,7 +855,7 @@ void Telemetry::log(std::string message, telemetry::LogLevel level,
   auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
                        clock_().wall.time_since_epoch())
                        .count();
-  std::lock_guard l{log_mutex_};
+  std::lock_guard lock{log_mutex_};
   logs_.emplace_back(
       telemetry::LogMessage{std::move(message), level, stacktrace, timestamp});
 }
@@ -866,7 +867,7 @@ void Telemetry::increment_counter(const Counter& id) {
 void Telemetry::increment_counter(const Counter& id,
                                   const std::vector<std::string>& tags) {
   if (is_shut_down_) return;
-  std::lock_guard l{counter_mutex_};
+  std::lock_guard lock{counter_mutex_};
   counters_[{id, tags}] += 1;
 }
 
@@ -877,9 +878,9 @@ void Telemetry::decrement_counter(const Counter& id) {
 void Telemetry::decrement_counter(const Counter& id,
                                   const std::vector<std::string>& tags) {
   if (is_shut_down_) return;
-  std::lock_guard l{counter_mutex_};
-  auto& v = counters_[{id, tags}];
-  if (v > 0) v -= 1;
+  std::lock_guard lock{counter_mutex_};
+  auto& value = counters_[{id, tags}];
+  if (value > 0) value -= 1;
 }
 
 void Telemetry::set_counter(const Counter& id, uint64_t value) {
@@ -890,7 +891,7 @@ void Telemetry::set_counter(const Counter& id,
                             const std::vector<std::string>& tags,
                             uint64_t value) {
   if (is_shut_down_) return;
-  std::lock_guard l{counter_mutex_};
+  std::lock_guard lock{counter_mutex_};
   counters_[{id, tags}] = value;
 }
 
@@ -901,7 +902,7 @@ void Telemetry::set_rate(const Rate& id, uint64_t value) {
 void Telemetry::set_rate(const Rate& id, const std::vector<std::string>& tags,
                          uint64_t value) {
   if (is_shut_down_) return;
-  std::lock_guard l{rate_mutex_};
+  std::lock_guard lock{rate_mutex_};
   rates_[{id, tags}] = value;
 }
 
@@ -913,7 +914,7 @@ void Telemetry::add_datapoint(const Distribution& id,
                               const std::vector<std::string>& tags,
                               uint64_t value) {
   if (is_shut_down_) return;
-  std::lock_guard l{distributions_mutex_};
+  std::lock_guard lock{distributions_mutex_};
   distributions_[{id, tags}].emplace_back(value);
 }
 
