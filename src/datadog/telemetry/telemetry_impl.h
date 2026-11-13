@@ -79,9 +79,8 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
 
   std::mutex http_client_mutex_;
 
-  // Set by shutdown(). After it, recording methods return early: their data
-  // can no longer be sent, and the metric definitions they get may already be
-  // destroyed by exit().
+  // Used to skip recording after shutdown(), because the data can't be sent
+  // anymore.
   std::atomic<bool> is_shut_down_{false};
 
  public:

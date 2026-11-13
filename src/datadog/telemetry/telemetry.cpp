@@ -42,21 +42,18 @@ TelemetryProxy make_telemetry(const tracing::Optional<Ctor_param>& init) {
                            init->agent_url, init->clock);
 }
 
-namespace {
-
-// Sends the app-closing message when statics are destroyed, as the destructor
-// of the telemetry singleton used to do.
-struct ShutdownTelemetryAtExit {
-  ~ShutdownTelemetryAtExit() { shutdown(); }
-};
-
-}  // namespace
-
 TelemetryProxy& instance(
     const tracing::Optional<Ctor_param>& init = tracing::nullopt) {
-  // Never destroyed: a Tracer destroyed during exit() may still use it.
-  static TelemetryProxy& telemetry = *new TelemetryProxy(make_telemetry(init));
-  static const ShutdownTelemetryAtExit shutdown_at_exit;
+  // This singleton is never destroyed on purpose because the Tracer's
+  // destructor needs it.
+  static TelemetryProxy& telemetry = *new TelemetryProxy{make_telemetry(init)};
+
+  // Send the app-closing message when statics are destroyed.
+  struct ShutdownTelemetryAtExit {
+    ~ShutdownTelemetryAtExit() { shutdown(); }
+  };
+  static const ShutdownTelemetryAtExit shutdown_telemetry_at_exit;
+
   return telemetry;
 }
 

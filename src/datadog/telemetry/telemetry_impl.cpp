@@ -373,13 +373,13 @@ void Telemetry::shutdown() {
 }
 
 void Telemetry::app_closing() {
+  // Check if the HTTP client is still available, as shutdown() may have already
+  // been called.
   std::shared_ptr<tracing::HTTPClient> client;
   {
     std::lock_guard l{http_client_mutex_};
     client = http_client_;
   }
-  // Already shut down: shutdown() may be called twice, e.g. by the host and at
-  // exit.
   if (!client) return;
 
   // Capture metrics in-between two ticks to be sent with the last payload.
