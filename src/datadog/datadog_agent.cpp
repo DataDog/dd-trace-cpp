@@ -261,11 +261,12 @@ void DatadogAgent::flush() {
   auto encode_result = msgpack_encode(body, trace_chunks);
   auto end = std::chrono::steady_clock::now();
 
-  telemetry::distribution::add(
-      metrics::tracer::trace_chunk_serialization_duration,
-      std::chrono::duration_cast<std::chrono::microseconds>(end - beg).count());
-  telemetry::distribution::add(metrics::tracer::trace_chunk_serialized_bytes,
-                               static_cast<uint64_t>(body.size()));
+  metrics::tracer_metrics().trace_chunk_serialization_duration->record(
+      {}, static_cast<std::uint64_t>(
+              std::chrono::duration_cast<std::chrono::microseconds>(end - beg)
+                  .count()));
+  metrics::tracer_metrics().trace_chunk_serialized_bytes->record(
+      {}, static_cast<std::uint64_t>(body.size()));
 
   if (auto* error = encode_result.if_error()) {
     logger_->log_error(*error);
@@ -295,21 +296,9 @@ void DatadogAgent::flush() {
                       logger = logger_](int response_status,
                                         const DictReader& /*response_headers*/,
                                         std::string response_body) {
-    if (response_status >= 500) {
-      telemetry::counter::increment(metrics::tracer::api::responses,
-                                    {"status_code:5xx"});
-    } else if (response_status >= 400) {
-      telemetry::counter::increment(metrics::tracer::api::responses,
-                                    {"status_code:4xx"});
-    } else if (response_status >= 300) {
-      telemetry::counter::increment(metrics::tracer::api::responses,
-                                    {"status_code:3xx"});
-    } else if (response_status >= 200) {
-      telemetry::counter::increment(metrics::tracer::api::responses,
-                                    {"status_code:2xx"});
-    } else if (response_status >= 100) {
-      telemetry::counter::increment(metrics::tracer::api::responses,
-                                    {"status_code:1xx"});
+    if (const auto tags =
+            telemetry::StatusTags::from_http_status(response_status)) {
+      metrics::tracer_metrics().api_responses->record(*tags, 1);
     }
     if (response_status != 200) {
       logger->log_error([&](auto& stream) {
@@ -347,15 +336,14 @@ void DatadogAgent::flush() {
   // request or retrieving the response. It's invoked
   // asynchronously.
   auto on_error = [logger = logger_](Error error) {
-    telemetry::counter::increment(metrics::tracer::api::errors,
-                                  {"type:network"});
+    metrics::tracer_metrics().api_errors->record({}, 1);
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for submitting traces: "));
   };
 
-  telemetry::counter::increment(metrics::tracer::api::requests);
-  telemetry::distribution::add(metrics::tracer::api::bytes_sent,
-                               static_cast<uint64_t>(body.size()));
+  metrics::tracer_metrics().api_requests->record({}, 1);
+  metrics::tracer_metrics().api_bytes_sent->record(
+      {}, static_cast<std::uint64_t>(body.size()));
 
   auto post_result =
       http_client_->post(traces_endpoint_, std::move(set_request_headers),
@@ -363,8 +351,7 @@ void DatadogAgent::flush() {
                          std::move(on_error), clock_().tick + request_timeout_);
   if (auto* error = post_result.if_error()) {
     // NOTE(@dmehala): `technical` is a better kind of errors.
-    telemetry::counter::increment(metrics::tracer::api::errors,
-                                  {"type:network"});
+    metrics::tracer_metrics().api_errors->record({}, 1);
     logger_->log_error(
         error->with_prefix("Unexpected error submitting traces: "));
   }

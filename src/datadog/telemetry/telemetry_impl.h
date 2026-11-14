@@ -17,10 +17,18 @@
 #include "log.h"
 #include "metric_context.h"
 #include "platform_util.h"
+#include "status_tags.h"
 
 namespace datadog::telemetry {
 
 using MetricSnapshot = std::vector<std::pair<std::time_t, uint64_t>>;
+
+// The `level` tag of the logs_created metric.
+struct LogTags {
+  LogLevel level = LogLevel::ERROR;
+
+  static auto tag_fields() { return std::tuple{tag("level", &LogTags::level)}; }
+};
 
 // The `Telemetry` class is responsible for handling internal telemetry data to
 // track Datadog product usage. It _can_ collect and report logs and metrics.
@@ -43,22 +51,21 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
 
   // Counter
   std::mutex counter_mutex_;
-  std::unordered_map<MetricContext<Counter>, uint64_t> counters_;
   std::unordered_map<MetricContext<Counter>, MetricSnapshot> counters_snapshot_;
 
   // Rate
   std::mutex rate_mutex_;
-  std::unordered_map<MetricContext<Rate>, uint64_t> rates_;
   std::unordered_map<MetricContext<Rate>, MetricSnapshot> rates_snapshot_;
-
-  // Distribution
-  // TODO: split distribution in array of N element?
-  std::mutex distributions_mutex_;
-  std::unordered_map<MetricContext<Distribution>, std::vector<uint64_t>>
-      distributions_;
 
   // The metric handles created with this Telemetry.
   details::MetricRegistry metrics_;
+
+  // The metrics of this Telemetry itself.
+  std::shared_ptr<CounterHandle<LogTags>> logs_created_;
+  std::shared_ptr<CounterHandle<>> api_requests_;
+  std::shared_ptr<CounterHandle<StatusTags>> api_responses_;
+  std::shared_ptr<CounterHandle<>> api_errors_;
+  std::shared_ptr<DistributionHandle<>> api_bytes_sent_;
 
   // Configuration
   std::vector<tracing::ConfigMetadata> configuration_snapshot_;
@@ -123,27 +130,6 @@ class Telemetry final : public std::enable_shared_from_this<Telemetry> {
   // (joining the background thread if this is the last reference).
   // After this call the Telemetry object is inert and safe to destroy.
   void shutdown();
-
-  // Counter
-  void increment_counter(const Counter& counter);
-  void increment_counter(const Counter& counter,
-                         const std::vector<std::string>& tags);
-  void decrement_counter(const Counter& counter);
-  void decrement_counter(const Counter& counter,
-                         const std::vector<std::string>& tags);
-  void set_counter(const Counter& counter, uint64_t value);
-  void set_counter(const Counter& counter, const std::vector<std::string>& tags,
-                   uint64_t value);
-
-  // Rate
-  void set_rate(const Rate& rate, uint64_t value);
-  void set_rate(const Rate& rate, const std::vector<std::string>& tags,
-                uint64_t value);
-
-  // Distribution
-  void add_datapoint(const Distribution& distribution, uint64_t value);
-  void add_datapoint(const Distribution& distribution,
-                     const std::vector<std::string>& tags, uint64_t value);
 
   // Creates the metric handles that this Telemetry sends.
   details::MetricRegistry& metrics() { return metrics_; }

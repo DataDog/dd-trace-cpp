@@ -1,11 +1,17 @@
 #include <datadog/optional.h>
 #include <datadog/string_view.h>
 
+#include <array>
 #include <string>
 
 namespace datadog::telemetry {
 
 enum class LogLevel : char { ERROR, WARNING };
+
+// The names of the `level` tag of the logs_created metric.
+constexpr std::array<const char*, 2> tag_value_names(LogLevel) {
+  return {"error", "warning"};
+}
 
 struct LogMessage final {
   std::string message;

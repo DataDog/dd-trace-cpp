@@ -241,8 +241,8 @@ Span Tracer::create_span(const SpanConfig& config) {
   }
 
   const auto span_data_ptr = span_data.get();
-  telemetry::counter::increment(metrics::tracer::trace_segments_created,
-                                {"new_continued:new"});
+  metrics::tracer_metrics().trace_segments_created->record(
+      {metrics::Continuation::new_trace}, 1);
   const auto segment = std::make_shared<TraceSegment>(
       logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
       defaults, config_manager_, runtime_id_, injection_styles_, hostname_,
@@ -282,23 +282,23 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
   for (const auto style : extraction_styles_) {
     using Extractor = decltype(&extract_datadog);  // function pointer
     Extractor extract;
-    std::string extracted_tag;  ///< for telemetry
+    metrics::HeaderStyle header_style;  ///< for telemetry
     switch (style) {
       case PropagationStyle::DATADOG:
         extract = &extract_datadog;
-        extracted_tag = "header_style:datadog";
+        header_style = metrics::HeaderStyle::datadog;
         break;
       case PropagationStyle::B3:
         extract = &extract_b3;
-        extracted_tag = "header_style:b3multi";
+        header_style = metrics::HeaderStyle::b3multi;
         break;
       case PropagationStyle::W3C:
         extract = &extract_w3c;
-        extracted_tag = "header_style:tracecontext";
+        header_style = metrics::HeaderStyle::tracecontext;
         break;
       default:
         extract = &extract_none;
-        extracted_tag = "header_style:none";
+        header_style = metrics::HeaderStyle::none;
     }
     audited_reader.entries_found.clear();
     auto data = extract(audited_reader, span_data->tags, *logger_);
@@ -307,8 +307,7 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
           extraction_error_prefix(style, audited_reader.entries_found));
     }
 
-    telemetry::counter::increment(metrics::tracer::trace_context::extracted,
-                                  {extracted_tag});
+    metrics::tracer_metrics().context_extracted->record({header_style}, 1);
 
     if (!first_style_with_trace_id && data->trace_id.has_value()) {
       first_style_with_trace_id = style;
@@ -476,8 +475,8 @@ Expected<Span> Tracer::extract_span(const DictReader& reader,
       }
 
       const auto span_data_ptr = span_data.get();
-      telemetry::counter::increment(metrics::tracer::trace_segments_created,
-                                    {"new_continued:continued"});
+      metrics::tracer_metrics().trace_segments_created->record(
+          {metrics::Continuation::continued}, 1);
       const auto segment = std::make_shared<TraceSegment>(
           logger_, collector_, config_manager_->trace_sampler(), span_sampler_,
           config_manager_->span_defaults(), config_manager_, runtime_id_,
@@ -554,12 +553,11 @@ Expected<Baggage, Baggage::Error> Tracer::extract_baggage(
 
   auto maybe_baggage = Baggage::extract(reader, baggage_opts_);
   if (maybe_baggage) {
-    telemetry::counter::increment(metrics::tracer::trace_context::extracted,
-                                  {"header_style:baggage"});
+    metrics::tracer_metrics().context_extracted->record(
+        {metrics::HeaderStyle::baggage}, 1);
   } else if (auto err = maybe_baggage.if_error()) {
     if (err->code == Baggage::Error::MALFORMED_BAGGAGE_HEADER) {
-      telemetry::counter::increment(metrics::tracer::trace_context::malformed,
-                                    {"header_style:baggage"});
+      metrics::tracer_metrics().context_malformed->record({}, 1);
     }
   }
   return maybe_baggage;
@@ -586,16 +584,14 @@ Expected<void> Tracer::inject(const Baggage& baggage, DictWriter& writer) {
         err->with_prefix("failed to serialize all baggage items: "));
 
     if (err->code == Error::Code::BAGGAGE_MAXIMUM_BYTES_REACHED) {
-      telemetry::counter::increment(
-          metrics::tracer::trace_context::truncated,
-          {"truncation_reason:baggage_byte_count_exceeded"});
+      metrics::tracer_metrics().context_truncated->record(
+          {metrics::TruncationReason::baggage_byte_count_exceeded}, 1);
     } else if (err->code == Error::Code::BAGGAGE_MAXIMUM_ITEMS_REACHED) {
-      telemetry::counter::increment(
-          metrics::tracer::trace_context::truncated,
-          {"truncation_reason:baggage_item_count_exceeded"});
+      metrics::tracer_metrics().context_truncated->record(
+          {metrics::TruncationReason::baggage_item_count_exceeded}, 1);
     } else {
-      telemetry::counter::increment(metrics::tracer::trace_context::injected,
-                                    {"header_style:baggage"});
+      metrics::tracer_metrics().context_injected->record(
+          {metrics::HeaderStyle::baggage}, 1);
     }
   }
 

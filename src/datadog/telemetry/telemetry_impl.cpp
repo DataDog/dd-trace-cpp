@@ -18,40 +18,6 @@ using namespace datadog::tracing;
 using namespace std::chrono_literals;
 
 namespace datadog::telemetry {
-namespace internal_metrics {
-
-/// The number of logs created with a given log level. Useful for calculating
-/// impact for other features (automatic sending of logs). Levels should be one
-/// of `debug`, `info`, `warn`, `error`, `critical`.
-const telemetry::Counter logs_created{"logs_created", "general", true};
-
-/// The number of requests sent to the api endpoint in the agent that errored,
-/// tagged by the error type (e.g. `type:timeout`, `type:network`,
-/// `type:status_code`) and Endpoint (`endpoint:agent`, `endpoint:agentless`).
-const telemetry::Counter errors{"telemetry_api.errors", "telemetry", true};
-
-/// The number of requests sent to a telemetry endpoint, regardless of success,
-/// tagged by the endpoint (`endpoint:agent`, `endpoint:agentless`).
-const telemetry::Counter requests{"telemetry_api.requests", "telemetry", true};
-
-/// The number of responses received from the endpoint, tagged with status code
-/// (`status_code:200`, `status_code:404`) and endpoint (`endpoint:agent`,
-/// `endpoint:agentless`).
-const telemetry::Counter responses{"telemetry_api.responses", "telemetry",
-                                   true};
-
-/// The size of the payload sent to the stats endpoint in bytes, tagged by the
-/// endpoint (`endpoint:agent`, `endpoint:agentless`).
-const telemetry::Distribution bytes_sent{"telemetry_api.bytes", "telemetry",
-                                         true};
-
-/// The time it takes to send the payload sent to the endpoint in ms, tagged by
-/// the endpoint (`endpoint:agent`, `endpoint:agentless`).
-[[maybe_unused]] const telemetry::Distribution request_duration{
-    "telemetry_api.ms", "telemetry", true};
-
-}  // namespace internal_metrics
-
 namespace {
 
 constexpr std::chrono::steady_clock::duration request_timeout = 2s;
@@ -189,27 +155,6 @@ void encode_metrics(
   }
 }
 
-nlohmann::json encode_distributions(
-    const std::unordered_map<MetricContext<Distribution>,
-                             std::vector<uint64_t>>& distributions) {
-  auto j = nlohmann::json::array();
-
-  for (const auto& [metric_ctx, values] : distributions) {
-    auto series = nlohmann::json{
-        {"metric", metric_ctx.id.name},
-        {"common", metric_ctx.id.common},
-        {"namespace", metric_ctx.id.scope},
-        {"points", values},
-    };
-    if (!metric_ctx.tags.empty()) {
-      series.emplace("tags", metric_ctx.tags);
-    }
-    j.emplace_back(series);
-  }
-
-  return j;
-}
-
 // The `sketches` payload of the distribution handles' series, or nothing if
 // there are none.
 Optional<nlohmann::json> sketches_payload(
@@ -270,6 +215,16 @@ Telemetry::Telemetry(FinalizedConfiguration config,
       http_client_(client),
       clock_(std::move(clock)),
       scheduler_(event_scheduler),
+      logs_created_(
+          metrics_.counter<LogTags>({"logs_created", "general", true})),
+      api_requests_(metrics_.counter(
+          {"telemetry_api.requests", "telemetry", true}, {"endpoint:agent"})),
+      api_responses_(metrics_.counter<StatusTags>(
+          {"telemetry_api.responses", "telemetry", true}, {"endpoint:agent"})),
+      api_errors_(metrics_.counter({"telemetry_api.errors", "telemetry", true},
+                                   {"type:network", "endpoint:agent"})),
+      api_bytes_sent_(metrics_.distribution(
+          {"telemetry_api.bytes", "telemetry", true}, {"endpoint:agent"})),
       host_info_(get_host_info()) {}
 
 std::shared_ptr<Telemetry> Telemetry::create(
@@ -322,19 +277,19 @@ Telemetry::~Telemetry() {
 
 void Telemetry::log_error(std::string message) {
   if (!config_.report_logs) return;
-  increment_counter(internal_metrics::logs_created, {"level:error"});
+  logs_created_->record({LogLevel::ERROR}, 1);
   log(std::move(message), LogLevel::ERROR);
 }
 
 void Telemetry::log_error(std::string message, std::string stacktrace) {
   if (!config_.report_logs) return;
-  increment_counter(internal_metrics::logs_created, {"level:error"});
+  logs_created_->record({LogLevel::ERROR}, 1);
   log(std::move(message), LogLevel::ERROR, stacktrace);
 }
 
 void Telemetry::log_warning(std::string message) {
   if (!config_.report_logs) return;
-  increment_counter(internal_metrics::logs_created, {"level:warning"});
+  logs_created_->record({LogLevel::WARNING}, 1);
   log(std::move(message), LogLevel::WARNING);
 }
 
@@ -372,17 +327,15 @@ void Telemetry::app_started() {
         "Error occurred during HTTP request for telemetry: "));
   };
 
-  increment_counter(internal_metrics::requests, {"endpoint:agent"});
-  add_datapoint(internal_metrics::bytes_sent, {"endpoint:agent"},
-                payload.size());
+  api_requests_->record({}, 1);
+  api_bytes_sent_->record({}, payload.size());
 
   auto post_result =
       http_client_->post(telemetry_endpoint_, on_headers, std::move(payload),
                          std::move(on_response), std::move(on_error),
                          clock_().tick + request_timeout);
   if (auto* error = post_result.if_error()) {
-    increment_counter(internal_metrics::errors,
-                      {"type:network", "endpoint:agent"});
+    api_errors_->record({}, 1);
     logger_->log_error(
         error->with_prefix("Unexpected error submitting telemetry event: "));
   }
@@ -432,21 +385,8 @@ void Telemetry::send_payload(StringView request_type, std::string payload) {
                          int response_status, const DictReader&,
                          std::string response_body) {
     if (auto self = weak.lock()) {
-      if (response_status >= 500) {
-        self->increment_counter(internal_metrics::responses,
-                                {"status_code:5xx", "endpoint:agent"});
-      } else if (response_status >= 400) {
-        self->increment_counter(internal_metrics::responses,
-                                {"status_code:4xx", "endpoint:agent"});
-      } else if (response_status >= 300) {
-        self->increment_counter(internal_metrics::responses,
-                                {"status_code:3xx", "endpoint:agent"});
-      } else if (response_status >= 200) {
-        self->increment_counter(internal_metrics::responses,
-                                {"status_code:2xx", "endpoint:agent"});
-      } else if (response_status >= 100) {
-        self->increment_counter(internal_metrics::responses,
-                                {"status_code:1xx", "endpoint:agent"});
+      if (const auto tags = StatusTags::from_http_status(response_status)) {
+        self->api_responses_->record(*tags, 1);
       }
     }
     if (response_status < 200 || response_status >= 300) {
@@ -461,24 +401,21 @@ void Telemetry::send_payload(StringView request_type, std::string payload) {
   // Callback for unsuccessful telemetry HTTP requests.
   auto on_error = [weak = weak_from_this(), logger = logger_](Error error) {
     if (auto self = weak.lock()) {
-      self->increment_counter(internal_metrics::errors,
-                              {"type:network", "endpoint:agent"});
+      self->api_errors_->record({}, 1);
     }
     logger->log_error(error.with_prefix(
         "Error occurred during HTTP request for telemetry: "));
   };
 
-  increment_counter(internal_metrics::requests, {"endpoint:agent"});
-  add_datapoint(internal_metrics::bytes_sent, {"endpoint:agent"},
-                payload.size());
+  api_requests_->record({}, 1);
+  api_bytes_sent_->record({}, payload.size());
 
   auto post_result =
       client->post(telemetry_endpoint_, set_telemetry_headers,
                    std::move(payload), std::move(on_response),
                    std::move(on_error), clock_().tick + request_timeout);
   if (auto* error = post_result.if_error()) {
-    increment_counter(internal_metrics::errors,
-                      {"type:network", "endpoint:agent"});
+    api_errors_->record({}, 1);
     logger_->log_error(
         error->with_prefix("Unexpected error submitting telemetry event: "));
   }
@@ -513,13 +450,6 @@ std::string Telemetry::heartbeat_and_telemetry() {
   batch_payloads.emplace_back(std::move(heartbeat));
   append_product_change(batch_payloads);
 
-  std::unordered_map<MetricContext<Distribution>, std::vector<uint64_t>>
-      distributions;
-  {
-    std::lock_guard l{distributions_mutex_};
-    std::swap(distributions_, distributions);
-  }
-
   std::unordered_map<MetricContext<Counter>, MetricSnapshot> counters_snapshot;
   {
     std::lock_guard l{counter_mutex_};
@@ -543,20 +473,6 @@ std::string Telemetry::heartbeat_and_telemetry() {
                     })},
     });
     batch_payloads.emplace_back(std::move(generate_metrics));
-  }
-
-  if (auto distributions_series = encode_distributions(distributions);
-      !distributions.empty()) {
-    auto distributions_json = nlohmann::json{
-        {"request_type", "distributions"},
-        {
-            "payload",
-            nlohmann::json{
-                {"series", distributions_series},
-            },
-        },
-    };
-    batch_payloads.emplace_back(std::move(distributions_json));
   }
 
   if (auto sketches = sketches_payload(metrics_.take<Distribution>())) {
@@ -610,20 +526,6 @@ std::string Telemetry::app_closing_payload() {
                     })},
     });
     batch_payloads.emplace_back(std::move(generate_metrics));
-  }
-
-  if (auto distributions_series = encode_distributions(distributions_);
-      !distributions_.empty()) {
-    auto distributions_json = nlohmann::json{
-        {"request_type", "distributions"},
-        {
-            "payload",
-            nlohmann::json{
-                {"series", distributions_series},
-            },
-        },
-    };
-    batch_payloads.emplace_back(std::move(distributions_json));
   }
 
   if (auto sketches = sketches_payload(metrics_.take<Distribution>())) {
@@ -863,28 +765,6 @@ void Telemetry::capture_metrics() {
                               clock_().wall.time_since_epoch())
                               .count();
 
-  std::unordered_map<MetricContext<Counter>, uint64_t> counter_snapshot;
-  {
-    std::lock_guard l{counter_mutex_};
-    std::swap(counter_snapshot, counters_);
-  }
-
-  for (auto& [counter, value] : counter_snapshot) {
-    auto& counter_snapshots = counters_snapshot_[counter];
-    counter_snapshots.emplace_back(std::make_pair(timepoint, value));
-  }
-
-  std::unordered_map<MetricContext<Rate>, uint64_t> rate_snapshot;
-  {
-    std::lock_guard l{rate_mutex_};
-    std::swap(rate_snapshot, rates_);
-  }
-
-  for (auto& [rate, value] : rate_snapshot) {
-    auto& rates_snapshots = rates_snapshot_[rate];
-    rates_snapshots.emplace_back(std::make_pair(timepoint, value));
-  }
-
   for (auto& series : metrics_.take<Counter>()) {
     counters_snapshot_[{series.metric, std::move(series.tags)}].emplace_back(
         timepoint, series.value);
@@ -904,59 +784,6 @@ void Telemetry::log(std::string message, telemetry::LogLevel level,
   std::lock_guard l{log_mutex_};
   logs_.emplace_back(
       telemetry::LogMessage{std::move(message), level, stacktrace, timestamp});
-}
-
-void Telemetry::increment_counter(const Counter& id) {
-  increment_counter(id, {});
-}
-
-void Telemetry::increment_counter(const Counter& id,
-                                  const std::vector<std::string>& tags) {
-  std::lock_guard l{counter_mutex_};
-  counters_[{id, tags}] += 1;
-}
-
-void Telemetry::decrement_counter(const Counter& id) {
-  decrement_counter(id, {});
-}
-
-void Telemetry::decrement_counter(const Counter& id,
-                                  const std::vector<std::string>& tags) {
-  std::lock_guard l{counter_mutex_};
-  auto& v = counters_[{id, tags}];
-  if (v > 0) v -= 1;
-}
-
-void Telemetry::set_counter(const Counter& id, uint64_t value) {
-  set_counter(id, {}, value);
-}
-
-void Telemetry::set_counter(const Counter& id,
-                            const std::vector<std::string>& tags,
-                            uint64_t value) {
-  std::lock_guard l{counter_mutex_};
-  counters_[{id, tags}] = value;
-}
-
-void Telemetry::set_rate(const Rate& id, uint64_t value) {
-  set_rate(id, {}, value);
-}
-
-void Telemetry::set_rate(const Rate& id, const std::vector<std::string>& tags,
-                         uint64_t value) {
-  std::lock_guard l{rate_mutex_};
-  rates_[{id, tags}] = value;
-}
-
-void Telemetry::add_datapoint(const Distribution& id, uint64_t value) {
-  add_datapoint(id, {}, value);
-}
-
-void Telemetry::add_datapoint(const Distribution& id,
-                              const std::vector<std::string>& tags,
-                              uint64_t value) {
-  std::lock_guard l{distributions_mutex_};
-  distributions_[{id, tags}].emplace_back(value);
 }
 
 }  // namespace datadog::telemetry

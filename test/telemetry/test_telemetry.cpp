@@ -44,11 +44,11 @@ std::optional<nlohmann::json> find_payload(const nlohmann::json& messages,
   return std::nullopt;
 };
 
-struct StatusTags {
+struct ErrorTags {
   bool error = false;
 
   static auto tag_fields() {
-    return std::tuple{tag("error", &StatusTags::error)};
+    return std::tuple{tag("error", &ErrorTags::error)};
   }
 };
 
@@ -56,6 +56,16 @@ std::string sketch_b64(std::initializer_list<double> values) {
   LogBinnedDistr sketch;
   for (double value : values) sketch.record(value);
   return base64_encode(sketch.encode_protobuf());
+}
+
+// The series of `payload` in the namespace `scope`.
+nlohmann::json series_in(const nlohmann::json& payload,
+                         std::string_view scope) {
+  auto series = nlohmann::json::array();
+  for (const auto& one_series : payload["payload"]["series"]) {
+    if (one_series["namespace"] == scope) series.push_back(one_series);
+  }
+  return series;
 }
 
 struct FakeEventScheduler : public EventScheduler {
@@ -629,212 +639,9 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
   }
 
   SECTION("metrics reporting") {
-    SECTION("counters are correctly serialized in generate-metrics payload") {
-      client->clear();
-      /// test cases for counters:
-      /// - can't decrement below zero. -> is that a telemetry requirements?
-      /// - rates or counter reset to zero after capture.
-      const Counter my_counter{"my_counter", "counter-test", true};
-      telemetry->increment_counter(my_counter);  // = 1
-      telemetry->increment_counter(my_counter);  // = 2
-      telemetry->increment_counter(my_counter);  // = 3
-      telemetry->decrement_counter(my_counter);  // = 2
-      scheduler->trigger_metrics_capture();
-
-      telemetry->increment_counter(my_counter);  // = 1
-      scheduler->trigger_metrics_capture();
-
-      telemetry->set_counter(my_counter, 42);
-      telemetry->set_counter(my_counter, {"event:test"}, 100);
-      telemetry->decrement_counter(my_counter, {"event:test"});
-      scheduler->trigger_metrics_capture();
-
-      // Expect 2 series:
-      //   - `my_counter` without tags: 3 datapoint (2, 1, 42) with the same
-      //   timestamp.
-      //   - `my_counter` with `event:test` tags: 1 datapoint (99).
-      scheduler->trigger_heartbeat();
-
-      auto message_batch = nlohmann::json::parse(client->request_body);
-      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-      REQUIRE(message_batch["payload"].size() >= 2);
-
-      auto generate_metrics =
-          find_payload(message_batch["payload"], "generate-metrics");
-      REQUIRE(generate_metrics.has_value());
-      auto payload = (*generate_metrics)["payload"];
-
-      auto series = payload["series"];
-      REQUIRE(series.size() >= 2);
-
-      const auto expected_metrics = nlohmann::json::parse(R"(
-        [
-          {
-            "common": true,
-            "metric": "my_counter",
-            "namespace": "counter-test",
-            "points": [
-              [ 1672484400, 99 ]
-            ],
-            "tags": [ "event:test" ],
-            "type": "count"
-          },
-          {
-            "common": true,
-            "metric": "my_counter",
-            "namespace": "counter-test",
-            "points": [
-              [ 1672484400, 2 ],
-              [ 1672484400, 1 ],
-              [ 1672484400, 42 ]
-            ],
-            "type": "count"
-          }
-        ]
-      )");
-
-      for (const auto& s : series) {
-        if (s["metric"] == "my_counter") {
-          if (s.contains("tags")) {
-            CHECK(s == expected_metrics[0]);
-          } else {
-            CHECK(s == expected_metrics[1]);
-          }
-        }
-      }
-
-      // Make sure the next heartbeat doesn't contains counters if no
-      // datapoint has been incremented, decremented or set.
-      client->clear();
-      scheduler->trigger_heartbeat();
-
-      auto message_batch2 = nlohmann::json::parse(client->request_body);
-      REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
-      REQUIRE(message_batch2["payload"].size() >= 1);
-
-      CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
-    }
-
-    SECTION("counters can't go below zero") {
-      client->clear();
-      const Counter positive_counter{"positive_counter", "counter-test2", true};
-      telemetry->decrement_counter(positive_counter);  // = 0
-      telemetry->decrement_counter(positive_counter);  // = 0
-      telemetry->decrement_counter(positive_counter);  // = 0
-
-      scheduler->trigger_metrics_capture();
-      scheduler->trigger_heartbeat();
-
-      auto message_batch = nlohmann::json::parse(client->request_body);
-      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-      REQUIRE(message_batch["payload"].size() >= 2);
-
-      auto generate_metrics =
-          find_payload(message_batch["payload"], "generate-metrics");
-      REQUIRE(generate_metrics);
-      auto payload = (*generate_metrics)["payload"];
-
-      auto series = payload["series"];
-      REQUIRE(series.size() >= 1);
-
-      const auto expected_metric = nlohmann::json::parse(R"(
-          {
-            "common": true,
-            "metric": "positive_counter",
-            "namespace": "counter-test2",
-            "points": [
-              [ 1672484400, 0 ]
-            ],
-            "type": "count"
-          }
-      )");
-
-      for (const auto& s : series) {
-        if (s["metric"] == "positive_counter") {
-          CHECK(s == expected_metric);
-        }
-      }
-    }
-
-    SECTION("rate") {
-      client->clear();
-
-      Rate rps{"request", "rate-test", true};
-      telemetry->set_rate(rps, 1000);
-
-      scheduler->trigger_metrics_capture();
-
-      telemetry->set_rate(rps, 2000);
-      telemetry->set_rate(rps, 5000);
-      telemetry->set_rate(rps, {"status:2xx"}, 5000);
-
-      scheduler->trigger_metrics_capture();
-
-      // Expect 2 series:
-      //  - `request` without tags: 2 datapoint (1000, 5000)
-      //  - `request` with tags: 1 datapoint (5000)
-      scheduler->trigger_heartbeat();
-
-      auto message_batch = nlohmann::json::parse(client->request_body);
-      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-      REQUIRE(message_batch["payload"].size() >= 2);
-      auto generate_metrics =
-          find_payload(message_batch["payload"], "generate-metrics");
-      REQUIRE(generate_metrics);
-      auto payload = (*generate_metrics)["payload"];
-
-      auto series = payload["series"];
-      REQUIRE(series.size() >= 2);
-
-      const auto expected_metrics = nlohmann::json::parse(R"(
-        [
-          {
-            "common": true,
-            "metric": "request",
-            "namespace": "rate-test",
-            "points": [
-              [ 1672484400, 5000 ]
-            ],
-            "tags": [ "status:2xx" ],
-            "type": "rate"
-          },
-          {
-            "common": true,
-            "metric": "request",
-            "namespace": "rate-test",
-            "points": [
-              [ 1672484400, 1000 ],
-              [ 1672484400, 5000 ]
-            ],
-            "type": "rate"
-          }
-        ]
-      )");
-
-      for (const auto& s : series) {
-        if (s["metric"] == "request") {
-          if (s.contains("tags")) {
-            CHECK(s == expected_metrics[0]);
-          } else {
-            CHECK(s == expected_metrics[1]);
-          }
-        }
-      }
-
-      // Make sure the next heartbeat doesn't contains distributions if no
-      // datapoint has been added to a distribution.
-      client->clear();
-      scheduler->trigger_heartbeat();
-
-      auto message_batch2 = nlohmann::json::parse(client->request_body);
-      REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
-      REQUIRE(message_batch2["payload"].size() >= 1);
-      CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
-    }
-
     SECTION("counter and rate handles are sent with the metrics") {
       client->clear();
-      auto requests = telemetry->metrics().counter<StatusTags>(
+      auto requests = telemetry->metrics().counter<ErrorTags>(
           {"handle_requests", "handle-test", true},
           {"integration_name:datadog"});
       auto rate =
@@ -883,7 +690,7 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
 
     SECTION("distribution handles are sent as sketches") {
       client->clear();
-      auto duration = telemetry->metrics().distribution<StatusTags>(
+      auto duration = telemetry->metrics().distribution<ErrorTags>(
           {"handle_duration", "handle-test", true});
       duration->record({false}, 100);
       duration->record({false}, 250);
@@ -902,157 +709,66 @@ TELEMETRY_IMPLEMENTATION_TEST("Tracer telemetry API") {
         }
       ])");
       expected[0]["sketch_b64"] = sketch_b64({100, 250});
-      CHECK((*sketches)["payload"]["series"] == expected);
-    }
-
-    SECTION("distribution") {
-      client->clear();
-
-      Distribution response_time{"response_time", "dist-test", false};
-      telemetry->add_datapoint(response_time, 128);
-      telemetry->add_datapoint(response_time, 42);
-      telemetry->add_datapoint(response_time, 3000);
-
-      // Add a tag, this will add a new serie to the distribution payload.
-      telemetry->add_datapoint(response_time, {"status:200", "method:GET"},
-                               6530);
-
-      Distribution request_size{"request_size", "dist-test-2", true};
-      telemetry->add_datapoint(request_size, 1843);
-      telemetry->add_datapoint(request_size, 4135);
-
-      // Expect 3 series:
-      //  - `response_time` without tags: 3 datapoint (128, 42, 3000).
-      //  - `response_time` with 2 tags: 1 datapoint (6530).
-      //  - `request_size`: 2 datapoint (1843, 4135).
-      scheduler->trigger_heartbeat();
-
-      auto message_batch = nlohmann::json::parse(client->request_body);
-      REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-      REQUIRE(message_batch["payload"].size() == 2);
-
-      auto distribution_message = message_batch["payload"][1];
-      REQUIRE(distribution_message["request_type"] == "distributions");
-
-      auto distribution_series = distribution_message["payload"]["series"];
-      REQUIRE(distribution_series.size() >= 3);
-
-      const auto expected_series = nlohmann::json::parse(R"([
-        {
-           "common":false,
-           "metric":"response_time",
-           "namespace":"dist-test",
-           "points": [6530],
-           "tags":["status:200","method:GET"]
-        },
-        {
-           "common":true,
-           "metric": "request_size",
-           "namespace":"dist-test-2",
-           "points":[1843,4135]
-        },
-        {
-           "common": false,
-           "metric":"response_time",
-           "namespace":"dist-test",
-           "points":[128,42,3000]
-        }
-      ])");
-
-      for (const auto& s : distribution_series) {
-        if (s["metric"] == "response_time") {
-          if (s.contains("tags")) {
-            CHECK(s == expected_series[0]);
-          } else {
-            CHECK(s == expected_series[2]);
-          }
-        } else if (s["metric"] == "request_size") {
-          CHECK(s == expected_series[1]);
-        }
-      }
-
-      // Make sure the next heartbeat doesn't contains distributions if no
-      // datapoint has been added to a distribution.
-      client->clear();
-      scheduler->trigger_heartbeat();
-
-      auto message_batch2 = nlohmann::json::parse(client->request_body);
-      REQUIRE(is_valid_telemetry_payload(message_batch2) == true);
-      REQUIRE(message_batch2["payload"].size() >= 1);
-      CHECK(find_payload(message_batch["payload"], "app-heartbeat"));
+      CHECK(series_in(*sketches, "handle-test") == expected);
     }
 
     SECTION("dtor sends metrics and distributions") {
-      // metrics captured before the aggregation task
-      const Distribution response_time{"response_time", "dist-test", false};
-      const Rate rps{"request", "rate-test", true};
-      const Counter my_counter{"my_counter", "counter-test", true};
+      // The handles outlive the Telemetry, which sends them when destroyed.
+      std::shared_ptr<CounterHandle<>> counter;
+      std::shared_ptr<RateHandle<>> rate;
+      std::shared_ptr<DistributionHandle<>> distribution;
       {
         auto tmp_telemetry =
             Telemetry::create(*finalize_config(), tracer_signature, logger,
                               client, scheduler, *url, clock);
-        tmp_telemetry->increment_counter(my_counter);  // = 1
-        tmp_telemetry->add_datapoint(response_time, 128);
-        tmp_telemetry->set_rate(rps, 1000);
+        counter = tmp_telemetry->metrics().counter(
+            {"my_counter", "counter-test", true});
+        rate = tmp_telemetry->metrics().rate({"request", "rate-test", true});
+        distribution = tmp_telemetry->metrics().distribution(
+            {"response_time", "dist-test", false});
+        counter->record({}, 1);
+        rate->record({}, 1000);
+        distribution->record({}, 128);
         client->clear();
       }
 
-      // Expect 2 metrics with 1 datapoint each and 1 ditribution
       auto message_batch = nlohmann::json::parse(client->request_body);
       REQUIRE(is_valid_telemetry_payload(message_batch) == true);
-      REQUIRE(message_batch["payload"].size() == 3);
-
-      for (const auto& payload : message_batch["payload"]) {
-        const auto& req_type = payload["request_type"];
-        if (req_type == "generate-metrics") {
-          const auto& metrics_series = payload["payload"]["series"];
-          REQUIRE(metrics_series.size() >= 2);
-
-          for (const auto& s : metrics_series) {
-            if (s["metric"] == "my_counter") {
-              const auto expected_counter = nlohmann::json::parse(R"(
-                {
-                  "common":true,
-                  "metric":"my_counter",
-                  "namespace":"counter-test",
-                  "type": "count",
-                  "points": [[1672484400, 1]]
-                }
-              )");
-              CHECK(s == expected_counter);
-            } else if (s["metric"] == "request") {
-              const auto expected_rate = nlohmann::json::parse(R"(
-                {
-                  "common":true,
-                  "metric":"request",
-                  "namespace":"rate-test",
-                  "type": "rate",
-                  "points": [[1672484400, 1000]]
-                }
-              )");
-              CHECK(s == expected_rate);
-            }
-          }
-        } else if (req_type == "distributions") {
-          const auto& distribution_series = payload["payload"]["series"];
-          REQUIRE(distribution_series.size() >= 1);
-
-          const auto expected_d0 = nlohmann::json::parse(R"(
-            {
-              "common":false,
-              "metric":"response_time",
-              "namespace":"dist-test",
-              "points": [128]
-            }
-          )");
-
-          for (const auto& d : distribution_series) {
-            if (d["metric"] == "response_time") {
-              CHECK(d == expected_d0);
-            };
-          }
+      auto generate_metrics =
+          find_payload(message_batch["payload"], "generate-metrics");
+      REQUIRE(generate_metrics);
+      const auto expected_metrics = nlohmann::json::parse(R"([
+        {
+          "common": true,
+          "metric": "my_counter",
+          "namespace": "counter-test",
+          "points": [[1672484400, 1]],
+          "type": "count"
+        },
+        {
+          "common": true,
+          "metric": "request",
+          "namespace": "rate-test",
+          "points": [[1672484400, 1000]],
+          "type": "rate"
         }
+      ])");
+      const auto& sent = (*generate_metrics)["payload"]["series"];
+      for (const auto& series : expected_metrics) {
+        CHECK(std::count(sent.begin(), sent.end(), series) == 1);
       }
+
+      auto sketches = find_payload(message_batch["payload"], "sketches");
+      REQUIRE(sketches);
+      auto expected_sketches = nlohmann::json::parse(R"([
+        {
+          "common": false,
+          "metric": "response_time",
+          "namespace": "dist-test"
+        }
+      ])");
+      expected_sketches[0]["sketch_b64"] = sketch_b64({128});
+      CHECK(series_in(*sketches, "dist-test") == expected_sketches);
     }
   }
 
