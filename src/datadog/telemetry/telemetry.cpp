@@ -109,6 +109,17 @@ void capture_product_change(const Product& product) {
              instance());
 }
 
+details::MetricRegistry* details::metric_registry() {
+  return std::visit(
+      details::Overload{
+          [](std::shared_ptr<Telemetry>& telemetry) -> MetricRegistry* {
+            return &telemetry->metrics();
+          },
+          [](NoopTelemetry) -> MetricRegistry* { return nullptr; },
+      },
+      instance());
+}
+
 namespace log {
 void warning(std::string message) {
   std::visit(details::Overload{

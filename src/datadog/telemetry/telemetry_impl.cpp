@@ -10,6 +10,7 @@
 
 #include <chrono>
 
+#include "base64.h"
 #include "datadog_agent.h"
 #include "platform_util.h"
 
@@ -207,6 +208,30 @@ nlohmann::json encode_distributions(
   }
 
   return j;
+}
+
+// The `sketches` payload of the distribution handles' series, or nothing if
+// there are none.
+Optional<nlohmann::json> sketches_payload(
+    const std::vector<details::MetricSeries<Distribution>>& distributions) {
+  if (distributions.empty()) return nullopt;
+  auto series = nlohmann::json::array();
+  for (const auto& distribution : distributions) {
+    auto encoded = nlohmann::json{
+        {"metric", distribution.metric.name},
+        {"common", distribution.metric.common},
+        {"namespace", distribution.metric.scope},
+        {"sketch_b64", base64_encode(distribution.value)},
+    };
+    if (!distribution.tags.empty()) {
+      encoded.emplace("tags", distribution.tags);
+    }
+    series.emplace_back(std::move(encoded));
+  }
+  return nlohmann::json{
+      {"request_type", "sketches"},
+      {"payload", nlohmann::json{{"series", std::move(series)}}},
+  };
 }
 
 nlohmann::json encode_product(const Product& product) {
@@ -534,6 +559,10 @@ std::string Telemetry::heartbeat_and_telemetry() {
     batch_payloads.emplace_back(std::move(distributions_json));
   }
 
+  if (auto sketches = sketches_payload(metrics_.take<Distribution>())) {
+    batch_payloads.emplace_back(std::move(*sketches));
+  }
+
   std::vector<telemetry::LogMessage> old_logs;
   {
     std::lock_guard l{log_mutex_};
@@ -595,6 +624,10 @@ std::string Telemetry::app_closing_payload() {
         },
     };
     batch_payloads.emplace_back(std::move(distributions_json));
+  }
+
+  if (auto sketches = sketches_payload(metrics_.take<Distribution>())) {
+    batch_payloads.emplace_back(std::move(*sketches));
   }
 
   if (!logs_.empty()) {
@@ -850,6 +883,16 @@ void Telemetry::capture_metrics() {
   for (auto& [rate, value] : rate_snapshot) {
     auto& rates_snapshots = rates_snapshot_[rate];
     rates_snapshots.emplace_back(std::make_pair(timepoint, value));
+  }
+
+  for (auto& series : metrics_.take<Counter>()) {
+    counters_snapshot_[{series.metric, std::move(series.tags)}].emplace_back(
+        timepoint, series.value);
+  }
+
+  for (auto& series : metrics_.take<Rate>()) {
+    rates_snapshot_[{series.metric, std::move(series.tags)}].emplace_back(
+        timepoint, series.value);
   }
 }
 

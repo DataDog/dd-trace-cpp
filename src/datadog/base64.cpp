@@ -28,6 +28,12 @@ constexpr uint8_t k_base64_table[] = {
     _,  _,  _,  _,  _,  _,  _,  _,     _,  _,  _,  _,  _,  _,  _,  _,  _,  _,
     _,  _,  _,  _};
 
+namespace {
+
+void append_encoded_group(std::string& output, StringView group);
+
+}  // namespace
+
 std::string base64_decode(StringView input) {
   const size_t in_size = input.size();
 
@@ -83,6 +89,40 @@ std::string base64_decode(StringView input) {
 
   return output;
 }
+
+std::string base64_encode(StringView input) {
+  std::string output;
+  output.reserve((input.size() + 2) / 3 * 4);
+  for (size_t offset = 0; offset < input.size(); offset += 3) {
+    append_encoded_group(output, input.substr(offset, 3));
+  }
+  return output;
+}
+
+namespace {
+
+constexpr char k_base64_alphabet[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+// Appends the 4 characters for a group of 1 to 3 bytes. Missing bytes become
+// '=' padding.
+void append_encoded_group(std::string& output, StringView group) {
+  uint32_t bits = 0;
+  for (size_t position = 0; position < 3; ++position) {
+    bits <<= 8;
+    if (position < group.size()) {
+      bits |= static_cast<unsigned char>(group[position]);
+    }
+  }
+  const size_t encoded_chars = group.size() + 1;
+  for (size_t position = 0; position < 4; ++position) {
+    const uint32_t sextet = (bits >> (18 - 6 * position)) & 0x3F;
+    output.push_back(position < encoded_chars ? k_base64_alphabet[sextet]
+                                              : '=');
+  }
+}
+
+}  // namespace
 
 }  // namespace tracing
 }  // namespace datadog
