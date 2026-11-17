@@ -6,10 +6,10 @@ against a baseline to detect regressions on every PR.
 
 Files in this directory:
 
-- **`bp-runner.yml`** — the experiment the `benchmarks` CI job runs with
+- **`bp-runner.yml`** — the configuration the `benchmarks` CI job runs with
   `bp-runner`: fetch the candidate and baseline releases, run `bin/benchmark`
   on each, analyze with the GoogleBenchmark converter, upload to S3.
-- **`bp-runner.pr-comment.yml`** — the experiment the `benchmarks-pr-comment`
+- **`bp-runner.pr-comment.yml`** — the configuration the `benchmarks-pr-comment`
   job runs with `bp-runner`: post the comparison comment on the PR and upload
   to the BP API. The job is `allow_failure: true`, like the old `|| :` steps.
 - **`container/`** — Dockerfile and install script for the benchmarks CI image.
