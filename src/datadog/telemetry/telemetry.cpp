@@ -4,28 +4,25 @@
 #include "telemetry_impl.h"
 
 namespace datadog::telemetry {
-namespace details {
 
-/// NOTE(@dmehala): Generic overload function (P0051R3) like implementation.
+namespace details {
+// Generic overload function (P0051R3) like implementation.
 template <typename... Ts>
 struct Overload : Ts... {
   using Ts::operator()...;
 };
 
-/// NOTE(@dmehala): Guide required for C++17. Remove once we switch to C++20.
+// Guide required for C++17. Remove once we switch to C++20.
 template <class... Ts>
 Overload(Ts...) -> Overload<Ts...>;
-
 }  // namespace details
 
+// `TelemetryProxy` holds either the real implementation or a no-op
+// implementation.
 using NoopTelemetry = std::monostate;
-
-/// `TelemetryProxy` holds either the real implementation or a no-op
-/// implementation.
 using TelemetryProxy = std::variant<NoopTelemetry, std::shared_ptr<Telemetry>>;
 
-/// NOTE(@dmehala): Here to facilitate Meyer's singleton construction.
-struct Ctor_param final {
+struct TelemetryParameters final {
   FinalizedConfiguration configuration;
   tracing::TracerSignature tracer_signature;
   std::shared_ptr<tracing::Logger> logger;
@@ -35,28 +32,30 @@ struct Ctor_param final {
   tracing::Clock clock = tracing::default_clock;
 };
 
-TelemetryProxy make_telemetry(const tracing::Optional<Ctor_param>& init) {
+TelemetryProxy make_telemetry(
+    const tracing::Optional<TelemetryParameters>& init) {
   if (!init || !init->configuration.enabled) return NoopTelemetry{};
-  return Telemetry::create(init->configuration, init->tracer_signature,
-                           init->logger, init->client, init->scheduler,
-                           init->agent_url, init->clock);
-}
 
-TelemetryProxy& instance(
-    const tracing::Optional<Ctor_param>& init = tracing::nullopt) {
-  static TelemetryProxy telemetry = make_telemetry(init);
+  std::shared_ptr<Telemetry> telemetry = Telemetry::create(
+      init->configuration, init->tracer_signature, init->logger, init->client,
+      init->scheduler, init->agent_url, init->clock);
+
+  // Send the app-closing message when statics are destroyed.
+  struct ShutdownTelemetryAtExit {
+    std::shared_ptr<Telemetry> telemetry_;
+    ~ShutdownTelemetryAtExit() { telemetry_->shutdown(); }
+  };
+  static const ShutdownTelemetryAtExit shutdown_telemetry_at_exit{telemetry};
+
   return telemetry;
 }
 
-void init(FinalizedConfiguration configuration,
-          std::shared_ptr<tracing::Logger> logger,
-          std::shared_ptr<tracing::HTTPClient> client,
-          std::shared_ptr<tracing::EventScheduler> event_scheduler,
-          tracing::HTTPClient::URL agent_url, tracing::Clock clock) {
-  instance(Ctor_param{configuration,
-                      tracing::TracerSignature(tracing::RuntimeID::generate(),
-                                               tracing::get_process_name(), ""),
-                      logger, client, event_scheduler, agent_url, clock});
+TelemetryProxy& instance(
+    const tracing::Optional<TelemetryParameters>& init = tracing::nullopt) {
+  // This singleton is never destroyed on purpose because the Tracer's
+  // destructor needs it.
+  static TelemetryProxy& telemetry = *new TelemetryProxy{make_telemetry(init)};
+  return telemetry;
 }
 
 void init(FinalizedConfiguration configuration,
@@ -65,8 +64,19 @@ void init(FinalizedConfiguration configuration,
           std::shared_ptr<tracing::HTTPClient> client,
           std::shared_ptr<tracing::EventScheduler> event_scheduler,
           tracing::HTTPClient::URL agent_url, tracing::Clock clock) {
-  instance(Ctor_param{configuration, tracer_signature, logger, client,
-                      event_scheduler, agent_url, clock});
+  instance(TelemetryParameters{configuration, tracer_signature, logger, client,
+                               event_scheduler, agent_url, clock});
+}
+
+void init(FinalizedConfiguration configuration,
+          std::shared_ptr<tracing::Logger> logger,
+          std::shared_ptr<tracing::HTTPClient> client,
+          std::shared_ptr<tracing::EventScheduler> event_scheduler,
+          tracing::HTTPClient::URL agent_url, tracing::Clock clock) {
+  init(configuration,
+       tracing::TracerSignature(tracing::RuntimeID::generate(),
+                                tracing::get_process_name(), ""),
+       logger, client, event_scheduler, agent_url, clock);
 }
 
 void shutdown() {
@@ -135,7 +145,7 @@ void error(std::string message, std::string stacktrace) {
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->log_error(message, stacktrace);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -147,7 +157,7 @@ void increment(const Counter& counter) {
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->increment_counter(counter);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -157,7 +167,7 @@ void increment(const Counter& counter, const std::vector<std::string>& tags) {
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->increment_counter(counter, tags);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -167,7 +177,7 @@ void decrement(const Counter& counter) {
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->decrement_counter(counter);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -177,7 +187,7 @@ void decrement(const Counter& counter, const std::vector<std::string>& tags) {
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->decrement_counter(counter, tags);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -187,7 +197,7 @@ void set(const Counter& counter, uint64_t value) {
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->set_counter(counter, value);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -198,7 +208,7 @@ void set(const Counter& counter, const std::vector<std::string>& tags,
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->set_counter(counter, tags, value);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -211,7 +221,7 @@ void set(const Rate& rate, uint64_t value) {
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->set_rate(rate, value);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -222,7 +232,7 @@ void set(const Rate& rate, const std::vector<std::string>& tags,
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->set_rate(rate, tags, value);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -235,7 +245,7 @@ void add(const Distribution& distribution, uint64_t value) {
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->add_datapoint(distribution, value);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
@@ -246,7 +256,7 @@ void add(const Distribution& distribution, const std::vector<std::string>& tags,
                  [&](std::shared_ptr<Telemetry>& telemetry) {
                    telemetry->add_datapoint(distribution, tags, value);
                  },
-                 [](auto&&) {},
+                 [](NoopTelemetry) {},
              },
              instance());
 }
