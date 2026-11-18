@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <limits>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -15,7 +13,7 @@ namespace datadog::telemetry {
 // Every value in bin i is reported as the same bin value x̂(i). It is the
 // harmonic mean of the bin's edges:
 //
-//   x̂ = 2 × low × γ low / (low + γ low) = low × (1 + α)
+//   x̂ = 2 × low × γ × low / (low + γ × low) = low × (1 + α)
 //
 // This puts x̂ at the same relative error from both edges. So for any value x
 // in the bin, |x̂ - x| / x <= α.
@@ -41,8 +39,8 @@ namespace datadog::telemetry {
 //   to the neighbouring bin. The worst relative error is then
 //   α + 4 × 10^-13. This also moves a few bin edges by a double or so between
 //   C libraries, and from libdatadog's.
-// * All member functions are thread-safe. Each distribution has its own lock.
-class LogBinnedDistr {
+// * Not thread-safe: callers must lock.
+class LogBinnedDistribution {
  public:
   // Returns false if the value is rejected.
   bool record(double value);
@@ -61,20 +59,17 @@ class LogBinnedDistr {
   void extend_down(BinIndex bin, BinIndex highest);
   void extend_up(BinIndex bin, BinIndex highest);
   std::uint64_t take_counts(BinIndex lowest, BinIndex highest);
-  void cover(BinIndex lowest, BinIndex highest);
+  void ensure_window_covers(BinIndex lowest, BinIndex highest);
   std::uint64_t& count_at(BinIndex bin);
+  std::uint64_t count_at(BinIndex bin) const;
   std::string encode_bins() const;
 
-  mutable std::mutex mutex_;
   // counts_[k] is the count of bin window_start_ + k. Bins outside the range
-  // [lowest_bin_, lowest_bin_ + bin_span_) are always zero.
+  // [lowest_bin_, lowest_bin_ + bin_range_size_) are always zero.
   std::vector<std::uint64_t> counts_;
   BinIndex window_start_ = 0;
   BinIndex lowest_bin_ = 0;
-  std::uint32_t bin_span_ = 0;
-  // The lowest bin, once the range holds the maximum number of bins. Lower
-  // values are moved up to it without a branch.
-  BinIndex clamp_floor_ = std::numeric_limits<BinIndex>::min();
+  std::uint32_t bin_range_size_ = 0;
   std::uint64_t zero_count_ = 0;
 };
 

@@ -4,11 +4,12 @@
 // mapping.
 
 #include <cstdint>
+#include <cstring>
 #include <limits>
 
 namespace datadog::telemetry::log_bins {
 
-// The number of a bin. Same type as LogBinnedDistr's private BinIndex.
+// The number of a bin. Same type as LogBinnedDistribution's private BinIndex.
 using BinIndex = std::int32_t;
 
 // Each bin's upper edge is this many times its lower edge.
@@ -35,5 +36,22 @@ BinIndex reference_bin_index(double value);
 
 // Returns true if the fast table was built. Declared here for the tests.
 bool fast_table_built();
+
+// TODO: replace to_bits() and from_bits() with std::bit_cast after the upgrade
+// to C++20.
+
+// The bits of a double, as an integer.
+inline std::uint64_t to_bits(double value) {
+  std::uint64_t bits;
+  std::memcpy(&bits, &value, sizeof bits);
+  return bits;
+}
+
+// The double with these bits.
+inline double from_bits(std::uint64_t bits) {
+  double value;
+  std::memcpy(&value, &bits, sizeof value);
+  return value;
+}
 
 }  // namespace datadog::telemetry::log_bins

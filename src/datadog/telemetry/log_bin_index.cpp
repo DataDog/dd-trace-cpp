@@ -3,7 +3,6 @@
 #include <array>
 #include <cfenv>
 #include <cmath>
-#include <cstring>
 
 namespace datadog::telemetry::log_bins {
 namespace {
@@ -103,8 +102,6 @@ std::uint64_t find_edge(BinIndex bin, std::uint64_t below,
                         std::uint64_t at_or_above);
 void narrow_around_guess(BinIndex bin, std::uint64_t& below,
                          std::uint64_t& at_or_above);
-std::uint64_t to_bits(double value);
-double from_bits(std::uint64_t bits);
 
 }  // namespace
 
@@ -227,18 +224,6 @@ void narrow_around_guess(BinIndex bin, std::uint64_t& below,
     }
     if (below == low && at_or_above == high) return;
   }
-}
-
-std::uint64_t to_bits(double value) {
-  std::uint64_t bits;
-  std::memcpy(&bits, &value, sizeof bits);
-  return bits;
-}
-
-double from_bits(std::uint64_t bits) {
-  double value;
-  std::memcpy(&value, &bits, sizeof value);
-  return value;
 }
 
 }  // namespace

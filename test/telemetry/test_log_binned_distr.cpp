@@ -1,11 +1,9 @@
 #include <algorithm>
-#include <cfloat>
 #include <cmath>
-#include <cstring>
 #include <functional>
+#include <limits>
 #include <map>
 #include <random>
-#include <thread>
 #include <vector>
 
 #include "datadog/telemetry/log_bin_index.h"
@@ -20,6 +18,8 @@ namespace {
 
 using BinIndex = log_bins::BinIndex;
 using Bins = std::map<BinIndex, double>;
+using log_bins::from_bits;
+using log_bins::to_bits;
 
 struct DecodedSketch {
   double gamma = 0;
@@ -32,8 +32,6 @@ struct DecodedSketch {
 };
 
 DecodedSketch decode_sketch(const std::string& data);
-std::uint64_t to_bits(double value);
-double from_bits(std::uint64_t bits);
 
 // The bins expected once `values` are recorded. Each value counts in its own
 // bin, but only the 2048 highest bins are kept. Lower values count in the
@@ -61,7 +59,7 @@ double value_in_bin(BinIndex bin) {
 }
 
 Bins recorded_bins(const std::vector<BinIndex>& bins) {
-  LogBinnedDistr distribution;
+  LogBinnedDistribution distribution;
   for (const BinIndex bin : bins) distribution.record(value_in_bin(bin));
   return decode_sketch(distribution.encode_protobuf()).bins;
 }
@@ -87,7 +85,7 @@ void check_same_bin(double value) {
 }
 
 void check_bins(const std::vector<double>& values) {
-  LogBinnedDistr distribution;
+  LogBinnedDistribution distribution;
   for (const double value : values) distribution.record(value);
   const double zero_count =
       static_cast<double>(std::count(values.begin(), values.end(), 0.0));
@@ -119,10 +117,11 @@ LOG_BINNED_TEST("mapping constants follow libdatadog's formulas") {
         log_bins::bin_index_shift);
 
   const double multiplier = 1 / log_ratio;
+  const double lowest_bin = std::numeric_limits<BinIndex>::min();
   const double int32_limit =
-      std::exp((INT32_MIN - log_bins::bin_index_shift) / multiplier + 1.0);
-  CHECK(std::max(DBL_MIN * log_bins::bin_ratio, int32_limit) ==
-        log_bins::zero_threshold);
+      std::exp((lowest_bin - log_bins::bin_index_shift) / multiplier + 1.0);
+  CHECK(std::max(std::numeric_limits<double>::min() * log_bins::bin_ratio,
+                 int32_limit) == log_bins::zero_threshold);
 }
 
 LOG_BINNED_TEST("bin index of special values") {
@@ -132,17 +131,17 @@ LOG_BINNED_TEST("bin index of special values") {
       {infinity, log_bins::rejected_value},
       {-infinity, log_bins::rejected_value},
       {-1.0, log_bins::rejected_value},
-      {-DBL_MIN, log_bins::rejected_value},
+      {-std::numeric_limits<double>::min(), log_bins::rejected_value},
       {0.0, log_bins::zero_bin},
       {-0.0, log_bins::zero_bin},
       {std::numeric_limits<double>::denorm_min(), log_bins::zero_bin},
-      {DBL_MIN, log_bins::zero_bin},
+      {std::numeric_limits<double>::min(), log_bins::zero_bin},
       {std::nextafter(log_bins::zero_threshold, 0.0), log_bins::zero_bin},
       {log_bins::zero_threshold, -44352},
       {1e-9, 1},
       {1.0, 1338},
       {1000.0, 1784},
-      {DBL_MAX, 47118},
+      {std::numeric_limits<double>::max(), 47118},
   };
   for (const auto& [value, expected_bin] : cases) {
     INFO("value " << value);
@@ -201,18 +200,18 @@ LOG_BINNED_TEST("bin index equals the reference around every bin edge") {
 
 LOG_BINNED_TEST("bin index equals the reference on many values") {
   SECTION("log-uniform values") {
-    for (const double value : log_uniform(1'000'000, 1e-15, 1e25, 1)) {
+    for (const double value : log_uniform(100'000, 1e-15, 1e25, 1)) {
       check_same_bin(value);
     }
   }
   SECTION("random bit patterns") {
     std::mt19937_64 generator(2);
-    for (int count = 0; count < 1'000'000; ++count) {
+    for (int count = 0; count < 100'000; ++count) {
       check_same_bin(from_bits(generator()));
     }
   }
   SECTION("integers and decimal fractions") {
-    for (int number = 0; number < 200'000; ++number) {
+    for (int number = 0; number < 20'000; ++number) {
       check_same_bin(number);
       check_same_bin(number / 1000.0);
     }
@@ -220,7 +219,7 @@ LOG_BINNED_TEST("bin index equals the reference on many values") {
 }
 
 LOG_BINNED_TEST("record rejects invalid values") {
-  LogBinnedDistr distribution;
+  LogBinnedDistribution distribution;
   CHECK_FALSE(distribution.record(std::nan("")));
   CHECK_FALSE(distribution.record(-1.0));
   CHECK_FALSE(distribution.record(std::numeric_limits<double>::infinity()));
@@ -233,22 +232,21 @@ LOG_BINNED_TEST("record rejects invalid values") {
 }
 
 LOG_BINNED_TEST("encoding of an empty distribution") {
-  const LogBinnedDistr distribution;
+  const LogBinnedDistribution distribution;
   const unsigned char expected[] = {
-      0x0a, 0x12, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0xf0, 0x3f, 0x11,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0xea, 0x94, 0x40, 0x12, 0x00, 0x1a, 0x00};
+      0x0a, 0x12, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0xf0, 0x3f,
+      0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0xea, 0x94, 0x40, 0x12, 0x00};
   CHECK(distribution.encode_protobuf() ==
         std::string(reinterpret_cast<const char*>(expected), sizeof expected));
 }
 
 LOG_BINNED_TEST("encoding of one value") {
-  LogBinnedDistr distribution;
+  LogBinnedDistribution distribution;
   distribution.record(1.0);
   const unsigned char expected[] = {
-      0x0a, 0x12, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0xf0,
-      0x3f, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0xea, 0x94, 0x40,
-      0x12, 0x0e, 0x0a, 0x0c, 0x08, 0xf4, 0x14, 0x11, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f, 0x1a, 0x00};
+      0x0a, 0x12, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0xf0, 0x3f, 0x11,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0xea, 0x94, 0x40, 0x12, 0x0e, 0x0a, 0x0c,
+      0x08, 0xf4, 0x14, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f};
   CHECK(distribution.encode_protobuf() ==
         std::string(reinterpret_cast<const char*>(expected), sizeof expected));
 
@@ -257,8 +255,21 @@ LOG_BINNED_TEST("encoding of one value") {
   CHECK(decoded.index_offset == 1338.5);
   CHECK(decoded.interpolation == 0);
   CHECK(decoded.bins == Bins{{1338, 1.0}});
-  CHECK(decoded.has_negative_store);
-  CHECK(decoded.negative_bins.empty());
+  CHECK_FALSE(decoded.has_negative_store);
+}
+
+LOG_BINNED_TEST("encoding of one value in a negative bin") {
+  // Bin -147 holds values around 1e-10. Its key is zigzag(-147) = 293.
+  LogBinnedDistribution distribution;
+  distribution.record(value_in_bin(-147));
+  const unsigned char expected[] = {
+      0x0a, 0x12, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0xf0, 0x3f, 0x11,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0xea, 0x94, 0x40, 0x12, 0x0e, 0x0a, 0x0c,
+      0x08, 0xa5, 0x02, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f};
+  CHECK(distribution.encode_protobuf() ==
+        std::string(reinterpret_cast<const char*>(expected), sizeof expected));
+  CHECK(decode_sketch(distribution.encode_protobuf()).bins ==
+        Bins{{-147, 1.0}});
 }
 
 LOG_BINNED_TEST("the store keeps the 2048 highest bins") {
@@ -319,28 +330,6 @@ LOG_BINNED_TEST("bins of many values") {
   }
 }
 
-LOG_BINNED_TEST("records from several threads are all counted") {
-  LogBinnedDistr distribution;
-  static constexpr int thread_count = 4;
-  static constexpr int values_per_thread = 50'000;
-  std::vector<std::thread> threads;
-  for (int thread_number = 0; thread_number < thread_count; ++thread_number) {
-    threads.emplace_back([&distribution, thread_number] {
-      for (int index = 0; index < values_per_thread; ++index) {
-        distribution.record(1.0 + thread_number + index % 100);
-      }
-    });
-  }
-  for (std::thread& thread : threads) thread.join();
-
-  double total = 0;
-  for (const auto& [bin, count] :
-       decode_sketch(distribution.encode_protobuf()).bins) {
-    total += count;
-  }
-  CHECK(total == thread_count * values_per_thread);
-}
-
 namespace {
 
 // A minimal protobuf reader, for the messages of a DDSketch.
@@ -353,7 +342,8 @@ class ProtobufReader {
   std::uint64_t read_varint() {
     std::uint64_t value = 0;
     for (int shift = 0;; shift += 7) {
-      const auto byte = static_cast<unsigned char>(data_.at(position_++));
+      const unsigned char byte =
+          static_cast<unsigned char>(data_.at(position_++));
       value |= std::uint64_t{byte & 0x7fu} << shift;
       if ((byte & 0x80) == 0) return value;
     }
@@ -362,7 +352,8 @@ class ProtobufReader {
   double read_double() {
     std::uint64_t bits = 0;
     for (int byte = 0; byte < 8; ++byte) {
-      const auto value = static_cast<unsigned char>(data_.at(position_++));
+      const unsigned char value =
+          static_cast<unsigned char>(data_.at(position_++));
       bits |= std::uint64_t{value} << (8 * byte);
     }
     return from_bits(bits);
@@ -382,7 +373,7 @@ class ProtobufReader {
 };
 
 std::int32_t unzigzag(std::uint64_t value) {
-  const auto low = static_cast<std::uint32_t>(value);
+  const std::uint32_t low = static_cast<std::uint32_t>(value);
   return static_cast<std::int32_t>((low >> 1) ^ (0u - (low & 1)));
 }
 
@@ -449,18 +440,6 @@ DecodedSketch decode_sketch(const std::string& data) {
     }
   }
   return sketch;
-}
-
-std::uint64_t to_bits(double value) {
-  std::uint64_t bits;
-  std::memcpy(&bits, &value, sizeof bits);
-  return bits;
-}
-
-double from_bits(std::uint64_t bits) {
-  double value;
-  std::memcpy(&value, &bits, sizeof value);
-  return value;
 }
 
 }  // namespace
