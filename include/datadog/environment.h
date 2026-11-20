@@ -25,7 +25,7 @@ namespace environment {
 //
 // This registry is the single source of truth for:
 //   - env variable name allowlist (`include/datadog/environment.h`)
-//   - generated metadata (`metadata/supported-configurations.json`)
+//   - generated metadata (`supported-configurations.json` at the repo root)
 //
 // Each entry has:
 //   - NAME:    environment variable symbol (e.g. DD_SERVICE)
@@ -35,11 +35,14 @@ namespace environment {
 // Marker tokens:
 //   - ENV_DEFAULT_RESOLVED_IN_CODE("...description...")
 //       The runtime default is resolved in C++ configuration finalization
-//       logic. The description is emitted as the "default" field in
-//       metadata/supported-configurations.json.
+//       logic. The "default" field in supported-configurations.json is an
+//       empty string. The description is only for readers of this file.
+//       Do not use it with DECIMAL: the generated default would be `""`.
 //   - nullptr
 //       There is no default value. This is emitted as JSON null in
-//       metadata/supported-configurations.json.
+//       supported-configurations.json.
+//
+// See docs/add_configurations.md before adding or changing an entry.
 #define DD_LIST_ENVIRONMENT_VARIABLES(MACRO)                                   \
   MACRO(DD_AGENT_HOST, STRING, "localhost")                                    \
   MACRO(DD_ENV, STRING, "")                                                    \

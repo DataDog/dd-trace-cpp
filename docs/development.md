@@ -29,6 +29,10 @@ To check formatting without writing files:
 bin/check-format
 ```
 
+## Configuration
+
+Follow [add_configurations.md](add_configurations.md) when adding or changing a configuration.
+
 ## Static Analysis
 
 C++ code is analyzed with Clang Tidy. Run it with the following command:
