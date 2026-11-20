@@ -30,3 +30,18 @@ BASE64_TEST("padding") {
   CHECK(base64_decode("bGlnaHQgd28=") == "light wo");
   CHECK(base64_decode("bGlnaHQgd29y") == "light wor");
 }
+
+BASE64_TEST("encode") {
+  CHECK(base64_encode("") == "");
+  CHECK(base64_encode("f") == "Zg==");
+  CHECK(base64_encode("fo") == "Zm8=");
+  CHECK(base64_encode("foo") == "Zm9v");
+  CHECK(base64_encode("foob") == "Zm9vYg==");
+  CHECK(base64_encode("fooba") == "Zm9vYmE=");
+  CHECK(base64_encode("foobar") == "Zm9vYmFy");
+}
+
+BASE64_TEST("encode bytes above 0x7f") {
+  CHECK(base64_encode("\xff\xfe") == "//4=");
+  CHECK(base64_encode(std::string("\x00\x80\xfb", 3)) == "AID7");
+}

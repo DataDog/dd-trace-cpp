@@ -6,6 +6,7 @@
 #include <datadog/http_client.h>
 #include <datadog/logger.h>
 #include <datadog/telemetry/configuration.h>
+#include <datadog/telemetry/metric_handle.h>
 #include <datadog/telemetry/metrics.h>
 #include <datadog/tracer_signature.h>
 
@@ -115,11 +116,40 @@ void error(std::string message);
 void error(std::string message, std::string stacktrace);
 }  // namespace log
 
+namespace details {
+
+/// The registry of the running telemetry, or null if telemetry is not running.
+MetricRegistry* metric_registry();
+
+/// Calls `create` with the registry of the running telemetry. If telemetry is
+/// not running, uses a registry that is never sent instead.
+template <typename Create>
+auto create_handle(const Create& create) {
+  if (MetricRegistry* registry = metric_registry()) return create(*registry);
+  MetricRegistry never_sent;
+  return create(never_sent);
+}
+
+}  // namespace details
+
 /// The `counter` namespace provides functions to track values.
 /// Counters can be useful for tracking the total number of an event occurring
 /// in one time interval. For example, the amount of requests, errors or jobs
 /// processed every 10 seconds.
 namespace counter {
+
+/// Creates a counter handle, sent by telemetry. Call it after `init`. Without
+/// telemetry, the handle records values that are never sent.
+///
+/// @param `metric` the counter.
+/// @param `fixed_tags` tags sent with every point, as "name:value".
+template <typename Tags = details::NoTags>
+std::shared_ptr<CounterHandle<Tags>> create(
+    Counter metric, std::vector<std::string> fixed_tags = {}) {
+  return details::create_handle([&](details::MetricRegistry& registry) {
+    return registry.counter<Tags>(std::move(metric), std::move(fixed_tags));
+  });
+}
 
 /// Increments the specified counter by 1.
 ///
@@ -164,6 +194,19 @@ void set(const Counter& counter, const std::vector<std::string>& tags,
 /// one time interval. For example, the number of requests per second.
 namespace rate {
 
+/// Creates a rate handle, sent by telemetry. Call it after `init`. Without
+/// telemetry, the handle records values that are never sent.
+///
+/// @param `metric` the rate.
+/// @param `fixed_tags` tags sent with every point, as "name:value".
+template <typename Tags = details::NoTags>
+std::shared_ptr<RateHandle<Tags>> create(
+    Rate metric, std::vector<std::string> fixed_tags = {}) {
+  return details::create_handle([&](details::MetricRegistry& registry) {
+    return registry.rate<Tags>(std::move(metric), std::move(fixed_tags));
+  });
+}
+
 /// Sets the rate to a specific value.
 ///
 /// @param `rate` the rate to update.
@@ -183,6 +226,21 @@ void set(const Rate& rate, const std::vector<std::string>&, uint64_t value);
 /// Distribution can be useful for tracking things like response times or
 /// payload sizes.
 namespace distribution {
+
+/// Creates a distribution handle, sent by telemetry as DDSketches. Call it
+/// after `init`. Without telemetry, the handle records values that are never
+/// sent.
+///
+/// @param `metric` the distribution.
+/// @param `fixed_tags` tags sent with every series, as "name:value".
+template <typename Tags = details::NoTags>
+std::shared_ptr<DistributionHandle<Tags>> create(
+    Distribution metric, std::vector<std::string> fixed_tags = {}) {
+  return details::create_handle([&](details::MetricRegistry& registry) {
+    return registry.distribution<Tags>(std::move(metric),
+                                       std::move(fixed_tags));
+  });
+}
 
 /// Adds a value to the distribution.
 ///
