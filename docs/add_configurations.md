@@ -71,7 +71,9 @@ Follow the `DD_SERVICE` pattern:
    Parse the text with the helpers in [src/datadog/parse_util.h](../src/datadog/parse_util.h)
    (`falsy`, `parse_uint64`, `parse_double`, `parse_list`, `parse_tags`). On a parse error, return
    an `Error` that names the variable with `name(environment::...)`.
-3. Add a `ConfigName` value in [include/datadog/config.h](../include/datadog/config.h). Map it to
+3. Add a `ConfigName` value at the end of the enum in
+   [include/datadog/config.h](../include/datadog/config.h), so existing values keep their
+   numbers. Map it to
    its telemetry name in `to_string` in
    [src/datadog/telemetry/telemetry_impl.cpp](../src/datadog/telemetry/telemetry_impl.cpp).
 4. Pick the final value in `finalize_config` with `resolve_and_record_config` from `config.h`. It
