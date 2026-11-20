@@ -27,10 +27,9 @@ target_compile_options(dd-trace-cpp-specs
     -pedantic
 )
 
-target_link_options(dd-trace-cpp-specs
-  INTERFACE
-    -Wl,-z,noexecstack
-)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "AIX")
+  target_link_options(dd-trace-cpp-specs INTERFACE -Wl,-z,noexecstack)
+endif()
 
 if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 13)
   target_compile_options(dd-trace-cpp-specs
