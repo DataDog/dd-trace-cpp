@@ -183,6 +183,8 @@ target_sources(dd-trace-cpp-objects
   PRIVATE
     src/datadog/common/hash.cpp
     src/datadog/telemetry/configuration.cpp
+    src/datadog/telemetry/log_bin_index.cpp
+    src/datadog/telemetry/log_binned_distr.cpp
     src/datadog/telemetry/telemetry.cpp
     src/datadog/telemetry/telemetry_impl.cpp
     src/datadog/baggage.cpp
