@@ -4,6 +4,9 @@
 #include <limits>
 #include <map>
 #include <random>
+#include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "datadog/telemetry/log_bin_index.h"
@@ -150,6 +153,41 @@ LOG_BINNED_TEST("bin index rounds the multiplication and the addition once") {
   // result up to 3254.
   const double value = 7'903'045'517'381.0;
   CHECK(log_bins::bin_index(value) == 3253);
+}
+
+LOG_BINNED_TEST("a move takes the values and empties the source") {
+  static_assert(std::is_nothrow_move_constructible_v<LogBinnedDistribution>);
+  static_assert(std::is_nothrow_move_assignable_v<LogBinnedDistribution>);
+  LogBinnedDistribution source;
+  source.record(0.0);
+  source.record(1.0);
+  source.record(1000.0);
+  const std::string encoded = source.encode_protobuf();
+
+  SECTION("move construction") {
+    const LogBinnedDistribution target(std::move(source));
+    CHECK(target.encode_protobuf() == encoded);
+  }
+  SECTION("move assignment") {
+    LogBinnedDistribution target;
+    target.record(5.0);
+    target = std::move(source);
+    CHECK(target.encode_protobuf() == encoded);
+  }
+  CHECK(source.encode_protobuf() == LogBinnedDistribution().encode_protobuf());
+  CHECK(source.record(1000.0));
+  LogBinnedDistribution expected;
+  expected.record(1000.0);
+  CHECK(source.encode_protobuf() == expected.encode_protobuf());
+}
+
+LOG_BINNED_TEST("a self-move keeps the values") {
+  LogBinnedDistribution distribution;
+  distribution.record(1.0);
+  const std::string encoded = distribution.encode_protobuf();
+  LogBinnedDistribution& same = distribution;
+  distribution = std::move(same);
+  CHECK(distribution.encode_protobuf() == encoded);
 }
 
 LOG_BINNED_TEST("record rejects invalid values") {

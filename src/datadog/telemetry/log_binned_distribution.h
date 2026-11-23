@@ -42,6 +42,14 @@ namespace datadog::telemetry {
 // * Not thread-safe: callers must lock.
 class LogBinnedDistribution {
  public:
+  LogBinnedDistribution() = default;
+  LogBinnedDistribution(const LogBinnedDistribution&) = default;
+  LogBinnedDistribution& operator=(const LogBinnedDistribution&) = default;
+  // A move leaves the source empty. The implicit move would leave the
+  // source's range without counts.
+  LogBinnedDistribution(LogBinnedDistribution&& other) noexcept;
+  LogBinnedDistribution& operator=(LogBinnedDistribution&& other) noexcept;
+
   // Returns false if the value is rejected.
   bool record(double value);
 

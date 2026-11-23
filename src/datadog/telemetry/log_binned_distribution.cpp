@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <type_traits>
+#include <utility>
 
 #include "log_bin_index.h"
 
@@ -31,6 +32,22 @@ void append_varint(std::string& out, std::uint64_t value);
 std::uint32_t zigzag(std::int32_t value);
 
 }  // namespace
+
+LogBinnedDistribution::LogBinnedDistribution(
+    LogBinnedDistribution&& other) noexcept {
+  *this = std::move(other);
+}
+
+LogBinnedDistribution& LogBinnedDistribution::operator=(
+    LogBinnedDistribution&& other) noexcept {
+  if (this == &other) return *this;
+  counts_ = std::exchange(other.counts_, {});
+  window_start_ = std::exchange(other.window_start_, 0);
+  lowest_bin_ = std::exchange(other.lowest_bin_, 0);
+  bin_range_size_ = std::exchange(other.bin_range_size_, 0);
+  zero_count_ = std::exchange(other.zero_count_, 0);
+  return *this;
+}
 
 bool LogBinnedDistribution::record(double value) {
   static_assert(std::is_same_v<BinIndex, log_bins::BinIndex>);
