@@ -7,12 +7,12 @@
 #include <vector>
 
 #include "datadog/telemetry/log_bin_index.h"
-#include "datadog/telemetry/log_binned_distr.h"
+#include "datadog/telemetry/log_binned_distribution.h"
 #include "test.h"
 
 using namespace datadog::telemetry;
 
-#define LOG_BINNED_TEST(x) TEST_CASE(x, "[telemetry][log_binned_distr]")
+#define LOG_BINNED_TEST(x) TEST_CASE(x, "[telemetry][log_binned_distribution]")
 
 namespace {
 

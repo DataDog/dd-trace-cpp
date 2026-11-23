@@ -1,7 +1,7 @@
 #pragma once
 
-// Bin index of the log-binned distributions. See log_binned_distr.h for the
-// mapping.
+// Bin index of the log-binned distributions. See log_binned_distribution.h
+// for the mapping.
 
 #include <cstdint>
 #include <cstring>

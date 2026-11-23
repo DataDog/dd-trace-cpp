@@ -1,4 +1,4 @@
-#include "log_binned_distr.h"
+#include "log_binned_distribution.h"
 
 #include <algorithm>
 #include <type_traits>
