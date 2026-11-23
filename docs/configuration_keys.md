@@ -1,11 +1,11 @@
-# Adding or Changing a Configuration
+# Adding or Changing a Configuration Key
 
-This guide explains how to add, rename or change a configuration (an environment variable) in
+This guide explains how to add, rename or change a configuration key (an environment variable) in
 `dd-trace-cpp`. Follow every step. CI checks parts of steps 2 to 4.
 
 ## Overview
 
-- All configurations are listed in one place: `DD_LIST_ENVIRONMENT_VARIABLES` in
+- All configuration keys are listed in one place: `DD_LIST_ENVIRONMENT_VARIABLES` in
   [include/datadog/environment.h](../include/datadog/environment.h).
 - The `config-inversion` tool ([tools/config-inversion](../tools/config-inversion)) reads that list
   and writes [supported-configurations.json](../supported-configurations.json) at the repo root.
@@ -15,8 +15,8 @@ This guide explains how to add, rename or change a configuration (an environment
 
 ## 1. Check the Central Registry
 
-Search the registry for the setting before you pick a name. If another tracer already has it, reuse
-its name and behavior. If the key is new for all tracers, add it to the registry.
+Search the registry for the configuration key before you pick a name. If another tracer already has
+it, reuse its name and behavior. If the key is new for all tracers, add it to the registry.
 
 Each registry entry has one or more implementations, named `A`, `B`, `C`, and so on. Each one has a
 type, a default and a description. The registry description is what users see: the public
@@ -25,8 +25,8 @@ builds its list of keys from the registry.
 
 ## 2. Add the Entry
 
-Add one line at the end of `DD_LIST_ENVIRONMENT_VARIABLES`. Add a `\` to the line that was last.
-The new last line has no `\`:
+In [include/datadog/environment.h](../include/datadog/environment.h), add one line at the end of
+`DD_LIST_ENVIRONMENT_VARIABLES`. Add a `\` to the line that was last. The new last line has no `\`:
 
 ```cpp
   MACRO(DD_EXTERNAL_ENV, STRING, nullptr)                                      \
@@ -38,21 +38,20 @@ The new last line has no `\`:
 - `DEFAULT`: the default value. Use:
   - a literal (`"localhost"`, `true`, `8126`, `5.0`) when the default is fixed;
   - `nullptr` when there is no default (written as JSON `null`);
-  - `ENV_DEFAULT_RESOLVED_IN_CODE("...")` when the code computes the default at runtime. For
-    example, `DD_SERVICE` defaults to the process name. The JSON `default` is then an empty string.
-    The text is only for readers of the header. Do not use it with `DECIMAL`: the tool would write
-    `""` (two quote characters) as the default.
+  - `ENV_DEFAULT_RESOLVED_IN_CODE("[explanation]")` when the code computes the default at runtime.
+    For example, `DD_SERVICE` defaults to the process name. The string parameter is only for
+    readers of the header. The JSON `default` is then an empty string. Do not use it with
+    `DECIMAL`: the tool would write `""` (two quote characters) as the default.
 
 The type and default must match the registry implementation you use. The JSON keys are sorted, so
 the order does not matter for the JSON. Add new entries at the end, as shown above: the list
 also defines the public `environment::Variable` enum, and the existing values must not change.
 
-Run `bin/format` after editing the header. CI runs `bin/check-format`.
+Run `bin/format` after editing the header.
 
 ## 3. Read the Value in Code
 
-Never call `std::getenv`. CI runs `bin/check-environment-variables` and fails if `std::getenv` is
-used outside `src/datadog/environment.cpp` and `src/datadog/curl.cpp`. Use `environment::lookup`.
+Never call `std::getenv`. Use `environment::lookup`. This is checked by the CI.
 
 Follow the `DD_SERVICE` pattern:
 
@@ -72,10 +71,11 @@ Follow the `DD_SERVICE` pattern:
    (`falsy`, `parse_uint64`, `parse_double`, `parse_list`, `parse_tags`). On a parse error, return
    an `Error` that names the variable with `name(environment::...)`.
 3. Add a `ConfigName` value at the end of the enum in
-   [include/datadog/config.h](../include/datadog/config.h), so existing values keep their
-   numbers. Map it to
-   its telemetry name in `to_string` in
+   [include/datadog/config.h](../include/datadog/config.h), so existing values keep their numbers.
+   Map it to its telemetry name in `to_string` in
    [src/datadog/telemetry/telemetry_impl.cpp](../src/datadog/telemetry/telemetry_impl.cpp).
+   Skip this step for telemetry settings (`telemetry/configuration.cpp`) because they record no
+   metadata.
 4. Pick the final value in `finalize_config` with `resolve_and_record_config` from `config.h`. It
    applies the precedence environment > code > default, and records the origin for telemetry:
 
@@ -88,31 +88,22 @@ Follow the `DD_SERVICE` pattern:
    For a value that is not a string, pass a function that turns it into a string as the last
    argument. See the `log_on_startup` call in `tracer_config.cpp`.
 
-Other components in `src/datadog` also have a `load_*_env_config` function. Some of them pick the
-final value differently:
+Other components in `src/datadog` also have a `load_*_env_config` function. Some pick the final
+value differently (for example with `resolve_and_record_config`, `pick` or `value_or`). Follow the
+code next to your setting.
 
-- `span_sampler_config.cpp` uses `resolve_and_record_config`.
-- `trace_sampler_config.cpp` uses `resolve_and_record_config`, and sets the sampling rules metadata
-  by hand.
-- `datadog_agent_config.cpp` mostly uses `value_or`. It uses `pick` for the agent URL and sets the
-  `AGENT_URL` metadata by hand.
-- `telemetry/configuration.cpp` uses `pick` and records no `ConfigName` metadata. Do not add a
-  `ConfigName` there.
-
-Follow the code next to your setting.
-
-## 4. Regenerate supported-configurations.json
+## 4. Regenerate `supported-configurations.json`
 
 Build the tool and run it from the repo root:
 
 ```shell
-cmake -B .build -DDD_TRACE_BUILD_TOOLS=1 .
-cmake --build .build -j --target config-inversion
-./.build/tools/config-inversion/config-inversion --output-file supported-configurations.json
+cmake -B build -DDD_TRACE_BUILD_TOOLS=1 .
+cmake --build build -j --target config-inversion
+./build/tools/config-inversion/config-inversion --output-file supported-configurations.json
 ```
 
-Run it from the repo root. The tool reads the existing `supported-configurations.json` in the
-current directory to keep each key's `implementation`. In any other directory it aborts with
+The tool reads the existing `supported-configurations.json` in the current directory to keep each
+key's `implementation`. In any other directory it aborts with
 `parse error ... attempting to parse an empty input`.
 
 New keys get implementation `A`. If the registry uses another letter for this behavior, edit only
@@ -134,7 +125,7 @@ Test at least: the default, the environment value overriding the code value, and
 If you record metadata, check its origin and value (see the `PROPAGATION_BEHAVIOR_EXTRACT` tests).
 See [development.md](development.md) to run the tests.
 
-## Renaming or Removing a Configuration
+## Renaming or Removing a Configuration Key
 
 The `config-inversion` tool does not emit aliases or deprecations. To rename, add the new
 name as its own entry and keep the old one. Read both in code and decide which wins. See how

@@ -42,7 +42,7 @@ namespace environment {
 //       There is no default value. This is emitted as JSON null in
 //       supported-configurations.json.
 //
-// See docs/add_configurations.md before adding or changing an entry.
+// See docs/configuration_keys.md before adding or changing an entry.
 #define DD_LIST_ENVIRONMENT_VARIABLES(MACRO)                                   \
   MACRO(DD_AGENT_HOST, STRING, "localhost")                                    \
   MACRO(DD_ENV, STRING, "")                                                    \
