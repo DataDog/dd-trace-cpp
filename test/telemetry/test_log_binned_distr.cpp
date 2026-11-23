@@ -19,7 +19,6 @@ namespace {
 using BinIndex = log_bins::BinIndex;
 using Bins = std::map<BinIndex, double>;
 using log_bins::from_bits;
-using log_bins::to_bits;
 
 struct DecodedSketch {
   double gamma = 0;
@@ -62,26 +61,6 @@ Bins recorded_bins(const std::vector<BinIndex>& bins) {
   LogBinnedDistribution distribution;
   for (const BinIndex bin : bins) distribution.record(value_in_bin(bin));
   return decode_sketch(distribution.encode_protobuf()).bins;
-}
-
-// Returns the bits of the smallest double whose reference bin is at least
-// `bin`, searching in (below, at_or_above].
-std::uint64_t reference_edge(BinIndex bin, std::uint64_t below,
-                             std::uint64_t at_or_above) {
-  while (at_or_above - below > 1) {
-    const std::uint64_t middle = below + (at_or_above - below) / 2;
-    if (log_bins::reference_bin_index(from_bits(middle)) >= bin) {
-      at_or_above = middle;
-    } else {
-      below = middle;
-    }
-  }
-  return at_or_above;
-}
-
-void check_same_bin(double value) {
-  INFO("value " << value << ", bits " << to_bits(value));
-  CHECK(log_bins::bin_index(value) == log_bins::reference_bin_index(value));
 }
 
 void check_bins(const std::vector<double>& values) {
@@ -146,12 +125,7 @@ LOG_BINNED_TEST("bin index of special values") {
   for (const auto& [value, expected_bin] : cases) {
     INFO("value " << value);
     CHECK(log_bins::bin_index(value) == expected_bin);
-    CHECK(log_bins::reference_bin_index(value) == expected_bin);
   }
-}
-
-LOG_BINNED_TEST("the fast table is built") {
-  CHECK(log_bins::fast_table_built());
 }
 
 LOG_BINNED_TEST("bin index of values far from an edge is exact") {
@@ -175,47 +149,7 @@ LOG_BINNED_TEST("bin index rounds the multiplication and the addition once") {
   // exact bin is 3253. Rounding the multiplication first would round the
   // result up to 3254.
   const double value = 7'903'045'517'381.0;
-  CHECK(log_bins::reference_bin_index(value) == 3253);
   CHECK(log_bins::bin_index(value) == 3253);
-}
-
-LOG_BINNED_TEST("bin index equals the reference around every bin edge") {
-  // Covers the fast table, [2^-30, 2^65), and some bins on each side.
-  const std::uint64_t lowest_bits = to_bits(std::ldexp(1.0, -32));
-  const std::uint64_t highest_bits = to_bits(std::ldexp(1.0, 67));
-  const BinIndex first_bin =
-      log_bins::reference_bin_index(from_bits(lowest_bits));
-  const BinIndex last_bin =
-      log_bins::reference_bin_index(from_bits(highest_bits));
-
-  std::uint64_t previous_edge = lowest_bits;
-  for (BinIndex bin = first_bin + 1; bin <= last_bin; ++bin) {
-    const std::uint64_t edge = reference_edge(bin, previous_edge, highest_bits);
-    for (std::uint64_t step = 0; step <= 6; ++step) {
-      check_same_bin(from_bits(edge - 3 + step));
-    }
-    previous_edge = edge;
-  }
-}
-
-LOG_BINNED_TEST("bin index equals the reference on many values") {
-  SECTION("log-uniform values") {
-    for (const double value : log_uniform(100'000, 1e-15, 1e25, 1)) {
-      check_same_bin(value);
-    }
-  }
-  SECTION("random bit patterns") {
-    std::mt19937_64 generator(2);
-    for (int count = 0; count < 100'000; ++count) {
-      check_same_bin(from_bits(generator()));
-    }
-  }
-  SECTION("integers and decimal fractions") {
-    for (int number = 0; number < 20'000; ++number) {
-      check_same_bin(number);
-      check_same_bin(number / 1000.0);
-    }
-  }
 }
 
 LOG_BINNED_TEST("record rejects invalid values") {

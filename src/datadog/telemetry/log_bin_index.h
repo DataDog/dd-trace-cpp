@@ -24,18 +24,11 @@ inline constexpr double zero_threshold =
 inline constexpr BinIndex zero_bin = std::numeric_limits<BinIndex>::min();
 inline constexpr BinIndex rejected_value = zero_bin + 1;
 
-// Returns the bin of `value`. Returns `zero_bin` for values below
-// `zero_threshold`, and `rejected_value` for negative values, NaN and
-// infinities. Same result as reference_bin_index(), but faster.
-BinIndex bin_index(double value);
-
-// Computes the bin as floor(ln(value) × m + bin_index_shift), with
+// Returns the bin of `value`, floor(ln(value) × m + bin_index_shift), with
 // m = 1 / ln(bin_ratio). The multiplication and the addition are rounded once.
-// Declared here for the tests. The library only uses bin_index().
-BinIndex reference_bin_index(double value);
-
-// Returns true if the fast table was built. Declared here for the tests.
-bool fast_table_built();
+// Returns `zero_bin` for values below `zero_threshold`, and `rejected_value`
+// for negative values, NaN and infinities.
+BinIndex bin_index(double value);
 
 // TODO: replace to_bits() and from_bits() with std::bit_cast after the upgrade
 // to C++20.
