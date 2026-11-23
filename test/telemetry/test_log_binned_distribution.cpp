@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <limits>
 #include <map>
+#include <new>
 #include <random>
 #include <string>
 #include <type_traits>
@@ -12,6 +14,24 @@
 #include "datadog/telemetry/log_bin_index.h"
 #include "datadog/telemetry/log_binned_distribution.h"
 #include "test.h"
+
+namespace {
+
+// While true, operator new throws std::bad_alloc.
+bool fail_allocations = false;
+
+}  // namespace
+
+// Replaced so that a test can make the window allocation fail.
+void* operator new(std::size_t size) {
+  if (fail_allocations) throw std::bad_alloc();
+  if (void* memory = std::malloc(size == 0 ? 1 : size)) return memory;
+  throw std::bad_alloc();
+}
+
+void operator delete(void* memory) noexcept { std::free(memory); }
+
+void operator delete(void* memory, std::size_t) noexcept { std::free(memory); }
 
 using namespace datadog::telemetry;
 
@@ -188,6 +208,26 @@ LOG_BINNED_TEST("a self-move keeps the values") {
   LogBinnedDistribution& same = distribution;
   distribution = std::move(same);
   CHECK(distribution.encode_protobuf() == encoded);
+}
+
+LOG_BINNED_TEST("record keeps old counts if the window allocation fails") {
+  LogBinnedDistribution distribution;
+  distribution.record(value_in_bin(0));
+  distribution.record(value_in_bin(2047));
+
+  // Bin 3100 merges bins 0 to 1052, and needs a new window.
+  fail_allocations = true;
+  bool threw = false;
+  try {
+    distribution.record(value_in_bin(3100));
+  } catch (const std::bad_alloc&) {
+    threw = true;
+  }
+  fail_allocations = false;
+
+  CHECK(threw);
+  CHECK(decode_sketch(distribution.encode_protobuf()).bins ==
+        Bins{{0, 1}, {2047, 1}});
 }
 
 LOG_BINNED_TEST("record rejects invalid values") {

@@ -66,7 +66,8 @@ class LogBinnedDistribution {
   void start_range(BinIndex bin);
   void extend_down(BinIndex bin, BinIndex highest);
   void extend_up(BinIndex bin, BinIndex highest);
-  std::uint64_t take_counts(BinIndex lowest, BinIndex highest);
+  std::uint64_t sum_counts(BinIndex lowest, BinIndex highest) const;
+  void clear_counts(BinIndex lowest, BinIndex highest);
   void ensure_window_covers(BinIndex lowest, BinIndex highest);
   std::uint64_t& count_at(BinIndex bin);
   std::uint64_t count_at(BinIndex bin) const;

@@ -120,25 +120,30 @@ void LogBinnedDistribution::extend_down(BinIndex bin, BinIndex highest) {
 // the new lowest bin.
 void LogBinnedDistribution::extend_up(BinIndex bin, BinIndex highest) {
   const BinIndex new_lowest = std::max(lowest_bin_, bin - (max_bins - 1));
-  const std::uint64_t merged =
-      take_counts(lowest_bin_, std::min(new_lowest - 1, highest));
+  const BinIndex last_merged = std::min(new_lowest - 1, highest);
+  const std::uint64_t merged = sum_counts(lowest_bin_, last_merged);
+  // The window grows before any count changes. If the allocation throws, no
+  // count is lost.
   ensure_window_covers(new_lowest, bin);
+  // The new window may have dropped some merged bins. Clears the others.
+  clear_counts(std::max(lowest_bin_, window_start_), last_merged);
   lowest_bin_ = new_lowest;
   bin_range_size_ = static_cast<std::uint32_t>(bin - new_lowest + 1);
   count_at(new_lowest) += merged;
   ++count_at(bin);
 }
 
-// Sets the counts of bins [lowest, highest] to zero and returns their sum.
-std::uint64_t LogBinnedDistribution::take_counts(BinIndex lowest,
-                                                 BinIndex highest) {
+// Returns the sum of the counts of bins [lowest, highest].
+std::uint64_t LogBinnedDistribution::sum_counts(BinIndex lowest,
+                                                BinIndex highest) const {
   std::uint64_t sum = 0;
-  for (BinIndex bin = lowest; bin <= highest; ++bin) {
-    std::uint64_t& count = count_at(bin);
-    sum += count;
-    count = 0;
-  }
+  for (BinIndex bin = lowest; bin <= highest; ++bin) sum += count_at(bin);
   return sum;
+}
+
+// Sets the counts of bins [lowest, highest] to zero.
+void LogBinnedDistribution::clear_counts(BinIndex lowest, BinIndex highest) {
+  for (BinIndex bin = lowest; bin <= highest; ++bin) count_at(bin) = 0;
 }
 
 // Makes the window cover bins [lowest, highest]. The new window has room on
