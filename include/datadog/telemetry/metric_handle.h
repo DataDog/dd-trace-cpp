@@ -127,17 +127,24 @@ class NamedCodec final : public TagCodec {
 };
 
 // An optional enum field. Value 0 is an empty field, which is not sent. Value
-// i + 1 renders as rendered[i].
+// i + 1 renders as rendered[i]. An enum value without a name reads as
+// `invalid_enum_value`, which is out of range, so its series is dropped.
 template <typename Tags, typename Enum>
 class OptionalCodec final : public TagCodec {
  public:
+  static constexpr std::uint64_t invalid_enum_value =
+      std::numeric_limits<std::uint64_t>::max();
+
   OptionalCodec(tracing::Optional<Enum> Tags::*field,
                 std::vector<std::string> rendered)
       : field_(field), rendered_(std::move(rendered)) {}
 
   std::uint64_t read(const void* tags) const override {
     const auto& value = static_cast<const Tags*>(tags)->*field_;
-    return value ? static_cast<std::uint64_t>(*value) + 1 : 0;
+    if (!value) return 0;
+    // Checks before adding 1, which would wrap UINT64_MAX (from -1) to 0.
+    const auto index = static_cast<std::uint64_t>(*value);
+    return index < rendered_.size() ? index + 1 : invalid_enum_value;
   }
 
   std::string render(std::uint64_t value) const override {

@@ -41,6 +41,19 @@ struct SizeTags {
   static auto tag_fields() { return std::tuple{tag("size", &SizeTags::size)}; }
 };
 
+// A signed enum can hold -1, which has no name.
+enum class Level : int { low, high };
+
+std::array<const char*, 2> tag_value_names(Level) { return {"low", "high"}; }
+
+struct LevelTags {
+  Optional<Level> level;
+
+  static auto tag_fields() {
+    return std::tuple{tag("level", &LevelTags::level)};
+  }
+};
+
 struct TooManyTags {
   TagString first, second, third, fourth, fifth;
 
@@ -162,4 +175,17 @@ METRIC_HANDLE_TEST("an enum value without a name is dropped") {
 
   using Counts = std::map<std::vector<std::string>, std::uint64_t>;
   CHECK(by_tags(registry.take<Counter>()) == Counts{{{"size:large"}, 1}});
+}
+
+METRIC_HANDLE_TEST("an optional enum value without a name is dropped") {
+  details::MetricRegistry registry;
+  const auto hits = registry.counter<LevelTags>({"hits", "appsec", true});
+  hits->record({}, 1);
+  hits->record({Level::high}, 1);
+  hits->record({static_cast<Level>(-1)}, 1);
+  hits->record({static_cast<Level>(2)}, 1);
+
+  using Counts = std::map<std::vector<std::string>, std::uint64_t>;
+  CHECK(by_tags(registry.take<Counter>()) ==
+        Counts{{{}, 1}, {{"level:high"}, 1}});
 }
