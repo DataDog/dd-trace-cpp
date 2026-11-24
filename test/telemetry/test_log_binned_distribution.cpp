@@ -1,0 +1,469 @@
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <functional>
+#include <limits>
+#include <map>
+#include <new>
+#include <random>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "datadog/telemetry/log_bin_index.h"
+#include "datadog/telemetry/log_binned_distribution.h"
+#include "test.h"
+
+namespace {
+
+// While true, operator new throws std::bad_alloc.
+bool fail_allocations = false;
+
+}  // namespace
+
+// Replaced so that a test can make the window allocation fail.
+void* operator new(std::size_t size) {
+  if (fail_allocations) throw std::bad_alloc();
+  if (void* memory = std::malloc(size == 0 ? 1 : size)) return memory;
+  throw std::bad_alloc();
+}
+
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept {
+  try {
+    return ::operator new(size);
+  } catch (const std::bad_alloc&) {
+    return nullptr;
+  }
+}
+
+void operator delete(void* memory) noexcept { std::free(memory); }
+
+void operator delete(void* memory, std::size_t) noexcept { std::free(memory); }
+
+void operator delete(void* memory, const std::nothrow_t&) noexcept {
+  std::free(memory);
+}
+
+using namespace datadog::telemetry;
+
+#define LOG_BINNED_TEST(x) TEST_CASE(x, "[telemetry][log_binned_distribution]")
+
+namespace {
+
+using BinIndex = log_bins::BinIndex;
+using Bins = std::map<BinIndex, double>;
+using log_bins::from_bits;
+
+struct DecodedSketch {
+  double gamma = 0;
+  double index_offset = 0;
+  std::uint64_t interpolation = 0;
+  Bins bins;
+  bool has_negative_store = false;
+  Bins negative_bins;
+  double zero_count = 0;
+};
+
+DecodedSketch decode_sketch(const std::string& data);
+
+// The bins expected once `values` are recorded. Each value counts in its own
+// bin, but only the 2048 highest bins are kept. Lower values count in the
+// lowest bin kept.
+Bins expected_bins(const std::vector<double>& values) {
+  Bins exact;
+  for (const double value : values) {
+    const BinIndex bin = log_bins::bin_index(value);
+    if (bin != log_bins::zero_bin) exact[bin] += 1;
+  }
+  if (exact.empty()) return exact;
+
+  const BinIndex lowest_kept = exact.rbegin()->first - 2047;
+  Bins expected;
+  for (const auto& [bin, count] : exact) {
+    expected[std::max(bin, lowest_kept)] += count;
+  }
+  return expected;
+}
+
+// A value in the middle of `bin`, half a bin from both edges. Bin 1338 holds
+// 1.0.
+double value_in_bin(BinIndex bin) {
+  return std::pow(log_bins::bin_ratio, bin - 1338);
+}
+
+Bins recorded_bins(const std::vector<BinIndex>& bins) {
+  LogBinnedDistribution distribution;
+  for (const BinIndex bin : bins) distribution.record(value_in_bin(bin));
+  return decode_sketch(distribution.encode_protobuf()).bins;
+}
+
+void check_bins(const std::vector<double>& values) {
+  LogBinnedDistribution distribution;
+  for (const double value : values) distribution.record(value);
+  const double zero_count =
+      static_cast<double>(std::count(values.begin(), values.end(), 0.0));
+
+  const DecodedSketch decoded = decode_sketch(distribution.encode_protobuf());
+  CHECK(decoded.bins == expected_bins(values));
+  CHECK(decoded.zero_count == zero_count);
+}
+
+std::vector<double> log_uniform(std::size_t count, double lowest,
+                                double highest, std::uint64_t seed) {
+  std::mt19937_64 generator(seed);
+  std::uniform_real_distribution<double> exponent(std::log(lowest),
+                                                  std::log(highest));
+  std::vector<double> values(count);
+  for (double& value : values) value = std::exp(exponent(generator));
+  return values;
+}
+
+}  // namespace
+
+LOG_BINNED_TEST("mapping constants follow libdatadog's formulas") {
+  const double relative_accuracy = 0.007751937984496124;
+  CHECK((1 + relative_accuracy) / (1 - relative_accuracy) ==
+        log_bins::bin_ratio);
+
+  const double log_ratio = std::log(log_bins::bin_ratio);
+  CHECK((1 - std::floor(std::log(1e-9) / log_ratio)) + 0.5 ==
+        log_bins::bin_index_shift);
+
+  const double multiplier = 1 / log_ratio;
+  const double lowest_bin = std::numeric_limits<BinIndex>::min();
+  const double int32_limit =
+      std::exp((lowest_bin - log_bins::bin_index_shift) / multiplier + 1.0);
+  CHECK(std::max(std::numeric_limits<double>::min() * log_bins::bin_ratio,
+                 int32_limit) == log_bins::zero_threshold);
+}
+
+LOG_BINNED_TEST("bin index of special values") {
+  const double infinity = std::numeric_limits<double>::infinity();
+  const std::vector<std::pair<double, BinIndex>> cases{
+      {std::nan(""), log_bins::rejected_value},
+      {infinity, log_bins::rejected_value},
+      {-infinity, log_bins::rejected_value},
+      {-1.0, log_bins::rejected_value},
+      {-std::numeric_limits<double>::min(), log_bins::rejected_value},
+      {0.0, log_bins::zero_bin},
+      {-0.0, log_bins::zero_bin},
+      {std::numeric_limits<double>::denorm_min(), log_bins::zero_bin},
+      {std::numeric_limits<double>::min(), log_bins::zero_bin},
+      {std::nextafter(log_bins::zero_threshold, 0.0), log_bins::zero_bin},
+      {log_bins::zero_threshold, -44352},
+      {1e-9, 1},
+      {1.0, 1338},
+      {1000.0, 1784},
+      {std::numeric_limits<double>::max(), 47118},
+  };
+  for (const auto& [value, expected_bin] : cases) {
+    INFO("value " << value);
+    CHECK(log_bins::bin_index(value) == expected_bin);
+  }
+}
+
+LOG_BINNED_TEST("bin index of values far from an edge is exact") {
+  // Exact bins, computed with 300-bit arithmetic (mpmath): the floor of
+  // ln(x) / ln(65/64) + 1338.5. Each value is at least 0.04 bins from an edge.
+  const std::vector<std::pair<double, BinIndex>> cases{
+      {1e-300, -43216}, {5e-300, -43112}, {1e-20, -1632}, {3.3e-15, -813},
+      {1e-9, 1},        {0.001, 892},     {0.37, 1274},   {0.5, 1293},
+      {1.0, 1338},      {2.5, 1397},      {3.0, 1409},    {123.456, 1649},
+      {1000.0, 1784},   {65536.0, 2053},  {1e9, 2675},    {1e12, 3120},
+      {1e18, 4011},     {1e25, 5051},     {1e100, 16189}, {1e300, 45892},
+  };
+  for (const auto& [value, expected_bin] : cases) {
+    INFO("value " << value);
+    CHECK(log_bins::bin_index(value) == expected_bin);
+  }
+}
+
+LOG_BINNED_TEST("bin index rounds the multiplication and the addition once") {
+  // ln(x) / ln(65/64) + 1338.5 is 3253.99999999999995516 for this x, so the
+  // exact bin is 3253. Rounding the multiplication first would round the
+  // result up to 3254.
+  const double value = 7'903'045'517'381.0;
+  CHECK(log_bins::bin_index(value) == 3253);
+}
+
+LOG_BINNED_TEST("a move takes the values and empties the source") {
+  static_assert(std::is_nothrow_move_constructible_v<LogBinnedDistribution>);
+  static_assert(std::is_nothrow_move_assignable_v<LogBinnedDistribution>);
+  LogBinnedDistribution source;
+  source.record(0.0);
+  source.record(1.0);
+  source.record(1000.0);
+  const std::string encoded = source.encode_protobuf();
+
+  SECTION("move construction") {
+    const LogBinnedDistribution target(std::move(source));
+    CHECK(target.encode_protobuf() == encoded);
+  }
+  SECTION("move assignment") {
+    LogBinnedDistribution target;
+    target.record(5.0);
+    target = std::move(source);
+    CHECK(target.encode_protobuf() == encoded);
+  }
+  CHECK(source.encode_protobuf() == LogBinnedDistribution().encode_protobuf());
+  CHECK(source.record(1000.0));
+  LogBinnedDistribution expected;
+  expected.record(1000.0);
+  CHECK(source.encode_protobuf() == expected.encode_protobuf());
+}
+
+LOG_BINNED_TEST("a self-move keeps the values") {
+  LogBinnedDistribution distribution;
+  distribution.record(1.0);
+  const std::string encoded = distribution.encode_protobuf();
+  LogBinnedDistribution& same = distribution;
+  distribution = std::move(same);
+  CHECK(distribution.encode_protobuf() == encoded);
+}
+
+LOG_BINNED_TEST("record keeps old counts if the window allocation fails") {
+  LogBinnedDistribution distribution;
+  distribution.record(value_in_bin(0));
+  distribution.record(value_in_bin(2047));
+
+  // Bin 3100 merges bins 0 to 1052, and needs a new window.
+  fail_allocations = true;
+  bool threw = false;
+  try {
+    distribution.record(value_in_bin(3100));
+  } catch (const std::bad_alloc&) {
+    threw = true;
+  }
+  fail_allocations = false;
+
+  CHECK(threw);
+  CHECK(decode_sketch(distribution.encode_protobuf()).bins ==
+        Bins{{0, 1}, {2047, 1}});
+}
+
+LOG_BINNED_TEST("record rejects invalid values") {
+  LogBinnedDistribution distribution;
+  CHECK_FALSE(distribution.record(std::nan("")));
+  CHECK_FALSE(distribution.record(-1.0));
+  CHECK_FALSE(distribution.record(std::numeric_limits<double>::infinity()));
+  CHECK(distribution.record(0.0));
+  CHECK(distribution.record(-0.0));
+
+  const DecodedSketch decoded = decode_sketch(distribution.encode_protobuf());
+  CHECK(decoded.bins.empty());
+  CHECK(decoded.zero_count == 2);
+}
+
+LOG_BINNED_TEST("encoding of an empty distribution") {
+  const LogBinnedDistribution distribution;
+  const unsigned char expected[] = {
+      0x0a, 0x12, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0xf0, 0x3f,
+      0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0xea, 0x94, 0x40, 0x12, 0x00};
+  CHECK(distribution.encode_protobuf() ==
+        std::string(reinterpret_cast<const char*>(expected), sizeof expected));
+}
+
+LOG_BINNED_TEST("encoding of one value") {
+  LogBinnedDistribution distribution;
+  distribution.record(1.0);
+  const unsigned char expected[] = {
+      0x0a, 0x12, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0xf0, 0x3f, 0x11,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0xea, 0x94, 0x40, 0x12, 0x0e, 0x0a, 0x0c,
+      0x08, 0xf4, 0x14, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f};
+  CHECK(distribution.encode_protobuf() ==
+        std::string(reinterpret_cast<const char*>(expected), sizeof expected));
+
+  const DecodedSketch decoded = decode_sketch(distribution.encode_protobuf());
+  CHECK(decoded.gamma == 65.0 / 64.0);
+  CHECK(decoded.index_offset == 1338.5);
+  CHECK(decoded.interpolation == 0);
+  CHECK(decoded.bins == Bins{{1338, 1.0}});
+  CHECK_FALSE(decoded.has_negative_store);
+}
+
+LOG_BINNED_TEST("encoding of one value in a negative bin") {
+  // Bin -147 holds values around 1e-10. Its key is zigzag(-147) = 293.
+  LogBinnedDistribution distribution;
+  distribution.record(value_in_bin(-147));
+  const unsigned char expected[] = {
+      0x0a, 0x12, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0xf0, 0x3f, 0x11,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0xea, 0x94, 0x40, 0x12, 0x0e, 0x0a, 0x0c,
+      0x08, 0xa5, 0x02, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f};
+  CHECK(distribution.encode_protobuf() ==
+        std::string(reinterpret_cast<const char*>(expected), sizeof expected));
+  CHECK(decode_sketch(distribution.encode_protobuf()).bins ==
+        Bins{{-147, 1.0}});
+}
+
+LOG_BINNED_TEST("the store keeps the 2048 highest bins") {
+  SECTION("a range of 2048 bins keeps every bin") {
+    CHECK(recorded_bins({1000, 3047}) == Bins{{1000, 1}, {3047, 1}});
+  }
+  SECTION("a higher value merges the lowest bins into the lowest bin kept") {
+    CHECK(recorded_bins({1000, 1000, 1500, 3048}) ==
+          Bins{{1001, 2}, {1500, 1}, {3048, 1}});
+    CHECK(recorded_bins({1000, 1500, 9000}) == Bins{{6953, 2}, {9000, 1}});
+  }
+  SECTION("a lower value goes to the lowest bin kept") {
+    CHECK(recorded_bins({3047, 1000, 999, 10}) == Bins{{1000, 3}, {3047, 1}});
+    CHECK(recorded_bins({3047, 500}) == Bins{{1000, 1}, {3047, 1}});
+    CHECK(recorded_bins({1000, 3048, 5}) == Bins{{1001, 2}, {3048, 1}});
+  }
+}
+
+LOG_BINNED_TEST("bins of many values") {
+  SECTION("narrow durations") {
+    check_bins(log_uniform(100'000, 100, 10'000, 3));
+  }
+  SECTION("wide range, which collapses the lowest bins") {
+    check_bins(log_uniform(100'000, 1e-12, 1e22, 4));
+  }
+  SECTION("values that only increase") {
+    std::vector<double> values = log_uniform(20'000, 1e-9, 1e20, 5);
+    std::sort(values.begin(), values.end());
+    check_bins(values);
+  }
+  SECTION("values that only decrease") {
+    std::vector<double> values = log_uniform(20'000, 1e-9, 1e20, 6);
+    std::sort(values.begin(), values.end(), std::greater<double>());
+    check_bins(values);
+  }
+  SECTION("values alternating between both ends") {
+    std::vector<double> values;
+    for (int step = 0; step < 5'000; ++step) {
+      values.push_back(1e-6 * (1 + step % 7));
+      values.push_back(1e15 * (1 + step % 5));
+    }
+    check_bins(values);
+  }
+  SECTION("low values, then high ones, then low ones again") {
+    std::vector<double> values = log_uniform(5'000, 1, 100, 7);
+    const std::vector<double> high = log_uniform(5'000, 1e14, 1e16, 8);
+    const std::vector<double> low = log_uniform(5'000, 1e-3, 10, 9);
+    values.insert(values.end(), high.begin(), high.end());
+    values.insert(values.end(), low.begin(), low.end());
+    check_bins(values);
+  }
+  SECTION("zeros and fractions mixed") {
+    std::vector<double> values = log_uniform(50'000, 1e-4, 1, 10);
+    for (std::size_t index = 0; index < values.size(); index += 10) {
+      values[index] = 0;
+    }
+    check_bins(values);
+  }
+}
+
+namespace {
+
+// A minimal protobuf reader, for the messages of a DDSketch.
+class ProtobufReader {
+ public:
+  explicit ProtobufReader(const std::string& data) : data_(data) {}
+
+  bool done() const { return position_ >= data_.size(); }
+
+  std::uint64_t read_varint() {
+    std::uint64_t value = 0;
+    for (int shift = 0;; shift += 7) {
+      const unsigned char byte =
+          static_cast<unsigned char>(data_.at(position_++));
+      value |= std::uint64_t{byte & 0x7fu} << shift;
+      if ((byte & 0x80) == 0) return value;
+    }
+  }
+
+  double read_double() {
+    std::uint64_t bits = 0;
+    for (int byte = 0; byte < 8; ++byte) {
+      const unsigned char value =
+          static_cast<unsigned char>(data_.at(position_++));
+      bits |= std::uint64_t{value} << (8 * byte);
+    }
+    return from_bits(bits);
+  }
+
+  std::string read_bytes() {
+    const std::size_t length = read_varint();
+    REQUIRE(position_ + length <= data_.size());
+    std::string bytes = data_.substr(position_, length);
+    position_ += length;
+    return bytes;
+  }
+
+ private:
+  const std::string& data_;
+  std::size_t position_ = 0;
+};
+
+std::int32_t unzigzag(std::uint64_t value) {
+  const std::uint32_t low = static_cast<std::uint32_t>(value);
+  return static_cast<std::int32_t>((low >> 1) ^ (0u - (low & 1)));
+}
+
+void decode_bin(const std::string& data, Bins& bins) {
+  ProtobufReader reader(data);
+  BinIndex bin = 0;
+  double count = 0;
+  while (!reader.done()) {
+    const std::uint64_t tag = reader.read_varint();
+    if (tag == ((1 << 3) | 0)) {
+      bin = unzigzag(reader.read_varint());
+    } else if (tag == ((2 << 3) | 1)) {
+      count = reader.read_double();
+    } else {
+      FAIL("unexpected field in a bin entry: " << tag);
+    }
+  }
+  bins[bin] += count;
+}
+
+Bins decode_store(const std::string& data) {
+  ProtobufReader reader(data);
+  Bins bins;
+  while (!reader.done()) {
+    const std::uint64_t tag = reader.read_varint();
+    REQUIRE(tag == ((1 << 3) | 2));
+    decode_bin(reader.read_bytes(), bins);
+  }
+  return bins;
+}
+
+void decode_mapping(const std::string& data, DecodedSketch& sketch) {
+  ProtobufReader reader(data);
+  while (!reader.done()) {
+    const std::uint64_t tag = reader.read_varint();
+    if (tag == ((1 << 3) | 1)) {
+      sketch.gamma = reader.read_double();
+    } else if (tag == ((2 << 3) | 1)) {
+      sketch.index_offset = reader.read_double();
+    } else if (tag == ((3 << 3) | 0)) {
+      sketch.interpolation = reader.read_varint();
+    } else {
+      FAIL("unexpected field in the mapping: " << tag);
+    }
+  }
+}
+
+DecodedSketch decode_sketch(const std::string& data) {
+  ProtobufReader reader(data);
+  DecodedSketch sketch;
+  while (!reader.done()) {
+    const std::uint64_t tag = reader.read_varint();
+    if (tag == ((1 << 3) | 2)) {
+      decode_mapping(reader.read_bytes(), sketch);
+    } else if (tag == ((2 << 3) | 2)) {
+      sketch.bins = decode_store(reader.read_bytes());
+    } else if (tag == ((3 << 3) | 2)) {
+      sketch.has_negative_store = true;
+      sketch.negative_bins = decode_store(reader.read_bytes());
+    } else if (tag == ((4 << 3) | 1)) {
+      sketch.zero_count = reader.read_double();
+    } else {
+      FAIL("unexpected field in the sketch: " << tag);
+    }
+  }
+  return sketch;
+}
+
+}  // namespace
