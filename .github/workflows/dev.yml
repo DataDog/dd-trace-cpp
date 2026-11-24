@@ -24,12 +24,14 @@ jobs:
         run: cmake --build ${BUILD_DIR} -j --target config-inversion -v
       - name: Verify supported configurations metadata
         run: |
+          tool="./${BUILD_DIR}/tools/config-inversion/config-inversion"
           tmp_dir="$(mktemp -d)"
           trap 'rm -rf "$tmp_dir"' EXIT
-          ./${BUILD_DIR}/tools/config-inversion/config-inversion --output-file "${tmp_dir}/ci-supported-configurations.json"
-          if ! diff -q "$tmp_dir/ci-supported-configurations.json" "supported-configurations.json" >/dev/null 2>&1; then
-            echo "ERROR: supported-configurations.json got out of sync with implemented configurations. Please run `./config-inversion --output-file supported-configurations.json` locally."
-            diff -u "$tmp_dir/supported-configurations.json" supported-configurations.json || true
+          ci_generated_configurations="${tmp_dir}/ci-supported-configurations.json"
+          "$tool" --output-file "$ci_generated_configurations"
+          if ! diff -q "$ci_generated_configurations" supported-configurations.json >/dev/null 2>&1; then
+            echo "ERROR: supported-configurations.json got out of sync with implemented configurations. Run ${tool} --output-file supported-configurations.json from the repo root. See docs/configuration_keys.md."
+            diff -u "$ci_generated_configurations" supported-configurations.json || true
             exit 1
           fi
 

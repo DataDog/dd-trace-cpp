@@ -37,3 +37,6 @@ C++ code is analyzed with Clang Tidy. Run it with the following command:
 bin/check-tidy
 ```
 
+## Configuration Keys
+
+Follow [configuration_keys.md](configuration_keys.md) when adding or changing a configuration key.
