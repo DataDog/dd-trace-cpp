@@ -5,6 +5,24 @@ include:
   - project: 'DataDog/benchmarking-platform-tools'
     file: 'images/templates/gitlab/build-ci-images.template.yml'
 
+.analyzer-settings: &analyzer-settings
+  UNCONFIDENCE_THRESHOLD: "2.0"
+  DISABLE_NHST: "1"
+  CI_TYPE: "theoretical"
+  MD_REPORT_ONLY_CHANGES: "1"
+
+.benchmarks-rules: &benchmarks-rules
+  - if: $CI_COMMIT_BRANCH == "main"
+    interruptible: false
+  - interruptible: true
+
+.reports-artifacts: &reports-artifacts
+  name: "reports"
+  when: always
+  paths:
+    - reports/
+  expire_in: 3 months
+
 variables:
   # Consumed by the benchmark jobs below. To rebuild the image, run the manual
   # `build-benchmark-ci-images` job and repin to the tag it pushes
@@ -26,10 +44,7 @@ benchmarks:
   when: on_success
   tags: ["runner:apm-k8s-tweaked-metal"]
   image: $BENCHMARKS_CI_IMAGE
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      interruptible: false
-    - interruptible: true
+  rules: *benchmarks-rules
   timeout: 15m
   script:
     # Keep the prelude: the gate and the insteadOf clone rewriting both
@@ -38,12 +53,7 @@ benchmarks:
     - export ARTIFACTS_DIR="$(pwd)/reports" && (mkdir "${ARTIFACTS_DIR}" || :)
     - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
     - bp-runner .gitlab/benchmarks/bp-runner.yml --debug
-  artifacts:
-    name: "reports"
-    when: always
-    paths:
-      - reports/
-    expire_in: 3 months
+  artifacts: *reports-artifacts
   variables:
     UPSTREAM_PROJECT_ID: $CI_PROJECT_ID # The ID of the current project. This ID is unique across all projects on the GitLab instance.
     UPSTREAM_PROJECT_NAME: $CI_PROJECT_NAME # "dd-trace-cpp"
@@ -51,12 +61,8 @@ benchmarks:
     UPSTREAM_COMMIT_SHA: $CI_COMMIT_SHA # The commit revision the project is built for.
     # See https://datadoghq.atlassian.net/wiki/x/dAKLrgE for more details.
     FLAKY_BENCHMARKS_REGEX: ""
-    # Analyzer settings. Every bp-runner step inherits the CI process environment,
-    # so the settings live here instead of the config.
-    UNCONFIDENCE_THRESHOLD: "2.0"
-    DISABLE_NHST: "1"
-    CI_TYPE: "theoretical"
-    MD_REPORT_ONLY_CHANGES: "1"
+    # Analyzer settings.
+    <<: *analyzer-settings
 
 # Posts the comparison and uploads results. allow_failure preserves the old || :
 # semantics, and a separate job avoids the parallel-teardown race with the S3
@@ -69,26 +75,15 @@ benchmarks-pr-comment:
   tags: ["arch:amd64"]
   image: $BENCHMARKS_CI_IMAGE
   timeout: 30m
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      interruptible: false
-    - interruptible: true
+  rules: *benchmarks-rules
   variables:
     # Analyzer settings the PR comment's comparison output depends on.
-    UNCONFIDENCE_THRESHOLD: "2.0"
-    DISABLE_NHST: "1"
-    CI_TYPE: "theoretical"
-    MD_REPORT_ONLY_CHANGES: "1"
+    <<: *analyzer-settings
   script:
     - export ARTIFACTS_DIR="$(pwd)/reports" && (mkdir "${ARTIFACTS_DIR}" || :)
     - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
     - bp-runner .gitlab/benchmarks/bp-runner.pr-comment.yml --debug
-  artifacts:
-    name: "reports"
-    when: always
-    paths:
-      - reports/
-    expire_in: 3 months
+  artifacts: *reports-artifacts
 
 # This repository is using PR-level performance quality gates.
 # Verify that the check-big-regressions CI job has passed. If any regression happened, merging this PR will be blocked.
@@ -98,10 +93,7 @@ check-big-regressions:
   stage: benchmarks-report
   needs: [ benchmarks ]
   when: on_success
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      interruptible: false
-    - interruptible: true
+  rules: *benchmarks-rules
   tags: ["arch:amd64"]
   image: $BENCHMARKS_CI_IMAGE
   script: |
