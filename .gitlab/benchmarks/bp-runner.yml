@@ -9,12 +9,10 @@ experiments:
         run: run_microbenchmarks
         repo: DataDog/dd-trace-cpp
         # The default fetch does not initialise submodules, and the benchmark
-        # binary needs the google-benchmark submodule. The clone follows the
-        # branch tip, so the submodules must be re-synced after the SHA
-        # checkout.
+        # binary needs the google-benchmark and tinycc submodules.
         how_to_fetch_release: |
-          git clone --recurse-submodules --branch $BRANCH https://github.com/DataDog/dd-trace-cpp/ "$CODE_SRC"
-          cd "$CODE_SRC" && git checkout $COMMIT_SHA
+          git clone --branch "$BRANCH" https://github.com/DataDog/dd-trace-cpp/ "$CODE_SRC"
+          cd "$CODE_SRC" && git checkout "$COMMIT_SHA"
           git submodule update --init --recursive
         # --benchmark_out makes the analyzer find the results file, named
         # the way the fail-on-regression gate already globs.
