@@ -27,7 +27,7 @@ variables:
   # Consumed by the benchmark jobs below. To rebuild the image, run the manual
   # `build-benchmark-ci-images` job and repin to the tag it pushes
   # (dd-trace-cpp-<pipeline id>).
-  BENCHMARKS_CI_IMAGE: registry.ddbuild.io/ci/benchmarking-platform:dd-trace-cpp-152931925
+  BENCHMARKS_CI_IMAGE: registry.ddbuild.io/ci/benchmarking-platform:dd-trace-cpp-156635051
 
   # The per-pipeline
   # suffix gives each build a unique tag.
