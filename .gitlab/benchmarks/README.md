@@ -6,16 +6,16 @@ against a baseline to detect regressions on every PR.
 
 Files in this directory:
 
-- **`bp-runner.yml`** — the configuration the `benchmarks` CI job runs with
-  `bp-runner`: fetch the candidate and baseline releases, run `bin/benchmark`
-  on each, analyze with the GoogleBenchmark converter, upload to S3.
-- **`bp-runner.pr-comment.yml`** — the configuration the `benchmarks-pr-comment`
-  job runs with `bp-runner`: post the comparison comment on the PR and upload
-  to the BP API. The job is `allow_failure: true`, like the old `|| :` steps.
-- **`container/`** — Dockerfile and install script for the benchmarks CI image.
-- **`bp-runner.fail-on-regression.yml`** — gate config. The
+- **`bp-runner.fail-on-regression.yml`**: gate config. The
   `check-big-regressions` job runs it with `bp-runner` and fails the pipeline on
   regressions above `regression_threshold`.
+- **`bp-runner.pr-comment.yml`**: the configuration the `benchmarks-pr-comment`
+  job runs with `bp-runner`: post the comparison comment on the PR and upload
+  to the BP API. The job is `allow_failure: true`, like the old `|| :` steps.
+- **`bp-runner.yml`**: the configuration the `benchmarks` CI job runs with
+  `bp-runner`: fetch the candidate and baseline releases, run `bin/benchmark`
+  on each, analyze with the GoogleBenchmark converter, upload to S3.
+- **`container/`**: Dockerfile and install script for the benchmarks CI image.
 
 Execution flow on each PR:
 
@@ -29,7 +29,7 @@ Execution flow on each PR:
    `bp-runner.fail-on-regression.yml` and fails on regressions above the
    threshold.
 
-## How to add a benchmark
+## How to Add a Benchmark
 
 1. Write it in [`benchmark/`](../../benchmark/) using Google Benchmark, and add
    the source file to `benchmark/CMakeLists.txt`.
@@ -38,14 +38,14 @@ Execution flow on each PR:
 New benchmarks that don't exist on the baseline branch are skipped from the
 baseline comparison on the first run.
 
-## How to update a benchmark
+## How to Update a Benchmark
 
 Edit the source in `benchmark/`. The experiment only builds and runs what is in
 `benchmark/`, so no config change is needed to add, edit, or remove a
 benchmark. Edit `bp-runner.yml` when the flow itself changes (fetch, run,
 analyze, upload), and `container/` only when the toolchain changes.
 
-## How to mark a benchmark as flaky
+## How to Mark a Benchmark as Flaky
 
 Add it to `FLAKY_BENCHMARKS_REGEX` in the `benchmarks` job's `variables` in
 [`../benchmarks.yml`](../benchmarks.yml). The benchmark still runs and reports,
@@ -64,7 +64,7 @@ Open a ticket to fix or remove it. See
 [Flaky Benchmarks Monitoring](https://datadoghq.atlassian.net/wiki/x/dAKLrgE)
 for more details.
 
-## How to run a benchmark locally
+## How to Run a Benchmark Locally
 
 From the repository root:
 
@@ -85,7 +85,7 @@ bp-runner .gitlab/benchmarks/bp-runner.yml --debug
 Some steps need tools that only exist in the CI image (`benchmark_analyzer`,
 `github-find-merge-into-branch`, `pr-commenter`).
 
-## How to rebuild the CI image
+## How to Rebuild the CI Image
 
 The `BENCHMARKS_CI_IMAGE` used by the benchmark jobs is built from
 `container/`. Rebuild and repin it whenever `container/` changes.
