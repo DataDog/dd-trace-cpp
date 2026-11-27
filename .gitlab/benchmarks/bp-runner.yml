@@ -11,6 +11,7 @@ experiments:
         # The default fetch does not initialise submodules, and the benchmark
         # binary needs the google-benchmark and tinycc submodules.
         how_to_fetch_release: |
+          set -e
           git clone --branch "$BRANCH" https://github.com/DataDog/dd-trace-cpp/ "$CODE_SRC"
           cd "$CODE_SRC" && git checkout "$COMMIT_SHA"
           git submodule update --init --recursive
