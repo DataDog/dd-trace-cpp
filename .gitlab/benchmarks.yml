@@ -29,8 +29,7 @@ variables:
   # (dd-trace-cpp-<pipeline id>).
   BENCHMARKS_CI_IMAGE: registry.ddbuild.io/ci/benchmarking-platform:dd-trace-cpp-156635051
 
-  # The per-pipeline
-  # suffix gives each build a unique tag.
+  # The per-pipeline suffix gives each build a unique tag.
   BASE_CI_IMAGE_SUFFIX: dd-trace-cpp-${CI_PIPELINE_ID}
   BASE_CI_IMAGE_CONTAINER_DIR: .gitlab/benchmarks/container
 
@@ -61,12 +60,11 @@ benchmarks:
     UPSTREAM_COMMIT_SHA: $CI_COMMIT_SHA # The commit revision the project is built for.
     # See https://datadoghq.atlassian.net/wiki/x/dAKLrgE for more details.
     FLAKY_BENCHMARKS_REGEX: ""
-    # Analyzer settings.
     <<: *analyzer-settings
 
-# Posts the comparison and uploads results. allow_failure preserves the old || :
-# semantics, and a separate job avoids the parallel-teardown race with the S3
-# upload.
+# Posts the comparison and uploads results. allow_failure keeps a failure here
+# from failing the pipeline, and a separate job avoids the parallel-teardown
+# race with the S3 upload.
 benchmarks-pr-comment:
   stage: benchmarks-report
   needs: [ benchmarks ]
