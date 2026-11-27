@@ -35,8 +35,8 @@ baseline comparison on the first run.
 
 ## How to Update a Benchmark
 
-Edit the source in `benchmark/`. The experiment only builds and runs what is in
-`benchmark/`, so no config change is needed to add, edit, or remove a
+Edit the source in `benchmark/`. The `benchmarks` job only builds and runs what
+is in `benchmark/`, so no config change is needed to add, edit, or remove a
 benchmark. Edit `bp-runner.yml` when the flow itself changes (fetch, run,
 analyze, upload), and `container/` only when the toolchain changes.
 
@@ -69,8 +69,8 @@ bin/benchmark --benchmark_repetitions=10 --benchmark_format=json --benchmark_out
 
 `bin/benchmark` builds `dd-trace-cpp` and the benchmark, then runs it.
 
-To run the full experiment locally, install `bp-runner` and run it against the
-config, like the job does:
+To run the full `bp-runner.yml` flow locally, install `bp-runner` and run it
+against the config, like the job does:
 
 ```bash
 export ARTIFACTS_DIR="$(pwd)/reports"
