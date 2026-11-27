@@ -23,6 +23,13 @@ include:
     - reports/
   expire_in: 3 months
 
+# bp-runner writes reports to ARTIFACTS_DIR. The insteadOf rule makes clones
+# of github.com/DataDog go through gitlab.ddbuild.io.
+.bp-runner-prelude:
+  before_script:
+    - export ARTIFACTS_DIR="$(pwd)/reports" && (mkdir "${ARTIFACTS_DIR}" || :)
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
+
 variables:
   # Consumed by the benchmark jobs below. To rebuild the image, run the manual
   # `build-benchmark-ci-images` job and repin to the tag it pushes
@@ -39,6 +46,7 @@ build-benchmark-ci-images:
   stage: benchmarks
 
 benchmarks:
+  extends: .bp-runner-prelude
   stage: benchmarks
   when: on_success
   tags: ["runner:apm-k8s-tweaked-metal"]
@@ -46,11 +54,6 @@ benchmarks:
   rules: *benchmarks-rules
   timeout: 15m
   script:
-    # Keep the prelude: the gate and the insteadOf clone rewriting both
-    # depend on ARTIFACTS_DIR pointing at reports/ and on github.com/DataDog
-    # being rewritten to gitlab.ddbuild.io.
-    - export ARTIFACTS_DIR="$(pwd)/reports" && (mkdir "${ARTIFACTS_DIR}" || :)
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
     - bp-runner .gitlab/benchmarks/bp-runner.yml --debug
   artifacts: *reports-artifacts
   variables:
@@ -66,6 +69,7 @@ benchmarks:
 # from failing the pipeline, and a separate job avoids the parallel-teardown
 # race with the S3 upload.
 benchmarks-pr-comment:
+  extends: .bp-runner-prelude
   stage: benchmarks-report
   needs: [ benchmarks ]
   allow_failure: true
@@ -78,8 +82,6 @@ benchmarks-pr-comment:
     # Analyzer settings the PR comment's comparison output depends on.
     <<: *analyzer-settings
   script:
-    - export ARTIFACTS_DIR="$(pwd)/reports" && (mkdir "${ARTIFACTS_DIR}" || :)
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
     - bp-runner .gitlab/benchmarks/bp-runner.pr-comment.yml --debug
   artifacts: *reports-artifacts
 
@@ -88,17 +90,12 @@ benchmarks-pr-comment:
 
 # If bypassing is necessary, see https://datadoghq.atlassian.net/wiki/spaces/APMINT/pages/5158175217/Performance+quality+gates+-+User+Guide for more details.
 check-big-regressions:
+  extends: .bp-runner-prelude
   stage: benchmarks-report
   needs: [ benchmarks ]
   when: on_success
   rules: *benchmarks-rules
   tags: ["arch:amd64"]
   image: $BENCHMARKS_CI_IMAGE
-  script: |
-    export ARTIFACTS_DIR="$(pwd)/reports/"
-    if [[ -n "$CI_JOB_TOKEN" ]];
-    then
-      git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ddbuild.io/DataDog/".insteadOf "https://github.com/DataDog/"
-    fi
-
-    bp-runner "$CI_PROJECT_DIR/.gitlab/benchmarks/bp-runner.fail-on-regression.yml" --debug
+  script:
+    - bp-runner .gitlab/benchmarks/bp-runner.fail-on-regression.yml --debug
