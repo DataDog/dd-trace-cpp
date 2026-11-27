@@ -1,0 +1,34 @@
+global_setup:
+  - name: Capture hardware/software info
+    run: collect_hardware_software_info
+
+experiments:
+  - name: Microbenchmarks
+    steps:
+      - name: Run benchmarks
+        run: run_microbenchmarks
+        repo: DataDog/dd-trace-cpp
+        # The default fetch does not initialise submodules, and the benchmark
+        # binary needs the google-benchmark and tinycc submodules.
+        how_to_fetch_release: |
+          set -e
+          git clone --branch "$BRANCH" https://github.com/DataDog/dd-trace-cpp/ "$CODE_SRC"
+          cd "$CODE_SRC" && git checkout "$COMMIT_SHA"
+          git submodule update --init --recursive
+        # --benchmark_out makes the analyzer find the results file, named
+        # the way the fail-on-regression gate already globs.
+        how_to_run_benchmarks: |
+          bin/benchmark --benchmark_repetitions=10 --benchmark_format=json --benchmark_out="$ARTIFACTS_DIR/$BASELINE_OR_CANDIDATE.json"
+
+      - name: Analyze results
+        run: analyze_microbenchmarks
+        framework: GoogleBenchmark
+
+global_teardown:
+  - name: Upload to S3
+    run: upload_to_s3
+    # S3 upload failures are usually transient and the upload is idempotent,
+    # so retry twice before failing the job (3 attempts total).
+    retries_on_failure: 2
+    # If BP_EXTERNAL_S3_URL is empty, bp-runner uses its default S3 destination.
+    url: $BP_EXTERNAL_S3_URL
